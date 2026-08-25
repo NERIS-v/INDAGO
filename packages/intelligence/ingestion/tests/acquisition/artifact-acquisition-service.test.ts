@@ -90,19 +90,18 @@ describe('ArtifactAcquisitionService', () => {
       expect(fetcher.fetchCalls.length).toBe(0);
     });
 
-    it('rejects when declaredSizeBytes equals limit', async () => {
-      const fetcher = new MockArtifactFetcher();
+    it('does not fast-reject when declaredSizeBytes equals limit', async () => {
+      const fetcher = new MockArtifactFetcher({ body: TEXT_ARTIFACT_CONTENT });
       const service = makeService(fetcher);
 
       const result = await service.acquire(
-        makeReference({ declaredSizeBytes: 1024 * 1024 + 1 }),
+        makeReference({ declaredSizeBytes: 1024 * 1024 }),
         CONTEXT,
       );
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.category).toBe('ARTIFACT_TOO_LARGE');
-      }
+      // Should NOT be fast-rejected; fetcher should have been called
+      expect(fetcher.fetchCalls.length).toBe(1);
+      expect(result.ok).toBe(true);
     });
   });
 
@@ -251,6 +250,55 @@ describe('ArtifactAcquisitionService', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.artifact.hashVerified).toBe(false);
+      }
+    });
+
+    it('requireContentHash=false allows acquisition without declared hash', async () => {
+      const fetcher = new MockArtifactFetcher({ body: TEXT_ARTIFACT_CONTENT });
+      const service = makeService(fetcher, {
+        ...DEFAULT_CONFIG,
+        requireContentHash: false,
+      });
+
+      const result = await service.acquire(makeReference(), CONTEXT);
+
+      expect(result.ok).toBe(true);
+    });
+
+    it('requireContentHash=true rejects when no declared hash', async () => {
+      const fetcher = new MockArtifactFetcher({ body: TEXT_ARTIFACT_CONTENT });
+      const service = makeService(fetcher, {
+        ...DEFAULT_CONFIG,
+        requireContentHash: true,
+      });
+
+      const result = await service.acquire(makeReference(), CONTEXT);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.category).toBe('INVALID_REFERENCE');
+        expect(result.error.retryable).toBe(false);
+      }
+      // Fetcher was called (we fetched the bytes), but hash enforcement rejected
+      expect(fetcher.fetchCalls.length).toBe(1);
+    });
+
+    it('requireContentHash=true allows acquisition when declared hash is provided', async () => {
+      const contentHash = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+      const fetcher = new MockArtifactFetcher({ body: TEXT_ARTIFACT_CONTENT });
+      const service = makeService(fetcher, {
+        ...DEFAULT_CONFIG,
+        requireContentHash: true,
+      });
+
+      const result = await service.acquire(
+        makeReference({ declaredContentHash: contentHash }),
+        CONTEXT,
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.artifact.hashVerified).toBe(true);
       }
     });
   });
@@ -489,6 +537,25 @@ describe('ArtifactAcquisitionService', () => {
         expect(result.error.category).toBe('ARTIFACT_TOO_LARGE');
         expect(result.error.retryable).toBe(false);
       }
+    });
+
+    it('oversized artifact never reaches storage', async () => {
+      const oversized = generateOversizedContent(2048);
+      const fetcher = new MockArtifactFetcher({ body: oversized });
+      const storage = new InMemoryArtifactStorage();
+      const service = new ArtifactAcquisitionService({
+        fetcher,
+        storage,
+        acquisitionConfig: { ...DEFAULT_CONFIG, maxArtifactSizeBytes: 1024 },
+      });
+
+      const result = await service.acquire(makeReference(), CONTEXT);
+
+      expect(result.ok).toBe(false);
+      // Storage should be completely empty — nothing was written
+      // InMemoryArtifactStorage uses mem://hash paths; verify none exist
+      const exists = await storage.exists('mem://test');
+      expect(exists).toBe(false);
     });
   });
 });

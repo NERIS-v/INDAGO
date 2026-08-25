@@ -1,5 +1,4 @@
 import type { IngestionError } from '@indago/contracts';
-import type { IngestionContext } from '../adapters/source-adapter.js';
 
 // ============================================================================
 // Acquisition Types
@@ -7,7 +6,26 @@ import type { IngestionContext } from '../adapters/source-adapter.js';
 // Types for the artifact acquisition pipeline.
 // VerifiedArtifact is the output of successful acquisition.
 // ArtifactAcquisitionResult is the discriminated union result.
+//
+// AcquisitionContext is intentionally narrower than IngestionContext.
+// It contains only the fields relevant to the acquisition service:
+// source identity and investigation scope. Adapter-specific fields
+// (adapterId, adapterVersion, caseId) belong to SourceAdapter.
 // ============================================================================
+
+/**
+ * Context for artifact acquisition operations.
+ *
+ * This is intentionally NOT IngestionContext. The acquisition service
+ * does not need adapter-specific fields (adapterId, adapterVersion, caseId).
+ * Keeping this type narrow enforces the ownership boundary between
+ * MAYUR (acquisition) and GURASHISH (adapter/API infrastructure).
+ */
+export interface AcquisitionContext {
+  readonly sourceId: string;
+  readonly investigationId?: string;
+  readonly operationId: string;
+}
 
 export interface ArtifactAcquisitionConfig {
   readonly maxArtifactSizeBytes: number;
@@ -40,5 +58,3 @@ export interface VerifiedArtifact {
 export type ArtifactAcquisitionResult =
   | { readonly ok: true; readonly artifact: VerifiedArtifact }
   | { readonly ok: false; readonly error: IngestionError };
-
-export type AcquisitionContext = IngestionContext;

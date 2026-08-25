@@ -38,6 +38,24 @@ function makeFetchResponse(config: {
   });
 }
 
+function makeChunkedFetchResponse(
+  chunks: Uint8Array[],
+  status = 200,
+): Response {
+  let index = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (index < chunks.length) {
+        controller.enqueue(chunks[index]!);
+        index++;
+      } else {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, { status });
+}
+
 describe('HttpArtifactFetcher', () => {
   let fetcher: HttpArtifactFetcher;
   let originalFetch: typeof globalThis.fetch;
@@ -246,6 +264,84 @@ describe('HttpArtifactFetcher', () => {
           maxBytes: 1024,
         }),
       ).rejects.toThrow('exceeding maximum');
+    });
+
+    it('rejects maxBytes+1 across multiple small chunks', async () => {
+      // 4 chunks of 256 bytes = 1024 bytes total, plus 5th chunk of 1 byte = 1025 bytes
+      const chunks: Uint8Array[] = [];
+      for (let i = 0; i < 4; i++) {
+        chunks.push(new Uint8Array(256));
+      }
+      chunks.push(new Uint8Array([0x01])); // 1025th byte
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        makeChunkedFetchResponse(chunks),
+      );
+
+      await expect(
+        fetcher.fetch(makeReference(), {
+          timeoutMs: 5000,
+          maxBytes: 1024,
+        }),
+      ).rejects.toThrow('exceeding maximum');
+    });
+
+    it('rejects when overflow occurs only on a later chunk', async () => {
+      // First chunk fits (512 bytes), second chunk pushes past limit (600 bytes)
+      const chunk1 = new Uint8Array(512);
+      const chunk2 = new Uint8Array(600); // total: 1112 > 1024
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        makeChunkedFetchResponse([chunk1, chunk2]),
+      );
+
+      await expect(
+        fetcher.fetch(makeReference(), {
+          timeoutMs: 5000,
+          maxBytes: 1024,
+        }),
+      ).rejects.toThrow('exceeding maximum');
+    });
+
+    it('does not return partial oversized body on overflow', async () => {
+      // 2 chunks: first is 800 bytes (within limit), second is 300 bytes (total 1100 > 1024)
+      const chunk1 = new Uint8Array(800);
+      const chunk2 = new Uint8Array(300);
+
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        makeChunkedFetchResponse([chunk1, chunk2]),
+      );
+
+      // Must throw, never return
+      const resultOrError = await fetcher
+        .fetch(makeReference(), { timeoutMs: 5000, maxBytes: 1024 })
+        .then(
+          (r) => ({ ok: true as const, value: r }),
+          (e) => ({ ok: false as const, error: e }),
+        );
+
+      expect(resultOrError.ok).toBe(false);
+      if (!resultOrError.ok) {
+        expect(resultOrError.error).toBeInstanceOf(Error);
+        expect((resultOrError.error as Error).message).toContain('exceeding maximum');
+      }
+    });
+
+    it('Content-Length greater than maxBytes rejects before body consumption', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        makeFetchResponse({
+          status: 200,
+          contentLength: 2048,
+          // Body is intentionally empty or absent — rejection happens on header
+        }),
+      );
+
+      await expect(
+        fetcher.fetch(makeReference(), {
+          timeoutMs: 5000,
+          maxBytes: 1024,
+        }),
+      ).rejects.toThrow('exceeds maximum');
     });
   });
 

@@ -5,7 +5,6 @@ import type {
   FetchedArtifact,
 } from '../../src/acquisition/artifact-fetcher.js';
 import {
-  HttpError,
   FetchFailedError,
   FetchTimeoutError,
   ArtifactTooLargeError,
@@ -31,8 +30,6 @@ export interface MockFetcherConfig {
   readonly networkError?: boolean;
   /** Throw a timeout error */
   readonly timeoutError?: boolean;
-  /** Size of each streamed chunk (controls streaming behavior) */
-  readonly chunkSize?: number;
 }
 
 export class MockArtifactFetcher implements ArtifactFetcher {
@@ -70,17 +67,6 @@ export class MockArtifactFetcher implements ArtifactFetcher {
         options.maxBytes,
         body.byteLength,
       );
-    }
-
-    // Simulate streaming with chunk size control
-    if (this.config.chunkSize && body.byteLength > 0) {
-      const chunks: Uint8Array[] = [];
-      for (let i = 0; i < body.byteLength; i += this.config.chunkSize) {
-        chunks.push(body.slice(i, i + this.config.chunkSize));
-      }
-      // Simulate that each chunk was read from the stream
-      // The real HttpArtifactFetcher enforces limits during streaming;
-      // the mock just returns the final concatenated body.
     }
 
     return {

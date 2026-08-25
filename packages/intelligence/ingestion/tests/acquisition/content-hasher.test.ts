@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeContentHash, deterministicArtifactId } from '../../src/acquisition/content-hasher.js';
+import { ArtifactIdSchema } from '@indago/contracts';
 import {
   TEXT_ARTIFACT_CONTENT,
   PDF_ARTIFACT_CONTENT,
@@ -61,6 +62,16 @@ describe('computeContentHash', () => {
     const hash2 = await computeContentHash(PDF_ARTIFACT_CONTENT);
     expect(hash).toBe(hash2);
   });
+
+  it('produces known SHA-256 for empty input', async () => {
+    const hash = await computeContentHash(new Uint8Array(0));
+    expect(hash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  });
+
+  it('produces known SHA-256 for "abc"', async () => {
+    const hash = await computeContentHash(new TextEncoder().encode('abc'));
+    expect(hash).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  });
 });
 
 describe('deterministicArtifactId', () => {
@@ -95,5 +106,12 @@ describe('deterministicArtifactId', () => {
     expect(parts[2]![0]).toBe('4');
     // Variant 1: fourth group starts with 8, 9, a, or b
     expect(['8', '9', 'a', 'b']).toContain(parts[3]![0]);
+  });
+
+  it('produces ID that satisfies canonical ArtifactIdSchema', async () => {
+    const hash = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+    const id = deterministicArtifactId(hash);
+    // Should parse without throwing — proves UUID format matches the contract
+    expect(() => ArtifactIdSchema.parse(id)).not.toThrow();
   });
 });
