@@ -92,7 +92,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 **Date:** 26-28 Aug | **Owner:** Mayur | **Gate:** Intelligence lane compiles independently
 
-- [ ] M-A01: Ingestion skeleton (source adapter interfaces) `[Mayur]`
+- [x] M-A01: Ingestion skeleton (source adapter interfaces) `[Mayur]`
 - [ ] M-A02: FIR/narrative ingestion (raw artifacts + source metadata) `[Mayur]`
 - [ ] M-A03: CDR CSV ingestion (normalized communication rows) `[Mayur]`
 - [ ] M-A04: Financial CSV ingestion (normalized transaction rows) `[Mayur]`
