@@ -65,3 +65,37 @@ export type {
   ArtifactAcquisitionServiceConfig,
 } from './acquisition/index.js';
 
+// M-PR2 Artifact Classification
+export {
+  ARTIFACT_FORMATS,
+  ARTIFACT_FAMILIES,
+  ENCODING_TYPES,
+  mimeToFormat,
+  formatToFamily,
+  extractExtension,
+  extensionToFormat,
+  detectEncoding,
+  classifyArtifact,
+} from './classification/index.js';
+export type {
+  ArtifactFormat,
+  ArtifactFamily,
+  EncodingType,
+  ClassificationMethod,
+  ClassificationConfidence,
+  ArtifactClassification,
+} from './classification/index.js';
+
+// M-PR2 Parser Routing
+export {
+  ParserRegistry,
+  selectParser,
+  createDefaultParserRegistry,
+} from './parser/index.js';
+export type {
+  ParserCapability,
+  ParserRoute,
+  ParserRouteResult,
+  ArtifactParser,
+} from './parser/index.js';
+
