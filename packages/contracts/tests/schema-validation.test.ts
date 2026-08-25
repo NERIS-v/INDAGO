@@ -237,3 +237,15 @@ describe('M-PR2: IngestionErrorCategory UNSUPPORTED_FORMAT', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('M-PR3: IngestionErrorCategory EXTRACTION_FAILED and MALFORMED_ARTIFACT', () => {
+  it('IngestionErrorCategorySchema accepts EXTRACTION_FAILED', () => {
+    const result = IngestionErrorCategorySchema.safeParse('EXTRACTION_FAILED');
+    expect(result.success).toBe(true);
+  });
+
+  it('IngestionErrorCategorySchema accepts MALFORMED_ARTIFACT', () => {
+    const result = IngestionErrorCategorySchema.safeParse('MALFORMED_ARTIFACT');
+    expect(result.success).toBe(true);
+  });
+});

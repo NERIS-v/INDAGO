@@ -12,6 +12,7 @@ import { MetadataSchema } from '../common/metadata.js';
 //   - Adapter-level errors (existing): source routing, input validation, adapter execution
 //   - Acquisition-level errors (M-PR1): HTTP fetching, integrity, size, MIME verification
 //   - Classification-level errors (M-PR2): format detection, parser routing
+//   - Extraction-level errors (M-PR3): parsing, structure, OCR
 // ============================================================================
 
 export const IngestionErrorCategorySchema = z.enum([
@@ -38,6 +39,9 @@ export const IngestionErrorCategorySchema = z.enum([
   'CONTENT_TYPE_MISMATCH',
   // Classification-level (M-PR2)
   'UNSUPPORTED_FORMAT',
+  // Extraction-level (M-PR3)
+  'EXTRACTION_FAILED',
+  'MALFORMED_ARTIFACT',
 ]);
 export type IngestionErrorCategory = z.infer<typeof IngestionErrorCategorySchema>;
 

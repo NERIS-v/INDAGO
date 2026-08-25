@@ -14,16 +14,16 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 **Date:** 25 Aug | **Owner:** Both | **Gate:** Scope + ownership locked
 
-- [ ] Confirm V7 is the architecture source of truth `[Both]`
-- [ ] Freeze P0 / P0.5 / P1 split `[Both]`
-- [ ] Freeze TypeScript/Node.js-first stack `[Both]`
-- [ ] Freeze PostgreSQL vs Neo4j responsibilities `[Both]`
-- [ ] Confirm temporal strategy (event history + current projection + intervals + checkpoints) `[Both]`
-- [ ] Confirm Aion role (reference/optional, not mandatory) `[Both]`
-- [ ] Confirm BullMQ + Redis + custom state machine for orchestration `[Both]`
-- [ ] Freeze repository / monorepo layout `[Both]`
-- [ ] Freeze owner boundary (Mayur = intelligence; Gurashish = execution/platform/UI) `[Both]`
-- [ ] Create shared issue tracker with phase/owner/dependency/checkpoint labels `[Both]`
+- [x] Confirm V7 is the architecture source of truth `[Both]`
+- [x] Freeze P0 / P0.5 / P1 split `[Both]`
+- [x] Freeze TypeScript/Node.js-first stack `[Both]`
+- [x] Freeze PostgreSQL vs Neo4j responsibilities `[Both]`
+- [x] Confirm temporal strategy (event history + current projection + intervals + checkpoints) `[Both]`
+- [x] Confirm Aion role (reference/optional, not mandatory) `[Both]`
+- [x] Confirm BullMQ + Redis + custom state machine for orchestration `[Both]`
+- [x] Freeze repository / monorepo layout `[Both]`
+- [x] Freeze owner boundary (Mayur = intelligence; Gurashish = execution/platform/UI) `[Both]`
+- [x] Create shared issue tracker with phase/owner/dependency/checkpoint labels `[Both]`
 
 ---
 
@@ -33,58 +33,58 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ### 1.1 Domain Contracts (Mayur leads, Gurashish reviews)
 
-- [ ] Define Investigation and Case `[Mayur]`
-- [ ] Define EvidenceSource / Artifact / Observation `[Mayur]`
-- [ ] Define EntityHypothesis and EntityRoleHypothesis `[Mayur]`
-- [ ] Define RelationHypothesis `[Mayur]`
-- [ ] Define Hypothesis and InvestigativeLead `[Mayur]`
-- [ ] Define InvestigativeGap and EvidenceRequest `[Mayur]`
-- [ ] Define ReviewTask `[Mayur]`
-- [ ] Define evidence posture T0-T3 `[Mayur]`
+- [x] Define Investigation and Case `[Mayur]`
+- [x] Define EvidenceSource / Artifact / Observation `[Mayur]`
+- [x] Define EntityHypothesis and EntityRoleHypothesis `[Mayur]`
+- [x] Define RelationHypothesis `[Mayur]`
+- [x] Define Hypothesis and InvestigativeLead `[Mayur]`
+- [x] Define InvestigativeGap and EvidenceRequest `[Mayur]`
+- [x] Define ReviewTask `[Mayur]`
+- [x] Define evidence posture T0-T3 `[Mayur]`
 
 ### 1.2 Execution Contracts (Gurashish leads, Mayur reviews)
 
-- [ ] Define InvestigationRun and RunState `[Gurashish]`
-- [ ] Define ToolRequest / ToolResult `[Gurashish]`
-- [ ] Define AgentCheckpoint `[Gurashish]`
-- [ ] Define state transitions `[Gurashish]`
-- [ ] Define retryability semantics `[Gurashish]`
-- [ ] Define execution errors `[Gurashish]`
+- [x] Define InvestigationRun and RunState `[Gurashish]`
+- [x] Define ToolRequest / ToolResult `[Gurashish]`
+- [x] Define AgentCheckpoint `[Gurashish]`
+- [x] Define state transitions `[Gurashish]`
+- [x] Define retryability semantics `[Gurashish]`
+- [x] Define execution errors `[Gurashish]`
 
 ### 1.3 Shared Contracts (both)
 
-- [ ] ID strategy `[Both]`
-- [ ] Correlation and idempotency keys `[Both]`
-- [ ] Graph version IDs `[Both]`
-- [ ] Event names and payloads `[Both]`
-- [ ] Service errors `[Both]`
-- [ ] Authentication/authorization context `[Both]`
-- [ ] Case-scope enforcement `[Both]`
-- [ ] Contract versioning `[Both]`
+- [x] ID strategy `[Both]`
+- [x] Correlation and idempotency keys `[Both]`
+- [x] Graph version IDs `[Both]`
+- [x] Event names and payloads `[Both]`
+- [x] Service errors `[Both]`
+- [x] Authentication/authorization context `[Both]`
+- [x] Case-scope enforcement `[Both]`
+- [x] Contract versioning `[Both]`
 
 ### 1.4 Intelligence API
 
-- [ ] searchEvidence() `[Mayur]`
-- [ ] getEvidence() `[Mayur]`
-- [ ] resolveEntity() `[Mayur]`
-- [ ] resolveRelation() `[Mayur]`
-- [ ] getEntityTimeline() `[Mayur]`
-- [ ] findCrossCaseLinks() `[Mayur]`
-- [ ] runGraphAnalytics() `[Mayur]`
-- [ ] findGraphHoles() `[Mayur]`
-- [ ] classifyGap() `[Mayur]`
-- [ ] rankEvidenceRequests() `[Mayur]`
-- [ ] findCounterEvidence() `[Mayur]`
-- [ ] runRobustness() `[Mayur]`
+- [x] searchEvidence() `[Mayur]`
+- [x] getEvidence() `[Mayur]`
+- [x] resolveEntity() `[Mayur]`
+- [x] resolveRelation() `[Mayur]`
+- [x] getEntityTimeline() `[Mayur]`
+- [x] findCrossCaseLinks() `[Mayur]`
+- [x] runGraphAnalytics() `[Mayur]`
+- [x] findGraphHoles() `[Mayur]`
+- [x] classifyGap() `[Mayur]`
+- [x] rankEvidenceRequests() `[Mayur]`
+- [x] findCounterEvidence() `[Mayur]`
+- [x] runRobustness() `[Mayur]`
 
 ### 1.5 Contract Tests
 
-- [ ] Schema validation tests `[Both]`
-- [ ] Serialization/deserialization tests `[Both]`
-- [ ] Invalid payload tests `[Both]`
-- [ ] Event compatibility tests `[Both]`
-- [ ] Mock tool integration tests `[Both]`
-- [ ] Error/retry semantics tests `[Both]`
+- [x] Schema validation tests `[Both]`
+- [x] Serialization/deserialization tests `[Both]`
+- [x] Invalid payload tests `[Both]`
+- [x] Event compatibility tests `[Both]`
+- [x] Mock tool integration tests `[Both]`
+- [x] Error/retry semantics tests `[Both]`
 
 ---
 
@@ -93,6 +93,9 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 **Date:** 26-28 Aug | **Owner:** Mayur | **Gate:** Intelligence lane compiles independently
 
 - [x] M-A01: Ingestion skeleton (source adapter interfaces) `[Mayur]`
+  - [x] M-PR1: Artifact Acquisition Core (fetcher, hasher, mime-detector, storage, acquisition-service) `[Mayur]`
+  - [x] M-PR2: Artifact Classification & Parser Routing (classifier, encoding-detector, router, registry) `[Mayur]`
+  - [x] M-PR3: Raw Extraction Layer (7 parsers, ExtractionService, OCR, PDF extraction) `[Mayur]`
 - [ ] M-A02: FIR/narrative ingestion (raw artifacts + source metadata) `[Mayur]`
 - [ ] M-A03: CDR CSV ingestion (normalized communication rows) `[Mayur]`
 - [ ] M-A04: Financial CSV ingestion (normalized transaction rows) `[Mayur]`
@@ -444,20 +447,20 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ## Summary
 
-| Phase | Total Tasks | Mayur | Gurashish | Both |
-|---|---|---|---|---|
-| 0 | 10 | 0 | 0 | 10 |
-| 1 | 40 | 20 | 6 | 14 |
-| 2A | 13 | 13 | 0 | 0 |
-| 2B | 12 | 0 | 12 | 0 |
-| 3 | 12 | 5 | 6 | 1 |
-| 4 | 16 | 9 | 6 | 1 |
-| 5 | 18 | 9 | 8 | 1 |
-| 6 | 20 | 8 | 8 | 4 |
-| 7 | 18 | 7 | 11 | 0 |
-| 8 | 22 | 7 | 6 | 9 |
-| 9 | 17 | 7 | 10 | 0 |
-| 10 | 10 | 5 | 5 | 0 |
-| 11 | 30 | 10 | 10 | 10 |
-| 12 | 16 | 7 | 8 | 1 |
-| **Total** | **254** | **107** | **96** | **51** |
+| Phase | Total Tasks | Done | Mayur | Gurashish | Both |
+|---|---|---|---|---|---|
+| 0 | 10 | 10 | 0 | 0 | 10 |
+| 1 | 40 | 40 | 20 | 6 | 14 |
+| 2A | 16 | 4 | 4 | 0 | 0 |
+| 2B | 12 | 0 | 0 | 12 | 0 |
+| 3 | 12 | 0 | 0 | 6 | 1 |
+| 4 | 16 | 0 | 0 | 6 | 1 |
+| 5 | 18 | 0 | 0 | 8 | 1 |
+| 6 | 20 | 0 | 0 | 8 | 4 |
+| 7 | 18 | 0 | 0 | 11 | 0 |
+| 8 | 22 | 0 | 0 | 6 | 9 |
+| 9 | 17 | 0 | 0 | 10 | 0 |
+| 10 | 10 | 0 | 0 | 5 | 0 |
+| 11 | 30 | 0 | 0 | 10 | 10 |
+| 12 | 16 | 0 | 0 | 8 | 1 |
+| **Total** | **257** | **54** | **24** | **86** | **51** |
