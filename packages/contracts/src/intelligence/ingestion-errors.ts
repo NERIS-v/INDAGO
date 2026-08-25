@@ -7,9 +7,14 @@ import { MetadataSchema } from '../common/metadata.js';
 //
 // Typed error contracts for ingestion failures.
 // Distinct from execution errors — these describe adapter/input problems.
+//
+// Categories are split into:
+//   - Adapter-level errors (existing): source routing, input validation, adapter execution
+//   - Acquisition-level errors (new): HTTP fetching, integrity, size, MIME verification
 // ============================================================================
 
 export const IngestionErrorCategorySchema = z.enum([
+  // Adapter-level (existing)
   'UNSUPPORTED_SOURCE',
   'UNSUPPORTED_INPUT',
   'INVALID_INPUT',
@@ -20,6 +25,16 @@ export const IngestionErrorCategorySchema = z.enum([
   'PROVENANCE_FAILURE',
   'TIMEOUT',
   'UNKNOWN',
+  // Acquisition-level (M-PR1)
+  'INVALID_REFERENCE',
+  'UNSUPPORTED_REFERENCE',
+  'FETCH_FAILED',
+  'HTTP_ERROR',
+  'FETCH_TIMEOUT',
+  'ARTIFACT_TOO_LARGE',
+  'EMPTY_ARTIFACT',
+  'HASH_MISMATCH',
+  'CONTENT_TYPE_MISMATCH',
 ]);
 export type IngestionErrorCategory = z.infer<typeof IngestionErrorCategorySchema>;
 

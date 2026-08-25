@@ -40,3 +40,28 @@ export type {
   IngestionServiceConfig,
 } from './service/ingestion-service.js';
 
+// M-PR1 Artifact Acquisition
+export {
+  HttpArtifactFetcher,
+  HttpError,
+  FetchFailedError,
+  FetchTimeoutError,
+  ArtifactTooLargeError,
+  InvalidReferenceError,
+  ArtifactAcquisitionService,
+  computeContentHash,
+  deterministicArtifactId,
+  detectMimeType,
+} from './acquisition/index.js';
+export type {
+  ArtifactFetcher,
+  FetchOptions,
+  FetchedArtifact,
+  MimeTypeResult,
+  ArtifactAcquisitionConfig,
+  VerifiedArtifact,
+  ArtifactAcquisitionResult,
+  AcquisitionContext,
+  ArtifactAcquisitionServiceConfig,
+} from './acquisition/index.js';
+
