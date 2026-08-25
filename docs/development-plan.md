@@ -26,7 +26,7 @@ Planning window: **25 August 2026 — 6 September 2026** (13 calendar days inclu
 
 | Owner | Primary Responsibility | Existing Strength Being Leveraged |
 |---|---|---|
-| **Mayur** | INDAGO intelligence: evidence, entity/relation resolution, graph, temporal reasoning, graph holes, evidence planning, robustness, hypotheses | RAMMY-style evidence/retrieval/graph reasoning |
+| **Mayur** | INDAGO intelligence: evidence, entity/relation resolution, graph, temporal reasoning, graph holes, evidence planning, robustness, hypotheses | PRCUS-style evidence/retrieval/graph reasoning |
 | **Gurashish** | INDAGO execution: orchestration, queues, state machine, checkpoint/recovery, security, audit, realtime, product/UI | Sentinel + Forge durable execution / systems / AI platform engineering |
 | **Both** | Contracts, integration checkpoints, benchmark truth, final demo, hardening | Shared architecture / product decisions |
 
