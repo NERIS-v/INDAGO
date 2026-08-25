@@ -115,18 +115,18 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 **Date:** 26-28 Aug | **Owner:** Gurashish | **Gate:** Execution lane compiles independently
 
-- [ ] G-A01: API/service skeleton (Node.js service base) `[Gurashish]`
-- [ ] G-A02: PostgreSQL/Prisma base (persistent execution store) `[Gurashish]`
-- [ ] G-A03: Redis + BullMQ (queues/workers) `[Gurashish]`
-- [ ] G-A04: Investigation state machine (run lifecycle) `[Gurashish]`
-- [ ] G-A05: Checkpoint store (resume/replay state) `[Gurashish]`
-- [ ] G-A06: Tool registry (tool metadata + validation) `[Gurashish]`
-- [ ] G-A07: Tool execution runtime (request/result pipeline) `[Gurashish]`
-- [ ] G-A08: Agent orchestrator (bounded planning loop) `[Gurashish]`
-- [ ] G-A09: Retries/circuit breakers (failure controls) `[Gurashish]`
-- [ ] G-A10: Realtime event stream (investigation progress events) `[Gurashish]`
-- [ ] G-A11: Audit event infrastructure (append-only audit records) `[Gurashish]`
-- [ ] G-A12: Auth/RBAC skeleton (protected endpoints) `[Gurashish]`
+- [x] G-A01: API/service skeleton (Node.js service base) `[Gurashish]`
+- [x] G-A02: PostgreSQL/Prisma base (persistent execution store) `[Gurashish]`
+- [x] G-A03: Redis + BullMQ (queues/workers) `[Gurashish]`
+- [x] G-A04: Investigation state machine (run lifecycle) `[Gurashish]`
+- [x] G-A05: Checkpoint store (resume/replay state) `[Gurashish]`
+- [x] G-A06: Tool registry (tool metadata + validation) `[Gurashish]`
+- [x] G-A07: Tool execution runtime (request/result pipeline) `[Gurashish]`
+- [x] G-A08: Agent orchestrator (bounded planning loop) `[Gurashish]`
+- [x] G-A09: Retries/circuit breakers (failure controls) `[Gurashish]`
+- [x] G-A10: Realtime event stream (investigation progress events) `[Gurashish]`
+- [x] G-A11: Audit event infrastructure (append-only audit records) `[Gurashish]`
+- [x] G-A12: Auth/RBAC skeleton (protected endpoints) `[Gurashish]`
 
 ---
 
@@ -238,14 +238,14 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ### 6B. Gurashish
 
-- [ ] Implement checkpoint/recovery tests `[Gurashish]`
-- [ ] Implement bounded retries and circuit breakers `[Gurashish]`
-- [ ] Implement tool idempotency `[Gurashish]`
-- [ ] Implement claim-grounding validator `[Gurashish]`
-- [ ] Reject unsupported agent claims `[Gurashish]`
-- [ ] Persist AgentCheckpoint `[Gurashish]`
-- [ ] Record recovery in audit trail `[Gurashish]`
-- [ ] Implement safe human escalation `[Gurashish]`
+- [x] Implement checkpoint/recovery tests `[Gurashish]`
+- [x] Implement bounded retries and circuit breakers `[Gurashish]`
+- [x] Implement tool idempotency `[Gurashish]`
+- [x] Implement claim-grounding validator `[Gurashish]`
+- [x] Reject unsupported agent claims `[Gurashish]`
+- [x] Persist AgentCheckpoint `[Gurashish]`
+- [x] Record recovery in audit trail `[Gurashish]`
+- [x] Implement safe human escalation `[Gurashish]`
 
 ### 6C. Joint Trust Checkpoint
 
@@ -329,14 +329,14 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ### 9A. Gurashish
 
-- [ ] Authentication `[Gurashish]`
-- [ ] RBAC `[Gurashish]`
-- [ ] Case-scope authorization `[Gurashish]`
+- [x] Authentication `[Gurashish]`
+- [x] RBAC `[Gurashish]`
+- [x] Case-scope authorization `[Gurashish]`
 - [ ] PII masking `[Gurashish]`
 - [ ] Tool authorization boundaries `[Gurashish]`
 - [ ] Prompt-injection defenses for untrusted evidence `[Gurashish]`
 - [ ] Audit access logging `[Gurashish]`
-- [ ] Hash-linked audit events `[Gurashish]`
+- [x] Hash-linked audit events `[Gurashish]`
 - [ ] Secret management `[Gurashish]`
 - [ ] Failure isolation `[Gurashish]`
 
