@@ -1,0 +1,23 @@
+{
+  "name": "@indago/platform",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@indago/contracts": "workspace:*",
+    "@prisma/client": "^5.10.0",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.3.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prisma": "^5.10.0",
+    "typescript": "^5.7.0"
+  }
+}

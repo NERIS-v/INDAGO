@@ -1,0 +1,75 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================================
+// G-A04: Investigation Run State
+// Maps exactly to @indago/contracts InvestigationRunStatus & State
+// ============================================================================
+model InvestigationRun {
+  id              String   @id @default(uuid())
+  investigationId String   // References Domain ID
+  status          String   // QUEUED, RUNNING, PAUSED, COMPLETED, FAILED
+  state           String   // CREATED, INGESTING, ANALYZING, WAITING_FOR_EVIDENCE
+  currentStage    String?  // Human readable sub-stage
+  contextData     Json     // Stores current knowns/gaps
+  error           String?
+  retryCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  checkpoints     AgentCheckpoint[]
+  toolExecutions  ToolExecution[]
+}
+
+// ============================================================================
+// G-A05: Checkpoint Store for Resume/Replay
+// ============================================================================
+model AgentCheckpoint {
+  id              String   @id @default(uuid())
+  runId           String
+  stage           String
+  stageIndex      Int
+  stateSnapshot   Json     // Serialized state for resumability
+  createdAt       DateTime @default(now())
+
+  run InvestigationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// G-A07: Tool Execution Runtime
+// ============================================================================
+model ToolExecution {
+  id              String   @id @default(uuid())
+  runId           String
+  toolId          String
+  status          String   // PENDING, RUNNING, COMPLETED, FAILED
+  parameters      Json
+  output          Json?
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  run InvestigationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// G-A11: Append-Only Hash-Linked Audit Records
+// ============================================================================
+model AuditEvent {
+  id              String   @id @default(uuid())
+  investigationId String
+  action          String   
+  actor           String   // "AGENT", "SYSTEM", or "HUMAN:<ID>"
+  targetType      String
+  targetId        String
+  description     String
+  timestamp       DateTime @default(now())
+  previousHash    String   // Link to previous audit event
+  hash            String   @unique // SHA-256(previousHash + actor + action + targetId + timestamp)
+}
