@@ -10,7 +10,8 @@ import { MetadataSchema } from '../common/metadata.js';
 //
 // Categories are split into:
 //   - Adapter-level errors (existing): source routing, input validation, adapter execution
-//   - Acquisition-level errors (new): HTTP fetching, integrity, size, MIME verification
+//   - Acquisition-level errors (M-PR1): HTTP fetching, integrity, size, MIME verification
+//   - Classification-level errors (M-PR2): format detection, parser routing
 // ============================================================================
 
 export const IngestionErrorCategorySchema = z.enum([
@@ -35,6 +36,8 @@ export const IngestionErrorCategorySchema = z.enum([
   'EMPTY_ARTIFACT',
   'HASH_MISMATCH',
   'CONTENT_TYPE_MISMATCH',
+  // Classification-level (M-PR2)
+  'UNSUPPORTED_FORMAT',
 ]);
 export type IngestionErrorCategory = z.infer<typeof IngestionErrorCategorySchema>;
 
