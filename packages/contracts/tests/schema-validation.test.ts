@@ -17,6 +17,7 @@ import {
   ResumeTransitionSchema,
   DEFAULT_RUN_STATE_CONFIGURATION,
 } from '../src/index.js';
+import { IngestionErrorCategorySchema } from '../src/intelligence/ingestion-errors.js';
 
 // ============================================================================
 // Schema Validation Tests
@@ -222,5 +223,29 @@ describe('G: Generic Confidence Rejection', () => {
       updatedAt: { value: '2025-01-15T10:10:00Z', precision: 'exact' },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('M-PR2: IngestionErrorCategory UNSUPPORTED_FORMAT', () => {
+  it('IngestionErrorCategorySchema accepts UNSUPPORTED_FORMAT', () => {
+    const result = IngestionErrorCategorySchema.safeParse('UNSUPPORTED_FORMAT');
+    expect(result.success).toBe(true);
+  });
+
+  it('IngestionErrorCategorySchema rejects invalid category', () => {
+    const result = IngestionErrorCategorySchema.safeParse('UNSUPPORTED_PARSER');
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('M-PR3: IngestionErrorCategory EXTRACTION_FAILED and MALFORMED_ARTIFACT', () => {
+  it('IngestionErrorCategorySchema accepts EXTRACTION_FAILED', () => {
+    const result = IngestionErrorCategorySchema.safeParse('EXTRACTION_FAILED');
+    expect(result.success).toBe(true);
+  });
+
+  it('IngestionErrorCategorySchema accepts MALFORMED_ARTIFACT', () => {
+    const result = IngestionErrorCategorySchema.safeParse('MALFORMED_ARTIFACT');
+    expect(result.success).toBe(true);
   });
 });

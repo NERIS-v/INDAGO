@@ -54,7 +54,7 @@ export const ReviewTaskSchema = z.object({
     decision: z.enum([
       'APPROVED',
       'REJECTED',
-      'NEEDS更多信息',
+      'NEEDS_MORE_INFO',
       'ESCALATED',
     ]).optional(),
   })).optional()

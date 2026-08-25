@@ -45,7 +45,7 @@ export const EvidenceProcessedEventSchema = BaseEventSchema.extend({
 export const EvidenceReviewedPayloadSchema = z.object({
   evidenceId: EvidenceIdSchema,
   reviewer: z.string(),
-  decision: z.enum(['APPROVED', 'REJECTED', 'NEEDS更多信息']),
+  decision: z.enum(['APPROVED', 'REJECTED', 'NEEDS_MORE_INFO']),
   posture: EvidencePostureSchema,
   strength: EvidenceStrengthSchema,
 }).strict();

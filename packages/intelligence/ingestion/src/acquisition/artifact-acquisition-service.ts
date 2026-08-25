@@ -168,7 +168,20 @@ export class ArtifactAcquisitionService {
     // 5. Compute SHA-256
     const contentHash = await computeContentHash(fetched.body);
 
-    // 6. Verify declared hash
+    // 6. Enforce required content hash
+    if (this.config.requireContentHash === true && reference.declaredContentHash === undefined) {
+      return {
+        ok: false,
+        error: makeError(
+          'INVALID_REFERENCE',
+          'Content hash is required but not provided in reference',
+          context,
+          { retryable: false },
+        ),
+      };
+    }
+
+    // 7. Verify declared hash
     if (reference.declaredContentHash !== undefined) {
       if (contentHash !== reference.declaredContentHash) {
         return {
@@ -189,10 +202,10 @@ export class ArtifactAcquisitionService {
       }
     }
 
-    // 7. Detect MIME type
+    // 8. Detect MIME type
     const mimeResult = detectMimeType(fetched.body, reference.originalFilename);
 
-    // 8. Verify declared MIME when detection is definite
+    // 9. Verify declared MIME when detection is definite
     if (
       reference.declaredMimeType !== undefined &&
       mimeResult.confidence === 'definite'
@@ -216,7 +229,7 @@ export class ArtifactAcquisitionService {
       }
     }
 
-    // 9. Enforce allowed content types
+    // 10. Enforce allowed content types
     if (this.config.allowedContentTypes !== undefined) {
       if (!this.config.allowedContentTypes.includes(mimeResult.detected)) {
         return {
@@ -237,7 +250,7 @@ export class ArtifactAcquisitionService {
       }
     }
 
-    // 10. Store artifact
+    // 11. Store artifact
     let storageResult;
     try {
       storageResult = await this.storage.write({
@@ -258,7 +271,7 @@ export class ArtifactAcquisitionService {
       };
     }
 
-    // 11. Build VerifiedArtifact
+    // 12. Build VerifiedArtifact
     const hashVerified =
       reference.declaredContentHash !== undefined
         ? contentHash === reference.declaredContentHash

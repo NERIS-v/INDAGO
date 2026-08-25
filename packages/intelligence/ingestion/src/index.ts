@@ -65,3 +65,88 @@ export type {
   ArtifactAcquisitionServiceConfig,
 } from './acquisition/index.js';
 
+// M-PR2 Artifact Classification
+export {
+  ARTIFACT_FORMATS,
+  ARTIFACT_FAMILIES,
+  ENCODING_TYPES,
+  mimeToFormat,
+  formatToFamily,
+  extractExtension,
+  extensionToFormat,
+  detectEncoding,
+  classifyArtifact,
+} from './classification/index.js';
+export type {
+  ArtifactFormat,
+  ArtifactFamily,
+  EncodingType,
+  ClassificationMethod,
+  ClassificationConfidence,
+  ArtifactClassification,
+} from './classification/index.js';
+
+// M-PR2 Parser Routing
+export {
+  ParserRegistry,
+  selectParser,
+  createDefaultParserRegistry,
+} from './parser/index.js';
+export type {
+  ParserCapability,
+  ParserRoute,
+  ParserRouteResult,
+  ArtifactParser,
+} from './parser/index.js';
+
+// M-PR3 Raw Extraction
+export {
+  ExtractionService,
+  createTesseractOcrProvider,
+} from './extraction/index.js';
+export type {
+  ExtractionWarningCode,
+  ExtractionWarning,
+  SourceLocation,
+  ExtractionMethod,
+  ParserContext,
+  ParserLimits,
+  ParseResult,
+  ExtractionResult,
+  PdfSourceLocation,
+  PdfSpan,
+  PdfPage,
+  PdfExtraction,
+  DocxSourceLocation,
+  DocxParagraph,
+  DocxHeading,
+  DocxTableCell,
+  DocxTableRow,
+  DocxTable,
+  DocxSection,
+  DocxExtraction,
+  TxtSourceLocation,
+  TxtLine,
+  TxtExtraction,
+  CsvSourceLocation,
+  CsvCell,
+  CsvRecord,
+  CsvExtraction,
+  JsonSourceLocation,
+  JsonExtraction,
+  XmlSourceLocation,
+  XmlNode,
+  XmlExtraction,
+  ImageExtraction,
+  RawExtractionBase,
+  RawExtraction,
+  OcrBoundingBox,
+  OcrWord,
+  OcrLine,
+  OcrProvider,
+  OcrInput,
+  OcrResult,
+  ExtractionServiceConfig,
+  TesseractOcrConfig,
+} from './extraction/index.js';
+
