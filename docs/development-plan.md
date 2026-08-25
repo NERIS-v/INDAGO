@@ -1,0 +1,695 @@
+<div align="center">
+
+# INDAGO V7 Parallel Development Plan
+
+**PS 26189 — AI-Powered Criminal Network Analysis System**
+
+**Mayur x Gurashish**
+
+Architecture Version 7.0 — Consolidated / Implementation-Ready / SIH Prototype
+
+</div>
+
+---
+
+## Purpose
+
+Turn the completed INDAGO V7 architecture into an executable two-person development program. The plan is designed for parallel work: Phase 1 is the only jointly blocking phase; after the contracts are frozen, Mayur owns the intelligence/data lane and Gurashish owns the execution/platform/product lane, with continuous vertical integration.
+
+## Timeline Anchor
+
+Planning window: **25 August 2026 — 6 September 2026** (13 calendar days including both dates). If the actual internal milestone shifts, preserve the phase order and compress/expand the time boxes rather than changing ownership.
+
+---
+
+## 1. Team Operating Model
+
+| Owner | Primary Responsibility | Existing Strength Being Leveraged |
+|---|---|---|
+| **Mayur** | INDAGO intelligence: evidence, entity/relation resolution, graph, temporal reasoning, graph holes, evidence planning, robustness, hypotheses | RAMMY-style evidence/retrieval/graph reasoning |
+| **Gurashish** | INDAGO execution: orchestration, queues, state machine, checkpoint/recovery, security, audit, realtime, product/UI | Sentinel + Forge durable execution / systems / AI platform engineering |
+| **Both** | Contracts, integration checkpoints, benchmark truth, final demo, hardening | Shared architecture / product decisions |
+
+V7 explicitly separates deterministic intelligence services from the investigation orchestrator: graph, temporal, evidence, resolution and robustness computations are deterministic services, while the agent orchestrates them. This is the core boundary that makes parallel development safe.
+
+> **Rule:** Mayur owns WHAT INDAGO KNOWS. Gurashish owns HOW INDAGO RUNS. Neither person silently changes a shared contract.
+
+---
+
+## 2. Master Timeline
+
+| Dates | Phase | Mayur | Gurashish | Joint Gate |
+|---|---|---|---|---|
+| 25 Aug | **0. Architecture / scope lock** | Review intelligence boundaries | Review execution/platform boundaries | Lock V7 + P0/P0.5/P1 |
+| 25-26 Aug | **1. Common contracts** | Domain + intelligence contracts | Execution + event contracts | Contracts v1 frozen |
+| 26-28 Aug | **2. Parallel foundations** | Ingestion > evidence > ER > graph | API > queues > state > worker > agent runtime | Both lanes compile independently |
+| 28 Aug | **3. Vertical slice #1** | FIR > observation > graph | Investigation runtime > UI event | One case visible end-to-end |
+| 29-30 Aug | **4. Core investigation loop** | Analytics > lead > counter-evidence | Agent/state lifecycle > UI | Lead generation works |
+| 31 Aug-1 Sep | **5. Differentiation engine** | Graph holes > gaps > next evidence | Evidence-request workflow + streaming | Graph-hole demo works |
+| 2 Sep | **6. Robustness + trust** | Robustness + ER evaluation | Claim grounding + recovery + audit | High-impact lead survives trust checks |
+| 3 Sep | **7. Investigator UX** | Define intelligence presentation | Implement workspace/UI | Judge-ready investigation workspace |
+| 3-4 Sep | **8. Benchmark + adversarial data** | Ground-truth generator | Blind harness + run control | Metrics produced |
+| 4 Sep | **9. Security + safety hardening** | Domain safety checks | Auth/RBAC/PII/tool security | Security pass |
+| 5 Sep | **10. P1 wow features** | Discovery / route-stage as time allows | Corresponding workflow/UI | No P0 regression |
+| 5 Sep | **11. Final stress + performance** | Data/analytics stress | Runtime/recovery/UI stress | No critical blocker |
+| 6 Sep | **12. Demo freeze** | Intelligence demo path | Platform/UI demo path | Final build locked |
+
+---
+
+## 3. Phase Dependency Model
+
+```
+PHASE 0 - LOCK SCOPE
+        |
+PHASE 1 - COMMON CONTRACTS (JOINT BLOCKING)
+        |
+   +---------+---------+
+   |                     |
+PHASE 2A            PHASE 2B
+MAYUR               GURASHISH
+Intelligence Core   Execution Platform
+   |                     |
+   +---------+---------+
+        |
+PHASE 3 - VERTICAL INTEGRATION
+        |
+PHASE 4 - CORE INVESTIGATION
+        |
+PHASE 5 - DIFFERENTIATION
+        |
+PHASE 6 - TRUST / ROBUSTNESS
+        |
+PHASE 7 - UX
+        |
+PHASE 8 - BENCHMARK
+        |
+PHASE 9 - SECURITY
+        |
+PHASE 10 - P1
+        |
+PHASE 11 - HARDEN
+        |
+PHASE 12 - DEMO FREEZE
+```
+
+The key design is not to wait for an entire phase to finish before integrating. Every major phase has a vertical checkpoint so the two lanes continuously prove that the shared contracts still work.
+
+---
+
+## 4. Phase 0 — Architecture & Scope Lock
+
+**Owner:** BOTH. **Duration:** 25 Aug. **Output:** development baseline.
+
+### Objective
+
+Translate V7 into an implementation contract and eliminate ambiguity before code ownership begins.
+
+### Tasks (both)
+
+- Confirm V7 is the architecture source of truth
+- Freeze the P0 / P0.5 / P1 split
+- Freeze TypeScript/Node.js-first stack
+- Freeze PostgreSQL vs Neo4j responsibilities
+- Confirm the temporal strategy: event history + current supported graph projection + intervals + checkpoints
+- Confirm Aion's role: implementation/reference to be evaluated, not a blind mandatory dependency unless the compatibility check passes
+- Confirm BullMQ + Redis + custom investigation state machine for orchestration
+- Freeze repository / monorepo layout
+- Freeze owner boundary: Mayur = intelligence; Gurashish = execution/platform/UI
+- Create a shared issue tracker with phase labels, owner labels, dependency labels, and integration checkpoints
+
+### Exit Gate
+
+No unresolved ownership ambiguity. Every planned component has exactly one primary owner.
+
+---
+
+## 5. Phase 1 — Common Contracts (Joint Blocking Phase)
+
+**Owner:** BOTH. **Duration:** 25-26 Aug. This is the only phase that intentionally blocks both developers.
+
+V7 already defines the canonical objects: EvidenceSource, Observation, EntityHypothesis, EntityRoleHypothesis, RelationHypothesis, GraphNode, GraphEdge, Hypothesis, InvestigativeGap, ReviewTask, AuditEvent, AgentCheckpoint and ClaimGrounding.
+
+### 5.1 Domain Contracts — Mayur leads, Gurashish reviews
+
+- Define Investigation and Case
+- Define EvidenceSource / Artifact / Observation
+- Define EntityHypothesis and EntityRoleHypothesis
+- Define RelationHypothesis
+- Define Hypothesis and InvestigativeLead
+- Define InvestigativeGap and EvidenceRequest
+- Define ReviewTask
+- Define evidence posture T0-T3
+
+### 5.2 Execution Contracts — Gurashish leads, Mayur reviews
+
+- Define InvestigationRun and RunState
+- Define ToolRequest / ToolResult
+- Define AgentCheckpoint
+- Define state transitions
+- Define retryability semantics
+- Define execution errors
+
+### 5.3 Shared Contracts — both
+
+- ID strategy
+- Correlation and idempotency keys
+- Graph version IDs
+- Event names and payloads
+- Service errors
+- Authentication/authorization context
+- Case-scope enforcement
+- Contract versioning
+
+### 5.4 Intelligence API
+
+```
+searchEvidence()
+getEvidence()
+resolveEntity()
+resolveRelation()
+getEntityTimeline()
+findCrossCaseLinks()
+runGraphAnalytics()
+findGraphHoles()
+classifyGap()
+rankEvidenceRequests()
+findCounterEvidence()
+runRobustness()
+```
+
+### 5.5 Contract Tests
+
+- Schema validation tests
+- Serialization/deserialization tests
+- Invalid payload tests
+- Event compatibility tests
+- Mock tool integration tests
+- Error/retry semantics tests
+
+### Exit Gate
+
+Contracts package v1 is published; both branches compile against it; mock calls work; no direct cross-lane database coupling.
+
+---
+
+## 6. Phase 2 — Parallel Foundations
+
+Owner model: Mayur and Gurashish work independently after Phase 1, using contracts + mocks.
+
+### 6A. MAYUR — Intelligence Foundation
+
+| Task ID | Task | Output | Dependency |
+|---|---|---|---|
+| M-A01 | Ingestion skeleton | Source adapter interfaces | Contracts |
+| M-A02 | FIR/narrative ingestion | Raw artifacts + source metadata | M-A01 |
+| M-A03 | CDR CSV ingestion | Normalized communication rows | M-A01 |
+| M-A04 | Financial CSV ingestion | Normalized transaction rows | M-A01 |
+| M-A05 | Normalization engine | Canonical fields + quality metadata | M-A02-04 |
+| M-A06 | Observation extraction | Observation[] with provenance | M-A05 |
+| M-A07 | Entity candidate generator | Candidate entities | M-A06 |
+| M-A08 | Multi-pass blocking | Candidate pairs | M-A07 |
+| M-A09 | Entity resolver | Reversible EntityHypothesis | M-A08 |
+| M-A10 | Relation resolver | RelationHypothesis | M-A06/M-A09 |
+| M-A11 | Neo4j graph projection | GraphNode/GraphEdge | M-A09/10 |
+| M-A12 | Temporal projection | Intervals + graph versioning | M-A11 |
+| M-A13 | Graph query layer | Typed graph service APIs | M-A11/12 |
+
+### 6B. GURASHISH — Execution / Platform Foundation
+
+| Task ID | Task | Output | Dependency |
+|---|---|---|---|
+| G-A01 | API/service skeleton | Node.js service base | Contracts |
+| G-A02 | PostgreSQL/Prisma base | Persistent execution store | Contracts |
+| G-A03 | Redis + BullMQ | Queues/workers | Contracts |
+| G-A04 | Investigation state machine | Run lifecycle | Contracts |
+| G-A05 | Checkpoint store | Resume/replay state | G-A04 |
+| G-A06 | Tool registry | Tool metadata + validation | Contracts |
+| G-A07 | Tool execution runtime | Request/result pipeline | G-A06 |
+| G-A08 | Agent orchestrator | Bounded planning loop | G-A04/G-A07 |
+| G-A09 | Retries/circuit breakers | Failure controls | G-A03/G-A08 |
+| G-A10 | Realtime event stream | Investigation progress events | G-A04 |
+| G-A11 | Audit event infrastructure | Append-only audit records | G-A04 |
+| G-A12 | Auth/RBAC skeleton | Protected endpoints | G-A01 |
+
+> **Parallel rule:** Neither side imports internal implementation files from the other side. Both consume contracts only.
+
+---
+
+## 7. Phase 3 — Vertical Integration #1: Evidence > Graph > Investigation
+
+**Duration:** 28 Aug. **Goal:** prove the architecture can cross the ownership boundary.
+
+### Mayur
+
+- Expose ingestion API
+- Expose observation API
+- Expose entity resolution API
+- Expose graph projection/query API
+- Seed one deliberately messy synthetic case
+
+### Gurashish
+
+- Create investigation run
+- Queue ingestion job
+- Consume tool results
+- Persist state
+- Emit progress events
+- Show graph-ready state in UI shell
+
+### Joint Integration Test
+
+```
+FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI
+```
+
+### Exit Gate
+
+One case enters the system and a human can inspect the resulting graph. No manual database edits.
+
+---
+
+## 8. Phase 4 — Core Investigation Loop
+
+**Duration:** 29-30 Aug.
+
+### Mayur Tasks
+
+- Implement temporal burst detection
+- Implement community candidates
+- Implement bridge/connector candidates
+- Implement bounded path queries
+- Implement cross-case shared-entity/infrastructure discovery
+- Create InvestigativeLead structure
+- Attach evidence FOR / AGAINST
+- Generate alternative explanations
+- Persist lead provenance
+
+### Gurashish Tasks
+
+- Implement investigation state transitions around analysis
+- Add tool orchestration for graph analytics
+- Persist Lead/Hypothesis lifecycle
+- Stream analysis progress to UI
+- Implement human-review state
+- Add pause/resume behavior
+
+### Joint Checkpoint
+
+```
+CASE > GRAPH > STRUCTURAL SIGNAL > INVESTIGATIVE LEAD > EVIDENCE FOR/AGAINST > HUMAN REVIEW
+```
+
+---
+
+## 9. Phase 5 — Differentiation Engine
+
+**Duration:** 31 Aug-1 Sep. This is the most important product phase.
+
+### 9A. MAYUR — Graph-Hole / Intelligence-Gap Core
+
+- Detect candidate missing relationships
+- Classify gap: missing investigation / missing data / missing comparison / infrastructure gap / concealment-consistent pattern
+- Generate competing explanations
+- Detect when an entity-resolution split could explain a graph hole
+- Trigger targeted reblocking
+- Generate candidate evidence requests
+- Calculate normalized evidence utility
+- Implement Evidence Resolution Rate@K evaluation
+- Add evidence-independence tracking
+
+### 9B. GURASHISH — Investigation Workflow Around the Gap
+
+- Add graph-hole event type
+- Add gap lifecycle state
+- Add evidence-request job
+- Implement human approval for request
+- Implement WAITING_FOR_EVIDENCE state
+- Handle evidence arrival event
+- Re-trigger reassessment
+- Stream graph/lead changes live
+
+### 9C. Signature Integration
+
+```
+GRAPH > LEAD > GRAPH HOLE > WHY IS IT MISSING? > BEST NEXT EVIDENCE > HUMAN VERIFICATION > NEW OBSERVATION > GRAPH UPDATE > REASSESS
+```
+
+### Exit Gate
+
+This loop works on the demo dataset without manual backend intervention.
+
+---
+
+## 10. Phase 6 — Robustness, Trust, and Agent Reliability
+
+**Duration:** 2 Sep.
+
+### 10A. Mayur
+
+- Implement staged robustness
+- Add graph version + perturbation policy cache key
+- Add candidate-region restriction
+- Add incremental recomputation where possible
+- Add adaptive stopping
+- Evaluate ER pair completeness / false split / false merge
+- Run missingness regimes: random, source-dependent, entity-dependent, structure-dependent, strategic sparsification
+- Separate structural signal from robustness from evidence posture
+
+### 10B. Gurashish
+
+- Implement checkpoint/recovery tests
+- Implement bounded retries and circuit breakers
+- Implement tool idempotency
+- Implement claim-grounding validator
+- Reject unsupported agent claims
+- Persist AgentCheckpoint
+- Record recovery in audit trail
+- Implement safe human escalation
+
+### 10C. Joint Trust Checkpoint
+
+```
+CORRECT TOOL RESULT + WRONG AGENT CLAIM > CLAIM GROUNDING > REPLAN
+MISSING EDGE > GAP CLASSIFICATION > NO INTENT INFERENCE
+HIGH CENTRALITY > STRUCTURAL SIGNAL ONLY
+HIGH MODEL SCORE > NOT LEGAL ADMISSIBILITY
+```
+
+---
+
+## 11. Phase 7 — Investigator UX
+
+**Duration:** 3 Sep.
+
+### 11A. Gurashish — Implementation Ownership
+
+- Investigation workspace shell
+- Graph visualization
+- Timeline visualization
+- Lead card
+- Evidence FOR / AGAINST panels
+- Gap / graph-hole visualization
+- Next-best-evidence panel
+- Reasoning ledger
+- Review/approval UI
+- Realtime progress and recovery states
+- Premium loading/empty/error states
+
+### 11B. Mayur — Intelligence Presentation Ownership
+
+- Define exact meaning of every intelligence score shown
+- Define language for structural signal vs investigative relevance
+- Define gap labels and explanations
+- Define evidence posture presentation
+- Define alternative-explanation presentation
+- Define what evidence must be clickable/source-traceable
+- Review graph semantics for misleading visual interpretations
+
+### UI Success Criterion
+
+A non-technical judge should understand the lead, the uncertainty, the graph hole, and the next evidence request without a technical explanation.
+
+---
+
+## 12. Phase 8 — Synthetic Benchmark and Adversarial Evaluation
+
+**Duration:** 3-4 Sep. Run this in parallel with late UX work.
+
+### 12A. Mayur
+
+- Build development generator
+- Generate ground-truth networks
+- Transform into observations with aliases, duplicates, missingness, contradictions and sparsification
+- Generate known hidden relationships
+- Generate entity collisions and splits
+- Create expected graph-hole/evidence mappings
+- Define intelligence metrics
+
+### 12B. Gurashish
+
+- Build blind evaluation harness
+- Hide ground truth during inference
+- Run repeatable experiment jobs
+- Persist metrics
+- Record runtime and failure/recovery metrics
+- Generate experiment summary
+
+### Metrics
+
+| Metric | Purpose |
+|---|---|
+| Entity-resolution precision/recall | Identity quality |
+| False-merge / false-split rate | Identity risk |
+| Relation precision/recall | Relationship extraction quality |
+| Graph-hole precision | Quality of candidate holes |
+| Evidence Resolution Rate@K | Whether recommended evidence actually helps |
+| Robustness stability | Lead sensitivity to missingness |
+| Claim-grounding accuracy | Agent factual grounding |
+| Recovery rate | Execution resilience |
+| Time-to-lead | Operational usefulness |
+
+---
+
+## 13. Phase 9 — Security, Privacy, Safety
+
+**Duration:** 4 Sep.
+
+### 13A. Gurashish
+
+- Authentication
+- RBAC
+- Case-scope authorization
+- PII masking
+- Tool authorization boundaries
+- Prompt-injection defenses for untrusted evidence
+- Audit access logging
+- Hash-linked audit events
+- Secret management
+- Failure isolation
+
+### 13B. Mayur
+
+- Review all intelligence wording for epistemic overclaim
+- Verify role != culpability
+- Verify absence != concealment
+- Verify structural signal != criminal relevance
+- Verify confidence != legal admissibility
+- Verify blocked pair != different entity
+- Verify alternatives/counter-evidence are surfaced for high-impact leads
+
+---
+
+## 14. Phase 10 — P1 / WOW Layer
+
+**Duration:** 5 Sep. Only proceed if all P0/P0.5 tests are green.
+
+| Feature | Mayur | Gurashish | Rule |
+|---|---|---|---|
+| Discovery Mode | Detection logic | Workflow + UI | No P0 regression |
+| Boundary Expansion | Candidate logic | Approval/UI | Never auto-add to active case |
+| Route/Stage Mode | Stage classifier + role checks | Visualization + workflow | One strong demo path |
+| Advanced robustness | Analytics | Worker execution | Only if benchmark/runtime permits |
+| Advanced ER recovery | Candidate generation | Job orchestration | Only if core ER is stable |
+
+---
+
+## 15. Phase 11 — Final Stress Test and Hardening
+
+**Duration:** 5 Sep.
+
+### Mayur Stress Tests
+
+- Duplicate evidence
+- Entity collisions
+- False splits
+- Contradictory timestamps
+- Missing source classes
+- Legitimate high-degree entities
+- False bridge candidates
+- Sparse networks
+- Concealment-consistent patterns with innocent alternatives
+- Graph-hole false positives
+
+### Gurashish Stress Tests
+
+- Duplicate jobs
+- Worker crash/restart
+- Redis interruption
+- Database timeout
+- Malformed tool request
+- Stale checkpoint
+- Agent loop
+- Contradictory tool output
+- Unauthorized tool call
+- Partial realtime connection
+
+### Joint Release Gate
+
+| Gate | Pass Condition |
+|---|---|
+| Functional | End-to-end demo path completes |
+| Data | No silent evidence loss |
+| ER | False merges/splits measured |
+| Graph | Provenance available |
+| Gap | At least one graph-hole > evidence > update cycle works |
+| Robustness | Top lead has reproducible stability result |
+| Agent | Claims are grounded and failures recover/escalate |
+| Security | Unauthorized actions blocked |
+| UI | No critical visual or state defects |
+| Demo | Resettable and repeatable |
+
+---
+
+## 16. Phase 12 — Final Demo Freeze
+
+**Duration:** 6 Sep.
+
+### Mayur Owns
+
+- Seed final intelligence dataset
+- Verify the lead is deterministic enough for demo
+- Verify graph-hole detection
+- Verify evidence recommendation
+- Verify counter-evidence story
+- Verify robustness numbers are reproducible
+- Prepare technical judge explanations
+
+### Gurashish Owns
+
+- Freeze UI
+- Freeze investigation state flow
+- Freeze worker/queue configuration
+- Freeze realtime display
+- Freeze auth/demo access
+- Prepare reset path
+- Prepare fallback path if a service fails
+- Prepare deployment package
+
+### Demo Sequence
+
+```
+MESSY CASE PACK
+  > OBSERVATIONS
+    > ENTITY / RELATION RESOLUTION
+      > TEMPORAL GRAPH
+        > CROSS-CASE SIGNAL
+          > INVESTIGATIVE LEAD
+            > GRAPH HOLE
+              > GAP CLASSIFICATION
+                > BEST NEXT EVIDENCE
+                  > COUNTER-EVIDENCE
+                    > ROBUSTNESS
+                      > VERIFIED EVIDENCE ARRIVES
+                        > GRAPH UPDATES
+                          > LEAD REASSESSMENT
+                            > REASONING LEDGER
+```
+
+---
+
+## 17. Rules for Parallel Work
+
+| Rule | Description |
+|---|---|
+| **1. Contracts before implementation** | No shared-domain schema changes without updating the contracts package |
+| **2. Mocks unblock parallelism** | A service may be implemented against a mocked contract; do not wait for the real service |
+| **3. One owner per subsystem** | One primary owner; the other reviewer. Avoid two people editing the same subsystem |
+| **4. No direct internal imports** | Consume another subsystem through contracts/APIs only |
+| **5. Small integration checkpoints** | Integrate at every vertical slice instead of one giant final integration |
+| **6. Intelligence decides semantics** | Mayur defines what an intelligence result means; Gurashish defines how it is executed and surfaced |
+| **7. Platform never invents evidence semantics** | The runtime does not reinterpret evidence/graph results |
+| **8. Intelligence never owns orchestration semantics** | Analytics services return typed results; they do not manage the investigation lifecycle |
+| **9. No hidden P1 work** | P1 features cannot destabilize P0/P0.5 |
+| **10. Demo path is a product feature** | Every major phase must keep the end-to-end demo path runnable |
+
+---
+
+## 18. Daily Execution Board
+
+| Date | Mayur | Gurashish | Joint Checkpoint |
+|---|---|---|---|
+| 25 Aug | Architecture review | Architecture review | Scope + ownership locked |
+| 26 Aug | Domain contracts | Execution/event contracts | Contracts v1 |
+| 27 Aug | Ingestion/ER | API/queues/state | Compile against contracts |
+| 28 Aug | Graph/temporal | Agent/tool runtime | Vertical slice #1 |
+| 29 Aug | Graph analytics | Investigation lifecycle | Lead loop |
+| 30 Aug | Cross-case/hypothesis | Agent + realtime | Core investigation |
+| 31 Aug | Graph holes/gap engine | Evidence-request workflow | Hole > request |
+| 1 Sep | Next evidence/concealment | Reassessment loop | Evidence > graph update |
+| 2 Sep | Robustness + ER eval | Recovery + grounding + audit | Trust gate |
+| 3 Sep | Intelligence UX definitions | Full investigator workspace | Judge UI |
+| 4 Sep | Benchmark generator | Benchmark harness + security | Evaluation/security |
+| 5 Sep | Stress tests/P1 | Stress tests/P1 | Release candidate |
+| 6 Sep | Final intelligence verification | Final runtime/UI verification | DEMO FREEZE |
+
+---
+
+## 19. Definition of Ready for Each Task
+
+1. Task has a named owner
+2. Task has a contract dependency identified
+3. Input/output schema is known
+4. Acceptance criteria are written
+5. No hidden cross-branch dependency exists
+6. Mock data or fixture exists if the real dependency is unfinished
+7. Test strategy is known
+8. Integration checkpoint is identified
+
+---
+
+## 20. Stop Rules / Scope Protection
+
+1. Do not introduce Python just because an ML library exists; the current product stack is TypeScript-first unless a concrete requirement proves otherwise
+2. Do not make Aion mandatory until the exact integration path has been tested; the V7 architecture treats it as an implementation/reference option
+3. Do not build new graph algorithms when Neo4j/GDS already provides the needed primitive
+4. Do not add more source connectors before the FIR/CDR/financial path is stable
+5. Do not build informant-source workflow for SIH
+6. Do not implement advanced learned link prediction before the synthetic benchmark exists
+7. Do not add an additional agent framework if the custom state machine + BullMQ is sufficient
+8. Do not sacrifice the graph-hole > evidence > update demo path for secondary features
+
+---
+
+## 21. Final Ownership Map
+
+| Subsystem | Primary Owner | Secondary Reviewer | Integration Contract |
+|---|---|---|---|
+| Ingestion | Mayur | Gurashish | EvidenceSource / Observation |
+| Normalization | Mayur | Gurashish | Observation |
+| Observation extraction | Mayur | Gurashish | Observation |
+| Entity resolution | Mayur | Gurashish | EntityHypothesis |
+| Relation resolution | Mayur | Gurashish | RelationHypothesis |
+| Graph projection | Mayur | Gurashish | GraphNode / GraphEdge |
+| Temporal layer | Mayur | Gurashish | GraphVersion / temporal contract |
+| Graph analytics | Mayur | Gurashish | AnalysisResult |
+| Graph holes / gap engine | Mayur | Gurashish | InvestigativeGap |
+| Evidence planner | Mayur | Gurashish | EvidenceRequest |
+| Hypothesis/counter-evidence | Mayur | Gurashish | Hypothesis / Lead |
+| Robustness | Mayur | Gurashish | RobustnessResult |
+| State machine | Gurashish | Mayur | InvestigationRun |
+| BullMQ/Redis | Gurashish | Mayur | Job/Run contracts |
+| Agent runtime | Gurashish | Mayur | ToolRequest/ToolResult |
+| Checkpoint/recovery | Gurashish | Mayur | AgentCheckpoint |
+| Claim grounding | Gurashish | Mayur | ClaimGrounding |
+| Audit/security | Gurashish | Mayur | AuditEvent |
+| Realtime | Gurashish | Mayur | InvestigationEvent |
+| Investigator UI | Gurashish | Mayur | Lead/Gap/Evidence UI model |
+| Benchmark truth | Mayur | Gurashish | Evaluation schema |
+| Benchmark harness | Gurashish | Mayur | Evaluation run schema |
+| Final demo | Both | Both | Locked vertical path |
+
+---
+
+## 22. One-Page Skim — What Each Person Does
+
+### MAYUR
+
+Build the intelligence: ingest > normalize > observe > resolve > graph > temporal analysis > cross-case > lead > graph hole > gap classification > next-best evidence > counter-evidence > robustness > benchmark truth.
+
+### GURASHISH
+
+Build the execution platform: API > Redis/BullMQ > state machine > workers > agent orchestration > checkpoints > recovery > claim grounding runtime > audit/security > realtime > investigator UI > benchmark harness.
+
+### BOTH
+
+Phase 1 contracts > continuous integration > vertical checkpoints > benchmark interpretation > final stress test > final demo.
