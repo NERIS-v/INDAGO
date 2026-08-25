@@ -49,6 +49,10 @@ export * from './intelligence/counter-evidence.js';
 export * from './intelligence/robustness.js';
 export * from './intelligence/route-stage.js';
 export * from './intelligence/intelligence-results.js';
+export * from './intelligence/ingestion-envelope.js';
+export * from './intelligence/adapter-capability.js';
+export * from './intelligence/ingestion-errors.js';
+export * from './intelligence/artifact-reference.js';
 
 // Execution contracts
 export * from './execution/investigation-run.js';

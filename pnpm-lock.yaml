@@ -21,6 +21,19 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7
 
+  packages/intelligence/ingestion:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':

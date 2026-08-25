@@ -1,0 +1,67 @@
+// ============================================================================
+// @indago/ingestion — MA01 Intelligence Ingestion Skeleton
+//
+// Source-agnostic ingestion boundary for INDAGO V7.
+// All source adapters plug into this boundary.
+//
+// This package does NOT:
+//   - Normalize source data (MA05)
+//   - Extract entities/relations/observations (MA06+)
+//   - Build graphs or run analytics
+//   - Own investigation lifecycle or orchestration
+//
+// Re-exports from @indago/contracts are NOT duplicated here.
+// Import contracts directly from @indago/contracts.
+// ============================================================================
+
+export type {
+  SourceAdapter,
+  IngestionContext,
+  IngestionInput,
+  IngestionResult,
+} from './adapters/source-adapter.js';
+
+export {
+  AdapterRegistry,
+  AdapterRegistryError,
+} from './registry/adapter-registry.js';
+
+export type {
+  ArtifactStorage,
+  StorageWriteResult,
+} from './storage/artifact-storage.js';
+
+export { InMemoryArtifactStorage } from './storage/artifact-storage.js';
+
+export {
+  IngestionService,
+} from './service/ingestion-service.js';
+export type {
+  IngestionServiceConfig,
+} from './service/ingestion-service.js';
+
+// M-PR1 Artifact Acquisition
+export {
+  HttpArtifactFetcher,
+  HttpError,
+  FetchFailedError,
+  FetchTimeoutError,
+  ArtifactTooLargeError,
+  InvalidReferenceError,
+  ArtifactAcquisitionService,
+  computeContentHash,
+  deterministicArtifactId,
+  detectMimeType,
+} from './acquisition/index.js';
+export type {
+  ArtifactFetcher,
+  FetchOptions,
+  FetchedArtifact,
+  MimeTypeResult,
+  ArtifactAcquisitionConfig,
+  VerifiedArtifact,
+  ArtifactAcquisitionResult,
+  AcquisitionContext,
+  ArtifactAcquisitionServiceConfig,
+} from './acquisition/index.js';
+
