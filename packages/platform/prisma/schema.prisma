@@ -31,12 +31,13 @@ model InvestigationRun {
 // G-A05: Checkpoint Store for Resume/Replay
 // ============================================================================
 model AgentCheckpoint {
-  id              String   @id @default(uuid())
-  runId           String
-  stage           String
-  stageIndex      Int
-  stateSnapshot   Json     // Serialized state for resumability
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  runId         String
+  stepId        String   
+  stateHash     String
+  toolResults   Json?    
+  nextAction    String?  
+  timestamp     DateTime @default(now())
 
   run InvestigationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 }

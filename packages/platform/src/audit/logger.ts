@@ -1,6 +1,8 @@
 import { db } from "../db/prisma.js";
 import { createHash } from "node:crypto";
 import type { AuditAction } from "@indago/contracts";
+import { realtimeEvents } from "../realtime/sse.js";
+
 
 export async function logAuditEvent(params: {
   investigationId: string;
@@ -24,7 +26,7 @@ export async function logAuditEvent(params: {
     const hash = createHash("sha256").update(hashInput).digest("hex");
 
     // 3. Write immutable record
-    return await tx.auditEvent.create({
+    const record = await tx.auditEvent.create({
       data: {
         investigationId: params.investigationId,
         action: params.action,
@@ -37,5 +39,9 @@ export async function logAuditEvent(params: {
         hash
       }
     });
+    // Broadcast the event to any connected UI clients
+    realtimeEvents.emit("progress", record);
+    return record;
+
   });
 }

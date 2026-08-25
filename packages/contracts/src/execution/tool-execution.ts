@@ -45,3 +45,11 @@ export const ToolExecutionSchema = z.object({
   metadata: MetadataSchema.optional(),
 }).strict();
 export type ToolExecution = z.infer<typeof ToolExecutionSchema>;
+
+export const ToolResultSchema = z.object({
+  id: z.string().optional(),
+  data: z.array(z.any()).optional().describe("Raw tool output data"),
+  extractedIds: z.array(z.string()).optional().describe("Deterministic IDs used for claim grounding"),
+}).strict();
+
+export type ToolResult = z.infer<typeof ToolResultSchema>;

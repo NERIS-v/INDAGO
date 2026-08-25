@@ -1,8 +1,10 @@
 import { Queue, Worker, type Job } from "bullmq";
 import Redis from "ioredis";
+import { randomUUID } from "node:crypto";
 import { db } from "../db/prisma.js";
 import { logAuditEvent } from "../audit/logger.js";
 import { DEFAULT_RUN_STATE_CONFIGURATION, type InvestigationRunState } from "@indago/contracts";
+import { validateClaim, ClaimGroundingError } from "../security/grounding.js";
 
 const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
@@ -20,25 +22,48 @@ export const investigationWorker = new Worker(
     const run = await db.investigationRun.findUniqueOrThrow({ where: { id: job.data.runId } });
 
     try {
-      // Execute the State Machine mapped from Mayur's Contracts
       switch (run.state as InvestigationRunState) {
         case "CREATED":
           await transitionState(run.id, "INGESTING", "PIPELINE_START");
-          // Dispatch ingestion tasks here
           break;
 
         case "INGESTING":
-          await transitionState(run.id, "NORMALIZING", "INGESTION_COMPLETE");
+          await transitionState(run.id, "ANALYZING", "INGESTION_COMPLETE");
           break;
 
         case "ANALYZING":
-          // Run agent planner, execute graph tools, detect holes
+          // TODO: Replace mock with actual LLM/Agent execution
+          const agentDecision = {
+            proposedClaim: {
+              text: "Found a hidden connection to Account Y.",
+              referencedIds: ["mock_hallucinated_id_123"]
+            }
+          };
+          
+          const toolResult = { data: [{ id: "valid_id_456" }] };
+
+          // G-A08: Claim Grounding Gate
+          if (agentDecision.proposedClaim) {
+            try {
+              await validateClaim(run.investigationId, {
+                id: randomUUID(),
+                claimText: agentDecision.proposedClaim.text,
+                referencedIds: agentDecision.proposedClaim.referencedIds
+              }, toolResult);
+            } catch (error) {
+              if (error instanceof ClaimGroundingError) {
+                console.warn(`[GROUNDING FAILED] Agent hallucinated. Replanning run ${run.id}`);
+                await investigationQueue.add("investigation-pipeline", { runId: run.id }, { delay: 1000 });
+                return; 
+              }
+              throw error;
+            }
+          }
 
           await transitionState(run.id, "DISCOVERING", "ANALYSIS_COMPLETE");
           break;
 
         case "WAITING_FOR_EVIDENCE":
-          // Paused state. UI will trigger RESUME when evidence arrives.
           await db.investigationRun.update({
             where: { id: run.id },
             data: { status: "PAUSED" }
@@ -48,9 +73,9 @@ export const investigationWorker = new Worker(
     } catch (error: any) {
       await db.investigationRun.update({
         where: { id: run.id },
-        data: { status: "FAILED", error: error.message }
+        data: { status: "FAILED", contextData: { lastError: error.message } }
       });
-      throw error; // Let BullMQ handle retry backoff
+      throw error; 
     }
   },
   { connection }
@@ -59,25 +84,24 @@ export const investigationWorker = new Worker(
 async function transitionState(runId: string, newState: InvestigationRunState, trigger: string) {
   const run = await db.investigationRun.findUniqueOrThrow({ where: { id: runId } });
   
-  // 1. Verify Transition is valid according to V7 Contracts
   const isValid = DEFAULT_RUN_STATE_CONFIGURATION.validTransitions.some(
     t => t.from === run.state && t.to === newState
   );
 
   if (!isValid) throw new Error(`Invalid transition: ${run.state} -> ${newState}`);
 
-  // 2. G-A05: Create Checkpoint before moving forward
+  // G-A05: Create Checkpoint
   const checkpointsCount = await db.agentCheckpoint.count({ where: { runId } });
   await db.agentCheckpoint.create({
     data: {
       runId,
-      stage: run.state,
-      stageIndex: checkpointsCount,
-      stateSnapshot: run.contextData as any
+      stepId: `step_${checkpointsCount}`,
+      stateHash: randomUUID(),
+      toolResults: {},
+      timestamp: new Date()
     }
   });
 
-  // 3. Mutate State
   await db.investigationRun.update({
     where: { id: runId },
     data: { state: newState, status: "RUNNING" }
