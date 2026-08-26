@@ -903,7 +903,47 @@ Informant handling is outside P0. The architecture reserves a source-protection 
 
 ---
 
-<br>
+## Implementation Status
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 — Foundation | ✅ Complete | Monorepo setup, contracts, CI/CD |
+| Phase 2 — Platform Core | ✅ Complete | API server, auth, upload pipeline, SSE |
+| Phase 3 — Integration & UI | ✅ Complete | Next.js web app, evidence workflow, vis.js graph shell |
+
+### Monorepo Structure
+
+```
+packages/
+├── contracts/      # Zod schemas for domain models & API validation
+├── platform/       # Express API server, auth, upload queue, orchestrator
+├── web/            # Next.js 15 dark-mode UI with vis.js graph rendering
+└── intelligence/   # Ingestion pipeline (OCR, NER, CDR/financial parsing)
+```
+
+### Key Features Built
+
+- **RBAC-secured API** with investigation routes and SSE progress streaming
+- **Evidence upload pipeline** with ingestion job payloads and orchestrator
+- **Next.js web UI** — dark investigative theme, file upload, evidence review, investigation detail
+- **vis.js network graph shell** for temporal graph visualization
+- **Zod contract validation** across all packages
+- **GitHub Actions CI** — build, typecheck, test on every push
+
+### Getting Started
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run typechecks
+pnpm typecheck
+
+# Run tests
+pnpm test
+```
+
+---
 
 **Built by NERIS-v** · Architecture v7.0 · MIT License
 
