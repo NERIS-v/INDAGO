@@ -144,12 +144,12 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ### Gurashish
 
-- [ ] Create investigation run `[Gurashish]`
-- [ ] Queue ingestion job `[Gurashish]`
-- [ ] Consume tool results `[Gurashish]`
-- [ ] Persist state `[Gurashish]`
-- [ ] Emit progress events `[Gurashish]`
-- [ ] Show graph-ready state in UI shell `[Gurashish]`
+- [x] Create investigation run `[Gurashish]`
+- [x] Queue ingestion job `[Gurashish]`
+- [x] Consume tool results `[Gurashish]`
+- [x] Persist state `[Gurashish]`
+- [x] Emit progress events `[Gurashish]`
+- [x] Show graph-ready state in UI shell `[Gurashish]`
 
 ### Joint Integration Test
 

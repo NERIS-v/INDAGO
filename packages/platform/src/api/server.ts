@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import path from "path";
 import { apiRouter } from "./routes.js";
 import { createRouteHandler } from "uploadthing/express";
 import { uploadRouter } from "./uploadthing.js";
@@ -8,9 +9,23 @@ import { uploadRouter } from "./uploadthing.js";
 const app = express();
 
 // Middleware
-app.use(helmet()); // Security headers
+// Configure Helmet to allow UI shell scripts and CDN
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+        connectSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+      },
+    },
+  })
+);
 app.use(cors());
 app.use(express.json());
+
+app.use(express.static(path.join(process.cwd(), "public")));
 
 // UploadThing route handler
 app.use(
@@ -33,6 +48,7 @@ const PORT = process.env.PORT || 3000;
 export function startServer() {
   app.listen(PORT, () => {
     console.log(`🚀 INDAGO Execution Platform running on port ${PORT}`);
+    console.log(`📡 SSE Stream ready for Phase 3 UI shell`);
   });
 }
 

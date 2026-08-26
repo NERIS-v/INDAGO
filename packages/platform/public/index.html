@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INDAGO V7 - Phase 3 Test Shell</title>
+    <!-- Add Vis.js for instant graph rendering -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 2rem; }
+        .container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .header { grid-column: 1 / -1; }
+        .panel { background: #1e293b; padding: 1.5rem; border-radius: 8px; border: 1px solid #334155; }
+        .full-width { grid-column: 1 / -1; }
+        button { background: #3b82f6; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem; }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #475569; cursor: not-allowed; }
+        .log-entry { margin-bottom: 0.5rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; }
+        .state-badge { background: #3b82f6; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; margin-right: 0.5rem; color: white; display: inline-block; min-width: 80px; text-align: center; }
+        #mynetwork { width: 100%; height: 500px; background: #020617; border: 1px solid #334155; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>INDAGO V7 <span>// Phase 3 Shell</span></h1>
+        </div>
+        
+        <div class="panel">
+            <h3>1. Control Panel</h3>
+            <p>Target Case: <strong>case-042</strong> <em>(Auth Bypass Active)</em></p>
+            <button id="startBtn">Start Investigation</button>
+        </div>
+
+        <div class="panel">
+            <h3>2. Live SSE Event Stream</h3>
+            <div id="streamLogs" style="background: #020617; padding: 1rem; border-radius: 6px; height: 160px; overflow-y: auto; border: 1px solid #334155; font-family: monospace; font-size: 0.9rem;">
+                <div style="color: #64748b;">Waiting to start...</div>
+            </div>
+        </div>
+
+        <!-- Graph Visualization Panel -->
+        <div class="panel full-width">
+            <h3>3. Graph Visualization</h3>
+            <div id="mynetwork"></div>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN = "demo-token";
+        const CASE_ID = "case-042"; 
+        
+        const startBtn = document.getElementById('startBtn');
+        const logsDiv = document.getElementById('streamLogs');
+
+        function appendLog(state, message) {
+            // Keep logs visually clean, ignore the massive JSON payload in the logs UI
+            if (state === 'GRAPH_READY') message = "Graph payload received! Rendering...";
+            
+            const el = document.createElement('div');
+            el.className = 'log-entry';
+            el.innerHTML = `<span class="state-badge">${state}</span> <span style="color: #cbd5e1;">${message}</span>`;
+            logsDiv.prepend(el);
+        }
+
+        // Vis.js Graph Rendering Logic
+        function drawGraph(graphData) {
+
+            const nodes = new vis.DataSet(
+                graphData.nodes.map(n => ({ 
+                    id: n.id, 
+                    label: `${n.label}\n${n.properties?.name || n.properties?.accountNumber || ''}`
+                }))
+            );
+            
+            const edges = new vis.DataSet(
+                graphData.edges.map(e => ({ 
+                    from: e.from, 
+                    to: e.to, 
+                    label: e.relation 
+                }))
+            );
+
+            const container = document.getElementById('mynetwork');
+            const data = { nodes, edges };
+            
+            const options = {
+                nodes: {
+                    shape: 'box',
+                    margin: { top: 10, bottom: 10, left: 15, right: 15 },
+                    font: { 
+                        size: 14, 
+                        color: '#f8fafc', 
+                        face: 'system-ui, sans-serif',
+                        multi: true 
+                    },
+                    color: { 
+                        background: '#2563eb', 
+                        border: '#1d4ed8',
+                        highlight: { background: '#3b82f6', border: '#60a5fa' }
+                    },
+                    borderWidth: 2,
+                    shadow: { enabled: true, color: 'rgba(0,0,0,0.4)', size: 5, x: 2, y: 2 }
+                },
+                edges: {
+                    width: 2,
+                    color: { color: '#64748b', highlight: '#94a3b8' },
+                    font: { 
+                        size: 12, 
+                        color: '#cbd5e1', 
+                        face: 'system-ui, sans-serif',
+                        strokeWidth: 4,
+                        strokeColor: '#020617',
+                        align: 'horizontal'
+                    },
+                    arrows: {
+                        to: { enabled: true, scaleFactor: 0.6 }
+                    },
+                    smooth: {
+                        type: 'continuous',
+                        forceDirection: 'none'
+                    }
+                },
+                physics: {
+                    solver: 'forceAtlas2Based',
+                    forceAtlas2Based: {
+                        gravitationalConstant: -50,
+                        centralGravity: 0.01,
+                        springConstant: 0.08,
+                        springLength: 150,
+                        damping: 0.6,
+                        avoidOverlap: 1
+                    },
+                    stabilization: {
+                        enabled: true,
+                        iterations: 1000
+                    }
+                },
+                interaction: {
+                    hover: true,
+                    zoomView: true,
+                    dragView: true
+                }
+            };
+
+            new vis.Network(container, data, options);
+        }
+
+        async function connectToSSE(investigationId) {
+            appendLog('SYSTEM', 'Connecting to real-time stream...');
+            
+            try {
+                const response = await fetch(`/api/v1/investigations/${investigationId}/stream`, {
+                    headers: { 'Authorization': `Bearer ${TOKEN}` }
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.substring(6));
+                            
+                            // 3. Catch the graph data and draw it!
+                            if (data.state === 'GRAPH_READY') {
+                                drawGraph(JSON.parse(data.message));
+                            }
+                            
+                            // 4. Handle both Progress Events and Audit Events!
+                            const badgeText = data.state || data.type || data.action || 'UPDATE';
+                            const logText = data.message || data.description || 'System state updated';
+                            
+                            // Don't print the massive JSON graph payload to the tiny log window
+                            if (badgeText !== 'GRAPH_READY') {
+                                appendLog(badgeText, logText);
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                appendLog('ERROR', 'Stream disconnected: ' + err.message);
+            }
+        }
+
+        startBtn.addEventListener('click', async () => {
+            startBtn.disabled = true;
+            logsDiv.innerHTML = ''; 
+            const investigationId = crypto.randomUUID(); 
+
+            try {
+                appendLog('SYSTEM', `Initializing Case ${CASE_ID}...`);
+                
+                const res = await fetch('/api/v1/investigations/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${TOKEN}`
+                    },
+                    body: JSON.stringify({ caseId: CASE_ID, investigationId })
+                });
+
+                const data = await res.json();
+                
+                if (res.ok) {
+                    appendLog('HTTP 202', `Run Queued Successfully. ID: ${data.runId}`);
+                    connectToSSE(investigationId);
+                } else {
+                    appendLog('FAILED', JSON.stringify(data));
+                    startBtn.disabled = false;
+                }
+            } catch (err) {
+                appendLog('ERROR', err.message);
+                startBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
