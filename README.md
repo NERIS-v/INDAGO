@@ -907,8 +907,6 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
 
 ---
 
----
-
 ## Implementation Status
 
 <div align="center">
