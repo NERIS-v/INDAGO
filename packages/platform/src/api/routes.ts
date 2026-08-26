@@ -41,6 +41,7 @@ apiRouter.post(
       const run = await db.investigationRun.create({
         data: {
           investigationId,
+          caseId,
           status: "QUEUED",
           state: "CREATED",
           contextData: { caseId }, // Store case scope in context
