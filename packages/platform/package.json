@@ -6,7 +6,9 @@
     "build": "tsc",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",

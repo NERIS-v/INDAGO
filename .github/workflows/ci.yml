@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    name: Build & Test
+    name: Build, Typecheck & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -30,9 +30,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
-        # Ensures the database client is generated before TypeScript checks it
+        # Ensures the database client is generated before typechecking
         run: cd packages/platform && pnpm exec prisma generate
 
+      - name: Build
+        # Compiles the code across all workspaces
+        run: pnpm --recursive run build
+
+      - name: Typecheck
+        # Runs strict TypeScript validation
+        run: pnpm --recursive run typecheck
+
       - name: Run Tests (Vitest)
-        # Runs all tests across the monorepo to ensure the recovery/grounding logic passes
+        # Runs the test suites only if the build and types are perfectly valid
         run: pnpm --recursive test
