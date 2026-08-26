@@ -20,8 +20,12 @@
 
 ---
 
+<table>
+<tr>
+<td align="center" width="100%">
+
 <details>
-<summary><strong>Table of Contents</strong></summary>
+<summary><h3>📑 Table of Contents — click to expand</h3></summary>
 
 <br>
 
@@ -76,6 +80,10 @@
 - [License](#license)
 
 </details>
+
+</td>
+</tr>
+</table>
 
 ---
 
