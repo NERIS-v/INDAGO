@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 
 // Extend Express Request to include INDAGO User context
 declare global {
@@ -20,11 +21,15 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Missing or invalid authorization header" });
   }
-
+  
   const token = authHeader.split(" ")[1];
 
-  // Mock decoding a valid JWT. 
-  if (token === "demo-token") {
+  if (!token) {
+    return res.status(401).json({ error: "Token missing from authorization header" });
+  }
+  
+  // DEVELOPMENT OVERRIDE: Keep the mock for easy local testing
+  if (process.env.NODE_ENV === "development" && token === "demo-token") {
     req.user = {
       id: "usr_demo_123",
       role: "INVESTIGATOR",
@@ -34,7 +39,27 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     return next();
   }
 
-  return res.status(403).json({ error: "Invalid token" });
+  // REAL VALIDATION: Uses the .env JWT_SECRET
+  try {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("CRITICAL: JWT_SECRET is missing from .env");
+      return res.status(500).json({ error: "Internal server error" });
+    }
+    
+    // Verify the token using the secret from your .env
+    const decoded = jwt.verify(token, secret) as any;
+    
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      allowedCases: decoded.allowedCases || []
+    };
+    
+    return next();
+  } catch (error) {
+    return res.status(403).json({ error: "Invalid or expired token" });
+  }
 };
 
 // 2. Role-Based Access Control (RBAC) Gate
