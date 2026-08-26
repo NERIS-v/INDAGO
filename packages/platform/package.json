@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/api/server.ts",
+    "start": "node dist/api/server.js",
+    "test": "vitest run",
+    "prebuild": "prisma generate",
+    "predev": "prisma generate",
     "build": "tsc",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
