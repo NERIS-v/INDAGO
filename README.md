@@ -20,8 +20,12 @@
 
 ---
 
+<table>
+<tr>
+<td align="center" width="100%">
+
 <details>
-<summary><strong>Table of Contents</strong></summary>
+<summary><h3>📑 Table of Contents — click to expand</h3></summary>
 
 <br>
 
@@ -76,6 +80,10 @@
 - [License](#license)
 
 </details>
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -904,8 +912,6 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
 | Can ingest many records | **Exposes when a connection is missing** because data was unavailable, investigation was incomplete, entities were not compared, infrastructure failed, or a concealment-consistent pattern exists |
 
 > **The final output is not "the suspect."** It is **"what the evidence supports, what could be wrong, what is missing, and what should be verified next."**
-
----
 
 ---
 
