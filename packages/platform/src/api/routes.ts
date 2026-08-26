@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { db } from "../db/prisma.js";
 import { investigationQueue } from "../queue/orchestrator.js";
 import { logAuditEvent } from "../audit/logger.js";
 import { streamEventsHandler } from "../realtime/sse.js";
-import { requireAuth, requireRole, requireCaseAccess } from "./auth.js";
+import { realtimeEvents } from "../realtime/sse.js";
+import { requireAuth, requireRole, requireCaseAccess, verifyCaseAccess } from "./auth.js";
+import { EvidenceSubmissionRequestSchema } from "@indago/contracts";
 
 export const apiRouter: Router = Router();
 
@@ -16,20 +19,65 @@ const StartInvestigationSchema = z.object({
 
 // 1. Lock down the Realtime Stream
 apiRouter.get(
-  "/investigations/:investigationId/stream", 
-  requireAuth, 
+  "/investigations/:investigationId/stream",
+  requireAuth,
   streamEventsHandler
+);
+
+// 1b. Get Investigation Status
+apiRouter.get(
+  "/investigations/:investigationId",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const caseId = String(req.query.caseId || "");
+
+      if (!caseId) {
+        return res.status(400).json({ error: "caseId query parameter is required" });
+      }
+
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      return res.status(200).json({
+        id: run.id,
+        investigationId: run.investigationId,
+        status: run.status,
+        state: run.state,
+        currentStage: run.currentStage,
+        error: run.error,
+        retryCount: run.retryCount,
+        createdAt: run.createdAt.toISOString(),
+        updatedAt: run.updatedAt.toISOString(),
+      });
+    } catch (error: unknown) {
+      console.error("Failed to get investigation:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
 );
 
 // 2. Lock down the Start Investigation Endpoint
 apiRouter.post(
-  "/investigations/start", 
-  requireAuth,                            // Must be logged in
-  requireRole(["INVESTIGATOR", "ADMIN"]), // Must have correct role
-  requireCaseAccess,                      // Must have clearance for this specific caseId
+  "/investigations/start",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  requireCaseAccess,
   async (req, res) => {
     try {
-      // 1. Strict input validation
       const parsed = StartInvestigationSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid payload", details: parsed.error });
@@ -37,38 +85,166 @@ apiRouter.post(
 
       const { caseId, investigationId } = parsed.data;
 
-      // 2. Create the Investigation Run state in the database
       const run = await db.investigationRun.create({
         data: {
           investigationId,
+          caseId,
           status: "QUEUED",
           state: "CREATED",
-          contextData: { caseId }, // Store case scope in context
+          contextData: { caseId },
         }
       });
 
-      // 3. Log the action to the tamper-evident audit trail
       await logAuditEvent({
         investigationId,
-        action: "INVESTIGATION_OPENED" as any, // Cast to contracts AuditAction
-        actor: req.user!.id, //logs the actual user ID instead of "API_SYSTEM"
+        action: "INVESTIGATION_OPENED",
+        actor: req.user!.id,
         targetType: "INVESTIGATION_RUN",
         targetId: run.id,
         description: `Investigation run queued for case ${caseId}`
       });
 
-      // 4. Push to BullMQ (Producer)
       await investigationQueue.add("investigation-pipeline", {
         runId: run.id
       });
 
-      return res.status(202).json({ 
-        message: "Investigation queued successfully", 
-        runId: run.id 
+      return res.status(202).json({
+        message: "Investigation queued successfully",
+        runId: run.id
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to start investigation:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 3. Evidence Submission Endpoint (I-PR2 boundary)
+//    POST /api/v1/investigations/:investigationId/evidence
+//
+//    Authorization ordering:
+//      1. requireAuth — authenticate (middleware)
+//      2. requireRole — RBAC gate (middleware)
+//      3. Resolve investigation from DB
+//      4. Resolve caseId from canonical Prisma column
+//      5. verifyCaseAccess — case boundary check
+//      6. Validate payload + enqueue jobs
+//
+//    Accepts user-provided metadata + uploaded file references.
+//    Constructs ArtifactReference per file.
+//    Enqueues IngestionJobPayload per file to BullMQ.
+//
+//    The worker (I-PR3) processes these jobs.
+apiRouter.post(
+  "/investigations/:investigationId/evidence",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+
+      // 1. Resolve investigation from DB
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      // 2. Resolve caseId from canonical Prisma column
+      const caseId = run.caseId;
+      if (!caseId) {
+        return res.status(400).json({ error: "Investigation has no associated case" });
+      }
+
+      // 3. Case boundary authorization
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      // 4. Validate payload
+      const parsed = EvidenceSubmissionRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "VALIDATION_FAILED",
+          details: parsed.error.flatten(),
+        });
+      }
+      const submission = parsed.data;
+
+      // 5. System-generated IDs for this submission batch
+      const operationId = randomUUID();
+      const correlationId = randomUUID();
+
+      // 6. Construct ArtifactReference + enqueue one job per file
+      const jobIds: string[] = [];
+      for (const file of submission.files) {
+        const idempotencyKey = `evidence-${investigationId}-${file.fileKey}`;
+
+        const artifactReference = {
+          url: file.fileUrl,
+          originalFilename: file.fileName,
+          declaredMimeType: file.mimeType,
+          declaredSizeBytes: file.fileSize,
+          sourceType: "FILE_UPLOAD",
+          idempotencyKey,
+          providerMetadata: { fileKey: file.fileKey },
+        };
+
+        const job = await investigationQueue.add(
+          "ingest-evidence",
+          {
+            investigationId,
+            caseId,
+            artifactReference,
+            sourceName: submission.sourceName,
+            sourceDescription: submission.sourceDescription,
+            evidenceType: submission.evidenceType,
+            evidenceTitle: submission.evidenceTitle,
+            evidenceDescription: submission.evidenceDescription,
+            observedAt: submission.observedAt,
+            operationId,
+            correlationId,
+            idempotencyKey,
+          },
+          { jobId: idempotencyKey },
+        );
+
+        jobIds.push(job.id!);
+      }
+
+      // 7. Audit — EVIDENCE_QUEUED: submission accepted and jobs enqueued
+      await logAuditEvent({
+        investigationId,
+        action: "EVIDENCE_QUEUED",
+        actor: req.user!.id,
+        targetType: "EVIDENCE",
+        targetId: investigationId,
+        description: `Evidence queued: ${submission.evidenceTitle} (${submission.files.length} file(s), case: ${caseId})`,
+      });
+
+      // 8. Broadcast to SSE listeners
+      realtimeEvents.emit("progress", {
+        investigationId,
+        type: "EVIDENCE_SUBMITTED",
+        evidenceTitle: submission.evidenceTitle,
+        fileCount: submission.files.length,
+        operationId,
+      });
+
+      return res.status(202).json({
+        message: "Evidence submission accepted",
+        operationId,
+        correlationId,
+        jobsEnqueued: jobIds.length,
+        fileCount: submission.files.length,
+      });
+
+    } catch (error: unknown) {
+      console.error("Failed to submit evidence:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

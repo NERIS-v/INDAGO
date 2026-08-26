@@ -7,4 +7,5 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   prisma: true
+  sharp: true
   tesseract.js: true
