@@ -53,6 +53,9 @@ export * from './intelligence/ingestion-envelope.js';
 export * from './intelligence/adapter-capability.js';
 export * from './intelligence/ingestion-errors.js';
 export * from './intelligence/artifact-reference.js';
+export * from './intelligence/evidence-submission.js';
+export * from './intelligence/upload-router.js';
+export * from './intelligence/ingestion-job-payload.js';
 
 // Execution contracts
 export * from './execution/investigation-run.js';
