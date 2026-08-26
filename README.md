@@ -1,34 +1,39 @@
 <div align="center">
 
-# INDAGO
+<img src="https://img.shields.io/badge/PS-26189-FF6B35?style=for-the-badge&labelColor=0D1117" alt="PS 26189"> <img src="https://img.shields.io/badge/Architecture-v7.0-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Architecture v7.0"> <img src="https://img.shields.io/badge/Status-SIH%20Prototype-FFB800?style=for-the-badge&labelColor=0D1117" alt="Status"> <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge&labelColor=0D1117" alt="License: MIT">
 
-### **Evidence-to-Graph Investigative Intelligence**
+&nbsp;
+
+# `INDAGO`
+
+### Evidence-to-Graph Investigative Intelligence
 
 **AI-Powered Criminal Network Analysis System**
-*PS 26189 — Architecture Version 7.0*
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-7.0-green.svg)]()
-[![Status](https://img.shields.io/badge/Status-SIH%20Prototype-orange.svg)]()
 
 ---
 
-*From fragmented investigative evidence to defensible, reviewable investigative leads.*
+<img src="https://img.shields.io/badge/OBSERVE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/RESOLVE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/CONNECT-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/FIND_LEAD-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/CLASSIFY_GAP-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/REQUEST_EVIDENCE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/VERIFY-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/UPDATE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/CHALLENGE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/REASSESS-grey?style=flat-square">
 
-**OBSERVE → RESOLVE → CONNECT → FIND LEAD → CLASSIFY GAP → REQUEST BEST EVIDENCE → VERIFY → UPDATE → CHALLENGE → REASSESS**
+*From fragmented investigative evidence to defensible, reviewable investigative leads.*
 
 </div>
 
 ---
 
-## Table of Contents
+<details>
+<summary><strong>Table of Contents</strong></summary>
 
+<br>
+
+**Core**
 - [Executive Summary](#executive-summary)
 - [What INDAGO Is Not](#what-indago-is-not)
 - [V7 Core Thesis](#v7-core-thesis)
 - [V7 Engineering Principle](#v7-engineering-principle)
 - [Problem Statement Alignment](#problem-statement-alignment)
 - [Design Thesis & Innovation Boundary](#design-thesis--innovation-boundary)
+
+**Architecture**
 - [Master Architecture](#master-architecture)
 - [Ingestion & Source Provenance](#ingestion--source-provenance)
 - [Normalization & Data Quality](#normalization--data-quality)
@@ -36,17 +41,25 @@
 - [Entity & Relation Resolution](#entity--relation-resolution)
 - [Role-Aware Entity Model](#role-aware-entity-model)
 - [Temporal Intelligence Architecture](#temporal-intelligence-architecture)
+
+**Analytics & Discovery**
 - [Graph & Discovery Analytics](#graph--discovery-analytics)
 - [Cross-Case & Boundary Analysis](#cross-case--boundary-analysis)
 - [Investigative Gap & Graph-Hole Engine](#investigative-gap--graph-hole-engine)
 - [Concealment-Consistent Pattern Analysis](#concealment-consistent-pattern-analysis)
 - [Robustness Engine](#robustness-engine)
+
+**Reasoning & Reliability**
 - [Evidence Posture & Analytical Confidence](#evidence-posture--analytical-confidence)
 - [Investigation Orchestrator & Agent Reliability](#investigation-orchestrator--agent-reliability)
 - [Security, Privacy, Audit & Safety](#security-privacy-audit--safety)
+
+**Data & UX**
 - [Canonical Data Model](#canonical-data-model)
 - [Scoring & Mathematical Guardrails](#scoring--mathematical-guardrails)
 - [Investigator UX](#investigator-ux)
+
+**Delivery**
 - [Definition of Done](#definition-of-done)
 - [SIH Scope Lock](#sih-scope-lock)
 - [Winning Demo](#winning-demo)
@@ -54,10 +67,15 @@
 - [Non-Negotiable Safety & Epistemic Rules](#non-negotiable-safety--epistemic-rules)
 - [Research & Evidence Basis](#research--evidence-basis)
 - [Architecture Decision Record](#final-architecture-decision-record)
-- [Implementation Blueprint](#appendix-a---implementation-blueprint)
-- [Minimal Demo Dataset](#appendix-b---minimal-demo-dataset-design)
-- [Judge-Facing Differentiation](#appendix-c---judge-facing-differentiation-in-one-minute)
+
+**Implementation**
+- [Implementation Status](#implementation-status)
+- [Appendix A — Implementation Blueprint](#appendix-a---implementation-blueprint)
+- [Appendix B — Minimal Demo Dataset](#appendix-b---minimal-demo-dataset-design)
+- [Appendix C — Judge-Facing Differentiation](#appendix-c---judge-facing-differentiation-in-one-minute)
 - [License](#license)
+
+</details>
 
 ---
 
@@ -889,6 +907,84 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
 
 ---
 
+---
+
+## Implementation Status
+
+<div align="center">
+
+<img src="https://img.shields.io/badge/Phase_1-Foundation-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 1"> <img src="https://img.shields.io/badge/Phase_2-Platform-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 2"> <img src="https://img.shields.io/badge/Phase_3-Integration-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 3">
+
+</div>
+
+<table>
+  <tr>
+    <td><strong>Phase 1 — Foundation</strong></td>
+    <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
+    <td>Monorepo setup, Zod contracts, CI/CD pipeline</td>
+  </tr>
+  <tr>
+    <td><strong>Phase 2 — Platform Core</strong></td>
+    <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
+    <td>Express API, RBAC auth, upload queue, SSE streaming</td>
+  </tr>
+  <tr>
+    <td><strong>Phase 3 — Integration & UI</strong></td>
+    <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
+    <td>Next.js 15 web app, evidence workflow, vis.js graph shell</td>
+  </tr>
+</table>
+
+### Monorepo Structure
+
+```
+packages/
+├── contracts/      Zod schemas for domain models & API validation
+├── platform/       Express API server, auth, upload queue, orchestrator
+├── web/            Next.js 15 dark-mode UI with vis.js graph rendering
+└── intelligence/   Ingestion pipeline (OCR, NER, CDR/financial parsing)
+```
+
+### Features Built
+
+<table>
+  <tr>
+    <td><img src="https://img.shields.io/badge/API-Express-000000?style=flat-square" alt="API"></td>
+    <td>RBAC-secured investigation routes with SSE progress streaming</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Pipeline-Ingestion-1A1A2E?style=flat-square" alt="Pipeline"></td>
+    <td>Evidence upload with ingestion job payloads and orchestrator</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/UI-Next.js-000000?style=flat-square" alt="UI"></td>
+    <td>Dark investigative theme, file upload, evidence review, investigation detail</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Graph-vis.js-E63946?style=flat-square" alt="Graph"></td>
+    <td>Network graph shell for temporal graph visualization</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Contracts-Zod-389826?style=flat-square" alt="Contracts"></td>
+    <td>Shared validation schemas across all packages</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square" alt="CI"></td>
+    <td>Build, typecheck, test on every push</td>
+  </tr>
+</table>
+
+### Getting Started
+
+```bash
+pnpm install          # install all dependencies
+pnpm typecheck        # run type checks across packages
+pnpm test             # run test suites
+pnpm build            # build all packages
+```
+
+---
+
 <div align="center">
 
 ### Protected / Informant Sources — Future Scope
@@ -901,51 +997,11 @@ Informant handling is outside P0. The architecture reserves a source-protection 
 - Audit access without exposing protected identity in ordinary reasoning views
 - No informant-specific demo data
 
----
-
-## Implementation Status
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 1 — Foundation | ✅ Complete | Monorepo setup, contracts, CI/CD |
-| Phase 2 — Platform Core | ✅ Complete | API server, auth, upload pipeline, SSE |
-| Phase 3 — Integration & UI | ✅ Complete | Next.js web app, evidence workflow, vis.js graph shell |
-
-### Monorepo Structure
-
-```
-packages/
-├── contracts/      # Zod schemas for domain models & API validation
-├── platform/       # Express API server, auth, upload queue, orchestrator
-├── web/            # Next.js 15 dark-mode UI with vis.js graph rendering
-└── intelligence/   # Ingestion pipeline (OCR, NER, CDR/financial parsing)
-```
-
-### Key Features Built
-
-- **RBAC-secured API** with investigation routes and SSE progress streaming
-- **Evidence upload pipeline** with ingestion job payloads and orchestrator
-- **Next.js web UI** — dark investigative theme, file upload, evidence review, investigation detail
-- **vis.js network graph shell** for temporal graph visualization
-- **Zod contract validation** across all packages
-- **GitHub Actions CI** — build, typecheck, test on every push
-
-### Getting Started
-
-```bash
-# Install dependencies
-pnpm install
-
-# Run typechecks
-pnpm typecheck
-
-# Run tests
-pnpm test
-```
+<br>
 
 ---
 
-**Built by NERIS-v** · Architecture v7.0 · MIT License
+<img src="https://img.shields.io/badge/Built_by-NERIS--v-FF6B35?style=for-the-badge&labelColor=0D1117" alt="Built by NERIS-v"> <img src="https://img.shields.io/badge/Architecture-v7.0-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Architecture v7.0"> <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge&labelColor=0D1117" alt="MIT License">
 
 *INDAGO does not decide who is guilty. It shows the investigator what the evidence supports, what could be wrong, what is missing, and what to verify next.*
 
