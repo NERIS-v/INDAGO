@@ -14,6 +14,7 @@ generator client {
 model InvestigationRun {
   id              String   @id @default(uuid())
   investigationId String   // References Domain ID
+  caseId          String   // Case this investigation belongs to
   status          String   // QUEUED, RUNNING, PAUSED, COMPLETED, FAILED
   state           String   // CREATED, INGESTING, ANALYZING, WAITING_FOR_EVIDENCE
   currentStage    String?  // Human readable sub-stage

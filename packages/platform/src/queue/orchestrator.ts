@@ -3,22 +3,70 @@ import Redis from "ioredis";
 import { randomUUID } from "node:crypto";
 import { db } from "../db/prisma.js";
 import { logAuditEvent } from "../audit/logger.js";
-import { DEFAULT_RUN_STATE_CONFIGURATION, type InvestigationRunState } from "@indago/contracts";
+import {
+  DEFAULT_RUN_STATE_CONFIGURATION,
+  IngestionJobPayloadSchema,
+  type InvestigationRunState,
+} from "@indago/contracts";
 import { validateClaim, ClaimGroundingError } from "../security/grounding.js";
 
-const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const connection = new Redis(REDIS_URL);
+const workerConnection = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 
-export const investigationQueue = new Queue("investigation-pipeline", { 
+export const investigationQueue = new Queue("investigation-pipeline", {
   connection,
   defaultJobOptions: {
     attempts: 3,
-    backoff: { type: "exponential", delay: 2000 }
-  }
+    backoff: { type: "exponential", delay: 2000 },
+  },
 });
 
 export const investigationWorker = new Worker(
   "investigation-pipeline",
-  async (job: Job<{ runId: string }>) => {
+  async (job: Job) => {
+    // I-PR2: Handle ingest-evidence jobs (canonical IngestionJobPayload)
+    if (job.name === "ingest-evidence") {
+      const parsed = IngestionJobPayloadSchema.safeParse(job.data);
+      if (!parsed.success) {
+        // Malformed payload: extract investigationId via safe runtime checks.
+        // No casts — use typeof guards to avoid type narrowing violations.
+        const raw = job.data as unknown;
+        const investigationId =
+          typeof raw === "object" &&
+          raw !== null &&
+          "investigationId" in raw &&
+          typeof (raw as Record<string, unknown>).investigationId === "string"
+            ? String((raw as Record<string, unknown>).investigationId)
+            : "unknown";
+
+        // SYSTEM_ACTION: malformed queue message is a system anomaly,
+        // not an ingestion-job lifecycle failure.
+        await logAuditEvent({
+          investigationId,
+          action: "SYSTEM_ACTION",
+          actor: "SYSTEM_WORKER",
+          targetType: "SYSTEM",
+          targetId: job.id ?? "unknown",
+          description: `Malformed ingest-evidence payload: ${parsed.error.message}`,
+        });
+        throw new Error(`Malformed ingest-evidence payload: ${parsed.error.message}`);
+      }
+
+      // Valid payload received — log receipt, then return (no ingestion execution).
+      // I-PR3 will implement the actual ingestion logic here.
+      await logAuditEvent({
+        investigationId: parsed.data.investigationId,
+        action: "SYSTEM_ACTION",
+        actor: "SYSTEM_WORKER",
+        targetType: "INGESTION_JOB",
+        targetId: job.id ?? "unknown",
+        description: `Ingest-evidence job received (correlation: ${parsed.data.correlationId})`,
+      });
+      return;
+    }
+
+    // Existing investigation-pipeline handling
     const run = await db.investigationRun.findUniqueOrThrow({ where: { id: job.data.runId } });
 
     try {
@@ -78,7 +126,7 @@ export const investigationWorker = new Worker(
       throw error; 
     }
   },
-  { connection }
+  { connection: workerConnection }
 );
 
 async function transitionState(runId: string, newState: InvestigationRunState, trigger: string) {
