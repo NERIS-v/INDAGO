@@ -13,6 +13,9 @@ export function streamEventsHandler(req: Request, res: Response) {
 
   const investigationId = req.params.investigationId;
 
+  // Send an initial connection success event
+  res.write(`data: ${JSON.stringify({ investigationId, type: "CONNECTED", message: "Stream initialized" })}\n\n`);
+
   // The listener that pushes data to the client
   const listener = (eventData: any) => {
     // Only send events relevant to the requested investigation
@@ -28,5 +31,15 @@ export function streamEventsHandler(req: Request, res: Response) {
   req.on("close", () => {
     realtimeEvents.removeListener("progress", listener);
     res.end();
+  });
+}
+
+// Helper function to easily broadcast updates from BullMQ workers
+export function emitProgressEvent(investigationId: string, state: string, message: string) {
+  realtimeEvents.emit("progress", {
+    investigationId,
+    state,
+    message,
+    timestamp: new Date().toISOString(),
   });
 }
