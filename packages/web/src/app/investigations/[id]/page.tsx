@@ -1,36 +1,8 @@
-import { notFound } from "next/navigation";
-import { InvestigationDetail } from "./investigation-detail";
-import type { InvestigationStatusResponse } from "@/lib/api/types";
-import { Button } from "@/components/ui/button";
+import { InvestigationOverview } from "./investigation-overview";
 
 interface PageProps {
   readonly params: Promise<{ id: string }>;
   readonly searchParams: Promise<{ caseId?: string }>;
-}
-
-async function getInvestigation(
-  investigationId: string,
-  caseId: string,
-): Promise<InvestigationStatusResponse | null> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = process.env.AUTH_TOKEN;
-
-  if (!baseUrl || !token) return null;
-
-  try {
-    const res = await fetch(
-      `${baseUrl}/api/v1/investigations/${investigationId}?caseId=${encodeURIComponent(caseId)}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      },
-    );
-
-    if (!res.ok) return null;
-    return (await res.json()) as InvestigationStatusResponse;
-  } catch {
-    return null;
-  }
 }
 
 export default async function InvestigationPage({
@@ -56,18 +28,18 @@ export default async function InvestigationPage({
             </p>
           </div>
           <a href="/">
-            <Button variant="secondary" size="sm">Go to Dashboard</Button>
+            <span className="inline-flex rounded-md border border-border-subtle bg-surface-50 px-3.5 py-2 text-sm font-medium text-surface-700 hover:bg-surface-100">
+              Go to Dashboard
+            </span>
           </a>
         </div>
       </div>
     );
   }
 
-  const investigation = await getInvestigation(id, caseId);
-
-  if (!investigation) {
-    notFound();
-  }
-
-  return <InvestigationDetail initialData={investigation} caseId={caseId} />;
+  // The workspace shell + provider bundle are established in the layout via
+  // <WorkspaceBoundary>, which resolves investigationId from the route and
+  // caseId from ?caseId=. The overview consumes the bundle through the
+  // Workspace context and never imports Demo/Live implementations directly.
+  return <InvestigationOverview investigationId={id} />;
 }

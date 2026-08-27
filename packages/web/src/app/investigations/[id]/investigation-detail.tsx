@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { InvestigationStatusResponse } from "@/lib/api/types";
 import type { SseEvent } from "@/lib/realtime/sse-client";
-import { createSseClient } from "@/lib/realtime/sse-client";
+import { useWorkspace } from "@/lib/providers/workspace/context";
 import { InvestigationStatus } from "@/components/status/investigation-status";
 import { EvidenceSubmission } from "@/components/evidence/evidence-submission";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -20,13 +20,14 @@ export function InvestigationDetail({
   initialData,
   caseId,
 }: InvestigationDetailProps) {
+  const workspace = useWorkspace();
   const [investigation, setInvestigation] =
     useState<InvestigationStatusResponse>(initialData);
   const [events, setEvents] = useState<SseEvent[]>([]);
   const [sseError, setSseError] = useState<string | null>(null);
   const [sseConnected, setSseConnected] = useState(false);
   const [showEvidenceForm, setShowEvidenceForm] = useState(false);
-  const sseRef = useRef<ReturnType<typeof createSseClient> | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -41,25 +42,33 @@ export function InvestigationDetail({
   }, [investigation.investigationId, caseId]);
 
   useEffect(() => {
-    const client = createSseClient({
-      investigationId: investigation.investigationId,
-      onEvent: (event) => {
-        setEvents((prev) => [event, ...prev].slice(0, 100));
-        handleRefresh();
-      },
-      onOpen: () => setSseConnected(true),
-      onClose: () => setSseConnected(false),
-      onError: (err) => setSseError(err.message),
+    const realtime = workspace.realtime;
+
+    const unsubscribe = realtime.subscribe((event) => {
+      setEvents((prev) => [event, ...prev].slice(0, 100));
+      void handleRefresh();
     });
 
-    sseRef.current = client;
-    client.connect();
+    unsubscribeRef.current = unsubscribe;
+
+    // Track connection status via interval-less polling of getStatus.
+    const statusTimer = window.setInterval(() => {
+      const status = realtime.getStatus();
+      setSseConnected(status === "connected");
+      if (status === "error") {
+        setSseError("The live stream lost its connection.");
+      }
+    }, 500);
+
+    realtime.connect(workspace.workspaceId || investigation.investigationId);
 
     return () => {
-      client.destroy();
-      sseRef.current = null;
+      unsubscribe();
+      window.clearInterval(statusTimer);
+      realtime.disconnect();
+      unsubscribeRef.current = null;
     };
-  }, [investigation.investigationId, handleRefresh]);
+  }, [workspace, investigation.investigationId, handleRefresh]);
 
   const canAddEvidence =
     investigation.state === "CREATED" || investigation.state === "INGESTING";
@@ -108,7 +117,9 @@ export function InvestigationDetail({
               size="sm"
               onClick={() => {
                 setSseError(null);
-                sseRef.current?.connect();
+                workspace.realtime.connect(
+                  workspace.workspaceId || investigation.investigationId,
+                );
               }}
             >
               Reconnect
