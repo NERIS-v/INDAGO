@@ -45,8 +45,8 @@ export default function NewInvestigationPage() {
     <div className="p-8 animate-fade-in">
       <div className="mx-auto max-w-lg space-y-8">
         <div>
-          <h1 className="text-lg font-medium tracking-wide text-surface-800">New Investigation</h1>
-          <p className="text-xs text-surface-500 mt-1">
+          <h1 className="type-title text-text-primary">New Investigation</h1>
+          <p className="type-caption mt-1">
             Enter a case ID to begin a new intelligence analysis.
           </p>
         </div>

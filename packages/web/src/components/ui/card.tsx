@@ -2,6 +2,9 @@ import { type HTMLAttributes, forwardRef } from "react";
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   padding?: "none" | "sm" | "md" | "lg";
+  /** When set, the card is interactive: it warms on hover with a subtle
+   *  tonal shift (no lift, no shadow bloom). */
+  interactive?: boolean;
 }
 
 const paddingStyles = {
@@ -12,11 +15,18 @@ const paddingStyles = {
 };
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
-  function Card({ padding = "md", className = "", children, ...props }, ref) {
+  function Card(
+    { padding = "md", interactive = false, className = "", children, ...props },
+    ref,
+  ) {
     return (
       <div
         ref={ref}
-        className={`bg-surface-50 rounded-xl border border-surface-200/60 ${paddingStyles[padding]} ${className}`}
+        className={`bg-surface-50 rounded-xl border border-border-standard ${
+          interactive
+            ? "transition-colors duration-normal ease-restrained hover:bg-surface-100 hover:border-border-emphasis"
+            : ""
+        } ${paddingStyles[padding]} ${className}`}
         {...props}
       >
         {children}
@@ -47,7 +57,7 @@ export function CardTitle({
 }: HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={`text-sm font-medium tracking-wide uppercase text-surface-600 ${className}`}
+      className={`type-section text-text-muted ${className}`}
       {...props}
     >
       {children}
@@ -62,7 +72,7 @@ export function CardDescription({
 }: HTMLAttributes<HTMLParagraphElement>) {
   return (
     <p
-      className={`text-xs text-surface-500 ${className}`}
+      className={`type-caption ${className}`}
       {...props}
     >
       {children}
