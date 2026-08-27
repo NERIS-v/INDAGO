@@ -32,6 +32,10 @@ app.use(
   "/api/uploadthing",
   createRouteHandler({
     router: uploadRouter,
+    config: {
+      // This forces the SDK to use the active Seattle server, bypassing the dead domain!
+      ingestUrl: "https://sea1.ingest.uploadthing.com",
+    }
   })
 );
 
