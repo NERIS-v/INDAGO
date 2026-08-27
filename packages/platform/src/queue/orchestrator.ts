@@ -75,7 +75,7 @@ export const investigationWorker = new Worker(
         case "CREATED": {
           await transitionState(run.id, "INGESTING", "PIPELINE_START");
           // Re-queue to immediately process the INGESTING step
-          await investigationQueue.add("investigation-pipeline", { runId: run.id });
+          //await investigationQueue.add("investigation-pipeline", { runId: run.id });
           break;
         }
 
