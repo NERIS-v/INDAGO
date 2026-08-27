@@ -48,4 +48,38 @@ describe("StateBadge", () => {
     const badge = screen.getByTestId("state-badge");
     expect(badge.className).toContain("my-custom-class");
   });
+
+  it("should breathe for active processing states", () => {
+    const { container } = render(<StateBadge state="ANALYZING" />);
+    const dot = container.querySelector("span > span");
+    expect((dot as HTMLElement).className).toContain("animate-breathe");
+  });
+
+  it.each(["INGESTING", "NORMALIZING", "DISCOVERING", "REASSESSING"])(
+    "should treat %s as active processing (breathes)",
+    (state) => {
+      const { container } = render(<StateBadge state={state} />);
+      const dot = container.querySelector("span > span");
+      expect((dot as HTMLElement).className).toContain("animate-breathe");
+    },
+  );
+
+  it.each(["WAITING_FOR_EVIDENCE", "CREATED"])(
+    "should NOT treat %s as active processing (static, but still dotted)",
+    (state) => {
+      const { container } = render(<StateBadge state={state} />);
+      const dot = container.querySelector("span > span");
+      expect((dot as HTMLElement).className).not.toContain("animate-breathe");
+      expect((dot as HTMLElement).className).toContain("rounded-full");
+    },
+  );
+
+  it.each(["COMPLETED", "FAILED", "PAUSED", "REVIEW_REQUIRED"])(
+    "should render %s as a static terminal/held state",
+    (state) => {
+      const { container } = render(<StateBadge state={state} />);
+      const dot = container.querySelector("span > span");
+      expect((dot as HTMLElement).className).not.toContain("animate-breathe");
+    },
+  );
 });

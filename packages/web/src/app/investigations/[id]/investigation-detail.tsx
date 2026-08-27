@@ -69,13 +69,13 @@ export function InvestigationDetail({
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-medium tracking-wide text-surface-800">Investigation</h1>
+            <h1 className="type-title text-text-primary">Investigation</h1>
             <Badge variant={sseConnected ? "success" : "muted"}>
               <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${sseConnected ? "bg-success animate-slow-pulse" : "bg-surface-400"}`} />
               {sseConnected ? "Live" : "Offline"}
             </Badge>
           </div>
-          <p className="font-mono text-[11px] text-surface-500">
+          <p className="type-mono-small">
             {investigation.investigationId}
           </p>
         </div>

@@ -11,20 +11,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="space-y-1.5">
         {label && (
-          <label
-            htmlFor={inputId}
-            className="block text-xs font-medium tracking-wide uppercase text-surface-500"
-          >
+          <label htmlFor={inputId} className="type-label block">
             {label}
           </label>
         )}
         <input
           ref={ref}
           id={inputId}
-          className={`block w-full rounded-lg border bg-surface-100 px-3.5 py-2.5 text-sm text-surface-800 placeholder:text-surface-400 transition-all duration-500 focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 ${error ? "border-danger/50 focus:border-danger focus:ring-danger/20" : "border-surface-200/60 hover:border-surface-300"} ${className}`}
+          className={`block w-full rounded-lg border bg-surface-100 px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-disabled transition-colors duration-fast ease-restrained focus:border-accent-rose/50 focus:ring-1 focus:ring-accent-rose/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${error ? "border-danger/50 focus:border-danger focus:ring-danger/20" : "border-border-standard hover:border-border-emphasis"} ${className}`}
           {...props}
         />
-        {error && <p className="text-xs text-danger/80">{error}</p>}
+        {error && <p className="type-caption text-danger/80">{error}</p>}
       </div>
     );
   },
@@ -42,20 +39,17 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     return (
       <div className="space-y-1.5">
         {label && (
-          <label
-            htmlFor={textareaId}
-            className="block text-xs font-medium tracking-wide uppercase text-surface-500"
-          >
+          <label htmlFor={textareaId} className="type-label block">
             {label}
           </label>
         )}
         <textarea
           ref={ref}
           id={textareaId}
-          className={`block w-full rounded-lg border bg-surface-100 px-3.5 py-2.5 text-sm text-surface-800 placeholder:text-surface-400 transition-all duration-500 focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 resize-none ${error ? "border-danger/50 focus:border-danger focus:ring-danger/20" : "border-surface-200/60 hover:border-surface-300"} ${className}`}
+          className={`block w-full rounded-lg border bg-surface-100 px-3.5 py-2.5 text-sm text-text-primary placeholder:text-text-disabled transition-colors duration-fast ease-restrained focus:border-accent-rose/50 focus:ring-1 focus:ring-accent-rose/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 resize-none ${error ? "border-danger/50 focus:border-danger focus:ring-danger/20" : "border-border-standard hover:border-border-emphasis"} ${className}`}
           {...props}
         />
-        {error && <p className="text-xs text-danger/80">{error}</p>}
+        {error && <p className="type-caption text-danger/80">{error}</p>}
       </div>
     );
   },
@@ -77,17 +71,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="space-y-1.5">
         {label && (
-          <label
-            htmlFor={selectId}
-            className="block text-xs font-medium tracking-wide uppercase text-surface-500"
-          >
+          <label htmlFor={selectId} className="type-label block">
             {label}
           </label>
         )}
         <select
           ref={ref}
           id={selectId}
-          className={`block w-full rounded-lg border bg-surface-100 px-3.5 py-2.5 text-sm text-surface-800 transition-all duration-500 focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-30 ${error ? "border-danger/50 focus:border-danger focus:ring-danger/20" : "border-surface-200/60 hover:border-surface-300"} ${className}`}
+          className={`select-chevron block w-full rounded-lg border bg-surface-100 px-3.5 py-2.5 text-sm text-text-primary transition-colors duration-fast ease-restrained focus:border-accent-rose/50 focus:ring-1 focus:ring-accent-rose/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${error ? "border-danger/50 focus:border-danger focus:ring-danger/20" : "border-border-standard hover:border-border-emphasis"} ${className}`}
           {...props}
         >
           {placeholder && (
@@ -101,7 +92,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p className="text-xs text-danger/80">{error}</p>}
+        {error && <p className="type-caption text-danger/80">{error}</p>}
       </div>
     );
   },

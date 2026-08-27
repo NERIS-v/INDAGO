@@ -1,17 +1,29 @@
 import { type ButtonHTMLAttributes, forwardRef } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "quiet";
 type Size = "sm" | "md" | "lg";
 
+/**
+ * Button hierarchy:
+ *   primary   rare, strong, clear — the accent moment (dusty rose)
+ *   secondary default operational action
+ *   ghost     low emphasis
+ *   danger    destructive / high-impact
+ *   quiet     minimal, icon-friendly
+ *
+ * Hover is a subtle tonal movement — never scale, bounce, or glow.
+ */
 const variantStyles: Record<Variant, string> = {
   primary:
-    "bg-brand-500/20 text-brand-500 border border-brand-500/30 hover:bg-brand-500/30 hover:border-brand-500/50 active:bg-brand-500/40",
+    "bg-accent-rose text-background-base border border-accent-rose hover:bg-accent-rose/90 hover:border-accent-rose active:bg-accent-rose/80",
   secondary:
-    "bg-surface-100 text-surface-700 border border-surface-200 hover:bg-surface-200 hover:border-surface-300 active:bg-surface-300",
+    "bg-surface-100 text-text-secondary border border-border-standard hover:bg-surface-200 hover:border-border-emphasis hover:text-text-primary active:bg-surface-300",
   ghost:
-    "text-surface-600 hover:bg-surface-100 hover:text-surface-800 active:bg-surface-200",
+    "text-text-secondary hover:bg-surface-100 hover:text-text-primary active:bg-surface-200",
   danger:
-    "bg-danger/15 text-danger border border-danger/20 hover:bg-danger/25 active:bg-danger/35",
+    "bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20 hover:border-danger/30 active:bg-danger/30",
+  quiet:
+    "text-text-muted hover:bg-surface-100 hover:text-text-primary active:bg-surface-200",
 };
 
 const sizeStyles: Record<Size, string> = {
@@ -43,30 +55,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center justify-center font-medium transition-all duration-500 disabled:opacity-30 disabled:cursor-not-allowed ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+        className={`inline-flex items-center justify-center font-medium transition-colors duration-fast ease-restrained disabled:opacity-40 disabled:cursor-not-allowed ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
         {...props}
       >
         {loading && (
-          <svg
-            className="animate-spin -ml-0.5 h-4 w-4"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-20"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-60"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-current animate-breathe"
+            aria-hidden="true"
+          />
         )}
         {children}
       </button>
