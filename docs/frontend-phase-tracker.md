@@ -144,6 +144,67 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 ---
 
+# Page Completion Matrix
+
+Each row is one of the 22 views from `docs/frontend-development-plan.md` §14/§15. Mark `[x]` when the page is built against the provider. Source of truth for demo coverage.
+
+| View | Page / Surface | Provider method(s) | Owner | Route / Tab | Page spec | Status |
+|---|---|---|---|---|---|---|
+| 01 | Login / Access | (optional) | `[M]` | route (P2) | §15 V01 | [ ] |
+| 02 | Case List | `InvestigationProvider.getInvestigations()` | `[G]` | `/` | §15 V02 | [ ] |
+| 03 | New Case Intake | `EvidenceProvider.submitEvidence()` | `[G]` | `/investigations/new` | §15 V03 | [ ] |
+| 04 | Investigation Workspace | bundle + realtime | `[G]` | `/investigations/[id]` | §15 V04 | [ ] |
+| 05 | Observations Feed | `ObservationProvider` | `[G]` | workspace tab | §15 V05 | [ ] |
+| 06 | Entity Resolution Queue | `EntityProvider` | `[G]` | workspace tab | §15 V06 | [ ] |
+| 07 | Entity Detail | `EntityProvider` + `GraphProvider` | `[G]` | drawer | §15 V07 | [ ] |
+| 08 | Graph View | `GraphProvider.getGraph()` | `[G]` | workspace panel | §15 V08 | [ ] |
+| 09 | Timeline View | `TimelineProvider.getTimeline()` | `[G]` | workspace panel | §15 V09 | [ ] |
+| 10 | Leads List | `LeadProvider.getLeads()` | `[G]` | workspace tab | §15 V10 | [ ] |
+| 11 | Lead Detail | `LeadProvider` + `CounterEvidence` | `[G]` | drawer | §15 V11 | [ ] |
+| 12 | Gaps List | `GapProvider.getGaps()` | `[G]` | workspace tab | §15 V12 | [ ] |
+| 13 | Gap Detail | `GapProvider` | `[G]` | drawer | §15 V13 | [ ] |
+| 14 | Evidence Request Queue | `EvidenceProvider` / `GapProvider` | `[G]` | workspace tab | §15 V14 | [ ] |
+| 15 | Cross-Case Signals | `CrossCaseProvider` (demo) | `[G]` | workspace tab | §15 V15 | [ ] |
+| 16 | Reasoning Ledger | `ReviewProvider` / realtime | `[M]` | workspace tab | §15 V16 | [ ] |
+| 17 | Discovery Mode | `GraphProvider` overlay | `[G]` | interaction mode | §15 V17 | [ ] |
+| 18 | Boundary Expansion | `GraphProvider` overlay | `[G]` | interaction mode | §15 V18 | [ ] |
+| 19 | Robustness Report | `RobustnessProvider` | `[M]` | workspace tab | §15 V19 | [ ] |
+| 20 | Review Center | `ReviewProvider` | `[G]` | workspace tab | §15 V20 | [ ] |
+| 21 | Admin / RBAC | (P2, cut-if-time) | `[G]` | `/admin/*` | §15 V21 | [ ] |
+| 22 | Judge Mode | `DemoProvider` script | `[Both]` | `/investigations/[id]/judge/*` | §15 V22 | [ ] |
+
+---
+
+# Visual QA Matrix
+
+Cross-object interaction check. Row = one interaction/detail to verify visually in both live and mock modes.
+
+| # | Visual QA item | Mode | Status |
+|---|---|---|---|
+| 1 | Graph bloom animation (opacity + node stagger + edge dash-draw + bridge halo, settle, pause sim) | Demo | [ ] |
+| 2 | Timeline scrubber filters graph visibility | Demo + Live | [ ] |
+| 3 | Graph community washes + bridge halo render without clipping | Demo | [ ] |
+| 4 | Node click opens Entity Detail drawer, graph context preserved | Demo + Live | [ ] |
+| 5 | Entity-resolution convergence sequence (candidates → center, equal-weight Merge/Separate) | Demo | [ ] |
+| 6 | Lead reveal (graph dim, surface translate, FOR/AGAINST stagger, alternatives, static confidence) | Demo | [ ] |
+| 7 | Graph-hole dim + region pulse + candidate explanations enter (no red flash) | Demo | [ ] |
+| 8 | Evidence-arrival (opacity/translate + connection draw) updates graph | Demo | [ ] |
+| 9 | Cross-case thread draws (stroke-dasharray → offset 0) | Demo | [ ] |
+| 10 | Reasoning ledger staggered row entrance (≤40ms, capped) | Demo + Live | [ ] |
+| 11 | Traveling processing filament during state transitions | Demo | [ ] |
+| 12 | Recovery ring on SSE reconnect (calm, keep loaded state) | Live | [ ] |
+| 13 | Judge Mode keyboard-advance + restart; deterministic run-to-run | Demo | [ ] |
+| 14 | Confidence numbers NOT animated (AnalyticalConfidence/ResolutionScore are [0,1], not probability) | All | [ ] |
+| 15 | Robustness = perturbation count [0,100] shown, not truth probability | All | [ ] |
+| 16 | GraphHole vs InvestigativeGap remain distinct (structural vs classification) | All | [ ] |
+| 17 | PII revealed only on explicit toggle (Entity Detail) | All | [ ] |
+| 18 | Low-confidence edges dashed + transparent; edge thickness maps to confidence | Demo | [ ] |
+| 19 | Empty/loading/error/recovery states per surface (§25) | All | [ ] |
+| 20 | `prefers-reduced-motion`: grain loop stops, animations skip/jump-to-end | All | [ ] |
+| 21 | Demo reset restores initial snapshot; Judge restart works | Demo | [ ] |
+
+---
+
 # F-PR Tracker
 
 | PR | Goal | Owner | Dependencies | Acceptance | Status |
