@@ -3,16 +3,18 @@ import type { Request, Response, NextFunction } from "express";
 // ============================================================================
 // Authentication & Authorization
 //
-// verifyToken() is the single development-auth boundary currently used by
-// both Express middleware (requireAuth) and UploadThing middleware.
+// verifyToken() is the single development-auth boundary used by both Express
+// middleware (requireAuth) and UploadThing middleware (resolveUploadAuth).
 //
 // verifyCaseAccess() is the single authorization boundary for case-scope
 // enforcement.
 //
-// Both functions currently contain a development mock. Production JWT/session
-// implementation can replace verifyToken() later without changing the upload
-// producer logic or any other consumer — all authentication flows through
-// this single function.
+// AUTHENTICATION IS DEVELOPMENT-ONLY. The "demo-token" credential is a
+// development mock accepted in non-production environments ONLY. In
+// production verifyToken() rejects every token, including "demo-token",
+// which makes all protected endpoints fail closed until a real identity
+// system is introduced. Production deployments MUST NOT present the demo
+// credential anywhere.
 // ============================================================================
 
 export interface AuthenticatedUser {
@@ -25,12 +27,13 @@ export interface AuthenticatedUser {
  * Single authentication boundary. Returns the authenticated principal
  * if the token is valid, or null if it is not.
  *
- * Development mock: accepts "demo-token" and returns a fixed user.
- * Production: replace with JWT verification. All consumers (Express
- * middleware, UploadThing middleware) use this single function.
+ * Development mock: accepts "demo-token" and returns a fixed user, but ONLY
+ * when NODE_ENV is not "production". Production rejects every token (the
+ * real identity system is not implemented yet), so protected endpoints fail
+ * closed in production.
  */
 export function verifyToken(token: string): AuthenticatedUser | null {
-  if (token === "demo-token") {
+  if (token === "demo-token" && process.env.NODE_ENV !== "production") {
     return {
       id: "usr_demo_123",
       role: "INVESTIGATOR",
@@ -53,6 +56,40 @@ export function verifyCaseAccess(
 ): boolean {
   if (process.env.NODE_ENV !== "production") return true;
   return user.allowedCases.includes(caseId);
+}
+
+/**
+ * UploadThing authorization guard (Prompt 3 §8/§10).
+ *
+ * The browser upload flow cannot attach a Bearer token (AUTH_TOKEN is
+ * server-only), so those requests are authenticated by UploadThing's own
+ * signed-upload handshake and allowed through with no principal — case
+ * authorization is enforced later at the evidence-submission API boundary,
+ * the single queue producer.
+ *
+ * Defense in depth: if a request DOES present a Bearer token, it must pass
+ * the same verifyToken() boundary as the REST API. A present-but-invalid
+ * token is rejected rather than silently downgraded to the anonymous path.
+ */
+export type UploadAuthResult =
+  | { readonly authorized: true; readonly user: AuthenticatedUser | null }
+  | { readonly authorized: false; readonly reason: string };
+
+export function resolveUploadAuth(headers: {
+  readonly authorization?: string;
+}): UploadAuthResult {
+  const authHeader = headers.authorization;
+  if (!authHeader) {
+    return { authorized: true, user: null };
+  }
+  if (!authHeader.startsWith("Bearer ")) {
+    return { authorized: false, reason: "Malformed authorization header" };
+  }
+  const user = verifyToken(authHeader.slice("Bearer ".length).trim());
+  if (!user) {
+    return { authorized: false, reason: "Invalid upload token" };
+  }
+  return { authorized: true, user };
 }
 
 // Extend Express Request to include INDAGO User context

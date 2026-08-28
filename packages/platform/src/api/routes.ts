@@ -7,20 +7,65 @@ import { logAuditEvent } from "../audit/logger.js";
 import { streamEventsHandler } from "../realtime/sse.js";
 import { realtimeEvents } from "../realtime/sse.js";
 import { requireAuth, requireRole, requireCaseAccess, verifyCaseAccess } from "./auth.js";
-import { EvidenceSubmissionRequestSchema } from "@indago/contracts";
+import { EvidenceSubmissionRequestSchema, CaseIdSchema } from "@indago/contracts";
 
 export const apiRouter: Router = Router();
 
 // Schema for the incoming webhook/API request
+//
+// caseId MUST be a canonical CaseIdSchema UUID. The canonical case identity
+// is persisted once on InvestigationRun.caseId and flows verbatim through the
+// queue into the worker. No random/fabricated caseId is ever generated.
 const StartInvestigationSchema = z.object({
-  caseId: z.string(),
+  caseId: CaseIdSchema,
   investigationId: z.string().uuid(),
 });
 
 // 1. Lock down the Realtime Stream
+//
+// The SSE stream is case-scoped exactly like the GET status endpoint:
+//   authenticate → resolve investigation → canonical run.caseId →
+//   verifyCaseAccess(user, run.caseId)
+// The client NEVER supplies the case boundary; the persisted run row is the
+// only source of truth. Unauthenticated, nonexistent, and cross-case
+// investigations are rejected before the stream handler subscribes.
 apiRouter.get(
   "/investigations/:investigationId/stream",
   requireAuth,
+  async (req, res, next) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findUnique({
+        where: { investigationId },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      const caseId = run.caseId;
+      if (!caseId) {
+        return res.status(400).json({ error: "Investigation has no associated case" });
+      }
+
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      // Authorized: carry the canonical identity for the stream handler.
+      res.locals.caseId = caseId;
+      res.locals.runId = run.id;
+      return next();
+    } catch (error: unknown) {
+      console.error("Failed to authorize realtime stream:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
   streamEventsHandler
 );
 
@@ -50,6 +95,14 @@ apiRouter.get(
 
       if (!run) {
         return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      // 4b. Cross-check: the persisted run MUST belong to the requested case boundary.
+      //     Catches any caseId fabrication / cross-case data leakage.
+      if (run.caseId !== caseId) {
+        return res.status(403).json({
+          error: `Security Violation: Investigation ${investigationId} does not belong to case boundary ${caseId}`,
+        });
       }
 
       return res.status(200).json({
@@ -104,9 +157,14 @@ apiRouter.post(
         description: `Investigation run queued for case ${caseId}`
       });
 
-      await investigationQueue.add("investigation-pipeline", {
-        runId: run.id
-      });
+      // Run-state jobs are ONLY enqueued when the legacy pipeline is enabled.
+      // Otherwise the run waits in CREATED until evidence arrives and the
+      // canonical @indago/ingestion path drives INGESTING → NORMALIZING.
+      if (process.env.LEGACY_PIPELINE_ENABLED === "true") {
+        await investigationQueue.add("investigation-pipeline", {
+          runId: run.id
+        });
+      }
 
       return res.status(202).json({
         message: "Investigation queued successfully",
@@ -164,10 +222,6 @@ apiRouter.post(
       const operationId = randomUUID();
       const correlationId = randomUUID();
 
-      // Ensure caseId is a valid UUID to satisfy IngestionJobPayloadSchema
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const payloadCaseId = uuidRegex.test(caseId) ? caseId : randomUUID();
-
       // 6. Construct ArtifactReference + enqueue one job per file
       const jobIds: string[] = [];
       for (const file of submission.files) {
@@ -178,6 +232,9 @@ apiRouter.post(
           originalFilename: file.fileName,
           declaredMimeType: file.mimeType,
           declaredSizeBytes: file.fileSize,
+          ...(file.sha256Hash !== undefined
+            ? { declaredContentHash: file.sha256Hash }
+            : {}),
           sourceType: "FILE_UPLOAD",
           idempotencyKey,
           providerMetadata: { fileKey: file.fileKey },
@@ -187,7 +244,7 @@ apiRouter.post(
           "ingest-evidence",
           {
             investigationId,
-            caseId: payloadCaseId,
+            caseId,
             artifactReference,
             sourceName: submission.sourceName,
             sourceDescription: submission.sourceDescription,

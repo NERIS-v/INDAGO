@@ -6,6 +6,12 @@
 // authenticates to the platform with the server-side AUTH_TOKEN and
 // streams events back.
 //
+// SECURITY: the platform's stream endpoint enforces case-scope
+// authorization (verifyCaseAccess against the canonical run.caseId) BEFORE
+// any event is emitted. This proxy is a dumb pipe: it does not and cannot
+// grant case access — upstream 401/403/404 responses are forwarded verbatim
+// (see below). It cannot be used to obtain an unscoped stream.
+//
 // GET /api/sse/[investigationId]
 // → connects to platform SSE with AUTH_TOKEN
 // → streams events to browser
@@ -31,9 +37,20 @@ export async function GET(
 
   const platformUrl = `${baseUrl}/api/v1/investigations/${investigationId}/stream`;
 
-  const upstreamResponse = await fetch(platformUrl, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(platformUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // Platform unreachable (not running/network). Surface a clean 502 instead
+    // of an unhandled exception 500, so the client can show an honest
+    // "stream unavailable" state rather than a generic server error.
+    return new Response(
+      JSON.stringify({ error: "Platform unreachable" }),
+      { status: 502, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   if (!upstreamResponse.ok) {
     return new Response(
