@@ -26,7 +26,29 @@ vi.mock("../src/audit/logger.js", () => ({
 
 vi.mock("../src/realtime/sse.js", () => ({
   realtimeEvents: { emit: vi.fn() },
+  emitProgressEvent: vi.fn(),
 }));
+
+vi.mock("@indago/ingestion", () => {
+  return {
+    ArtifactAcquisitionService: vi.fn().mockImplementation(() => ({
+      acquire: vi.fn().mockResolvedValue({
+        ok: true,
+        artifact: { artifactId: "mock-id", detectedMimeType: "application/pdf" },
+      }),
+    })),
+    ExtractionService: vi.fn().mockImplementation(() => ({
+      extract: vi.fn().mockResolvedValue({
+        ok: true,
+        extraction: { format: "PDF", extractedAt: new Date().toISOString() },
+      }),
+    })),
+    HttpArtifactFetcher: class {},
+    InMemoryArtifactStorage: class {},
+    createDefaultParserRegistry: vi.fn(),
+    createTesseractOcrProvider: vi.fn(),
+  };
+});
 
 vi.mock("../src/security/grounding.js", () => ({
   validateClaim: vi.fn(),
@@ -101,11 +123,11 @@ describe("I-PR2 Worker Stub: ingest-evidence", () => {
     expect(logAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         investigationId: VALID_INV_ID,
-        action: "SYSTEM_ACTION",
-        actor: "SYSTEM_WORKER",
-        targetType: "INGESTION_JOB",
-        description: expect.stringContaining(VALID_CORR_ID),
-      }),
+        action: "EVIDENCE_INGESTED",
+        actor: "INGESTION_PIPELINE",
+        targetType: "EVIDENCE",
+        targetId: "mock-id",
+      })
     );
   });
 
