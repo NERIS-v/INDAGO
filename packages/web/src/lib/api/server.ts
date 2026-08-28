@@ -26,6 +26,15 @@ function getBaseUrl(): string {
 function getAuthToken(): string {
   const token = process.env.AUTH_TOKEN;
   if (!token) throw new Error("AUTH_TOKEN is not configured");
+  // Fail closed: the demo credential must never be presented in production.
+  // The platform rejects "demo-token" when NODE_ENV=production; this guard
+  // makes the web server fail fast at call time instead of surfacing obscure
+  // 401s while the platform is locked down.
+  if (process.env.NODE_ENV === "production" && token === "demo-token") {
+    throw new Error(
+      "AUTH_TOKEN must not be the development demo credential in production",
+    );
+  }
   return token;
 }
 

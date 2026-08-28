@@ -326,6 +326,24 @@ body {
   animation: breathe 1.8s ease-in-out infinite;
 }
 
+/* Document-pile tile entry — a subtle fade + rise that settles into the pile.
+   Uses the independent `translate` property so the tile's deterministic
+   `transform: rotate(...)` offset is preserved during entry. */
+@keyframes document-tile-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.animate-document-tile {
+  animation: document-tile-in 0.4s ease-restrained both;
+}
+
 /* ============================================================================
    Film grain — reused original SVG feTurbulence implementation.
    "Felt, not seen." pointer-events none, low opacity, overlay blend.
@@ -381,7 +399,8 @@ body {
 
   .animate-slow-pulse,
   .animate-breathe,
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-document-tile {
     animation: none !important;
   }
 

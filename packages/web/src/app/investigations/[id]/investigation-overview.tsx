@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import type {
   Investigation,
@@ -19,10 +19,23 @@ import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
 
 interface OverviewData {
   readonly investigation: Investigation;
-  readonly evidence: Evidence[];
-  readonly entities: Entity[];
-  readonly leads: Lead[];
-  readonly gaps: InvestigativeGap[];
+  /** null = blocked/unavailable (backend endpoint not exposed), distinct from empty. */
+  readonly evidence: Evidence[] | null;
+  readonly entities: Entity[] | null;
+  readonly leads: Lead[] | null;
+  readonly gaps: InvestigativeGap[] | null;
+}
+
+/** Load one list resource; unsupported/backend failures become an explicit
+ *  "unavailable" state — never a silent empty array that looks like "no data". */
+async function settleList<T>(
+  load: () => Promise<{ items: T[] }>,
+): Promise<T[] | null> {
+  try {
+    return (await load()).items;
+  } catch {
+    return null;
+  }
 }
 
 export function InvestigationOverview({
@@ -37,33 +50,44 @@ export function InvestigationOverview({
   const [events, setEvents] = useState<ProviderEvent[]>([]);
   const [live, setLive] = useState(false);
 
+  // Mirror the latest data for the realtime subscription callback (which is
+  // stable across renders), so reconnect resync reads current state.
+  const dataRef = useRef<OverviewData | null>(null);
+  dataRef.current = data;
+  const connectedOnceRef = useRef(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [investigation, evidence, entities, leads, gaps] =
-        await Promise.all([
-          workspace.investigations.get(investigationId),
+      // The investigation itself is authoritative: any failure here surfaces as
+      // the full error state. Domain list resources are tolerated individually
+      // so that live providers without a backend endpoint render a distinct
+      // "unavailable" state rather than taking down the whole overview.
+      const investigation = await workspace.investigations.get(investigationId);
+      const [evidence, entities, leads, gaps] = await Promise.all([
+        settleList(() =>
           workspace.evidence.listByInvestigation(investigationId, {
             pageSize: 100,
           }),
+        ),
+        settleList(() =>
           workspace.entities.listByInvestigation(investigationId, {
             pageSize: 100,
           }),
+        ),
+        settleList(() =>
           workspace.leads.listByInvestigation(investigationId, {
             pageSize: 100,
           }),
+        ),
+        settleList(() =>
           workspace.gaps.listByInvestigation(investigationId, {
             pageSize: 100,
           }),
-        ]);
-      setData({
-        investigation,
-        evidence: evidence.items,
-        entities: entities.items,
-        leads: leads.items,
-        gaps: gaps.items,
-      });
+        ),
+      ]);
+      setData({ investigation, evidence, entities, leads, gaps });
     } catch (err) {
       setError(toProviderError(err).message);
     } finally {
@@ -79,6 +103,16 @@ export function InvestigationOverview({
     const realtime = workspace.realtime;
     const unsubscribe = realtime.subscribe((event) => {
       setEvents((prev) => [event, ...prev].slice(0, 50));
+      // Reconnect resync (Prompt 3 §19/§20): once the stream reconnects, the
+      // database is authoritative — re-fetch the run state + lists. The first
+      // connect is skipped because the initial load() already covers it (and
+      // avoids a duplicate GET on mount).
+      if (event.action === "STREAM_CONNECTED") {
+        if (connectedOnceRef.current && dataRef.current !== null) {
+          void load();
+        }
+        connectedOnceRef.current = true;
+      }
     });
     const timer = window.setInterval(() => {
       setLive(realtime.getStatus() === "connected");
@@ -113,7 +147,7 @@ export function InvestigationOverview({
 
   if (!data) return null;
 
-  const { investigation, evidence, entities, leads, gaps } = data;
+  const { investigation } = data;
 
   return (
     <div className="space-y-6 p-6 animate-fade-in">
@@ -150,25 +184,41 @@ export function InvestigationOverview({
         <Card>
           <CardContent>
             <p className="type-section text-text-muted">Evidence</p>
-            <p className="type-mono-xl text-text-primary">{evidence.length}</p>
+            {data.evidence === null ? (
+              <p className="type-caption text-surface-500">Unavailable</p>
+            ) : (
+              <p className="type-mono-xl text-text-primary">{data.evidence.length}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent>
             <p className="type-section text-text-muted">Entities</p>
-            <p className="type-mono-xl text-text-primary">{entities.length}</p>
+            {data.entities === null ? (
+              <p className="type-caption text-surface-500">Unavailable</p>
+            ) : (
+              <p className="type-mono-xl text-text-primary">{data.entities.length}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent>
             <p className="type-section text-text-muted">Leads</p>
-            <p className="type-mono-xl text-text-primary">{leads.length}</p>
+            {data.leads === null ? (
+              <p className="type-caption text-surface-500">Unavailable</p>
+            ) : (
+              <p className="type-mono-xl text-text-primary">{data.leads.length}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent>
             <p className="type-section text-text-muted">Gaps</p>
-            <p className="type-mono-xl text-text-primary">{gaps.length}</p>
+            {data.gaps === null ? (
+              <p className="type-caption text-surface-500">Unavailable</p>
+            ) : (
+              <p className="type-mono-xl text-text-primary">{data.gaps.length}</p>
+            )}
           </CardContent>
         </Card>
       </div>
