@@ -610,7 +610,7 @@ The worker's `ingest-evidence` branch (`orchestrator.ts:30-68`) is the single po
 
 ## 22. Remaining Technical Debt
 
-1. **UI seam not routed** — `InvestigationDetail`/`EvidenceSubmission` live code is not mounted under F-PR2 routing; F-PR3 must wire evidence submission through the provider seam (tracked in `docs/frontend-phase-tracker.md` F2-04).
+1. **UI seam not routed** — `InvestigationDetail`/`EvidenceSubmission` live code is not mounted under F-PR2 routing; F-PR3 must wire evidence submission through the provider seam (tracked in `docs/frontend/frontend-phase-tracker.md` F2-04).
 2. **Auth is mock-token** — production auth is a single-function swap (`verifyToken`) but not implemented; case-scope dev-bypass.
 3. **SSE stream has no case-scope authorization**; GET `/investigations/:id` trusts query `caseId` and never cross-checks `run.caseId`.
 4. **`contextData.caseId` not fully eliminated** (legacy write + read in orchestrator).

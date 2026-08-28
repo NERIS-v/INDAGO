@@ -3,8 +3,8 @@
 > **Status:** F0-08 ✅ (created as the F-PR1 / F0-08 naming reference)
 > **Purpose:** the canonical customer-facing vocabulary for INDAGO's intelligence surfaces.
 > It is **documentation only** — it does not define new intelligence semantics. It re-states,
-> for the UI, the semantics already established by `docs/frontend-development-plan.md` (§11
-> scoring semantics, §15 page specs), `docs/development-plan.md`, and the canonical
+> for the UI, the semantics already established by `docs/frontend/frontend-development-plan.md` (§11
+> scoring semantics, §15 page specs), `docs/roadmap/development-plan.md`, and the canonical
 > `@indago/contracts` score types (`AnalyticalConfidence`, `ResolutionScore`,
 > `StructuralSignal`, `EvidenceStrength`, `RobustnessScore`, `RoleSignal`,
 > `RelationSupport`, `ExpectedInformationGain`).

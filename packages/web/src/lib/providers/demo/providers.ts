@@ -444,9 +444,10 @@ export class DemoRobustnessProvider implements RobustnessProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    return demoFixtures.robustness.hypothesisId === hypothesisId
-      ? demoFixtures.robustness
-      : demoFixtures.robustness;
+    if (demoFixtures.robustness.hypothesisId !== hypothesisId) {
+      throw ProviderError.notFound("No robustness result for this hypothesis.");
+    }
+    return demoFixtures.robustness;
   }
 }
 

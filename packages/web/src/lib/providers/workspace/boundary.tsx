@@ -50,7 +50,7 @@ function WorkspaceBoundaryContent({ children }: { readonly children: ReactNode }
   );
 
   const providers = useMemo(
-    () => createWorkspaceProviders(identity, process.env),
+    () => createWorkspaceProviders(identity),
     [identity],
   );
 

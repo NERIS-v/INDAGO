@@ -38,8 +38,8 @@ Establish the permanent app/data architecture for the INDAGO frontend:
 
 - Created from the F-PR1 state (commit `030f815`, branch `feat/f-pr1-visual-foundation`).
 - All F-PR2 work is uncommitted on branch `feat/f-pr2-provider-architecture`.
-- Backing docs (`docs/frontend-development-plan.md`, `docs/frontend-phase-tracker.md`,
-  `docs/f-pr1-visual-foundation.md`), `opencode.json`, and
+- Backing docs (`docs/frontend/frontend-development-plan.md`, `docs/frontend/frontend-phase-tracker.md`,
+  `docs/frontend/f-pr1-visual-foundation.md`), `opencode.json`, and
   `packages/platform/test-db.mjs` were **left untouched** (verified in the git audit).
 
 ---
@@ -324,5 +324,5 @@ New F-PR2 tests include:
 - ✅ Tests (164/164), typecheck exit 0, build exit 0, all routes HTTP 200.
 - ✅ `.env.example` updated.
 - ✅ Architecture audit clean; no forbidden deps/additions.
-- ✅ `docs/f-pr2-provider-architecture.md` report.
+- ✅ `docs/frontend/f-pr2-provider-architecture.md` report.
 - ✅ Final git audit confirms scope is `packages/web/**` + `.env.example` + this report.

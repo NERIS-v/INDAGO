@@ -2,7 +2,7 @@
 
 **PS 26189 — Mayur x Gurashish**
 
-> This document is a **track-specific, implementation-grade** plan that runs **in parallel with** the system-level roadmap in `docs/development-plan.md`. It does not replace it. The main V7 plan remains authoritative for subsystem ownership, phases, and the demo narrative.
+> This document is a **track-specific, implementation-grade** plan that runs **in parallel with** the system-level roadmap in `docs/roadmap/development-plan.md`. It does not replace it. The main V7 plan remains authoritative for subsystem ownership, phases, and the demo narrative.
 >
 > This build is **frontend-first**: build the production-shaped Investigator frontend **now**, ahead of the finished intelligence/backend services, using deterministic contract-valid implementations behind stable provider interfaces, so the frontend is demo-ready within ~7 days. When the real backend services arrive, replace the provider implementation **endpoint-by-endpoint** — do not rebuild the UI.
 >
@@ -12,7 +12,7 @@
 > - **§15** is the page-by-page implementation spec — the exact visual and behavioral contract for each of the 22 views. Build each view from its owned section.
 > - **§16–§24** define the design system, motion, and graph/timeline mechanisms that every page references.
 > - **§30–§31** are the PR plan and seven-day plan.
-> - Mirror execution status in `docs/frontend-phase-tracker.md`.
+> - Mirror execution status in `docs/frontend/frontend-phase-tracker.md`.
 
 ---
 
@@ -86,7 +86,7 @@ Live / Mock / Recorded implementations
 
 ## 2. Relationship to the Main V7 Plan
 
-| Aspect | Main V7 Plan (`docs/development-plan.md`) | Frontend-first track (this document) |
+| Aspect | Main V7 Plan (`docs/roadmap/development-plan.md`) | Frontend-first track (this document) |
 |---|---|---|
 | Role | System-level roadmap for the whole product | Parallel, short (7-day) sprint for the UI |
 | Authority | Remains authoritative | Subordinate; cannot override V7 |
@@ -1922,7 +1922,7 @@ MESSY CASE PACK
                             > REASONING LEDGER
 ```
 
-Source: `docs/development-plan.md` §16 Demo Sequence. The demo provider emits these as a scripted realtime sequence (§12).
+Source: `docs/roadmap/development-plan.md` §16 Demo Sequence. The demo provider emits these as a scripted realtime sequence (§12).
 
 ---
 
