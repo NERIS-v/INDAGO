@@ -387,3 +387,175 @@ describe('HttpArtifactFetcher', () => {
     });
   });
 });
+
+describe('SSRF / fetch policy (positive, no blacklists)', () => {
+  let fetcher: HttpArtifactFetcher;
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    fetcher = new HttpArtifactFetcher(); // strict defaults
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('rejects non-https schemes by default (http, ftp, file, data) and never fetches', async () => {
+    globalThis.fetch = vi.fn();
+
+    for (const url of [
+      'http://example.com/a.txt',
+      'ftp://example.com/a.txt',
+      'file:///etc/passwd',
+      'data:text/plain;base64,SGVsbG8=',
+    ]) {
+      await expect(fetcher.fetch({ url }, { timeoutMs: 5000, maxBytes: 1024 })).rejects.toThrow(
+        'Unsupported URL scheme',
+      );
+    }
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('allows http only when explicitly opted in', async () => {
+    const permissive = new HttpArtifactFetcher({
+      allowedSchemes: new Set(['https', 'http']),
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue(makeFetchResponse({ status: 200 }));
+
+    const result = await permissive.fetch(
+      { url: 'http://example.com/a.txt' },
+      { timeoutMs: 5000, maxBytes: 1024 },
+    );
+    expect(result.status).toBe(200);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects private / loopback / link-local / metadata / CGNAT / ULA destinations before any fetch', async () => {
+    globalThis.fetch = vi.fn();
+
+    const privateHosts = [
+      'https://127.0.0.1/x',
+      'https://10.0.0.1/x',
+      'https://169.254.169.254/latest/meta-data', // cloud metadata
+      'https://192.168.1.1/x',
+      'https://172.16.0.1/x',
+      'https://100.64.0.1/x',
+      'https://0.0.0.0/x',
+      'https://[::1]/x',
+      'https://[fe80::1]/x',
+      'https://[fc00::1]/x',
+      'https://localhost:3000/x',
+    ];
+
+    for (const url of privateHosts) {
+      await expect(fetcher.fetch({ url }, { timeoutMs: 5000, maxBytes: 1024 })).rejects.toThrow(
+        'not permitted',
+      );
+    }
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects reserved hostnames (.local, .internal, ...) even on https', async () => {
+    globalThis.fetch = vi.fn();
+    await expect(
+      fetcher.fetch({ url: 'https://db.internal/x' }, { timeoutMs: 5000, maxBytes: 1024 }),
+    ).rejects.toThrow('not permitted');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('positive allowlist: only listed origins (+subdomains) are reachable', async () => {
+    const allowlisted = new HttpArtifactFetcher({
+      allowedOrigins: new Set(['utfs.io']),
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue(makeFetchResponse({ status: 200 }));
+
+    const result = await allowlisted.fetch(
+      { url: 'https://utfs.io/f/abc.txt' },
+      { timeoutMs: 5000, maxBytes: 1024 },
+    );
+    expect(result.status).toBe(200);
+
+    // Subdomain of an allowed origin passes (UploadThing serves from x.utfs.io).
+    globalThis.fetch = vi.fn().mockResolvedValue(makeFetchResponse({ status: 200 }));
+    await allowlisted.fetch(
+      { url: 'https://files.utfs.io/f/abc.txt' },
+      { timeoutMs: 5000, maxBytes: 1024 },
+    );
+
+    // Anything outside the allowlist is rejected.
+    globalThis.fetch = vi.fn();
+    await expect(
+      allowlisted.fetch({ url: 'https://evil.example/x' }, { timeoutMs: 5000, maxBytes: 1024 }),
+    ).rejects.toThrow('not permitted');
+    await expect(
+      allowlisted.fetch({ url: 'https://utfs.io.evil.example/x' }, { timeoutMs: 5000, maxBytes: 1024 }),
+    ).rejects.toThrow('not permitted');
+  });
+
+  it('redirect to a disallowed destination is rejected and never followed (fetch interrupted)', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: 'https://127.0.0.1/internal' } }),
+      )
+      .mockResolvedValueOnce(makeFetchResponse({ body: TEXT_ARTIFACT_CONTENT }));
+
+    await expect(
+      fetcher.fetch(makeReference(), { timeoutMs: 5000, maxBytes: 1024 }),
+    ).rejects.toThrow('not permitted');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('redirect within the allowlist is followed and re-validated', async () => {
+    const allowlisted = new HttpArtifactFetcher({
+      allowedOrigins: new Set(['utfs.io']),
+    });
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: 'https://files.utfs.io/b.txt' } }),
+      )
+      .mockResolvedValueOnce(makeFetchResponse({ body: TEXT_ARTIFACT_CONTENT, status: 200 }));
+
+    const result = await allowlisted.fetch(
+      { url: 'https://utfs.io/a.txt' },
+      { timeoutMs: 5000, maxBytes: 1024 },
+    );
+    expect(result.status).toBe(200);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://files.utfs.io/b.txt',
+      expect.objectContaining({ redirect: 'manual' }),
+    );
+  });
+
+  it('caps redirects at maxRedirects (default 5) → FetchFailedError', async () => {
+    globalThis.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://example.com/hop' },
+        }),
+      ),
+    );
+
+    await expect(
+      fetcher.fetch(makeReference(), { timeoutMs: 5000, maxBytes: 1024 }),
+    ).rejects.toThrow('Too many redirects');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(6); // 5 redirects + the terminal hop
+  });
+
+  it('body deadline stays ACTIVE during body consumption (slow-drip body cannot outlive timeout)', async () => {
+    // ReadableStream with no pull → reader.read() never settles → watchdog fires.
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(new ReadableStream({}), { status: 200 }),
+    );
+
+    await expect(
+      fetcher.fetch(makeReference(), { timeoutMs: 50, maxBytes: 1024 }),
+    ).rejects.toThrow('timed out');
+  });
+});
