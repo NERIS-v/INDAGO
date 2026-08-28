@@ -65,21 +65,39 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 - F-PR2 `type-mono-xl` undefined utility in `investigation-overview.tsx` → F-PR2 follow-up.
 - F-PR2 default-Tailwind amber palette in `investigations/[id]/page.tsx` → F-PR2 follow-up.
 
+---
+
+# Current Status Snapshot (verified against `packages/web` source on `main` @ `f773366`)
+
+> Honest, source-verified state as of the last audit pass. Phase tables / page matrix / PR tracker above were reconciled to match this.
+
+- **F0** foundation + design system: **complete** ✅
+- **F1** provider seam + demo case: **complete** ✅ (`lib/providers/` — `config.ts`, `factory.ts`, `types.ts`, `demo/*`, `live/*`, `realtime/*`; bundled into a `Workspace` context instead of ten per-domain interface files).
+- **F2** case/evidence workflow: **complete** ✅ (case list, new intake, workspace overview, evidence surface).
+- **F3 / F4 / F5** graph, timeline, intelligence, robustness: **NOT implemented** — all workspace tabs except Evidence are `InvestigationScaffold` placeholders (no intelligence/graph/timeline behavior).
+- **F6** realtime: **partial** 🔶 — demo + live realtime, SSE client with reconnect, and `STREAM_CONNECTED` resync are implemented; signature motions + Judge Mode are not started.
+- **F7** polish/freeze: **not started** ❌.
+- **Tests:** 33 web test files present (incl. case-list, evidence-intake, evidence-flow, live-providers, live-run-projection, realtime-live.integration, fixture-validation, mock-leakage, auth-boundary).
+
+**Trust hierarchy:** pages with `[x]` are real provider-backed surfaces; rows marked "scaffold-only" render a placeholder that consumes the Workspace context but computes/showcases no intelligence.
+
 # Phase F1 — Provider / Data
 
 **Gate:** DemoProvider returns contract-valid coherent case.
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F1-01 | F1 | Define domain provider interfaces (Investigation/Evidence/Observation/Entity/Graph/Timeline/Lead/Gap/Review/Robustness/Realtime) | `[G]` | `[M]` | P0 | F0-06 | `lib/providers/*Provider.ts` (new) | interfaces exist; canonical types | — | [ ] |
-| F1-02 | F1 | Define `resolveDataMode(caseId, runtimeConfig)` with non-demo → live invariant | `[G]` | `[M]` | P0 | F1-01 | `lib/providers/DataMode.ts` (new) | non-demo never mock; no silent fallback | DataMode test | [ ] |
-| F1-03 | F1 | Build provider bundle + factory | `[G]` | `[M]` | P0 | F1-01, F1-02 | `lib/providers/factory.ts`, `types.ts` (new) | bundle constructed from resolved mode | factory test | [ ] |
-| F1-04 | F1 | Assemble coherent "Operation Financial Shadow" demo fixtures (case/investigation/evidence/observations/entities/relations/graph/timeline/leads/gaps/evidence-requests/cross-case/robustness/review/events) | `[M]` | `[G]` | P0 | — | `lib/providers/demo/demo-fixtures/*.json` (new) | coherent case; canonical fields | — | [ ] |
-| F1-05 | F1 | Validate every fixture through canonical `@indago/contracts` schemas | `[G]` | `[M]` | P0 | F1-04 | `demo-fixtures/**` | all fixtures `schema.parse()` OK | fixture validation test | [ ] |
-| F1-06 | F1 | Implement DemoProvider (contract-valid, deterministic, latency-aware, event-aware) | `[G]` | `[M]` | P0 | F1-04, F1-05 | `lib/providers/demo/*` (new) | mock behaves like future backend | DemoProvider test | [ ] |
-| F1-07 | F1 | Implement LiveProvider wrappers (status/evidence/SSE live) with typed "not available" for missing endpoints | `[G]` | `[M]` | P1 | F1-01 | `lib/providers/live/*` (new) | live endpoints wrapped | LiveProvider test | [ ] |
-| F1-08 | F1 | Live/Demo parity acceptance (same method signatures per domain) | `[G]` | `[M]` | P0 | F1-06, F1-07 | `lib/providers/**` | identical signatures; no UI branching | parity test | [ ] |
-| F1-09 | F1 | Configure `DEMO_TIMING_SCALE` simulated-latency scale factor | `[G]` | `[M]` | P1 | F1-06 | `lib/providers/**` | latency configurable | — | [ ] |
+| F1-01 | F1 | Define domain provider interfaces (Investigation/Evidence/Observation/Entity/Graph/Timeline/Lead/Gap/Review/Robustness/Realtime) | `[G]` | `[M]` | P0 | F0-06 | `lib/providers/*Provider.ts` (new) | interfaces exist; canonical types | — | ✅ |
+| F1-02 | F1 | Define `resolveDataMode(caseId, runtimeConfig)` with non-demo → live invariant | `[G]` | `[M]` | P0 | F1-01 | `lib/providers/DataMode.ts` (new) | non-demo never mock; no silent fallback | DataMode test | ✅ (`lib/providers/config.ts`, `data-mode.test.ts`) |
+| F1-03 | F1 | Build provider bundle + factory | `[G]` | `[M]` | P0 | F1-01, F1-02 | `lib/providers/factory.ts`, `types.ts` (new) | bundle constructed from resolved mode | factory test | ✅ (`factory.ts`, `provider-factory.test.ts`) |
+| F1-04 | F1 | Assemble coherent "Operation Financial Shadow" demo fixtures (case/investigation/evidence/observations/entities/relations/graph/timeline/leads/gaps/evidence-requests/cross-case/robustness/review/events) | `[M]` | `[G]` | P0 | — | `lib/providers/demo/demo-fixtures/*.json` (new) | coherent case; canonical fields | — | ✅ (TS fixture set in `demo-fixtures/`) |
+| F1-05 | F1 | Validate every fixture through canonical `@indago/contracts` schemas | `[G]` | `[M]` | P0 | F1-04 | `demo-fixtures/**` | all fixtures `schema.parse()` OK | fixture validation test | ✅ (`demo-fixtures/validate.ts`, `fixture-validation.test.ts`) |
+| F1-06 | F1 | Implement DemoProvider (contract-valid, deterministic, latency-aware, event-aware) | `[G]` | `[M]` | P0 | F1-04, F1-05 | `lib/providers/demo/*` (new) | mock behaves like future backend | DemoProvider test | ✅ (`demo/providers.ts`, `demo/realtime.ts`, `demo/submit.ts`, `demo-evidence-flow.test.ts`, `demo-realtime.test.ts`) |
+| F1-07 | F1 | Implement LiveProvider wrappers (status/evidence/SSE live) with typed "not available" for missing endpoints | `[G]` | `[M]` | P1 | F1-01 | `lib/providers/live/*` (new) | live endpoints wrapped | LiveProvider test | ✅ (`live/providers.ts`, `live/realtime.ts`, `live/errors.ts`, `live/run-projection.ts`, `live-providers.test.ts`) |
+| F1-08 | F1 | Live/Demo parity acceptance (same method signatures per domain) | `[G]` | `[M]` | P0 | F1-06, F1-07 | `lib/providers/**` | identical signatures; no UI branching | parity test | ✅ (`mock-leakage.test.ts`) |
+| F1-09 | F1 | Configure `DEMO_TIMING_SCALE` simulated-latency scale factor | `[G]` | `[M]` | P1 | F1-06 | `lib/providers/**` | latency configurable | — | ✅ (`demo/latency.ts`) |
+
+> **F1 note:** one deviation from the planned file shape — a per-domain `*Provider.ts` interface set was collapsed into a single provider bundle surfaced through `factory.ts` + the `Workspace` context (`workspace/context.tsx`), instead of ten separate interface files. Behavior and the live/demo parity invariant are preserved.
 
 # Phase F2 — Case / Evidence
 
@@ -87,12 +105,12 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F2-01 | F2 | Refactor existing Investigation Detail to consume provider bundle (not direct fetch) | `[G]` | `[M]` | P0 | F1-03 | `investigations/[id]/investigation-detail.tsx` | detail reads from provider | render test | [ ] |
-| F2-02 | F2 | Case List surface (evolve current `/` dashboard) | `[G]` | `[M]` | P0 | F0-06 | `app/page.tsx` | list from provider | render test | [ ] |
-| F2-03 | F2 | New Case Intake wired to provider | `[G]` | `[M]` | P0 | F2-02 | `investigations/new/*` | intake creates via provider | flow test | [ ] |
-| F2-04 | F2 | Evidence flow refactor (submit → provider → state) | `[G]` | `[M]` | P0 | F1-03 | `components/evidence/*`, `components/upload/file-upload.tsx` | evidence via provider; live/mock parity | parity test | [ ] |
-| F2-05 | F2 | Observations semantic content | `[M]` | `[G]` | P0 | F1-04 | `components/intel/*` (new) | observations surface | render test | [ ] |
-| F2-06 | F2 | Loading/empty/error states for case+evidence surfaces | `[G]` | `[M]` | P0 | F2-04 | `components/ui/empty-state.tsx`, `error-display.tsx` | states wired | state test | [ ] |
+| F2-01 | F2 | Refactor existing Investigation Detail to consume provider bundle (not direct fetch) | `[G]` | `[M]` | P0 | F1-03 | `investigations/[id]/investigation-detail.tsx` | detail reads from provider | render test | ✅ (`investigations/[id]/investigation-overview.tsx` — reads from Workspace provider bundle) |
+| F2-02 | F2 | Case List surface (evolve current `/` dashboard) | `[G]` | `[M]` | P0 | F0-06 | `app/page.tsx` | list from provider | render test | ✅ (`app/page.tsx` + `components/case-list/case-list.tsx`, `case-list.test.tsx`) |
+| F2-03 | F2 | New Case Intake wired to provider | `[G]` | `[M]` | P0 | F2-02 | `investigations/new/*` | intake creates via provider | flow test | ✅ (`investigations/new/page.tsx` — `createIntakeProviders`, case coordinator) |
+| F2-04 | F2 | Evidence flow refactor (submit → provider → state) | `[G]` | `[M]` | P0 | F1-03 | `components/evidence/*`, `components/upload/file-upload.tsx` | evidence via provider; live/mock parity | parity test | ✅ (`components/evidence/evidence-intake.tsx`, `evidence-list.tsx`, `evidence-intake.test.tsx`, `evidence-flow.test.ts`) |
+| F2-05 | F2 | Observations semantic content | `[M]` | `[G]` | P0 | F1-04 | `components/intel/*` (new) | observations surface | render test | [ ] (deferred — observations tab ships as `InvestigationScaffold` placeholder until F-PR5) |
+| F2-06 | F2 | Loading/empty/error states for case+evidence surfaces | `[G]` | `[M]` | P0 | F2-04 | `components/ui/empty-state.tsx`, `error-display.tsx` | states wired | state test | ✅ (`empty-state.tsx`, `error-display.tsx`, `loading-spinner.tsx`; used in overview + evidence) |
 
 # Phase F3 — Graph / Timeline
 
@@ -138,10 +156,10 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F6-01 | F6 | Realtime normalizer (loose SSE → canonical `InvestigationEvent`) reuse SSE client/proxy | `[G]` | `[M]` | P0 | F1-01 | `lib/realtime/normalize.ts` (new), `lib/realtime/sse-client.ts` | loose events normalized | normalize test | [ ] |
-| F6-02 | F6 | Event deduplication by stable event ID once IDs exist; smart refresh (no per-event full refresh) | `[G]` | `[M]` | P0 | F6-01 | workspace state | dedupe works | dedupe test | [ ] |
-| F6-03 | F6 | Mock realtime provider for demo mode | `[G]` | `[M]` | P0 | F1-06, F6-01 | `lib/providers/demo/Realtime*` | demo emits event sequence | sequence test | [ ] |
-| F6-04 | F6 | SSE failure recovery (reconnect w/ backoff, calm recovery ring, keep loaded state) | `[G]` | `[M]` | P0 | F6-01 | workspace, `components/feedback/*` | recovery behavior | failure test | [ ] |
+| F6-01 | F6 | Realtime normalizer (loose SSE → canonical `InvestigationEvent`) reuse SSE client/proxy | `[G]` | `[M]` | P0 | F1-01 | `lib/realtime/normalize.ts` (new), `lib/realtime/sse-client.ts` | loose events normalized | normalize test | ✅ (`lib/providers/realtime/normalizer.ts`, `sse-client.ts`, `realtime-normalizer.test.ts`) |
+| F6-02 | F6 | Event deduplication by stable event ID once IDs exist; smart refresh (no per-event full refresh) | `[G]` | `[M]` | P0 | F6-01 | workspace state | dedupe works | dedupe test | 🔶 partial — reconnect `STREAM_CONNECTED` resync + cache in sse-client exist; no full dedupe-defined refresh yet |
+| F6-03 | F6 | Mock realtime provider for demo mode | `[G]` | `[M]` | P0 | F1-06, F6-01 | `lib/providers/demo/Realtime*` | demo emits event sequence | sequence test | ✅ (`lib/providers/demo/realtime.ts`, `demo-realtime.test.ts`) |
+| F6-04 | F6 | SSE failure recovery (reconnect w/ backoff, calm recovery ring, keep loaded state) | `[G]` | `[M]` | P0 | F6-01 | workspace, `components/feedback/*` | recovery behavior | failure test | ✅ (sse-client reconnect + overview `STREAM_CONNECTED` resync; recovery ring visual not yet built) |
 | F6-05 | F6 | Judge Mode (seeded case, predetermined sequence, no chrome, keyboard advance, deterministic, restart/reset) | `[Both]` | `[Both]` | P0 | F5-01 | `app/investigations/[id]/judge/*` (new) | guided demo works | Judge sequence test | [ ] |
 | F6-06 | F6 | Judge Mode individual signature-moment rehearsal + reset | `[G]` | `[M]` | P1 | F6-05 | `judge/*` | per-moment rehearsal | — | [ ] |
 | F6-07 | F6 | Demo narration (Mayur) + semantic QA | `[M]` | `[G]` | P0 | F6-05 | narration/notes | narration approved | — | [ ] |
@@ -157,10 +175,10 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 | F7-02 | F7 | Demo content + semantic audit | `[M]` | `[G]` | P0 | — | fixtures/semantics | semantics correct | audit | [ ] |
 | F7-03 | F7 | Final integration (all PRs merged, single coherent app) | `[G]` | `[M]` | P0 | all | workspace | app coherent | integration | [ ] |
 | F7-04 | F7 | Accessibility baseline (focus-visible, contrast ≥4.5:1, a11y labels, Escape closes drawers, keyboard Judge, graph node list) | `[G]` | `[M]` | P0 | F6-05 | components | baseline passes | a11y check | [ ] |
-| F7-05 | F7 | Non-demo → live enforced; mock can never silently reach arbitrary real cases | `[G]` | `[M]` | P0 | F1-02 | `lib/providers/DataMode.ts` | invariant holds | DataMode test | [ ] |
-| F7-06 | F7 | Mock/live routing final wiring + demo reset | `[G]` | `[M]` | P0 | F1-03 | `lib/providers/**` | switch works; reset works | reset test | [ ] |
+| F7-05 | F7 | Non-demo → live enforced; mock can never silently reach arbitrary real cases | `[G]` | `[M]` | P0 | F1-02 | `lib/providers/DataMode.ts` | invariant holds | DataMode test | ✅ (`lib/providers/config.ts` — `resolveDataModeForWorkspace`/`assertNoImplicitFallback`; `data-mode.test.ts`) |
+| F7-06 | F7 | Mock/live routing final wiring + demo reset | `[G]` | `[M]` | P0 | F1-03 | `lib/providers/**` | switch works; reset works | reset test | ✅ (mode resolution + factory wiring in `config.ts`/`factory.ts`) |
 | F7-07 | F7 | Two clean timed rehearsals (full demo + Judge) | `[Both]` | `[Both]` | P0 | F7-03 | demo | 2 clean runs | rehearsal log | [ ] |
-| F7-08 | F7 | Live provider can replace demo provider without rewriting UI components | `[G]` | `[M]` | P0 | F1-08 | `lib/providers/**` | bundle swap, no component change | parity test | [ ] |
+| F7-08 | F7 | Live provider can replace demo provider without rewriting UI components | `[G]` | `[M]` | P0 | F1-08 | `lib/providers/**` | bundle swap, no component change | parity test | ✅ (`live/providers.ts` + `mock-leakage.test.ts` assert the UI never branches on mode) |
 
 ---
 
@@ -171,25 +189,25 @@ Each row is one of the 22 views from `docs/frontend/frontend-development-plan.md
 | View | Page / Surface | Provider method(s) | Owner | Route / Tab | Page spec | Status |
 |---|---|---|---|---|---|---|
 | 01 | Login / Access | (optional) | `[M]` | route (P2) | §15 V01 | [ ] |
-| 02 | Case List | `InvestigationProvider.getInvestigations()` | `[G]` | `/` | §15 V02 | [ ] |
-| 03 | New Case Intake | `EvidenceProvider.submitEvidence()` | `[G]` | `/investigations/new` | §15 V03 | [ ] |
-| 04 | Investigation Workspace | bundle + realtime | `[G]` | `/investigations/[id]` | §15 V04 | [ ] |
-| 05 | Observations Feed | `ObservationProvider` | `[G]` | workspace tab | §15 V05 | [ ] |
-| 06 | Entity Resolution Queue | `EntityProvider` | `[G]` | workspace tab | §15 V06 | [ ] |
-| 07 | Entity Detail | `EntityProvider` + `GraphProvider` | `[G]` | drawer | §15 V07 | [ ] |
-| 08 | Graph View | `GraphProvider.getGraph()` | `[G]` | workspace panel | §15 V08 | [ ] |
-| 09 | Timeline View | `TimelineProvider.getTimeline()` | `[G]` | workspace panel | §15 V09 | [ ] |
-| 10 | Leads List | `LeadProvider.getLeads()` | `[G]` | workspace tab | §15 V10 | [ ] |
-| 11 | Lead Detail | `LeadProvider` + `CounterEvidence` | `[G]` | drawer | §15 V11 | [ ] |
-| 12 | Gaps List | `GapProvider.getGaps()` | `[G]` | workspace tab | §15 V12 | [ ] |
-| 13 | Gap Detail | `GapProvider` | `[G]` | drawer | §15 V13 | [ ] |
-| 14 | Evidence Request Queue | `EvidenceProvider` / `GapProvider` | `[G]` | workspace tab | §15 V14 | [ ] |
-| 15 | Cross-Case Signals | `CrossCaseProvider` (demo) | `[G]` | workspace tab | §15 V15 | [ ] |
-| 16 | Reasoning Ledger | `ReviewProvider` / realtime | `[M]` | workspace tab | §15 V16 | [ ] |
+| 02 | Case List | `InvestigationProvider.getInvestigations()` | `[G]` | `/` | §15 V02 | [x] (`components/case-list/case-list.tsx`) |
+| 03 | New Case Intake | `EvidenceProvider.submitEvidence()` | `[G]` | `/investigations/new` | §15 V03 | [x] (`investigations/new/page.tsx`) |
+| 04 | Investigation Workspace | bundle + realtime | `[G]` | `/investigations/[id]` | §15 V04 | [x] (overview + live/demo realtime wiring; shell + provider bundle) |
+| 05 | Observations Feed | `ObservationProvider` | `[G]` | workspace tab | §15 V05 | [ ] scaffold-only (`InvestigationScaffold`) |
+| 06 | Entity Resolution Queue | `EntityProvider` | `[G]` | workspace tab | §15 V06 | [ ] scaffold-only |
+| 07 | Entity Detail | `EntityProvider` + `GraphProvider` | `[G]` | drawer | §15 V07 | [ ] scaffold-only |
+| 08 | Graph View | `GraphProvider.getGraph()` | `[G]` | workspace panel | §15 V08 | [ ] scaffold-only |
+| 09 | Timeline View | `TimelineProvider.getTimeline()` | `[G]` | workspace panel | §15 V09 | [ ] scaffold-only |
+| 10 | Leads List | `LeadProvider.getLeads()` | `[G]` | workspace tab | §15 V10 | [ ] scaffold-only |
+| 11 | Lead Detail | `LeadProvider` + `CounterEvidence` | `[G]` | drawer | §15 V11 | [ ] scaffold-only |
+| 12 | Gaps List | `GapProvider.getGaps()` | `[G]` | workspace tab | §15 V12 | [ ] scaffold-only |
+| 13 | Gap Detail | `GapProvider` | `[G]` | drawer | §15 V13 | [ ] scaffold-only |
+| 14 | Evidence Request Queue | `EvidenceProvider` / `GapProvider` | `[G]` | workspace tab | §15 V14 | [x] partial — `investigations/[id]/evidence/page.tsx` (list + intake) built; full queue/detail deferred |
+| 15 | Cross-Case Signals | `CrossCaseProvider` (demo) | `[G]` | workspace tab | §15 V15 | [ ] scaffold-only |
+| 16 | Reasoning Ledger | `ReviewProvider` / realtime | `[M]` | workspace tab | §15 V16 | [ ] scaffold-only |
 | 17 | Discovery Mode | `GraphProvider` overlay | `[G]` | interaction mode | §15 V17 | [ ] |
 | 18 | Boundary Expansion | `GraphProvider` overlay | `[G]` | interaction mode | §15 V18 | [ ] |
-| 19 | Robustness Report | `RobustnessProvider` | `[M]` | workspace tab | §15 V19 | [ ] |
-| 20 | Review Center | `ReviewProvider` | `[G]` | workspace tab | §15 V20 | [ ] |
+| 19 | Robustness Report | `RobustnessProvider` | `[M]` | workspace tab | §15 V19 | [ ] scaffold-only |
+| 20 | Review Center | `ReviewProvider` | `[G]` | workspace tab | §15 V20 | [ ] scaffold-only |
 | 21 | Admin / RBAC | (P2, cut-if-time) | `[G]` | `/admin/*` | §15 V21 | [ ] |
 | 22 | Judge Mode | `DemoProvider` script | `[Both]` | `/investigations/[id]/judge/*` | §15 V22 | [ ] |
 
@@ -230,11 +248,11 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 | PR | Goal | Owner | Dependencies | Acceptance | Status |
 |---|---|---|---|---|---|
 | F-PR1 | Visual Foundation + Design System | Mayur/Gurashish | — | visual foundation / design-system foundation | ✅ |
-| F-PR2 | Provider Seam + Demo Case | Gurashish/Mayur | F-PR1 | contract-valid coherent case | [ ] |
-| F-PR3 | Core Workspace + Case/Evidence | Gurashish | F-PR1, F-PR2 | case→evidence→provider→intelligence | [ ] |
-| F-PR4 | Graph + Timeline | Gurashish | F-PR2, F-PR3 | graph/timeline via provider | [ ] |
+| F-PR2 | Provider Seam + Demo Case | Gurashish/Mayur | F-PR1 | contract-valid coherent case | ✅ |
+| F-PR3 | Core Workspace + Case/Evidence | Gurashish | F-PR1, F-PR2 | case→evidence→provider→intelligence | ✅ (case list, new intake, workspace overview, evidence surface built against provider bundle; intelligence surfaces scaffolded, deferred to F-PR5) |
+| F-PR4 | Graph + Timeline | Gurashish | F-PR2, F-PR3 | graph/timeline via provider | [ ] (tabs scaffolded only) |
 | F-PR5 | Intelligence Surfaces | Gurashish/Mayur | F-PR3 | lead/entity/observation presentation | [ ] |
-| F-PR6 | Signature Motion + Realtime | Gurashish | F-PR2, F-PR4 | realtime + signature moments | [ ] |
+| F-PR6 | Signature Motion + Realtime | Gurashish | F-PR2, F-PR4 | realtime + signature moments | 🔶 in-progress — realtime + SSE recovery + reconnect resync done; signature moments + Judge Mode not started |
 | F-PR7 | Judge Mode + Polish | Both | all | 2 clean runs + freeze | [ ] |
 
 ---
@@ -257,13 +275,13 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 
 | Gate | Phase | Exit Criteria | Status |
 |---|---|---|---|
-| G-F0 | F0 | design system + shell foundation exists | [ ] |
-| G-F1 | F1 | DemoProvider returns contract-valid coherent case | [ ] |
-| G-F2 | F2 | case/evidence workflow works | [ ] |
-| G-F3 | F3 | graph/timeline work against provider only | [ ] |
+| G-F0 | F0 | design system + shell foundation exists | ✅ |
+| G-F1 | F1 | DemoProvider returns contract-valid coherent case | ✅ |
+| G-F2 | F2 | case/evidence workflow works | ✅ |
+| G-F3 | F3 | graph/timeline work against provider only | [ ] (tabs scaffolded only) |
 | G-F4 | F4 | lead/entity/observation presentation works | [ ] |
 | G-F5 | F5 | lead→gap→evidence→trust story works | [ ] |
-| G-F6 | F6 | realtime + signature moments + Judge Mode works | [ ] |
+| G-F6 | F6 | realtime + signature moments + Judge Mode works | 🔶 in-progress — realtime + recovery done; signature + Judge Mode open |
 | G-F7 | F7 | two clean demo runs | [ ] |
 
 ---
