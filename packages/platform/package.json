@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx src/api/server.ts",
     "start": "node dist/api/server.js",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
+    "test:integration": "vitest run tests/integration --no-file-parallelism",
     "prebuild": "prisma generate",
     "predev": "prisma generate",
     "build": "tsc",
