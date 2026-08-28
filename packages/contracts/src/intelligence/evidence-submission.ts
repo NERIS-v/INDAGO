@@ -34,6 +34,11 @@ export const UploadedFileReferenceSchema = z.object({
   fileName: z.string().min(1).max(500).describe('Original filename'),
   fileSize: z.number().int().nonnegative().describe('File size in bytes'),
   mimeType: z.string().max(200).optional().describe('MIME type if detected by provider'),
+  sha256Hash: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/i)
+    .optional()
+    .describe('Client-computed SHA-256 hex digest (optional, untrusted). Verified against fetched bytes on ingestion'),
 });
 
 export type UploadedFileReference = z.infer<typeof UploadedFileReferenceSchema>;

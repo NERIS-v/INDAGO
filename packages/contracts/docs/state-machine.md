@@ -37,6 +37,9 @@ QUEUED → INITIALIZING → RUNNING → PAUSED → RUNNING → COMPLETED
                                           → CANCELLED
 ```
 
+> Pipeline stages (CREATED → INGESTING → NORMALIZING → ANALYZING → DISCOVERING)
+> may also terminate in FAILED once ingestion retries are exhausted.
+
 ### Valid Transitions
 
 | From | To | Trigger |
@@ -49,6 +52,8 @@ QUEUED → INITIALIZING → RUNNING → PAUSED → RUNNING → COMPLETED
 | RUNNING | FAILED | ERROR |
 | RUNNING | CANCELLED | CANCEL |
 | FAILED | QUEUED | RETRY |
+| CREATED | FAILED | INGESTION_PERMANENT_FAILURE |
+| INGESTING | FAILED | INGESTION_PERMANENT_FAILURE |
 
 ### Invalid Transitions
 
