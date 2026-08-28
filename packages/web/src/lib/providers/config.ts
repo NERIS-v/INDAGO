@@ -21,6 +21,25 @@ export const DEMO_CASE_ID_ENV = "NEXT_PUBLIC_DEMO_CASE_ID";
 export const DATA_MODE_ENV = "NEXT_PUBLIC_DATA_MODE";
 export const TIMING_SCALE_ENV = "DEMO_TIMING_SCALE";
 
+/**
+ * Resolve the effective env to read NEXT_PUBLIC_ config from.
+ *
+ * Next/Turbopack statically inline NEXT_PUBLIC_* values ONLY for direct member
+ * access (process.env.NEXT_PUBLIC_X). Accessing via a dynamic index
+ * (env["NEXT_PUBLIC_X"]) is NOT inlined, so the client bundle would see
+ * undefined. This helper reads them statically so the inlined literals reach
+ * the client, and merges them back over process.env. An explicit `env`
+ * argument (used by tests) is returned as-is.
+ */
+export function getEffectiveEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  if (env) return env;
+  const staticPublic: Record<string, string | undefined> = {
+    [DATA_MODE_ENV]: process.env.NEXT_PUBLIC_DATA_MODE,
+    [DEMO_CASE_ID_ENV]: process.env.NEXT_PUBLIC_DEMO_CASE_ID,
+  };
+  return { ...process.env, ...staticPublic };
+}
+
 /** Safe enum parse; returns undefined for unknown/invalid values. */
 export function parseDataMode(raw: string | undefined): DataMode | undefined {
   if (raw === "demo" || raw === "live" || raw === "auto") return raw;
@@ -47,7 +66,7 @@ export function parseTimingScale(raw: string | undefined): number {
  */
 export function resolveDataModeForWorkspace(
   caseId: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
 ): AppDataMode {
   const raw = parseDataMode(env[DATA_MODE_ENV]);
   const demoCaseId = env[DEMO_CASE_ID_ENV];
@@ -87,7 +106,7 @@ export function resolveDataModeForWorkspace(
 /** Prohibit "auto" or "demo" in production when no demo case is configured to
  *  prevent an accidental silent live->mock fallback. */
 export function assertNoImplicitFallback(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
 ): void {
   const raw = parseDataMode(env[DATA_MODE_ENV]);
   const demoCaseId = env[DEMO_CASE_ID_ENV];
@@ -102,7 +121,7 @@ export function assertNoImplicitFallback(
  * Build the full DataModeConfig (used at workspace-shell build time and in tests).
  */
 export function getDataModeConfig(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
 ): DataModeConfig {
   const dev = isDevelopment();
   const demoCaseId = env[DEMO_CASE_ID_ENV] ?? "";

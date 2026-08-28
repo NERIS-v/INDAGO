@@ -29,7 +29,7 @@ export const ACCEPTED_FILE_TYPES = {
 /**
  * Max file counts matching platform's casePackUploader.
  */
-export const MAX_FILE_COUNTS: Record<string, number> = {
+export const MAX_FILE_COUNTS: Record<"pdf" | "image" | "text" | "blob", number> = {
   pdf: 10,
   image: 20,
   text: 10,
