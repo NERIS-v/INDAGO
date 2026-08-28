@@ -6,6 +6,8 @@
 // No external dependencies — uses Web Crypto API.
 // ============================================================================
 
+import { bytesToUuid4 } from './uuid-bytes.js';
+
 /**
  * Compute SHA-256 hash of content bytes.
  * Returns lowercase hexadecimal string (64 characters).
@@ -36,19 +38,5 @@ export function deterministicArtifactId(contentHash: string): string {
   const hashBytes = contentHash.slice(0, 32);
   const hexPairs = hashBytes.match(/.{1,2}/g) ?? [];
   const bytes = hexPairs.map((h) => parseInt(h, 16));
-
-  // Construct UUID v4 format from hash bytes
-  const uuid = [
-    bytes.slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join(''),
-    bytes.slice(4, 6).map((b) => b.toString(16).padStart(2, '0')).join(''),
-    // Version 4 marker: set high nibble of byte 6 to 0100 (version 4)
-    ((bytes[6]! & 0x0f) | 0x40).toString(16).padStart(2, '0') +
-      bytes.slice(7, 8).map((b) => b.toString(16).padStart(2, '0')).join(''),
-    // Variant 1 marker: set high bits of byte 8 to 10xx
-    ((bytes[8]! & 0x3f) | 0x80).toString(16).padStart(2, '0') +
-      bytes.slice(9, 10).map((b) => b.toString(16).padStart(2, '0')).join(''),
-    bytes.slice(10, 16).map((b) => b.toString(16).padStart(2, '0')).join(''),
-  ].join('-');
-
-  return uuid;
+  return bytesToUuid4(bytes);
 }

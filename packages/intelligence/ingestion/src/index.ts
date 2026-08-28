@@ -32,6 +32,7 @@ export type {
 } from './storage/artifact-storage.js';
 
 export { InMemoryArtifactStorage } from './storage/artifact-storage.js';
+export { FilesystemArtifactStorage } from './storage/filesystem-artifact-storage.js';
 
 export {
   IngestionService,
@@ -51,10 +52,12 @@ export {
   ArtifactAcquisitionService,
   computeContentHash,
   deterministicArtifactId,
+  deterministicSourceId,
   detectMimeType,
 } from './acquisition/index.js';
 export type {
   ArtifactFetcher,
+  ArtifactFetchPolicy,
   FetchOptions,
   FetchedArtifact,
   MimeTypeResult,
