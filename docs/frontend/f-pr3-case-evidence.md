@@ -205,4 +205,4 @@ Added UI + integration suites (all green):
 - [x] contracts untouched
 - [x] intelligence untouched
 - [x] final architecture audit passes
-- [x] docs/f-pr3-case-evidence.md exists
+- [x] docs/frontend/f-pr3-case-evidence.md exists

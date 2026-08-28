@@ -99,7 +99,7 @@ Explicitly out of scope (not shipped): GSAP, Framer Motion, radix/shadcn, MUI, C
 `git status` confirmed changes are confined to `packages/web`:
 
 - **Modified (15)**: `globals.css`, `layout.tsx`, `page.tsx`, `investigations/new/page.tsx`, `investigations/[id]/investigation-detail.tsx`, `status/state-badge.tsx`, `status/investigation-status.tsx`, `ui/{badge,button,card,empty-state,error-display,input,loading-spinner}.tsx`, `tests/state-badge.test.tsx`
-- **New**: `app/design/`, `ui/{confidence-indicator,provenance-chip,status-indicator}.tsx`, 6 test files, `docs/f-pr1-visual-foundation.md`
+- **New**: `app/design/`, `ui/{confidence-indicator,provenance-chip,status-indicator}.tsx`, 6 test files, `docs/frontend/f-pr1-visual-foundation.md`
 - **Untouched**: `packages/contracts`, `packages/intelligence` (clean), `packages/platform` (only pre-existing untracked `test-db.mjs`).
 - User files `opencode.json` and `packages/platform/test-db.mjs` left untouched.
 

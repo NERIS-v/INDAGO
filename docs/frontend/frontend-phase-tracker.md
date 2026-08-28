@@ -2,7 +2,7 @@
 
 **PS 26189 — Mayur x Gurashish**
 
-> Practical execution board for `docs/frontend-development-plan.md`. Check off tasks as completed. Each row is small enough to be checked off. **Documentation-only artifact — no source code is modified by this document.**
+> Practical execution board for `docs/frontend/frontend-development-plan.md`. Check off tasks as completed. Each row is small enough to be checked off. **Documentation-only artifact — no source code is modified by this document.**
 >
 > **Path convention:** unless a path already starts with `packages/web/src/`, all `Files` cells are relative to `packages/web/src/` (e.g. `components/ui/*` → `packages/web/src/components/ui/*`).
 
@@ -43,7 +43,7 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 | F0-05 | F0 | Create Workspace shell + workspace nav alongside existing Sidebar | `[G]` | `[M]` | P0 | — | `components/layout/workspace-nav.tsx` (new), `layout.tsx` | shell renders | shell render | ✅ (implemented during F-PR2 as planned phase delivery) |
 | F0-06 | F0 | Scaffold route structure `/`, `/investigations/new`, `/investigations/[id]` (and optional deep-links) | `[G]` | `[M]` | P0 | F0-05 | `app/**` routes | routes exist; shared layout | route smoke | ✅ (implemented during F-PR2 as planned phase delivery) |
 | F0-07 | F0 | Polish existing UI primitives against token set (no new design system) | `[M]` | `[G]` | P1 | F0-01 | `components/ui/*` | primitives use tokens | — | ✅ |
-| F0-08 | F0 | Define customer-facing intelligence semantic naming (confidence/lead/gap/evidence wording) | `[M]` | `[G]` | P0 | — | `docs` (naming ref) | naming doc agreed | — | ✅ (`docs/f0-semantic-naming.md`) |
+| F0-08 | F0 | Define customer-facing intelligence semantic naming (confidence/lead/gap/evidence wording) | `[M]` | `[G]` | P0 | — | `docs` (naming ref) | naming doc agreed | — | ✅ (`docs/frontend/f0-semantic-naming.md`) |
 
 ## F0 Closeout
 
@@ -52,7 +52,7 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 - **Implementation:** complete (F-PR1 visual foundation + design system).
 - **Verification:** 164/164 tests · typecheck clean · build clean · design-token utilities confirmed in compiled CSS.
 - **F0-05 / F0-06:** delivered through F-PR2 (workspace shell + provider architecture) as planned phase delivery — not part of F-PR1.
-- **F0-08:** semantic naming reference created — `docs/f0-semantic-naming.md`.
+- **F0-08:** semantic naming reference created — `docs/frontend/f0-semantic-naming.md`.
 - **Remaining:** only non-blocking future cleanup (listed below). F0 is closed; no further F0 implementation pass is planned.
 
 ### Non-blocking follow-ups (future PRs — do NOT reopen F0)
@@ -166,7 +166,7 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 # Page Completion Matrix
 
-Each row is one of the 22 views from `docs/frontend-development-plan.md` §14/§15. Mark `[x]` when the page is built against the provider. Source of truth for demo coverage.
+Each row is one of the 22 views from `docs/frontend/frontend-development-plan.md` §14/§15. Mark `[x]` when the page is built against the provider. Source of truth for demo coverage.
 
 | View | Page / Surface | Provider method(s) | Owner | Route / Tab | Page spec | Status |
 |---|---|---|---|---|---|---|
