@@ -24,19 +24,88 @@ export function eventIdentity(event: ProviderEvent): string {
   return `sig:${a}|${t}|${ts}`;
 }
 
-/** Normalize a raw transport event to a canonical ProviderEvent. */
+// ---------------------------------------------------------------------------
+// Platform payload → canonical event vocabulary
+//
+// The platform SSE stream emits heterogeneous frames:
+//   - canonical-shaped events (audit records, demo events) that ALREADY carry
+//     `action` / `description` — passed through unchanged;
+//   - control frames: { type: "CONNECTED" | "EVIDENCE_SUBMITTED", ... };
+//   - run-progress frames: { state, message, ... } (ProgressPayload).
+//
+// The Activity Feed renders `action` (the main line) and `description` (the
+// sub-line), so live frames without those fields are mapped here at the
+// provider boundary — UI components do NOT branch on payload shape or mode.
+// ============================================================================
+
+/**
+ * Deterministic canonical action for a platform run-progress state
+ * (CREATED / INGESTING / NORMALIZING / ANALYZING / …).
+ */
+export function runStateAction(state: string): string {
+  return `RUN_PHASE_${state}`;
+}
+
+/** Deterministic description for the platform EVIDENCE_SUBMITTED frame. */
+export function evidenceSubmittedDescription(raw: SseEvent): string {
+  const title = typeof raw.evidenceTitle === "string" ? raw.evidenceTitle : "";
+  const count = typeof raw.fileCount === "number" ? raw.fileCount : 0;
+  return `Evidence submitted: ${title} (${count} file(s))`;
+}
+
+/**
+ * Normalize a raw transport event to a canonical ProviderEvent.
+ *
+ * Events that already carry `action` are canonical and pass through (only the
+ * investigationId is backfilled). Platform control / progress frames without
+ * `action` are mapped into the canonical vocabulary:
+ *   { type: "CONNECTED" }           → action "STREAM_CONNECTED",
+ *                                      description = message
+ *   { type: "EVIDENCE_SUBMITTED" }  → action "EVIDENCE_SUBMITTED",
+ *                                      description from evidenceTitle/fileCount,
+ *                                      targetType "EVIDENCE", targetId = operationId
+ *   { state, message }              → action "RUN_PHASE_<STATE>",
+ *                                      description = message
+ */
 export function normalizeEvent(
   raw: SseEvent,
   investigationId?: string,
 ): ProviderEvent {
-  const mapped: ProviderEvent = {
-    ...raw,
-    // An empty-string or missing investigation id is not canonical; fill it
-    // from the provided context when available.
-    investigationId: raw.investigationId || investigationId || "",
+  const id = raw.investigationId || investigationId || "";
+  const base: ProviderEvent = { ...raw, investigationId: id };
+
+  // Canonical-shaped events already carry an action — pass through unchanged.
+  if (raw.action) return base;
+
+  const isType = (t: string) => raw.type === t;
+  const isProgress = !isType("CONNECTED") && !isType("EVIDENCE_SUBMITTED")
+    && typeof raw.state === "string" && raw.state !== "";
+
+  let action: string | undefined;
+  let description: string | undefined;
+  if (isType("CONNECTED")) {
+    action = "STREAM_CONNECTED";
+    description = typeof raw.message === "string" ? raw.message : "Stream connected";
+  } else if (isType("EVIDENCE_SUBMITTED")) {
+    action = "EVIDENCE_SUBMITTED";
+    description = evidenceSubmittedDescription(raw);
+  } else if (isProgress) {
+    const state = raw.state as string;
+    action = runStateAction(state);
+    description = typeof raw.message === "string" ? raw.message : "";
+  }
+
+  if (!action) return base;
+
+  return {
+    ...base,
+    action,
+    description,
+    targetType: isType("EVIDENCE_SUBMITTED") ? "EVIDENCE" : base.targetType,
+    targetId: isType("EVIDENCE_SUBMITTED")
+      ? (typeof raw.operationId === "string" ? raw.operationId : id)
+      : base.targetId,
   };
-  // Drop any private/undefined identity fields the transport may leave empty.
-  return mapped;
 }
 
 /**

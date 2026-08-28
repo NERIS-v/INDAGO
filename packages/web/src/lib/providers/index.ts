@@ -22,6 +22,7 @@ export type {
   InvestigationTimeline,
   InvestigationProvider,
   EvidenceProvider,
+  CaseProvider,
   ObservationProvider,
   EntityProvider,
   GraphProvider,
@@ -53,4 +54,7 @@ export {
 export {
   createWorkspaceProviders,
   resolveAppDataMode,
+  createCaseListProviders,
+  createIntakeProviders,
+  resolveCaseListMode,
 } from "./factory";

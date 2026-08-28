@@ -17,6 +17,7 @@
 // ============================================================================
 
 import type {
+  Case,
   Investigation,
   Evidence,
   Observation,
@@ -31,7 +32,10 @@ import type {
   GraphHole,
   CrossCaseMatch,
   RobustnessResult,
+  EvidenceSubmissionRequest,
+  UploadedFileReference,
 } from "@indago/contracts";
+import type { EvidenceSubmissionResponse } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
 
 // ============================================================================
@@ -229,11 +233,34 @@ export type RealtimeStatus = "disconnected" | "connecting" | "connected" | "erro
 export interface InvestigationProvider {
   get(id: string): Promise<Investigation>;
   listByCase(caseId: string, query?: ProviderQuery): Promise<Paginated<Investigation>>;
+  /** Create/start an investigation for a case. Deterministic in demo; maps to
+   *  the platform POST /investigations/start in live. */
+  start(caseId: string, investigationId: string): Promise<{ runId: string }>;
 }
 
 export interface EvidenceProvider {
   listByInvestigation(investigationId: string, query?: ProviderQuery): Promise<Paginated<Evidence>>;
   get(id: string): Promise<Evidence>;
+  /** Upload raw File objects into a transport, returning provider-supplied
+   *  file references. Keeps UploadThing out of UI components. In demo this is
+   *  deterministic and synthesizes references without a network upload. */
+  prepareUpload(
+    investigationId: string,
+    files: File[],
+    onProgress?: (progress: number) => void,
+  ): Promise<UploadedFileReference[]>;
+  /** Submit evidence through the provider boundary (canonical request). */
+  submit(
+    investigationId: string,
+    request: Omit<EvidenceSubmissionRequest, "investigationId">,
+    signal?: AbortSignal,
+  ): Promise<EvidenceSubmissionResponse>;
+}
+
+/** Case-level catalog (e.g. the Case List / dashboard). */
+export interface CaseProvider {
+  list(query?: ProviderQuery): Promise<Paginated<Case>>;
+  get(id: string): Promise<Case>;
 }
 
 export interface ObservationProvider {
@@ -326,6 +353,7 @@ export interface WorkspaceIdentity {
 
 export interface WorkspaceProviders extends WorkspaceIdentity {
   readonly mode: Exclude<DataMode, "auto">;
+  readonly cases: CaseProvider;
   readonly investigations: InvestigationProvider;
   readonly evidence: EvidenceProvider;
   readonly observations: ObservationProvider;

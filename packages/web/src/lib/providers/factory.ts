@@ -11,22 +11,32 @@
 // demo state.
 // ============================================================================
 
-import { resolveDataModeForWorkspace, getDataModeConfig } from "./config";
+import {
+  resolveDataModeForWorkspace,
+  getDataModeConfig,
+  getEffectiveEnv,
+} from "./config";
 import type {
   AppDataMode,
   DataModeConfig,
   WorkspaceIdentity,
   WorkspaceProviders,
+  CaseProvider,
+  EvidenceProvider,
+  InvestigationProvider,
 } from "./types";
 import { createWorkspaceDemoProviders } from "./demo/providers";
 import { createLiveWorkspaceProviders } from "./live/providers";
+import { DemoCaseProvider, DemoEvidenceProvider, DemoInvestigationProvider } from "./demo/providers";
+import { createDemoWorkspaceState } from "./demo/state";
+import { LiveCaseProvider, LiveEvidenceProvider, LiveInvestigationProvider } from "./live/providers";
 
 /**
  * Resolve the concrete app data mode for the given case.
  */
 export function resolveAppDataMode(
   caseId: string,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
 ): { mode: AppDataMode; config: DataModeConfig } {
   const config = getDataModeConfig(env);
   const mode = resolveDataModeForWorkspace(caseId, env);
@@ -44,7 +54,7 @@ export function resolveAppDataMode(
  */
 export function createWorkspaceProviders(
   identity: WorkspaceIdentity,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
 ): WorkspaceProviders {
   const config = getDataModeConfig(env);
   const mode = resolveDataModeForWorkspace(identity.caseId, env);
@@ -53,4 +63,75 @@ export function createWorkspaceProviders(
     return createWorkspaceDemoProviders(identity, config);
   }
   return createLiveWorkspaceProviders(identity, config);
+}
+
+// ============================================================================
+// Case List (dashboard) providers
+//
+// The Case List is a top-level surface OUTSIDE any investigation workspace, so
+// it cannot use the workspace bundle. It resolves data mode at the config level
+// (not per-case): in development auto mode the demo case is made discoverable;
+// production/live mode surfaces a typed unsupported/empty state.
+// ============================================================================
+
+export function resolveCaseListMode(
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
+): AppDataMode {
+  const config = getDataModeConfig(env);
+  if (config.mode === "demo") return "demo";
+  if (config.mode === "live") return "live";
+  // auto — dev surfaces the demo case so it is discoverable; prod is live.
+  return config.isDevelopment && config.demoCaseId ? "demo" : "live";
+}
+
+export interface CaseListProviders {
+  readonly mode: AppDataMode;
+  readonly cases: CaseProvider;
+}
+
+export function createCaseListProviders(
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
+): CaseListProviders {
+  const mode = resolveCaseListMode(env);
+  const config = getDataModeConfig(env);
+  if (mode === "demo") {
+    const state = createDemoWorkspaceState("case-list");
+    return { mode, cases: new DemoCaseProvider(state, config) };
+  }
+  return { mode, cases: new LiveCaseProvider() };
+}
+
+// ============================================================================
+// New Investigation (evidence intake) providers
+//
+// The intake page lives OUTSIDE the workspace boundary (the investigation does
+// not exist yet), so it builds a small provider set scoped to the entered case.
+// Resolves data mode from the caseId (never a silent demo fallback).
+// ============================================================================
+
+export interface IntakeProviders {
+  readonly mode: AppDataMode;
+  readonly evidence: EvidenceProvider;
+  readonly investigations: InvestigationProvider;
+}
+
+export function createIntakeProviders(
+  caseId: string,
+  env: NodeJS.ProcessEnv = getEffectiveEnv(),
+): IntakeProviders {
+  const mode = resolveDataModeForWorkspace(caseId, env);
+  const config = getDataModeConfig(env);
+  if (mode === "demo") {
+    const state = createDemoWorkspaceState(`intake:${caseId}`);
+    return {
+      mode,
+      evidence: new DemoEvidenceProvider(state, config),
+      investigations: new DemoInvestigationProvider(state, config),
+    };
+  }
+  return {
+    mode,
+    evidence: new LiveEvidenceProvider(),
+    investigations: new LiveInvestigationProvider(caseId),
+  };
 }

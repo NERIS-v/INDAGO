@@ -1,18 +1,25 @@
 // ============================================================================
 // F-PR2 Live Providers
 //
-// Wrappers over the EXISTING platform API (via platformFetch). These reuse the
-// server-side auth boundary — no new tokens, no client-side credentials.
+// Wrappers over the EXISTING platform API (via server actions → platformFetch).
+// Reuses the server-side auth boundary — no new tokens, no client-side
+// credentials, browser code never sees AUTH_TOKEN.
 //
-// Scope rule: we never silently fall back to demo, and we never invent
-// frontend schema. Endpoints the platform does not yet expose throw
-// ProviderError.unsupported() (documented as a dependency in the F-PR2 report)
-// rather than fabricating data.
+// Live convergence rules (Prompt 2/3):
+//   - Wire a live method ONLY where the platform exposes the endpoint.
+//   - Never silently fall back to demo; never fabricate data. A live failure
+//     surfaces as a typed ProviderError (see ./errors.ts).
+//   - The run-status endpoint carries no canonical Investigation metadata, so
+//     get() projects run status via ./run-projection.ts (documented PROJECTION).
+//   - Endpoints the platform does not yet expose throw
+//     ProviderError.unsupported() (documented dependency) rather than returning
+//     fabricated or demo data.
 // ============================================================================
 
 import type {
   InvestigationProvider,
   EvidenceProvider,
+  CaseProvider,
   ObservationProvider,
   EntityProvider,
   GraphProvider,
@@ -30,27 +37,135 @@ import type {
   WorkspaceIdentity,
 } from "../types";
 import { ProviderError } from "../types";
-import type { Investigation } from "@indago/contracts";
+import type {
+  Investigation,
+  Evidence,
+  EvidenceSubmissionRequest,
+  UploadedFileReference,
+} from "@indago/contracts";
+import type { EvidenceSubmissionResponse } from "@/lib/api/types";
 import { createLiveRealtimeProvider } from "./realtime";
-import { providerUnsupported } from "./unsupported";
+import { providerUnsupported, providerUnsupportedPaginated } from "./unsupported";
+import { toLiveProviderError } from "./errors";
+import { projectRunStatusToInvestigation } from "./run-projection";
+import {
+  getInvestigationStatus,
+  startInvestigation as apiStartInvestigation,
+  submitEvidence as apiSubmitEvidence,
+} from "@/lib/api/server-action";
+import { uploadEvidence } from "@/lib/upload/uploadthing";
 
 /**
- * Live implementation of InvestigationProvider.get() backed by the platform's
- * GET /investigations/:id. The platform response is a run-status shape, so it
- * is mapped into the canonical Investigation where the fields exist; missing
- * canonical fields are surfaced as a documented gap rather than fabricated.
+ * Live implementation of InvestigationProvider.
+ *
+ * get() → platform GET /investigations/:id (run-status), projected into the
+ * canonical Investigation where the fields exist and with documented neutral
+ * defaults elsewhere (see run-projection.ts). start() → platform
+ * POST /investigations/start. listByCase() has no platform endpoint yet and
+ * stays UNSUPPORTED.
  */
 export class LiveInvestigationProvider implements InvestigationProvider {
-  async get(_id: string): Promise<Investigation> {
-    throw ProviderError.unsupported(
-      "Live investigation domain endpoints are not yet exposed by the platform (documented dependency).",
-    );
+  constructor(private readonly caseId: string) {}
+
+  async get(id: string): Promise<Investigation> {
+    let run: Parameters<typeof projectRunStatusToInvestigation>[1];
+    try {
+      run = await getInvestigationStatus(id, this.caseId);
+    } catch (err) {
+      // A backend failure is NEVER turned into a fabricated Investigation.
+      throw toLiveProviderError(err);
+    }
+    try {
+      return projectRunStatusToInvestigation(
+        { investigationId: id, caseId: this.caseId },
+        run,
+      );
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live investigation projection failed for the run-status response.",
+        err,
+      );
+    }
   }
+
   async listByCase(
     _caseId: string,
     _query?: ProviderQuery,
   ): Promise<Paginated<Investigation>> {
-    throw providerUnsupported("investigation.listByCase");
+    return providerUnsupportedPaginated("investigation.listByCase");
+  }
+
+  async start(
+    caseId: string,
+    investigationId: string,
+  ): Promise<{ runId: string }> {
+    try {
+      const result = await apiStartInvestigation({ caseId, investigationId });
+      return { runId: result.runId };
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+}
+
+/**
+ * Live implementation of EvidenceProvider.
+ *
+ * submit() → platform POST /investigations/:id/evidence (via server action).
+ * prepareUpload() → the platform's UploadThing casePackUploader (client-side
+ * helper), returning UploadThing file references. listByInvestigation()/get()
+ * have no platform GET endpoint yet and stay UNSUPPORTED.
+ */
+export class LiveEvidenceProvider implements EvidenceProvider {
+  async listByInvestigation(
+    _investigationId: string,
+    _query?: ProviderQuery,
+  ): Promise<Paginated<Evidence>> {
+    return providerUnsupportedPaginated("evidence.listByInvestigation");
+  }
+
+  get(_id: string): Promise<Evidence> {
+    return providerUnsupported("evidence.get");
+  }
+
+  async prepareUpload(
+    investigationId: string,
+    files: File[],
+    onProgress?: (progress: number) => void,
+  ): Promise<UploadedFileReference[]> {
+    if (files.length === 0) {
+      throw ProviderError.validation("No files were selected to upload.");
+    }
+    try {
+      const uploaded = await uploadEvidence({
+        investigationId,
+        files,
+        onUploadProgress: onProgress
+          ? (data) => onProgress(data.progress)
+          : undefined,
+      });
+      return uploaded.map((u) => ({
+        fileKey: u.fileKey,
+        fileUrl: u.fileUrl,
+        fileName: u.fileName,
+        fileSize: u.fileSize,
+      }));
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async submit(
+    investigationId: string,
+    request: Omit<EvidenceSubmissionRequest, "investigationId">,
+    signal?: AbortSignal,
+  ): Promise<EvidenceSubmissionResponse> {
+    if (signal?.aborted) throw ProviderError.cancelled();
+    try {
+      return await apiSubmitEvidence(investigationId, request);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
   }
 }
 
@@ -59,27 +174,32 @@ export class LiveInvestigationProvider implements InvestigationProvider {
 // Each method throws an explicit UNSUPPORTED ProviderError.
 // ---------------------------------------------------------------------------
 
-class UnsupportedEvidenceProvider implements EvidenceProvider {
-  listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupported("evidence.listByInvestigation");
+/**
+ * Live CaseProvider. The platform does not yet expose a case-list endpoint,
+ * so every method throws an explicit UNSUPPORTED ProviderError rather than
+ * fabricating cases.
+ */
+export class LiveCaseProvider implements CaseProvider {
+  list(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("cases.list");
   }
   get(): Promise<never> {
-    return providerUnsupported("evidence.get");
+    return providerUnsupported("cases.get");
   }
 }
 
 class UnsupportedObservationProvider implements ObservationProvider {
   listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupported("observations.listByInvestigation");
+    return providerUnsupportedPaginated("observations.listByInvestigation");
   }
   listByEntity(): Promise<Paginated<never>> {
-    return providerUnsupported("observations.listByEntity");
+    return providerUnsupportedPaginated("observations.listByEntity");
   }
 }
 
 class UnsupportedEntityProvider implements EntityProvider {
   listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupported("entities.listByInvestigation");
+    return providerUnsupportedPaginated("entities.listByInvestigation");
   }
   get(): Promise<never> {
     return providerUnsupported("entities.get");
@@ -91,13 +211,13 @@ class UnsupportedGraphProvider implements GraphProvider {
     return providerUnsupported("graph.getVersion");
   }
   getNodes(): Promise<Paginated<never>> {
-    return providerUnsupported("graph.getNodes");
+    return providerUnsupportedPaginated("graph.getNodes");
   }
   getEdges(): Promise<Paginated<never>> {
-    return providerUnsupported("graph.getEdges");
+    return providerUnsupportedPaginated("graph.getEdges");
   }
   getGraphHoles(): Promise<Paginated<never>> {
-    return providerUnsupported("graph.getGraphHoles");
+    return providerUnsupportedPaginated("graph.getGraphHoles");
   }
 }
 
@@ -109,7 +229,7 @@ class UnsupportedTimelineProvider implements TimelineProvider {
 
 class UnsupportedLeadProvider implements LeadProvider {
   listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupported("leads.listByInvestigation");
+    return providerUnsupportedPaginated("leads.listByInvestigation");
   }
   get(): Promise<never> {
     return providerUnsupported("leads.get");
@@ -118,19 +238,19 @@ class UnsupportedLeadProvider implements LeadProvider {
 
 class UnsupportedGapProvider implements GapProvider {
   listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupported("gaps.listByInvestigation");
+    return providerUnsupportedPaginated("gaps.listByInvestigation");
   }
   get(): Promise<never> {
     return providerUnsupported("gaps.get");
   }
   evidenceRequests(): Promise<Paginated<never>> {
-    return providerUnsupported("gaps.evidenceRequests");
+    return providerUnsupportedPaginated("gaps.evidenceRequests");
   }
 }
 
 class UnsupportedReviewProvider implements ReviewProvider {
   listTasks(): Promise<Paginated<never>> {
-    return providerUnsupported("review.listTasks");
+    return providerUnsupportedPaginated("review.listTasks");
   }
 }
 
@@ -142,7 +262,7 @@ class UnsupportedRobustnessProvider implements RobustnessProvider {
 
 class UnsupportedCrossCaseProvider implements CrossCaseProvider {
   listMatches(): Promise<Paginated<never>> {
-    return providerUnsupported("crossCase.listMatches");
+    return providerUnsupportedPaginated("crossCase.listMatches");
   }
 }
 
@@ -150,6 +270,10 @@ class UnsupportedCrossCaseProvider implements CrossCaseProvider {
  * Build the full per-workspace LIVE provider bundle. No global singleton.
  * The explicit identity is surfaced on the bundle; investigation-scoped calls
  * receive the investigation id from the caller.
+ *
+ * The identity.caseId is threaded into the investigation provider so live
+ * get() can pass the canonical case boundary to the platform (which re-verifies
+ * it — the frontend never fabricates case access).
  */
 export function createLiveWorkspaceProviders(
   identity: WorkspaceIdentity,
@@ -161,8 +285,9 @@ export function createLiveWorkspaceProviders(
     caseId: identity.caseId,
     investigationId: identity.investigationId,
     mode: "live",
-    investigations: new LiveInvestigationProvider(),
-    evidence: new UnsupportedEvidenceProvider(),
+    cases: new LiveCaseProvider(),
+    investigations: new LiveInvestigationProvider(identity.caseId),
+    evidence: new LiveEvidenceProvider(),
     observations: new UnsupportedObservationProvider(),
     entities: new UnsupportedEntityProvider(),
     graph: new UnsupportedGraphProvider(),

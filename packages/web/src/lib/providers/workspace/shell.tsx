@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useWorkspace } from "./context";
+import { investigationUrl } from "@/lib/workspace/url";
 
 interface NavEntry {
   readonly label: string;
@@ -46,7 +47,6 @@ export function WorkspaceShell({
   // Paths are like /investigations/:id or /investigations/:id/graph
   const segments = pathname.split("/").filter(Boolean);
   const investigationId = segments[1] ?? "";
-  const base = `/investigations/${investigationId}`;
   const current = segments[2] ?? "";
 
   const modeLabel = workspace.mode === "demo" ? "Demo" : "Live";
@@ -58,7 +58,12 @@ export function WorkspaceShell({
       <div className="border-b border-surface-200/40 bg-surface-50/60 px-6">
         <div className="flex flex-wrap items-center gap-1 py-3">
           {NAV.map((entry) => {
-            const href = entry.href ? `${base}/${entry.href}` : base;
+            // Always preserve the case boundary in the URL.
+            const href = investigationUrl(
+              investigationId,
+              workspace.caseId,
+              entry.href || undefined,
+            );
             const isActive = entry.href === current;
             return (
               <Link

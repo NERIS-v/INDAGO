@@ -8,6 +8,7 @@
 // ============================================================================
 
 import type {
+  CaseProvider,
   InvestigationProvider,
   EvidenceProvider,
   ObservationProvider,
@@ -26,11 +27,26 @@ import type {
   WorkspaceIdentity,
 } from "../types";
 import { ProviderError } from "../types";
-import { createDemoWorkspaceState } from "./state";
+import type {
+  Case,
+  EvidenceSubmissionRequest,
+  UploadedFileReference,
+} from "@indago/contracts";
+import type { EvidenceSubmissionResponse } from "@/lib/api/types";
+import { createDemoWorkspaceState, logDemoEvent } from "./state";
 import type { DemoWorkspaceState } from "./state";
 import { createDemoRealtimeProvider } from "./realtime";
 import { baseLatency, heavyLatency, deterministicSleep } from "./latency";
 import { demoFixtures } from "./demo-fixtures";
+import {
+  addDemoSessionEvidence,
+  listDemoSessionEvidence,
+} from "./session";
+import {
+  deterministicUuid,
+  demoSubmissionIds,
+  buildDemoEvidence,
+} from "./submit";
 
 function paginate<T>(
   items: T[],
@@ -57,6 +73,25 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw ProviderError.cancelled();
 }
 
+export class DemoCaseProvider implements CaseProvider {
+  constructor(
+    private readonly state: DemoWorkspaceState,
+    private readonly config: DataModeConfig,
+  ) {}
+
+  async list(query?: ProviderQuery): Promise<Paginated<Case>> {
+    await deterministicSleep(heavyLatency(this.config), query?.signal);
+    throwIfAborted(query?.signal);
+    return paginate([this.state.case], query);
+  }
+
+  async get(id: string): Promise<Case> {
+    await deterministicSleep(baseLatency(this.config));
+    if (id !== this.state.case.id) throw ProviderError.notFound();
+    return this.state.case;
+  }
+}
+
 export class DemoInvestigationProvider implements InvestigationProvider {
   constructor(
     private readonly state: DemoWorkspaceState,
@@ -78,6 +113,17 @@ export class DemoInvestigationProvider implements InvestigationProvider {
     if (caseId !== this.state.case.id) return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
     return paginate([this.state.investigation], query);
   }
+
+  async start(
+    _caseId: string,
+    investigationId: string,
+  ): Promise<{ runId: string }> {
+    // Demo: creating an investigation is deterministic and does NOT touch the
+    // platform's auto-pipeline (documented F-PR3 dependency). The deterministic
+    // demo investigation already exists; we just return a stable run identity.
+    await deterministicSleep(baseLatency(this.config));
+    return { runId: deterministicUuid(`run:${investigationId}`) };
+  }
 }
 
 export class DemoEvidenceProvider implements EvidenceProvider {
@@ -95,14 +141,99 @@ export class DemoEvidenceProvider implements EvidenceProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    return paginate([...this.state.evidenceById.values()], query);
+    const fixtureEvidence = [...this.state.evidenceById.values()];
+    const submitted = listDemoSessionEvidence(investigationId);
+    return paginate([...fixtureEvidence, ...submitted], query);
   }
 
   async get(id: string): Promise<import("@indago/contracts").Evidence> {
     await deterministicSleep(baseLatency(this.config));
     const it = this.state.evidenceById.get(id);
-    if (!it) throw ProviderError.notFound();
-    return it;
+    if (it) return it;
+    const submitted = listDemoSessionEvidence(this.state.investigation.id).find(
+      (e) => e.id === id,
+    );
+    if (submitted) return submitted;
+    throw ProviderError.notFound();
+  }
+
+  async prepareUpload(
+    investigationId: string,
+    files: File[],
+    onProgress?: (progress: number) => void,
+  ): Promise<UploadedFileReference[]> {
+    if (files.length === 0) {
+      throw ProviderError.validation("No files were selected to upload.");
+    }
+    // Deterministic simulated upload: two scaled steps, no randomness.
+    onProgress?.(10);
+    await deterministicSleep(baseLatency(this.config));
+    onProgress?.(50);
+    await deterministicSleep(baseLatency(this.config));
+    onProgress?.(100);
+    return files.map((f) => {
+      const fileKey = deterministicUuid(
+        `file:${investigationId}:${f.name}:${f.size}`,
+      );
+      return {
+        fileKey: `demo:${fileKey}`,
+        fileUrl: `demo://${fileKey}`,
+        fileName: f.name,
+        fileSize: f.size,
+        mimeType: f.type || undefined,
+      };
+    });
+  }
+
+  async submit(
+    investigationId: string,
+    request: Omit<EvidenceSubmissionRequest, "investigationId">,
+    signal?: AbortSignal,
+  ): Promise<EvidenceSubmissionResponse> {
+    await deterministicSleep(heavyLatency(this.config), signal);
+    throwIfAborted(signal);
+    if (investigationId !== this.state.investigation.id) {
+      throw ProviderError.notFound("Investigation not found.");
+    }
+    if (!request.files || request.files.length === 0) {
+      throw ProviderError.validation("At least one file is required.");
+    }
+
+    const full: EvidenceSubmissionRequest = { ...request, investigationId };
+    const ids = demoSubmissionIds(
+      investigationId,
+      full.files,
+      full.sourceName,
+    );
+    const evidence = buildDemoEvidence(
+      full,
+      this.state.case.id,
+      ids.sourceId,
+      ids.evidenceId,
+      ids.artifactIds,
+    );
+
+    // Deterministic demo state transition (session-scoped). The immutable
+    // fixture constants are never mutated.
+    addDemoSessionEvidence(investigationId, evidence);
+    logDemoEvent(this.state, {
+      id: deterministicUuid(`event:${investigationId}:${ids.operationId}`),
+      investigationId,
+      action: "evidence.uploaded",
+      actor: "analyst",
+      targetType: "EVIDENCE",
+      targetId: ids.evidenceId,
+      description: `Evidence submitted: ${full.evidenceTitle} (${full.files.length} file(s))`,
+      timestamp: "2024-07-01T12:00:00.000Z",
+    });
+
+    return {
+      message: "Evidence submission accepted",
+      operationId: ids.operationId,
+      correlationId: ids.correlationId,
+      jobsEnqueued: full.files.length,
+      fileCount: full.files.length,
+    };
   }
 }
 
@@ -351,6 +482,7 @@ export function createWorkspaceDemoProviders(
 ): WorkspaceProviders {
   const state = createDemoWorkspaceState(identity.workspaceId);
   const realtime = createDemoRealtimeProvider(state, config);
+  const cases = new DemoCaseProvider(state, config);
   const investigations = new DemoInvestigationProvider(state, config);
   const evidence = new DemoEvidenceProvider(state, config);
   const observations = new DemoObservationProvider(state, config);
@@ -368,6 +500,7 @@ export function createWorkspaceDemoProviders(
     caseId: identity.caseId,
     investigationId: identity.investigationId,
     mode: "demo",
+    cases,
     investigations,
     evidence,
     observations,
