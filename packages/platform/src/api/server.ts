@@ -28,13 +28,16 @@ app.use(express.json());
 app.use(express.static(path.join(process.cwd(), "public")));
 
 // UploadThing route handler
+//
+// ingestUrl is resolved from UPLOADTHING_INGEST_URL when provided, otherwise
+// the UploadThing SDK performs its own region discovery. No region is
+// hardcoded here. See packages/platform/.env.example.
 app.use(
   "/api/uploadthing",
   createRouteHandler({
     router: uploadRouter,
     config: {
-      // This forces the SDK to use the active Seattle server, bypassing the dead domain!
-      ingestUrl: "https://sea1.ingest.uploadthing.com",
+      ingestUrl: process.env.UPLOADTHING_INGEST_URL || undefined,
     }
   })
 );
