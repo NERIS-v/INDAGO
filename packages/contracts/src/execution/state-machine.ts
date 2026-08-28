@@ -123,7 +123,9 @@ export type RunStateConfiguration = z.infer<typeof RunStateConfigurationSchema>;
 export const DEFAULT_RUN_STATE_CONFIGURATION: RunStateConfiguration = {
   validTransitions: [
     { from: 'CREATED', to: 'INGESTING', trigger: 'PIPELINE_START' },
+    { from: 'CREATED', to: 'FAILED', trigger: 'INGESTION_PERMANENT_FAILURE' },
     { from: 'INGESTING', to: 'NORMALIZING', trigger: 'INGESTION_COMPLETE' },
+    { from: 'INGESTING', to: 'FAILED', trigger: 'INGESTION_PERMANENT_FAILURE' },
     { from: 'NORMALIZING', to: 'ANALYZING', trigger: 'NORMALIZATION_COMPLETE' },
     { from: 'ANALYZING', to: 'DISCOVERING', trigger: 'ANALYSIS_COMPLETE' },
     { from: 'DISCOVERING', to: 'REVIEW_REQUIRED', trigger: 'DISCOVERY_REQUIRES_REVIEW' },

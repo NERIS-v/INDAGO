@@ -249,3 +249,28 @@ describe('M-PR3: IngestionErrorCategory EXTRACTION_FAILED and MALFORMED_ARTIFACT
     expect(result.success).toBe(true);
   });
 });
+
+describe('Failure Transitions (INGESTION_PERMANENT_FAILURE)', () => {
+  it('CREATED → FAILED is a valid transition', () => {
+    const t = DEFAULT_RUN_STATE_CONFIGURATION.validTransitions.find(
+      (x) => x.from === 'CREATED' && x.to === 'FAILED',
+    );
+    expect(t).toBeDefined();
+    expect(t!.trigger).toBe('INGESTION_PERMANENT_FAILURE');
+  });
+
+  it('INGESTING → FAILED is a valid transition', () => {
+    const t = DEFAULT_RUN_STATE_CONFIGURATION.validTransitions.find(
+      (x) => x.from === 'INGESTING' && x.to === 'FAILED',
+    );
+    expect(t).toBeDefined();
+    expect(t!.trigger).toBe('INGESTION_PERMANENT_FAILURE');
+  });
+
+  it('FAILED is reachable only through the INGESTION_PERMANENT_FAILURE trigger from pipeline states', () => {
+    const intoFailed = DEFAULT_RUN_STATE_CONFIGURATION.validTransitions.filter(
+      (x) => x.to === 'FAILED' && x.from !== 'INGESTING' && x.from !== 'CREATED',
+    );
+    expect(intoFailed).toHaveLength(0);
+  });
+});
