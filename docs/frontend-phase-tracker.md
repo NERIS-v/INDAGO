@@ -36,14 +36,34 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F0-01 | F0 | Extend Tailwind v4 `@theme` with accent tokens (muted dusty rose, desaturated amber) — do not create a second design system | `[M]` | `[G]` | P0 | — | `packages/web/src/app/globals.css` | tokens in existing `@theme`; no duplicate theme | token exists | [ ] |
-| F0-02 | F0 | Wire existing Inter + JetBrains Mono through `next/font` (if practical) | `[G]` | `[M]` | P1 | F0-01 | `packages/web/src/app/layout.tsx` | fonts load; fallback works | layout render | [ ] |
-| F0-03 | F0 | Define centralized motion duration/easing tokens (fast 200ms, normal 400ms, slow 900–1400ms) | `[M]` | `[G]` | P0 | F0-01 | `globals.css` | tokens defined | — | [ ] |
-| F0-04 | F0 | Add `prefers-reduced-motion` handling for grain + animations | `[G]` | `[M]` | P0 | F0-01 | `globals.css` | grain/motion disabled under reduced motion | a11y check | [ ] |
-| F0-05 | F0 | Create Workspace shell + workspace nav alongside existing Sidebar | `[G]` | `[M]` | P0 | — | `components/layout/workspace-nav.tsx` (new), `layout.tsx` | shell renders | shell render | [ ] |
-| F0-06 | F0 | Scaffold route structure `/`, `/investigations/new`, `/investigations/[id]` (and optional deep-links) | `[G]` | `[M]` | P0 | F0-05 | `app/**` routes | routes exist; shared layout | route smoke | [ ] |
-| F0-07 | F0 | Polish existing UI primitives against token set (no new design system) | `[M]` | `[G]` | P1 | F0-01 | `components/ui/*` | primitives use tokens | — | [ ] |
-| F0-08 | F0 | Define customer-facing intelligence semantic naming (confidence/lead/gap/evidence wording) | `[M]` | `[G]` | P0 | — | `docs` (naming ref) | naming doc agreed | — | [ ] |
+| F0-01 | F0 | Extend Tailwind v4 `@theme` with accent tokens (muted dusty rose, desaturated amber) — do not create a second design system | `[M]` | `[G]` | P0 | — | `packages/web/src/app/globals.css` | tokens in existing `@theme`; no duplicate theme | token exists | ✅ |
+| F0-02 | F0 | Wire existing Inter + JetBrains Mono through `next/font` (if practical) | `[G]` | `[M]` | P1 | F0-01 | `packages/web/src/app/layout.tsx` | fonts load; fallback works | layout render | ✅ |
+| F0-03 | F0 | Define centralized motion duration/easing tokens (fast 200ms, normal 400ms, slow 900–1400ms) | `[M]` | `[G]` | P0 | F0-01 | `globals.css` | tokens defined | — | ✅ |
+| F0-04 | F0 | Add `prefers-reduced-motion` handling for grain + animations | `[G]` | `[M]` | P0 | F0-01 | `globals.css` | grain/motion disabled under reduced motion | a11y check | ✅ |
+| F0-05 | F0 | Create Workspace shell + workspace nav alongside existing Sidebar | `[G]` | `[M]` | P0 | — | `components/layout/workspace-nav.tsx` (new), `layout.tsx` | shell renders | shell render | ✅ (implemented during F-PR2 as planned phase delivery) |
+| F0-06 | F0 | Scaffold route structure `/`, `/investigations/new`, `/investigations/[id]` (and optional deep-links) | `[G]` | `[M]` | P0 | F0-05 | `app/**` routes | routes exist; shared layout | route smoke | ✅ (implemented during F-PR2 as planned phase delivery) |
+| F0-07 | F0 | Polish existing UI primitives against token set (no new design system) | `[M]` | `[G]` | P1 | F0-01 | `components/ui/*` | primitives use tokens | — | ✅ |
+| F0-08 | F0 | Define customer-facing intelligence semantic naming (confidence/lead/gap/evidence wording) | `[M]` | `[G]` | P0 | — | `docs` (naming ref) | naming doc agreed | — | ✅ (`docs/f0-semantic-naming.md`) |
+
+## F0 Closeout
+
+**F0 = GREEN ✅**
+
+- **Implementation:** complete (F-PR1 visual foundation + design system).
+- **Verification:** 164/164 tests · typecheck clean · build clean · design-token utilities confirmed in compiled CSS.
+- **F0-05 / F0-06:** delivered through F-PR2 (workspace shell + provider architecture) as planned phase delivery — not part of F-PR1.
+- **F0-08:** semantic naming reference created — `docs/f0-semantic-naming.md`.
+- **Remaining:** only non-blocking future cleanup (listed below). F0 is closed; no further F0 implementation pass is planned.
+
+### Non-blocking follow-ups (future PRs — do NOT reopen F0)
+
+- Legacy `animate-spin` in `components/upload/file-upload.tsx` → future PR (loading-language harmonization).
+- Sidebar secondary accent harmonization → future PR.
+- Dead `STATE_COLORS` map in `lib/contracts/types.ts` → cleanup.
+- `Badge` raw `text-[11px]` → switch to a type utility (cleanup).
+- Unused tokens (`--transition-duration-slow`, `--color-background-hover/selected`, `--color-accent-*-subtle`) → cleanup if still unused.
+- F-PR2 `type-mono-xl` undefined utility in `investigation-overview.tsx` → F-PR2 follow-up.
+- F-PR2 default-Tailwind amber palette in `investigations/[id]/page.tsx` → F-PR2 follow-up.
 
 # Phase F1 — Provider / Data
 
@@ -209,7 +229,7 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 
 | PR | Goal | Owner | Dependencies | Acceptance | Status |
 |---|---|---|---|---|---|
-| F-PR1 | Foundation + Design System | Mayur/Gurashish | — | shell renders via provider | [ ] |
+| F-PR1 | Visual Foundation + Design System | Mayur/Gurashish | — | visual foundation / design-system foundation | ✅ |
 | F-PR2 | Provider Seam + Demo Case | Gurashish/Mayur | F-PR1 | contract-valid coherent case | [ ] |
 | F-PR3 | Core Workspace + Case/Evidence | Gurashish | F-PR1, F-PR2 | case→evidence→provider→intelligence | [ ] |
 | F-PR4 | Graph + Timeline | Gurashish | F-PR2, F-PR3 | graph/timeline via provider | [ ] |
