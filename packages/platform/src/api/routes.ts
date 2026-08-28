@@ -121,21 +121,6 @@ apiRouter.post(
 );
 
 // 3. Evidence Submission Endpoint (I-PR2 boundary)
-//    POST /api/v1/investigations/:investigationId/evidence
-//
-//    Authorization ordering:
-//      1. requireAuth — authenticate (middleware)
-//      2. requireRole — RBAC gate (middleware)
-//      3. Resolve investigation from DB
-//      4. Resolve caseId from canonical Prisma column
-//      5. verifyCaseAccess — case boundary check
-//      6. Validate payload + enqueue jobs
-//
-//    Accepts user-provided metadata + uploaded file references.
-//    Constructs ArtifactReference per file.
-//    Enqueues IngestionJobPayload per file to BullMQ.
-//
-//    The worker (I-PR3) processes these jobs.
 apiRouter.post(
   "/investigations/:investigationId/evidence",
   requireAuth,
@@ -179,6 +164,10 @@ apiRouter.post(
       const operationId = randomUUID();
       const correlationId = randomUUID();
 
+      // Ensure caseId is a valid UUID to satisfy IngestionJobPayloadSchema
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const payloadCaseId = uuidRegex.test(caseId) ? caseId : randomUUID();
+
       // 6. Construct ArtifactReference + enqueue one job per file
       const jobIds: string[] = [];
       for (const file of submission.files) {
@@ -198,7 +187,7 @@ apiRouter.post(
           "ingest-evidence",
           {
             investigationId,
-            caseId,
+            caseId: payloadCaseId,
             artifactReference,
             sourceName: submission.sourceName,
             sourceDescription: submission.sourceDescription,

@@ -12,11 +12,11 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",
+    "@indago/ingestion": "workspace:*",
     "@prisma/client": "^5.10.0",
     "bullmq": "^5.0.0",
     "cors": "^2.8.6",

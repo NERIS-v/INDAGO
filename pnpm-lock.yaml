@@ -60,6 +60,9 @@ importers:
       '@indago/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@indago/ingestion':
+        specifier: workspace:*
+        version: link:../intelligence/ingestion
       '@prisma/client':
         specifier: ^5.10.0
         version: 5.22.0(prisma@5.22.0)
