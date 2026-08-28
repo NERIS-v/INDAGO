@@ -39,7 +39,7 @@ Establish the permanent app/data architecture for the INDAGO frontend:
 - Created from the F-PR1 state (commit `030f815`, branch `feat/f-pr1-visual-foundation`).
 - All F-PR2 work is uncommitted on branch `feat/f-pr2-provider-architecture`.
 - Backing docs (`docs/frontend/frontend-development-plan.md`, `docs/frontend/frontend-phase-tracker.md`,
-  `docs/frontend/f-pr1-visual-foundation.md`), `opencode.json`, and
+  `docs/frontend/f-pr1-visual-foundation.md`), and the untracked
   `packages/platform/test-db.mjs` were **left untouched** (verified in the git audit).
 
 ---

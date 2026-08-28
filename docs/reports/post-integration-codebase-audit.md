@@ -1,4 +1,4 @@
-# POST-GURASHISH CODEBASE AUDIT
+# Post-Integration Codebase Audit
 
 > HEAD `b423ec8` (main) — audited after Gurashish's pipeline-wiring work (`7975ab4`, `730089a`, `34ab3af`), compared against the agreed I-PR2 architecture.
 > Method: read-every-file + run-every-verification. No code was modified.
@@ -35,7 +35,7 @@ Verdict: **structurally sound foundation, I-PR3 can start** once persistence, st
 
 - `origin/feat/wire-extraction-pipeline` and `origin/fix/phase3-backend-routing` are **fully merged** into main.
 - Packages: `contracts`, `platform`, `ingestion` (inside `intelligence/`), `web`. Root is pnpm workspace; no CI (`.github/**` absent).
-- Untracked files: `I-PR2-DEEP-ARCHITECTURE-AUDIT.md`, `opencode.json`, `packages/platform/test-db.mjs` 🔴.
+- Untracked file of note: `packages/platform/test-db.mjs` 🔴.
 
 ---
 

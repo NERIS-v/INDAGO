@@ -1,4 +1,4 @@
-# PROMPT 4/4 — BUG SCAN REMEDIATION REPORT
+# Bug Remediation Report
 
 Repository: `INDAGO` — Packages: `platform`, `contracts`, `ingestion`, `web`
 Date: 2026-08-28
@@ -27,7 +27,7 @@ Build & test evidence (all executed this session):
 | `@indago/platform` | **88 passed** (5 files) | **19/19** (3 files, real Postgres `indago_test` + Redis `requirepass` + BullMQ) | clean |
 | `@indago/intelligence/ingestion` | **301/301** (26 files; fetcher suite 28) | — | clean |
 | `@indago/web` | **203/203** (27 files) | — | see §9 (pre-existing debt, untouched) |
-| `@indago/contracts` | unchanged this session (114/114 at Prompt 3) | — | — |
+| `@indago/contracts` | unchanged this session (114/114, Phase 3) | — | — |
 
 ## 2. Scope & Exit Criteria
 
@@ -35,14 +35,14 @@ In scope: remediate the five findings, add targeted tests (mocked + real integra
 the same read-only scan proving each fix is wired at every call site, and deliver this report
 with the MA05 verdict (§11).
 
-Out of scope (unchanged, per prompt): demo/live/auto provider architecture, fixtures,
+Out of scope (unchanged, per this phase): demo/live/auto provider architecture, fixtures,
 provider interfaces, UI components, evidence wizard internals, and
 normalization/observation/entity/graph/lead domains. The platform still does **not** create
 domain-model rows — `RawExtraction` remains the output boundary.
 
 ## 3. Environment
 
-Reused the Prompt-3 Docker stack:
+Reused the Phase 3 Docker stack:
 
 | Component | Container | Notes |
 |---|---|---|
@@ -56,7 +56,7 @@ memory from `docker inspect`.
 
 ## 4. Held Lines (what the scan did not disturb)
 
-Re-confirmed while fixing the five findings — unchanged in this prompt:
+Re-confirmed while fixing the five findings — unchanged in this phase:
 
 - `transitions.ts`: `transitionRunToIngesting` / `transitionRunToNormalizing` are skip-if-past
   safe; the orchestrator has **no** FAILED transition (audits only), so the new `RUN_TERMINAL`
@@ -241,7 +241,7 @@ Re-run at the end of the session over `platform/src`, `web/src`, `ingestion/src`
   (`ingestion-store.ts:241`); `TERMINAL_RUN_STATUSES` guard in place (`ingest-evidence.ts:136`);
 - web `server.ts:33` prod fail-fast.
 
-## 9. Known Residuals (out of scope this prompt)
+## 9. Known Residuals (out of scope this phase)
 
 1. ~~Web typecheck has 8 pre-existing errors in untracked files~~ — **RESOLVED** in the
    follow-up (see §13.4). Root cause was `noUncheckedIndexedAccess: true` in
@@ -249,10 +249,10 @@ Re-run at the end of the session over `platform/src`, `web/src`, `ingestion/src`
    barrel exports. Web `tsc --noEmit` is now clean.
 2. **Auth stays dev-grade** but fully **fail-closed**: production rejects the demo token on the
    platform AND in the web client. JWT/OIDC + secret store remains the migration path (§25.3 of
-   the Prompt-3 report), unchanged.
+   the Phase 3 report), unchanged.
 3. **UploadThing live handshake** still unit-tested only (needs a live UT secret + browser) —
-   unchanged residual from Prompt 3.
-4. List/metadata endpoints remain `UNSUPPORTED` projections (Prompt 3 §25.2), unchanged.
+   unchanged residual from Phase 3.
+4. List/metadata endpoints remain `UNSUPPORTED` projections (Phase 3 §25.2), unchanged.
 
 ## 10. Boundary Compliance
 
@@ -269,10 +269,10 @@ Re-run at the end of the session over `platform/src`, `web/src`, `ingestion/src`
 
 ## 11. MA05 Readiness Gate (§49 update)
 
-Constraints adopted: still **structurally READY (YES)** — and this prompt hardened the gates
+Constraints adopted: still **structurally READY (YES)** — and this phase hardened the gates
 around it.
 
-| Prompt-3 gate | Status now |
+| Phase 3 gate | Status now |
 |---|---|
 | `RawExtraction` durable, immutable (`attemptId @unique`) | yes — collision-tolerant `ensureRawExtraction` (P1-5) closes the wedge that could strand it |
 | Queryable store boundary, strict types | yes, unchanged |
@@ -284,7 +284,7 @@ around it.
 | Real Postgres + Redis + BullMQ regression | **green, 19/19** this session |
 
 **Gate verdict: READY (YES) — hardened.** MA05 (normalization, analytics) remains the next
-prompt’s scope and must not modify `RawExtraction`. The pre-existing web typecheck debt in
+phase’s scope and must not modify `RawExtraction`. The pre-existing web typecheck debt in
 untracked UI/provider files (§9.1) is a separate workstream and should be resolved before MA05
 UI wiring, but does not block ingestion readiness.
 
@@ -325,7 +325,7 @@ New module `packages/platform/src/queue/artifact-fetch-policy.ts`:
   and attacker-controlled hostnames can never enter an operator-pinned allowlist; the
   allowlist is therefore inherently rebinding-safe. Defense in depth retained: the fetcher
   still blocks private/metadata ranges and re-validates every redirect hop against the
-  permissive/test policy (Prompt-4 P1-4).
+  permissive/test policy (Phase 4 P1-4).
 - Wired at the **single assembly point** `ingest-deps.ts` (`isProduction =
   process.env.NODE_ENV === "production"`) — the only place `HttpArtifactFetcher` is built.
 - Tests: `packages/platform/tests/artifact-fetch-policy.test.ts` (8) — unit suite + full
@@ -345,7 +345,7 @@ authorized evidence submission (`EVIDENCE_INGESTED` via BullMQ), not by file sta
 ### 13.3 Bug scanner re-run results (task 4)
 
 Re-ran the read-only wiring sweep against the post-remediation tree. Confirmed, all
-attributed to the prompt-4 fixes:
+attributed to the Phase 4 fixes:
 
 - `verifyCaseAccess` on every evidence surface (`routes.ts` 54/85/205, `uploadthing.ts:85`);
   anon `uploadthing.ts:80` returns before any audit.
