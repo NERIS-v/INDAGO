@@ -9,11 +9,41 @@ import {
   type InvestigationRunState,
 } from "@indago/contracts";
 import { validateClaim, ClaimGroundingError } from "../security/grounding.js";
-import { emitProgressEvent } from "../realtime/sse.js"; // <-- Task 5: Added SSE Emitter
+import { emitProgressEvent } from "../realtime/sse.js";
+
+// Ingestion & Extraction Services
+import {
+  ArtifactAcquisitionService,
+  HttpArtifactFetcher,
+  InMemoryArtifactStorage,
+  ExtractionService,
+  createDefaultParserRegistry,
+  createTesseractOcrProvider,
+} from "@indago/ingestion";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const connection = new Redis(REDIS_URL);
 const workerConnection = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+
+// Initialize Shared Storage & Services for Ingestion Pipeline
+const sharedStorage = new InMemoryArtifactStorage();
+const parserRegistry = createDefaultParserRegistry();
+const ocrProvider = createTesseractOcrProvider();
+
+const acquisitionService = new ArtifactAcquisitionService({
+  fetcher: new HttpArtifactFetcher(),
+  storage: sharedStorage,
+  acquisitionConfig: {
+    maxArtifactSizeBytes: 50 * 1024 * 1024, // 50MB limit
+    fetchTimeoutMs: 30000,
+  },
+});
+
+const extractionService = new ExtractionService(
+  sharedStorage,
+  parserRegistry,
+  { ocrProvider }
+);
 
 export const investigationQueue = new Queue("investigation-pipeline", {
   connection,
@@ -26,12 +56,11 @@ export const investigationQueue = new Queue("investigation-pipeline", {
 export const investigationWorker = new Worker(
   "investigation-pipeline",
   async (job: Job) => {
-    // I-PR2: Handle ingest-evidence jobs (canonical IngestionJobPayload)
+
+    // 1. INGEST-EVIDENCE JOB HANDLER (M-PR1 -> M-PR2 -> M-PR3)
     if (job.name === "ingest-evidence") {
       const parsed = IngestionJobPayloadSchema.safeParse(job.data);
       if (!parsed.success) {
-        // Malformed payload: extract investigationId via safe runtime checks.
-        // No casts — use typeof guards to avoid type narrowing violations.
         const raw = job.data as unknown;
         const investigationId =
           typeof raw === "object" &&
@@ -41,8 +70,6 @@ export const investigationWorker = new Worker(
             ? String((raw as Record<string, unknown>).investigationId)
             : "unknown";
 
-        // SYSTEM_ACTION: malformed queue message is a system anomaly,
-        // not an ingestion-job lifecycle failure.
         await logAuditEvent({
           investigationId,
           action: "SYSTEM_ACTION",
@@ -54,42 +81,95 @@ export const investigationWorker = new Worker(
         throw new Error(`Malformed ingest-evidence payload: ${parsed.error.message}`);
       }
 
-      // Valid payload received — log receipt, then return (no ingestion execution).
-      // I-PR3 will implement the actual ingestion logic here.
+      const payload = parsed.data;
+      console.log(`\n======================================================`);
+      console.log(`[Worker] 📥 Ingesting Evidence: "${payload.evidenceTitle}"`);
+      console.log(`[Worker] URL: ${payload.artifactReference.url}`);
+      console.log(`======================================================`);
+
+      emitProgressEvent(
+        payload.investigationId,
+        "INGESTING",
+        `Acquiring artifact for "${payload.evidenceTitle}"...`
+      );
+
+      // Step A: Acquire Artifact (M-PR1)
+      const acquireResult = await acquisitionService.acquire(
+        payload.artifactReference,
+        {
+          sourceId: randomUUID(),
+          operationId: payload.operationId,
+        }
+      );
+
+      if (!acquireResult.ok) {
+        console.error(`[Worker] ❌ Acquisition failed:`, acquireResult.error);
+        emitProgressEvent(payload.investigationId, "FAILED", `Acquisition failed: ${acquireResult.error.message}`);
+        throw new Error(acquireResult.error.message);
+      }
+
+      console.log(`[Worker] ✅ Artifact Acquired: ${acquireResult.artifact.artifactId} (${acquireResult.artifact.detectedMimeType})`);
+      emitProgressEvent(
+        payload.investigationId,
+        "NORMALIZING",
+        `Classifying & extracting content from ${acquireResult.artifact.originalFilename ?? "document"}...`
+      );
+
+      // Step B: Raw Extraction (M-PR2 Routing -> M-PR3 Extraction)
+      const extractionResult = await extractionService.extract(acquireResult.artifact);
+
+      if (!extractionResult.ok) {
+        console.error(`[Worker] ❌ Extraction failed:`, extractionResult.error);
+        emitProgressEvent(payload.investigationId, "FAILED", `Extraction failed: ${extractionResult.error.message}`);
+        throw new Error(extractionResult.error.message);
+      }
+
+      // Step C: Display Extracted Content in Console
+      console.log(`\n----------------- [EXTRACTION RESULT] -----------------`);
+      console.log(`Format:          ${extractionResult.extraction.format}`);
+      console.log(`Extracted At:    ${extractionResult.extraction.extractedAt}`);
+      console.log(`Content Preview:\n`);
+      console.dir(extractionResult.extraction, { depth: 4, colors: true });
+      console.log(`-------------------------------------------------------\n`);
+
+      emitProgressEvent(
+        payload.investigationId,
+        "ANALYZING",
+        `Extraction complete for ${acquireResult.artifact.originalFilename ?? "document"}.`
+      );
+
       await logAuditEvent({
-        investigationId: parsed.data.investigationId,
-        action: "SYSTEM_ACTION",
-        actor: "SYSTEM_WORKER",
-        targetType: "INGESTION_JOB",
-        targetId: job.id ?? "unknown",
-        description: `Ingest-evidence job received (correlation: ${parsed.data.correlationId})`,
+        investigationId: payload.investigationId,
+        action: "EVIDENCE_INGESTED",
+        actor: "INGESTION_PIPELINE",
+        targetType: "EVIDENCE",
+        targetId: acquireResult.artifact.artifactId,
+        description: `Successfully extracted ${extractionResult.extraction.format} content for ${payload.evidenceTitle}`,
       });
+
       return;
     }
 
-    // Existing investigation-pipeline handling
+    // 2. INVESTIGATION RUN STATE MACHINE PIPELINE
     const run = await db.investigationRun.findUniqueOrThrow({ where: { id: job.data.runId } });
 
     try {
       switch (run.state as InvestigationRunState) {
         case "CREATED": {
           await transitionState(run.id, "INGESTING", "PIPELINE_START");
-          // Re-queue to immediately process the INGESTING step
-          //await investigationQueue.add("investigation-pipeline", { runId: run.id });
+          // Re-queue explicitly commented out per intended user flow
+          // await investigationQueue.add("investigation-pipeline", { runId: run.id });
           break;
         }
 
         case "INGESTING": {
           console.log(`[Worker] Task 3: Ingesting case data for run ${run.id}...`);
-          
-          // Let the frontend know we are actively fetching data
           emitProgressEvent(run.investigationId, "INGESTING", "Fetching case data from Ingestion Service...");
 
           const context = (typeof run.contextData === "object" && run.contextData !== null)
             ? (run.contextData as Record<string, any>)
             : {};
 
-          // Consume Tool Results
           let graphData;
 
           if (process.env.USE_MOCK_INGESTION === "true") {
@@ -120,7 +200,6 @@ export const investigationWorker = new Worker(
             graphData = await response.json();
           }
 
-          // Persist State
           await db.investigationRun.update({
             where: { id: run.id },
             data: {
@@ -133,11 +212,9 @@ export const investigationWorker = new Worker(
           });
 
           console.log(`[Worker] Task 4: Graph state successfully persisted for run ${run.id}`);
-          // To send the graph payload to the frontend
           emitProgressEvent(run.investigationId, "GRAPH_READY", JSON.stringify(graphData));
 
           await transitionState(run.id, "NORMALIZING", "INGESTION_COMPLETE");
-          // Re-queue to process the next state machine step
           await investigationQueue.add("investigation-pipeline", { runId: run.id });
           break;
         }
@@ -145,14 +222,13 @@ export const investigationWorker = new Worker(
         case "NORMALIZING": {
           console.log(`[Worker] Task 3.5: Normalizing case data for run ${run.id}...`);
           emitProgressEvent(run.investigationId, "NORMALIZING", "Normalizing graph data format...");
-          // For Phase 3 testing, we just pass straight through this step to keep the pipeline moving
+          
           await transitionState(run.id, "ANALYZING", "NORMALIZATION_COMPLETE");
           await investigationQueue.add("investigation-pipeline", { runId: run.id });
           break;
         }
 
         case "ANALYZING": {
-          // LLM & Agent Decision Logic
           const agentDecision = {
             proposedClaim: {
               text: "Found a hidden connection to Account Y.",
@@ -162,7 +238,6 @@ export const investigationWorker = new Worker(
 
           const toolResult = { data: [{ id: "valid_id_456" }] };
 
-          // G-A08: Claim Grounding Gate
           if (agentDecision.proposedClaim) {
             try {
               await validateClaim(
@@ -202,8 +277,6 @@ export const investigationWorker = new Worker(
       }
     } catch (error: any) {
       console.error(`[Worker] Failed during state execution for run ${run.id}:`, error);
-      
-      // Let the frontend know there was a critical failure
       emitProgressEvent(run.investigationId, "FAILED", `Error: ${error.message}`);
       
       await db.investigationRun.update({
@@ -239,7 +312,6 @@ async function transitionState(
     throw new Error(`Invalid transition: ${run.state} -> ${newState}`);
   }
 
-  // G-A05: Create Checkpoint
   const checkpointsCount = await db.agentCheckpoint.count({ where: { runId } });
   await db.agentCheckpoint.create({
     data: {
@@ -256,7 +328,6 @@ async function transitionState(
     data: { state: newState, status: "RUNNING" },
   });
 
-  // Broadcast state transition to the frontend
   emitProgressEvent(run.investigationId, newState, `System transitioned to ${newState} via ${trigger}`);
 
   await logAuditEvent({
