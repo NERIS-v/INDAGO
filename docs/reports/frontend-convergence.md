@@ -1,4 +1,4 @@
-# PROMPT 2/3 — LIVE FRONTEND CONVERGENCE REPORT
+# Frontend Live Convergence Report
 
 Repository: `INDAGO` · Package: `packages/web` (+ regression on contracts / ingestion / platform)
 Date: 2026-08-28
@@ -7,7 +7,7 @@ Date: 2026-08-28
 
 ## 1. Executive Summary
 
-This prompt connected the existing Next.js frontend to the now-real backend through the
+This phase connected the existing Next.js frontend to the now-real backend through the
 **existing provider interfaces** — with DEMO / LIVE / AUTO modes, the demo providers, the
 mock fixtures, and the UI design untouched. No component was added, removed, or reshaped; no
 component branches on DataMode; demo providers and fixtures remain behavior-identical (two
@@ -181,7 +181,7 @@ This is error-model handling, not DataMode branching — the same code path runs
 Demo providers, fixtures, session/submit builders, timing, realtime replay, and the evidence
 wizard are unchanged in behavior. The two compile-only repairs (§4) do not alter any data,
 ordering, or deterministic identity. The wizard is **not** provider-rewired and **not** mounted
-on the active route: its current data path is preserved and documented as the next-prompt seam
+on the active route: its current data path is preserved and documented as the next-phase seam
 (§21).
 
 ## 12. Data-Mode Routing (demo / live / auto)
@@ -261,7 +261,7 @@ these. No new env keys required; nothing new to document.
 
 ## 19. Web Typecheck / Test / Build
 
-- **`npm run typecheck`** — clean. (The package was **broken before this prompt**: the live
+- **`npm run typecheck`** — clean. (The package was **broken before this phase**: the live
   bundle was missing `start`/`cases` and the demo files had stale type errors → repaired, §4.)
 - **`npm test`** — 27 files / **199 passed**.
 - **`npm run build`** — `next build` compiled, types checked, 23 routes built; SSE proxy and
@@ -272,9 +272,9 @@ these. No new env keys required; nothing new to document.
 - `@indago/contracts`: **114/114** (7 files), typecheck clean.
 - `@indago/ingestion`: **292/292** (26 files), typecheck clean.
 - `@indago/platform`: **55/55** plus 13 integration tests skipped (no test DB), typecheck clean.
-- No backend source was modified in this prompt (git diff confirmed — web files only).
+- No backend source was modified in this phase (git diff confirmed — web files only).
 
-## 21. Deferred Risks / Next-Prompt Seams
+## 21. Deferred Risks / Next-Phase Seams
 
 1. **Wizard → provider boundary:** the evidence wizard still calls the `submitEvidence`
    server action directly and is unmounted on the active route. Next step: mount a

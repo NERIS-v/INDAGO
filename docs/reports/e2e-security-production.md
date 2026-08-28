@@ -1,4 +1,4 @@
-# PROMPT 3/3 — FINAL E2E CONVERGENCE, SECURITY & PRODUCTION HARDENING REPORT
+# End-to-End Security & Production Hardening
 
 Repository: `INDAGO` — Packages: `platform`, `contracts`, `ingestion`, `web`
 Date: 2026-08-28
@@ -7,7 +7,7 @@ Date: 2026-08-28
 
 ## 1. Executive Summary
 
-Prompt 3/3 closed the loop that Prompt 2 could only document: **the full application stack
+This phase closed the loop that the prior phase could only document: **the full application stack
 now runs as one real system and is proven by real integration tests.**
 
 Build & test evidence (all executed in this session):
@@ -45,7 +45,7 @@ of worker failure semantics (retry/audit/progress), evidence-submission hash ver
 UploadThing defense-in-depth, and SSE reconnect/re-sync; acceptance checklist + MA05 readiness
 gate.
 
-Out of scope (unchanged, per prompt): demo/live/auto provider architecture, demo fixtures and
+Out of scope (unchanged, per this phase): demo/live/auto provider architecture, demo fixtures and
 realtime demos, UI components, provider interfaces, evidence wizard internals, and
 normalization/observation/entity/graph/lead domains — nothing in those areas was rewritten;
 the platform still does **not** create domain-model rows (RawExtraction is the output
@@ -58,7 +58,7 @@ MA05 gate (§49).
 
 ## 3. Environment & Provisioning
 
-No local Postgres/Redis exist on this machine, so Prompt 3 provisioned the stack with Docker:
+No local Postgres/Redis exist on this machine, so this phase provisioned the stack with Docker:
 
 | Component | Container | Version | Exposed | Auth |
 |---|---|---|---|---|
@@ -343,7 +343,7 @@ RawExtraction remains the terminal output of the ingestion tier. Audits:
   store path (`…\pnpm\store\v11\projects\<hash>\packages\…`) where Windows junctions
   (`AppData/Local/Application Data`) cause esbuild to fail loading any package's
   `vitest.config.ts` (`Cannot read directory … Access is denied`). Affects contracts/
-  ingestion/web (which ship configs); it predates and is unrelated to this prompt.
+  ingestion/web (which ship configs); it predates and is unrelated to this phase.
 - **Reliable pattern used for verification:** run suites directly from the package directory
   (`npx vitest run …` from `packages/<pkg>`), and `npx next build` directly (a direct
   `pnpm --filter web build` double-spawns `next build` which collide on `.next`).
@@ -352,7 +352,7 @@ RawExtraction remains the terminal output of the ingestion tier. Audits:
   config file — same guarantee that the two real-DB suites never clobber a shared test DB,
   without the pnpm/config-load problem.
 - **Flaky test note:** `web/tests/api-client.test.ts` intermittently fails under full-suite
-  CPU load (passes in isolation and on clean reruns — 199/199 final); untouched by this prompt.
+  CPU load (passes in isolation and on clean reruns — 199/199 final); untouched by this phase.
 
 ## 22. Files Changed
 
@@ -422,9 +422,9 @@ tier delivers a durable, queryable, provenance-preserving normalized surface. St
 
 **Gate verdict: READY (YES).** Run reaches NORMALIZING and downstream MA05 can consume
 `RawExtraction` without reaching back into the ingestion tier. MA05 itself (normalization,
-analytics) remains the next prompt's scope and must not modify RawExtraction.
+analytics) remains the next phase's scope and must not modify RawExtraction.
 
-## 25. Risks & Next-Prompt Seams
+## 25. Risks & Next-Phase Seams
 
 1. **UploadThing real handshake** still needs a live UT secret + browser to exercise the CDN
    signing path end to end (unit-tested only). `prepareUpload` progress semantics should be
@@ -436,7 +436,7 @@ analytics) remains the next prompt's scope and must not modify RawExtraction.
    secret store) is the migration path; `NODE_ENV=production` already disables the
    dev-access bypass and the wrong-case 403 cross-check is real at any env.
 4. **Wizard mount seam** (provider-backed evidence flow on the active route) remains
-   documented for the next prompt.
+   documented for the next phase.
 5. **pnpm/junction quirk** (§21) is environmental — direct package-dir execution is the
    reliable CI pattern on this box (documented in `test:integration` guidance).
 

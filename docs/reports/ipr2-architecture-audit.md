@@ -1,6 +1,6 @@
 # I-PR2 DEEP ARCHITECTURE AUDIT
 
-**Reconstructed from source.** Every claim below was traced against code, not inferred from comments. Where comments disagree with code, or where current code diverges from the I-PR2-REPORT.md, the discrepancy is called out explicitly.
+**Reconstructed from source.** Every claim below was traced against code, not inferred from comments. Where comments disagree with code, or where current code diverges from the ipr2-evidence-submission.md, the discrepancy is called out explicitly.
 
 **Repo state audited:** `HEAD` of `feat/f-pr2-provider-architecture` (commit `5f320d5`), I-PR2 work committed at `edbe2cb` (contracts), `0b5a79e` (platform), `bc5bba6` (web).
 
@@ -30,7 +30,7 @@ Key verified invariants:
 Two important gaps to keep in mind for the Obsidian note:
 
 1. **The routed web UI no longer mounts the I-PR2 evidence wizard.** Under the newer F-PR2 provider architecture, `investigations/[id]/page.tsx` renders `InvestigationOverview`; `investigation-detail.tsx` (the component that mounts `EvidenceSubmission`) is not imported by any active route. The I-PR2 flow is fully unit-tested but is currently a **live, unmounted seam** — F-PR3 is planned to refactor evidence submission through the provider layer.
-2. **The existing `I-PR2-REPORT.md` is stale in places** — most notably it claims audit logging is "console-only" (§11) when `audit/logger.ts` now persists hash-chained records to Prisma, and its test totals (509) predate the current state (604).
+2. **The existing `ipr2-evidence-submission.md` is stale in places** — most notably it claims audit logging is "console-only" (§11) when `audit/logger.ts` now persists hash-chained records to Prisma, and its test totals (509) predate the current state (604).
 
 ---
 
@@ -489,7 +489,7 @@ Ground truth comes from commit `0b5a79e` (message + diff) and current tests. For
 4. **Duplicate BullMQ producer path.** Pre-I-PR2 `uploadthing.ts` called `queue.add("ingest-evidence", {investigationId, fileUrl, fileName, fileKey})` with an ad-hoc payload. → Removed; single producer in `routes.ts`. Verified in diff. **Lesson:** exactly one authority may create a queue's jobs; anything else becomes drift.
 5. **Dual queue schemas.** `EvidenceIngestionJobSchema` existed alongside `IngestionJobPayloadSchema`. → Removed; zero references today (grep). **Lesson:** one queue = one strict schema.
 6. **Incorrect case authorization ordering.** Old `requireCaseAccess` trusted `caseId` from request body/query/params. → Evidence endpoint resolves the run and derives case from `run.caseId`, then verifies. **Lesson:** authorization must bind to persisted, server-derived scopes.
-7. **caseId in contextData instead of a canonical field.** Legacy mechanism: `contextData.caseId` JSON. → Added Prisma `InvestigationRun.caseId` column (`schema.prisma:17`). **Duplication remains**: `/start` still writes `contextData: { caseId }` (`routes.ts:94`) and the orchestrator's `INGESTING` branch still reads `context.caseId` for the mock ingestion HTTP call (`orchestrator.ts:113`). `I-PR2-REPORT.md` claims "contextData.caseId eliminated" — **stale; not fully eliminated** in the legacy pipeline branch.
+7. **caseId in contextData instead of a canonical field.** Legacy mechanism: `contextData.caseId` JSON. → Added Prisma `InvestigationRun.caseId` column (`schema.prisma:17`). **Duplication remains**: `/start` still writes `contextData: { caseId }` (`routes.ts:94`) and the orchestrator's `INGESTING` branch still reads `context.caseId` for the mock ingestion HTTP call (`orchestrator.ts:113`). `ipr2-evidence-submission.md` claims "contextData.caseId eliminated" — **stale; not fully eliminated** in the legacy pipeline branch.
 8. **EVIDENCE_INGESTED emitted before actual ingestion.** The old upload path produced an ingestion-signal without ingestion. → Current producer emits only `EVIDENCE_UPLOADED`/`EVIDENCE_QUEUED`/`EVIDENCE_SUBMITTED`; `EVIDENCE_INGESTED` is reserved for the worker. **Lesson:** never emit an outcome you can't fulfill.
 9. **Strictness test incorrectly treated caseId as unknown.** Old test fixtures used non-UUID case ids (`case-042`). → Reworked to real UUIDs (`upload-producer.test.ts:20-22`). **Lesson:** schema strictness tests must use schema-correct values or they validate nothing.
 10. **Stale contracts dist broke platform tests.** Platform consumes `@indago/contracts` from `dist`; a fresh schema wasn't rebuilt. → `pnpm --filter @indago/contracts build` before platform work; runs clean now. **Lesson:** in a workspace with emitted artifacts, rebuild upstream before downstream validate.
@@ -570,7 +570,7 @@ Mermaid versions of A/B/F are included in §§3-4; full mermaid set can be gener
 - Newly introduced failures: none.
 - Stale-dist issue: real and recurring (§16.10); resolved by rebuilding contracts first. This audit itself rebuilt contracts before running platform/web.
 - Environment issues: web tests are slow (~60s, jsdom setup); ingestion OCR tests heavy (~35s). No CI workflow exists in `.github/workflows` (matching report).
-- Note: `I-PR2-REPORT.md`'s numbers (509 tests, 9 web test files) reflect the I-PR2 moment; the web package gained the F-PR2 suite afterwards (now 24 files/164).
+- Note: `ipr2-evidence-submission.md`'s numbers (509 tests, 9 web test files) reflect the I-PR2 moment; the web package gained the F-PR2 suite afterwards (now 24 files/164).
 
 ---
 
@@ -676,4 +676,4 @@ The worker's `ingest-evidence` branch (`orchestrator.ts:30-68`) is the single po
 - The exact behavior of UploadThing's own retry/dedup cadence for `onUploadComplete` (SDK-internal; not observable in source).
 - Any claim that a second identical submission *always* results in a silently skipped job after the first job is **completed/removed** — BullMQ dedup only holds while the original job is waiting/active in the current implementation; completed-job handling is Redis/BullMQ-internal.
 - Whether `mimeType` is ever present in production upload results — the web helper currently drops it, so this is expected-undefined but not runtime-verified.
-- The `strictness test / role reconstruction / initial UI caseId` bug items (#1, #9, #12 in section 16) are reconstructed from commit history, commit messages, `I-PR2-REPORT.md`, and current code wherever possible; where the original failing code no longer exists in the tree, the "fix" is evidenced by the surviving artifact (tests + report), not by the deleted code.
+- The `strictness test / role reconstruction / initial UI caseId` bug items (#1, #9, #12 in section 16) are reconstructed from commit history, commit messages, `ipr2-evidence-submission.md`, and current code wherever possible; where the original failing code no longer exists in the tree, the "fix" is evidenced by the surviving artifact (tests + report), not by the deleted code.
