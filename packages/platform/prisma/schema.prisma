@@ -75,3 +75,104 @@ model AuditEvent {
   previousHash    String   // Link to previous audit event
   hash            String   @unique // SHA-256(previousHash + actor + action + targetId + timestamp)
 }
+
+// ============================================================================
+// P-01: Durable Artifact (M-PR1 persisted)
+//
+// artifactId is the deterministic content-derived UUID (SHA-256 of bytes →
+// UUID v4-shaped), computed by @indago/ingestion. contentHash is unique for
+// content-level deduplication. Artifacts are NEVER keyed by fileKey,
+// idempotencyKey, or provider fileHash.
+//
+// investigationId/caseId are plain indexed columns — no Prisma FK to
+// InvestigationRun is declared so artifact records survive run rotations
+// and the evidence ingestion path stays decoupled from the run lifecycle.
+// ============================================================================
+model Artifact {
+  id               String   @id // deterministic UUID derived from contentHash
+  contentHash      String   @unique // SHA-256 of artifact bytes
+  storagePath      String
+  detectedMimeType String
+  declaredMimeType String?
+  originalFilename String?
+  contentSizeBytes Int
+  sourceType       String?
+  sourceId         String?
+  investigationId  String
+  caseId           String
+  operationId      String
+  correlationId    String
+  idempotencyKey   String
+  hashVerified     Boolean  @default(false)
+  mimeVerified     Boolean  @default(false)
+  providerMetadata Json?
+  ingestedAt       DateTime @default(now())
+
+  attempts      IngestionAttempt[]
+  extractions   RawExtraction[]
+
+  @@index([investigationId])
+  @@index([idempotencyKey])
+}
+
+// ============================================================================
+// P-02: Durable Ingestion Attempt
+//
+// One row per logical evidence job (investigationId + idempotencyKey),
+// updated across BullMQ retries. attemptNumber = job.attemptsMade + 1.
+// Persisted failure state uses the canonical IngestionError JSON
+// (category / code / message / retryable / sourceId / details) from
+// @indago/contracts.
+// ============================================================================
+model IngestionAttempt {
+  id              String   @id @default(uuid())
+  investigationId String
+  caseId          String
+  idempotencyKey  String
+  operationId     String
+  correlationId   String
+  attemptNumber   Int
+  status          String   // RUNNING, SUCCEEDED, FAILED
+  sourceId        String?
+  artifactId      String?
+  parserId        String?
+  parserVersion   String?
+  format          String?
+  error           Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  artifact    Artifact?      @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  extractions RawExtraction[]
+
+  @@unique([investigationId, idempotencyKey])
+  @@index([idempotencyKey])
+  @@index([artifactId])
+}
+
+// ============================================================================
+// P-03: Durable RawExtraction (M-PR3 persisted)
+//
+// Immutable per ingestion attempt. The full RawExtraction discriminated
+// union (source locations + warnings + parserId/parserVersion) is stored as
+// JSON; queryable columns mirror the provenance base fields. New parser/OCR
+// version → new attempt → new row; the evidence trail is preserved.
+// This table creates NO observations / entities / relations (pre-MA05).
+// ============================================================================
+model RawExtraction {
+  id            String   @id @default(uuid())
+  attemptId     String
+  artifactId    String
+  parserId      String
+  parserVersion String
+  format        String
+  extraction    Json
+  warnings      Json?
+  extractedAt   DateTime
+
+  attempt  IngestionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  artifact Artifact         @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId])
+  @@index([artifactId, extractedAt])
+}
