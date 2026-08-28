@@ -23,11 +23,16 @@ export {
 } from './artifact-fetcher.js';
 export type {
   ArtifactFetcher,
+  ArtifactFetchPolicy,
   FetchOptions,
   FetchedArtifact,
 } from './artifact-fetcher.js';
 
 export { computeContentHash, deterministicArtifactId } from './content-hasher.js';
+
+export { deterministicSourceId } from './source-id.js';
+
+export { bytesToUuid4 } from './uuid-bytes.js';
 
 export { detectMimeType } from './mime-detector.js';
 export type { MimeTypeResult } from './mime-detector.js';
