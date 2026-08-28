@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
 import { EventEmitter } from "events";
+import { randomUUID } from "node:crypto";
+import { buildProgressPayload, type ProgressDetail } from "./payload.js";
 
 // Global event emitter for the platform
 export const realtimeEvents = new EventEmitter();
@@ -13,11 +15,22 @@ export function streamEventsHandler(req: Request, res: Response) {
 
   const investigationId = req.params.investigationId;
 
-  // Send an initial connection success event
-  res.write(`data: ${JSON.stringify({ investigationId, type: "CONNECTED", message: "Stream initialized" })}\n\n`);
+  // Send an initial connection-success event. A fresh `id` + `timestamp` per
+  // connection give the frame a unique identity, so frontend deduplicators
+  // surface every (re)connect — the UI uses it to re-fetch the authoritative
+  // InvestigationRun state after a dropped stream (Prompt 3 §19/§20).
+  res.write(
+    `data: ${JSON.stringify({
+      id: randomUUID(),
+      investigationId,
+      type: "CONNECTED",
+      message: "Stream initialized",
+      timestamp: new Date().toISOString(),
+    })}\n\n`,
+  );
 
   // The listener that pushes data to the client
-  const listener = (eventData: any) => {
+  const listener = (eventData: { investigationId?: string }) => {
     // Only send events relevant to the requested investigation
     if (eventData.investigationId === investigationId) {
       res.write(`data: ${JSON.stringify(eventData)}\n\n`);
@@ -35,11 +48,14 @@ export function streamEventsHandler(req: Request, res: Response) {
 }
 
 // Helper function to easily broadcast updates from BullMQ workers
-export function emitProgressEvent(investigationId: string, state: string, message: string) {
-  realtimeEvents.emit("progress", {
-    investigationId,
-    state,
-    message,
-    timestamp: new Date().toISOString(),
-  });
+export function emitProgressEvent(
+  investigationId: string,
+  state: string,
+  message: string,
+  detail?: ProgressDetail,
+) {
+  realtimeEvents.emit(
+    "progress",
+    buildProgressPayload(investigationId, state, message, detail),
+  );
 }

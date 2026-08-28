@@ -1,11 +1,60 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createHash } from "node:crypto";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { IngestionJobPayloadSchema } from "@indago/contracts";
-import { logAuditEvent } from "../src/audit/logger.js";
+
+// ============================================================================
+// Worker Stub Tests — Durable Ingest-Evidence Flow
+//
+// Verifies the canonical worker flow end to end across mocks:
+//   validate → resolve run → attempt RUNNING → INGESTING →
+//   acquire → persist artifact → extract → persist RawExtraction →
+//   attempt SUCCEEDED → NORMALIZING → audit EVIDENCE_INGESTED (only after
+//   persistence). Retryable vs permanent failure semantics + case identity.
+// ============================================================================
 
 // ============================================================================
 // Mocks
 // ============================================================================
+
+const VALID_INV_ID = "550e8400-e29b-41d4-a716-446655440000";
+const VALID_CORR_ID = "660e8400-e29b-41d4-a716-446655440001";
+const VALID_CASE_ID = "550e8400-e29b-41d4-a716-446655440010";
+const VALID_CASE_ID_2 = "550e8400-e29b-41d4-a716-446655440011";
+const VALID_OP_ID = "770e8400-e29b-41d4-a716-446655440002";
+const VALID_SOURCE_ID = "880e8400-e29b-41d4-a716-446655440003";
+const VALID_ARTIFACT_ID = "a00e8400-e29b-41d4-a716-446655440004";
+
+// Hoisted module mocks — accessible inside vi.mock factories (hoisting-safe).
+const h = vi.hoisted(() => {
+  const acquire = vi.fn();
+  const extract = vi.fn();
+  const deterministicSourceId = vi.fn();
+  return { acquire, extract, deterministicSourceId };
+});
+
+/** Loose shape of the mocked Prisma `db` object. */
+type MockedDb = {
+  investigationRun: {
+    findFirst: Mock;
+    findUniqueOrThrow: Mock;
+    update: Mock;
+  };
+  agentCheckpoint: { count: Mock; create: Mock };
+  artifact: { upsert: Mock; findUnique: Mock };
+  ingestionAttempt: { upsert: Mock; findUnique: Mock };
+  rawExtraction: { create: Mock; findUnique: Mock };
+};
+
+interface FakeJob {
+  name: string;
+  id: string;
+  data: unknown;
+  attemptsMade: number;
+  opts: { attempts: number };
+}
+
+let capturedHandler:
+  | ((job: FakeJob) => Promise<unknown>)
+  | null = null;
 
 vi.mock("ioredis", () => ({
   default: vi.fn().mockImplementation(() => ({
@@ -16,7 +65,15 @@ vi.mock("ioredis", () => ({
 
 vi.mock("../src/db/prisma.js", () => ({
   db: {
-    investigationRun: { findFirst: vi.fn() },
+    investigationRun: {
+      findFirst: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      update: vi.fn(),
+    },
+    agentCheckpoint: { count: vi.fn(), create: vi.fn() },
+    artifact: { upsert: vi.fn(), findUnique: vi.fn() },
+    ingestionAttempt: { upsert: vi.fn(), findUnique: vi.fn() },
+    rawExtraction: { create: vi.fn(), findUnique: vi.fn() },
   },
 }));
 
@@ -29,26 +86,15 @@ vi.mock("../src/realtime/sse.js", () => ({
   emitProgressEvent: vi.fn(),
 }));
 
-vi.mock("@indago/ingestion", () => {
-  return {
-    ArtifactAcquisitionService: vi.fn().mockImplementation(() => ({
-      acquire: vi.fn().mockResolvedValue({
-        ok: true,
-        artifact: { artifactId: "mock-id", detectedMimeType: "application/pdf" },
-      }),
-    })),
-    ExtractionService: vi.fn().mockImplementation(() => ({
-      extract: vi.fn().mockResolvedValue({
-        ok: true,
-        extraction: { format: "PDF", extractedAt: new Date().toISOString() },
-      }),
-    })),
-    HttpArtifactFetcher: class {},
-    InMemoryArtifactStorage: class {},
-    createDefaultParserRegistry: vi.fn(),
-    createTesseractOcrProvider: vi.fn(),
-  };
-});
+vi.mock("@indago/ingestion", () => ({
+  ArtifactAcquisitionService: vi.fn().mockImplementation(() => ({ acquire: h.acquire })),
+  ExtractionService: vi.fn().mockImplementation(() => ({ extract: h.extract })),
+  HttpArtifactFetcher: class {},
+  FilesystemArtifactStorage: class {},
+  createDefaultParserRegistry: vi.fn(),
+  createTesseractOcrProvider: vi.fn(),
+  deterministicSourceId: h.deterministicSourceId,
+}));
 
 vi.mock("../src/security/grounding.js", () => ({
   validateClaim: vi.fn(),
@@ -60,9 +106,6 @@ vi.mock("../src/security/grounding.js", () => ({
   },
 }));
 
-// Capture the worker handler by mocking BullMQ Worker to record the callback
-let capturedHandler: ((job: { name: string; data: unknown; id: string }) => Promise<unknown>) | null = null;
-
 vi.mock("bullmq", async () => {
   return {
     Queue: vi.fn().mockImplementation(() => ({
@@ -70,32 +113,49 @@ vi.mock("bullmq", async () => {
     })),
     Worker: vi.fn().mockImplementation((_name: string, handler: unknown) => {
       capturedHandler = handler as typeof capturedHandler;
-      return {};
+      return { on: vi.fn() };
     }),
+    UnrecoverableError: class UnrecoverableError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "UnrecoverableError";
+      }
+    },
   };
 });
 
-// Import after mocks — this triggers the Worker constructor which captures the handler
+// Import after mocks — triggers the Worker constructor which captures the handler.
 await import("../src/queue/orchestrator.js");
 
-const VALID_INV_ID = "550e8400-e29b-41d4-a716-446655440000";
-const VALID_CORR_ID = "660e8400-e29b-41d4-a716-446655440001";
-const VALID_CASE_ID = "550e8400-e29b-41d4-a716-446655440010";
-const VALID_OP_ID = "770e8400-e29b-41d4-a716-446655440002";
+// Import mocked modules to configure behavior per-test.
+const db = (await import("../src/db/prisma.js")).db as unknown as MockedDb;
+const audit = await import("../src/audit/logger.js");
+const logAuditEvent = audit.logAuditEvent as unknown as Mock;
+const sse = await import("../src/realtime/sse.js");
+const emitProgressEvent = sse.emitProgressEvent as unknown as Mock;
+
+const runState = {
+  id: "run-1",
+  investigationId: VALID_INV_ID,
+  caseId: VALID_CASE_ID,
+  state: "CREATED",
+  status: "QUEUED",
+  contextData: {} as Record<string, unknown>,
+};
 
 function makeValidPayload() {
   return {
     investigationId: VALID_INV_ID,
     caseId: VALID_CASE_ID,
     artifactReference: {
-      url: "https://utfs.io/f/test.pdf",
-      originalFilename: "test.pdf",
-      declaredMimeType: "application/pdf",
-      declaredSizeBytes: 1024,
+      url: "https://utfs.io/f/test.txt",
+      originalFilename: "note.txt",
+      declaredMimeType: "text/plain",
+      declaredSizeBytes: 11,
       sourceType: "UPLOADTHING",
-      providerMetadata: { uploadThingKey: "test.pdf" },
+      providerMetadata: { fileKey: "test.txt" },
     },
-    idempotencyKey: createHash("sha256").update(`${VALID_INV_ID}:test.pdf`).digest("hex"),
+    idempotencyKey: `evidence-${VALID_INV_ID}-test.txt`,
     correlationId: VALID_CORR_ID,
     operationId: VALID_OP_ID,
     sourceName: "Test Source",
@@ -104,40 +164,196 @@ function makeValidPayload() {
   };
 }
 
-describe("I-PR2 Worker Stub: ingest-evidence", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+function makeFakeJob(overrides: Partial<FakeJob> = {}): FakeJob {
+  return {
+    name: "ingest-evidence",
+    id: "job-001",
+    data: makeValidPayload(),
+    attemptsMade: 0,
+    opts: { attempts: 3 },
+    ...overrides,
+  };
+}
 
+const TXT_EXTRACTION = {
+  format: "TXT",
+  extractionMethod: "text-decode",
+  lines: [],
+  artifactId: VALID_ARTIFACT_ID,
+  parserId: "txt-parser",
+  parserVersion: "1.0.0",
+  extractedAt: new Date().toISOString(),
+  warnings: [],
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+
+  runState.state = "CREATED";
+  runState.status = "QUEUED";
+
+  db.investigationRun.findFirst.mockResolvedValue(runState);
+  db.investigationRun.findUniqueOrThrow.mockImplementation(async () => runState);
+  db.investigationRun.update.mockImplementation(async (args: { data?: Record<string, unknown> }) => {
+    const data = args.data ?? {};
+    if (typeof data.state === "string") runState.state = data.state;
+    if (typeof data.status === "string") runState.status = data.status;
+    if (typeof data.error === "string") runState.error = data.error;
+    return runState;
+  });
+  db.agentCheckpoint.count.mockResolvedValue(0);
+  db.agentCheckpoint.create.mockResolvedValue({ id: "cp-1" });
+  db.artifact.upsert.mockResolvedValue({
+    id: VALID_ARTIFACT_ID,
+    contentHash: "a".repeat(64),
+  });
+  db.ingestionAttempt.upsert.mockResolvedValue({ id: "attempt-1" });
+  db.rawExtraction.create.mockResolvedValue({ id: "rx-1" });
+  // No pre-existing extraction on the happy path.
+  db.rawExtraction.findUnique.mockResolvedValue(null);
+
+  h.acquire.mockResolvedValue({
+    ok: true,
+    artifact: {
+      artifactId: VALID_ARTIFACT_ID,
+      storagePath: `${VALID_ARTIFACT_ID}-storage`,
+      contentHash: "a".repeat(64),
+      contentSizeBytes: 11,
+      detectedMimeType: "text/plain",
+      declaredMimeType: undefined,
+      originalFilename: "note.txt",
+      hashVerified: false,
+      mimeVerified: false,
+      ingestionTime: new Date().toISOString(),
+      providerMetadata: { fileKey: "test.txt" },
+    },
+  });
+  h.extract.mockResolvedValue({ ok: true, extraction: TXT_EXTRACTION });
+  h.deterministicSourceId.mockResolvedValue(VALID_SOURCE_ID);
+});
+
+describe("I-PR2 Worker Stub: durable ingest-evidence", () => {
   it("handler was captured from Worker constructor", () => {
     expect(capturedHandler).not.toBeNull();
   });
 
-  it("accepts valid payload and logs receipt via SYSTEM_ACTION", async () => {
-    await capturedHandler!({
-      name: "ingest-evidence",
-      data: makeValidPayload(),
-      id: "job-001",
-    });
+  it("validates the payload schema the worker expects (strict)", async () => {
+    const result = IngestionJobPayloadSchema.safeParse(makeValidPayload());
+    expect(result.success).toBe(true);
 
-    expect(logAuditEvent).toHaveBeenCalledWith(
+    const strict = IngestionJobPayloadSchema.safeParse({
+      ...makeValidPayload(),
+      hackerField: "inject",
+    });
+    expect(strict.success).toBe(false);
+  });
+
+  it("establishes a RUNNING attempt, transitions to INGESTING on start", async () => {
+    await capturedHandler!(makeFakeJob());
+
+    expect(db.investigationRun.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { investigationId: VALID_INV_ID } }),
+    );
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        investigationId: VALID_INV_ID,
-        action: "EVIDENCE_INGESTED",
-        actor: "INGESTION_PIPELINE",
-        targetType: "EVIDENCE",
-        targetId: "mock-id",
-      })
+        create: expect.objectContaining({
+          status: "RUNNING",
+          attemptNumber: 1,
+          idempotencyKey: `evidence-${VALID_INV_ID}-test.txt`,
+        }),
+      }),
+    );
+
+    const runUpdates = db.investigationRun.update.mock.calls;
+    const ingesting = runUpdates.find((c) => c[0]?.data?.state === "INGESTING");
+    expect(ingesting).toBeDefined();
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ update: expect.objectContaining({ attemptNumber: 1 }) }),
     );
   });
 
-  it("rejects malformed payload with SYSTEM_ACTION audit (not INGESTION_JOB_FAILED)", async () => {
-    await expect(
-      capturedHandler!({
-        name: "ingest-evidence",
-        data: { notAValidPayload: true },
-        id: "job-002",
+  it("persists artifact, persists raw extraction, marks attempt SUCCEEDED, transitions to NORMALIZING", async () => {
+    await capturedHandler!(makeFakeJob());
+
+    expect(db.artifact.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          id: VALID_ARTIFACT_ID,
+          contentHash: "a".repeat(64),
+          caseId: VALID_CASE_ID,
+          investigationId: VALID_INV_ID,
+        }),
       }),
+    );
+
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          status: "SUCCEEDED",
+          artifactId: VALID_ARTIFACT_ID,
+          parserId: "txt-parser",
+          format: "TXT",
+        }),
+      }),
+    );
+
+    expect(db.rawExtraction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          attemptId: "attempt-1",
+          artifactId: VALID_ARTIFACT_ID,
+          format: "TXT",
+        }),
+      }),
+    );
+
+    const norm = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "NORMALIZING",
+    );
+    expect(norm).toBeDefined();
+    expect(runState.state).toBe("NORMALIZING");
+  });
+
+  it("§4: progress state mirrors DB — NORMALIZING emitted only after RawExtraction persisted", async () => {
+    await capturedHandler!(makeFakeJob());
+
+    const calls = emitProgressEvent.mock.calls as unknown as [string, string, string][];
+    const stateOf = (i: number) => calls[i]?.[1];
+
+    // "Classifying & extracting content …" happens while the run is still
+    // INGESTING (the DB transition to NORMALIZING occurs after persistence).
+    const classifyIdx = calls.findIndex((c, _idx) => String(c[2]).startsWith("Classifying"));
+    expect(classifyIdx).toBeGreaterThanOrEqual(0);
+    expect(stateOf(classifyIdx)).toBe("INGESTING");
+
+    // The first NORMALIZING frame may only fire after the extraction row exists.
+    const firstNorm = calls.findIndex((_, idx) => stateOf(idx) === "NORMALIZING");
+    expect(firstNorm).toBeGreaterThanOrEqual(0);
+    const rxOrder = db.rawExtraction.create.mock.invocationCallOrder[0] ?? 0;
+    const normOrder = emitProgressEvent.mock.invocationCallOrder[firstNorm] ?? 0;
+    expect(normOrder).toBeGreaterThan(rxOrder);
+  });
+
+  it("audits EVIDENCE_INGESTED ONLY after artifact + raw extraction are persisted", async () => {
+    await capturedHandler!(makeFakeJob());
+
+    const allCalls = logAuditEvent.mock.calls;
+    const ingestedIdx = allCalls.findIndex((c) => c[0]?.action === "EVIDENCE_INGESTED");
+    expect(ingestedIdx).toBeGreaterThanOrEqual(0);
+
+    const artifactWriteIndex = db.artifact.upsert.mock.invocationCallOrder[0] ?? 0;
+    const extractWriteIndex = db.rawExtraction.create.mock.invocationCallOrder[0] ?? 0;
+    const ingestedCallOrder = logAuditEvent.mock.invocationCallOrder[ingestedIdx] ?? 0;
+
+    expect(ingestedCallOrder).toBeGreaterThan(artifactWriteIndex);
+    expect(ingestedCallOrder).toBeGreaterThan(extractWriteIndex);
+  });
+
+  it("rejects malformed payload with SYSTEM_ACTION audit (not EVIDENCE_INGESTED)", async () => {
+    await expect(
+      capturedHandler!(
+        makeFakeJob({ id: "job-malformed", data: { notAValidPayload: true } }),
+      ),
     ).rejects.toThrow("Malformed ingest-evidence payload");
 
     expect(logAuditEvent).toHaveBeenCalledWith(
@@ -147,46 +363,270 @@ describe("I-PR2 Worker Stub: ingest-evidence", () => {
         description: expect.stringContaining("Malformed"),
       }),
     );
+    expect(
+      logAuditEvent.mock.calls.some((c) => c[0]?.action === "EVIDENCE_INGESTED"),
+    ).toBe(false);
   });
 
-  it("extracts investigationId from malformed payload via runtime check (no unsafe cast)", async () => {
-    await expect(
-      capturedHandler!({
-        name: "ingest-evidence",
-        data: { investigationId: VALID_INV_ID, other: "stuff" },
-        id: "job-003",
-      }),
-    ).rejects.toThrow();
-
-    expect(logAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ investigationId: VALID_INV_ID }),
-    );
+  it("throws when the investigation run does not exist", async () => {
+    db.investigationRun.findFirst.mockResolvedValue(null);
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow("Investigation not found");
+    expect(db.artifact.upsert).not.toHaveBeenCalled();
   });
+});
 
-  it("uses 'unknown' as audit target when investigationId missing from malformed payload", async () => {
-    await expect(
-      capturedHandler!({
-        name: "ingest-evidence",
-        data: { garbage: true },
-        id: "job-004",
-      }),
-    ).rejects.toThrow();
-
-    expect(logAuditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ investigationId: "unknown" }),
-    );
-  });
-
-  it("validates the 4-field payload schema matches what the worker expects", () => {
-    const result = IngestionJobPayloadSchema.safeParse(makeValidPayload());
-    expect(result.success).toBe(true);
-  });
-
-  it("strict rejection: extra fields rejected by schema", () => {
-    const result = IngestionJobPayloadSchema.safeParse({
-      ...makeValidPayload(),
-      hackerField: "inject",
+describe("Failure semantics: retryable vs permanent", () => {
+  it("retryable acquisition failure → attempt FAILED recorded, run NOT final-failed, rethrows", async () => {
+    h.acquire.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        category: "FETCH_FAILED",
+        code: "ACQUISITION_FETCH_FAILED",
+        message: "network hiccup",
+        retryable: true,
+        timestamp: new Date().toISOString(),
+      },
     });
-    expect(result.success).toBe(false);
+
+    await expect(
+      capturedHandler!(makeFakeJob({ attemptsMade: 0 })),
+    ).rejects.toThrow("ACQUISITION_FETCH_FAILED");
+
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          status: "FAILED",
+          error: expect.objectContaining({ category: "FETCH_FAILED", retryable: true }),
+        }),
+      }),
+    );
+    const failedTransition = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "FAILED",
+    );
+    expect(failedTransition).toBeUndefined();
+    expect(
+      logAuditEvent.mock.calls.some((c) => c[0]?.action === "EVIDENCE_INGESTED"),
+    ).toBe(false);
   });
+
+  it("§5: retryable failure emits an INGESTING retry notice — never claims FAILED", async () => {
+    h.acquire.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        category: "FETCH_FAILED",
+        code: "ACQUISITION_FETCH_FAILED",
+        message: "will retry",
+        retryable: true,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow();
+
+    const calls = emitProgressEvent.mock.calls as unknown as [string, string, string][];
+    expect(calls.some((c) => c[1] === "FAILED")).toBe(false);
+    expect(calls.some((c) => String(c[2]).includes("retrying"))).toBe(true);
+  });
+
+  it("non-retryable acquisition failure → run permanently FAILED (INGESTING → FAILED)", async () => {
+    h.acquire.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        category: "UNSUPPORTED_FORMAT",
+        code: "ACQUISITION_UNSUPPORTED_FORMAT",
+        message: "cannot process",
+        retryable: false,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow();
+
+    const failedTransition = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "FAILED",
+    );
+    expect(failedTransition).toBeDefined();
+    expect(failedTransition![0]?.data).toEqual(
+      expect.objectContaining({ status: "FAILED" }),
+    );
+  });
+
+  it("§5: terminal failure emits a FAILED progress frame", async () => {
+    h.acquire.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        category: "UNSUPPORTED_FORMAT",
+        code: "ACQUISITION_UNSUPPORTED_FORMAT",
+        message: "cannot process",
+        retryable: false,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow();
+
+    const calls = emitProgressEvent.mock.calls as unknown as [string, string, string][];
+    expect(calls.some((c) => c[1] === "FAILED")).toBe(true);
+  });
+
+  it("retry exhaustion (attempt 3 of 3) → run permanently FAILED", async () => {
+    h.acquire.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        category: "FETCH_FAILED",
+        code: "ACQUISITION_FETCH_FAILED",
+        message: "still down",
+        retryable: true,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    await expect(
+      capturedHandler!(makeFakeJob({ attemptsMade: 2 })), // 3rd attempt == exhausted
+    ).rejects.toThrow();
+
+    const failedTransition = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "FAILED",
+    );
+    expect(failedTransition).toBeDefined();
+  });
+});
+
+describe("Case identity: no fabrication", () => {
+  it("uses run.caseId (source of truth); queue payload caseId must match", async () => {
+    await capturedHandler!(makeFakeJob());
+    expect(db.artifact.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ caseId: VALID_CASE_ID }),
+      }),
+    );
+  });
+
+  it("CASE_ID_MISMATCH when queue caseId differs from run.caseId → attempt FAILED, no artifact, no EVIDENCE_INGESTED", async () => {
+    await expect(
+      capturedHandler!(
+        makeFakeJob({
+          data: { ...makeValidPayload(), caseId: VALID_CASE_ID_2 },
+        }),
+      ),
+    ).rejects.toThrow("CASE_ID_MISMATCH");
+
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ status: "FAILED", attemptNumber: 1 }),
+      }),
+    );
+    expect(db.artifact.upsert).not.toHaveBeenCalled();
+    expect(
+      logAuditEvent.mock.calls.some((c) => c[0]?.action === "EVIDENCE_INGESTED"),
+    ).toBe(false);
+  });
+});
+
+describe("Deterministic source identity", () => {
+  it("derives sourceId deterministically from investigation + fileKey", async () => {
+    await capturedHandler!(makeFakeJob());
+    expect(h.deterministicSourceId).toHaveBeenCalledWith(`${VALID_INV_ID}:test.txt`);
+    expect(db.artifact.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ sourceId: VALID_SOURCE_ID }),
+      }),
+    );
+  });
+});
+
+describe("Re-entrant completion (P1-5): RawExtraction persisted + retry", () => {
+  it("retry after raw persisted, run still INGESTING (transition failed) → completes transition, NO re-acquire, NO duplicate", async () => {
+    runState.state = "INGESTING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+
+    await capturedHandler!(makeFakeJob({ attemptsMade: 1 }));
+
+    expect(h.acquire).not.toHaveBeenCalled();
+    expect(db.artifact.upsert).not.toHaveBeenCalled();
+    expect(db.rawExtraction.create).not.toHaveBeenCalled();
+    const norm = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "NORMALIZING",
+    );
+    expect(norm).toBeDefined();
+    expect(runState.state).toBe("NORMALIZING");
+  });
+
+  it("already-NORMALIZING run with existing extraction → safe no-op (no transition, no re-acquire)", async () => {
+    runState.state = "NORMALIZING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+
+    await capturedHandler!(makeFakeJob());
+
+    expect(h.acquire).not.toHaveBeenCalled();
+    // RUNNING attempt is (re)established — that is idempotent and expected.
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledTimes(1);
+    // …but the attempt never advances to SUCCEEDED again.
+    const statuses = db.ingestionAttempt.upsert.mock.calls.map(
+      (c) => c[0]?.update?.status,
+    );
+    expect(statuses).toEqual(["RUNNING"]);
+    expect(db.investigationRun.update).not.toHaveBeenCalled();
+    expect(db.rawExtraction.create).not.toHaveBeenCalled();
+  });
+
+  it("duplicate completion call is idempotent (invariant: persisted + completed → safe no-op)", async () => {
+    // Realistic retry: the run is already INGESTING with extraction persisted.
+    runState.state = "INGESTING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+
+    await capturedHandler!(makeFakeJob());
+    await capturedHandler!(makeFakeJob());
+
+    expect(h.acquire).not.toHaveBeenCalled();
+    expect(db.rawExtraction.create).not.toHaveBeenCalled();
+    // First call completed the pending transition; the second found a run
+    // already past INGESTING (skip-if-past) → no further transition.
+    const normCalls = db.investigationRun.update.mock.calls.filter(
+      (c) => c[0]?.data?.state === "NORMALIZING",
+    );
+    expect(normCalls).toHaveLength(1);
+    expect(runState.state).toBe("NORMALIZING");
+  });
+
+  it("P2002 race on insert (pre-check missed, create collided) → recovered as already persisted", async () => {
+    db.rawExtraction.findUnique
+      .mockResolvedValueOnce(null) // worker re-entrancy gate
+      .mockResolvedValueOnce(null) // ensureRawExtraction pre-check
+      .mockResolvedValueOnce({ id: "rx-1", attemptId: "attempt-1" }); // P2002 re-query
+    const { Prisma } = await import("@prisma/client");
+    db.rawExtraction.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "5.10.0",
+      }),
+    );
+
+    await capturedHandler!(makeFakeJob());
+
+    expect(db.rawExtraction.create).toHaveBeenCalled();
+    expect(runState.state).toBe("NORMALIZING");
+  });
+});
+
+describe("Terminal-run guard (P1-5): no new evidence on terminal runs", () => {
+  for (const status of ["FAILED", "CANCELLED", "COMPLETED"] as const) {
+    it(`${status} run → RUN_TERMINAL UnrecoverableError, no acquisition, no attempt write, no state mutation`, async () => {
+      runState.status = status;
+      runState.state = status === "COMPLETED" ? "COMPLETED" : "FAILED";
+
+      await expect(capturedHandler!(makeFakeJob())).rejects.toThrow("RUN_TERMINAL");
+
+      expect(h.acquire).not.toHaveBeenCalled();
+      expect(db.ingestionAttempt.upsert).not.toHaveBeenCalled();
+      expect(db.rawExtraction.create).not.toHaveBeenCalled();
+      expect(db.investigationRun.update).not.toHaveBeenCalled();
+      expect(db.artifact.upsert).not.toHaveBeenCalled();
+      expect(runState.state).toBe(status === "COMPLETED" ? "COMPLETED" : "FAILED");
+      expect(runState.status).toBe(status);
+    });
+  }
 });
