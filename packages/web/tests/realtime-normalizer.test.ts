@@ -4,6 +4,8 @@ import {
   normalizeEvent,
   EventDeduplicator,
   consolidateStatus,
+  runStateAction,
+  evidenceSubmittedDescription,
 } from "@/lib/providers/realtime/normalizer";
 import type { SseEvent } from "@/lib/realtime/sse-client";
 import { INVESTIGATION_ID } from "@/lib/providers/demo/demo-fixtures/lookup";
@@ -81,5 +83,86 @@ describe("realtime status consolidation", () => {
     expect(consolidateStatus(true, false)).toBe("connected");
     expect(consolidateStatus(true, true)).toBe("error");
     expect(consolidateStatus(false, true)).toBe("error");
+  });
+});
+
+describe("platform payload normalization (Prompt 2/3 live convergence)", () => {
+  it("maps a run-progress frame (state/message) into action + description", () => {
+    const raw: SseEvent = {
+      investigationId: INVESTIGATION_ID,
+      state: "INGESTING",
+      message: "extracting financial records",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      runId: "run-1",
+    };
+    const out = normalizeEvent(raw, INVESTIGATION_ID);
+    expect(out.action).toBe("RUN_PHASE_INGESTING");
+    expect(out.description).toBe("extracting financial records");
+    expect(out.runId).toBe("run-1");
+  });
+
+  it("maps the CONNECTED control frame to a STREAM_CONNECTED action", () => {
+    const out = normalizeEvent(
+      { investigationId: INVESTIGATION_ID, type: "CONNECTED", message: "Stream initialized" },
+      INVESTIGATION_ID,
+    );
+    expect(out.action).toBe("STREAM_CONNECTED");
+    expect(out.description).toBe("Stream initialized");
+  });
+
+  it("maps the EVIDENCE_SUBMITTED control frame to a canonical evidence event", () => {
+    const out = normalizeEvent(
+      {
+        investigationId: INVESTIGATION_ID,
+        type: "EVIDENCE_SUBMITTED",
+        evidenceTitle: "Bank statements",
+        fileCount: 3,
+        operationId: "op-5",
+      },
+      INVESTIGATION_ID,
+    );
+    expect(out.action).toBe("EVIDENCE_SUBMITTED");
+    expect(out.description).toBe("Evidence submitted: Bank statements (3 file(s))");
+    expect(out.targetType).toBe("EVIDENCE");
+    expect(out.targetId).toBe("op-5");
+  });
+
+  it("leaves canonical-shaped events (action present) untouched", () => {
+    const raw: SseEvent = {
+      investigationId: INVESTIGATION_ID,
+      action: "EVIDENCE_INGESTED",
+      description: "Ingested ledger",
+      timestamp: "2026-01-01T00:00:00.000Z",
+    };
+    const out = normalizeEvent(raw, INVESTIGATION_ID);
+    expect(out.action).toBe("EVIDENCE_INGESTED");
+    expect(out.description).toBe("Ingested ledger");
+  });
+
+  it("leaves demo-style events untouched (deterministic seed stream parity)", () => {
+    const demoStyle: SseEvent = {
+      id: "evt-0001",
+      investigationId: "",
+      action: "EVIDENCE_INGESTED",
+      actor: "sync.platform",
+      targetType: "EVIDENCE",
+      targetId: "ev-1",
+      description: "Ingested Account 0092 ledger.",
+      timestamp: "2024-05-21T08:01:00.000Z",
+    };
+    const out = normalizeEvent(demoStyle, INVESTIGATION_ID);
+    expect(out.action).toBe("EVIDENCE_INGESTED");
+    expect(out.investigationId).toBe(INVESTIGATION_ID);
+  });
+
+  it("exposes deterministic vocabulary helpers", () => {
+    expect(runStateAction("ANALYZING")).toBe("RUN_PHASE_ANALYZING");
+    expect(
+      evidenceSubmittedDescription({
+        investigationId: INVESTIGATION_ID,
+        evidenceTitle: "Docs",
+        fileCount: 2,
+      }),
+    ).toBe("Evidence submitted: Docs (2 file(s))");
   });
 });

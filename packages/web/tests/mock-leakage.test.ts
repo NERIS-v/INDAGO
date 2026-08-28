@@ -53,10 +53,17 @@ describe("demo leakage audit", () => {
     );
     expect(providers.mode).toBe("live");
 
-    // Live investigation domain is not exposed by the platform yet: the
-    // provider must throw a typed UNSUPPORTED ProviderError — NOT return demo
-    // fixtures.
+    // Live investigation.get() IS wired to the platform endpoint; in this
+    // env it fails fast (NEXT_PUBLIC_API_URL is unset) and MUST surface as a
+    // typed ProviderError — NOT return demo fixtures. Other live domains are
+    // still unexposed and must throw a typed UNSUPPORTED ProviderError too.
     await expect(providers.investigations.get("inv-other")).rejects.toBeInstanceOf(ProviderError);
+    await expect(providers.evidence.submit("inv-other", {
+      sourceName: "test",
+      evidenceType: "DOCUMENT",
+      evidenceTitle: "t",
+      files: [],
+    })).rejects.toBeInstanceOf(ProviderError);
     await expect(providers.leads.listByInvestigation("inv-other")).rejects.toBeInstanceOf(ProviderError);
   });
 });

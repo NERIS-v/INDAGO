@@ -118,3 +118,81 @@ describe("Server API Client", () => {
     await expect(getHealth()).rejects.toThrow("AUTH_TOKEN");
   });
 });
+
+describe("Production demo-credential guard (P0-2)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:3000";
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.NODE_ENV;
+    vi.restoreAllMocks();
+  });
+
+  it("fails fast in production with the demo credential — no network call is made", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.AUTH_TOKEN = "demo-token";
+
+    const { getHealth } = await import("@/lib/api/server");
+    await expect(getHealth()).rejects.toThrow("demo credential");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("same guard applies to the evidence submission path", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.AUTH_TOKEN = "demo-token";
+
+    const { submitEvidence } = await import("@/lib/api/server");
+    await expect(
+      submitEvidence("550e8400-e29b-41d4-a716-446655440000", {
+        sourceName: "S",
+        evidenceType: "COMMUNICATION",
+        evidenceTitle: "T",
+        files: [
+          {
+            fileKey: "k.txt",
+            fileUrl: "https://utfs.io/f/k.txt",
+            fileName: "k.txt",
+            fileSize: 1,
+            mimeType: "text/plain",
+          },
+        ],
+      }),
+    ).rejects.toThrow("demo credential");
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("a NON-demo token in production is still sent", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.AUTH_TOKEN = "prod-secret-abc";
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: "healthy", service: "platform" }),
+    });
+
+    const { getHealth } = await import("@/lib/api/server");
+    await expect(getHealth()).resolves.toEqual({
+      status: "healthy",
+      service: "platform",
+    });
+    const callHeaders = mockFetch.mock.calls[0]?.[1]?.headers as Headers;
+    expect(callHeaders.get("Authorization")).toBe("Bearer prod-secret-abc");
+  });
+
+  it("the demo credential remains usable OUTSIDE production (dev/test)", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.AUTH_TOKEN = "demo-token";
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: "healthy", service: "platform" }),
+    });
+
+    const { getHealth } = await import("@/lib/api/server");
+    await expect(getHealth()).resolves.toBeDefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});

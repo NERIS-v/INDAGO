@@ -89,22 +89,50 @@ describe("Browser Auth Boundary — no tokens in client code", () => {
   });
 });
 
-describe("Upload Component — uses real SDK", () => {
-  it("file-upload.tsx should import from uploadthing helper", () => {
-    const content = fs.readFileSync(
-      path.resolve("src/components/upload/file-upload.tsx"),
-      "utf-8",
-    );
-    expect(content).toContain("@/lib/upload/uploadthing");
-    expect(content).toContain("uploadEvidence");
+describe("F-PR3 Provider Boundary — no UploadThing/server action in presentation", () => {
+  const PRESENTATION_DIRS = [
+    path.resolve("src/components"),
+    path.resolve("src/app"),
+  ];
+
+  it("presentation components should have zero UploadThing references", () => {
+    for (const dir of PRESENTATION_DIRS) {
+      if (!fs.existsSync(dir)) continue;
+      for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[]) {
+        const full = path.join(entry.parentPath ?? dir, entry.name);
+        const isFile = entry.isFile() && /\.(tsx|ts)$/.test(entry.name);
+        if (!isFile) continue;
+        const content = fs.readFileSync(full, "utf-8");
+        expect(content, `${full} references UploadThing`).not.toMatch(/uploadthing|genUploader|UploadThing/);
+      }
+    }
   });
 
-  it("file-upload.tsx should not use raw fetch for upload", () => {
-    const content = fs.readFileSync(
-      path.resolve("src/components/upload/file-upload.tsx"),
+  it("presentation components should have zero server-action imports", () => {
+    for (const dir of PRESENTATION_DIRS) {
+      if (!fs.existsSync(dir)) continue;
+      for (const entry of fs.readdirSync(dir, { recursive: true, withFileTypes: true }) as fs.Dirent[]) {
+        const full = path.join(entry.parentPath ?? dir, entry.name);
+        const isFile = entry.isFile() && /\.(tsx|ts)$/.test(entry.name);
+        if (!isFile) continue;
+        const content = fs.readFileSync(full, "utf-8");
+        expect(content, `${full} imports a server action`).not.toContain('@/lib/api/server-action');
+        expect(content, `${full} imports the platform directly`).not.toMatch(/platformFetch|new WebSocket\(/);
+      }
+    }
+  });
+
+  it("UploadThing helper is contained behind the live evidence provider", () => {
+    const live = fs
+      .readFileSync(path.resolve("src/lib/providers/live/providers.ts"), "utf-8")
+      .toLowerCase();
+    expect(live).toContain("@/lib/upload/uploadthing");
+    // The UI consumes prepareUpload(), never the raw helper directly.
+    const fileDrop = fs.readFileSync(
+      path.resolve("src/components/evidence/evidence-file-drop.tsx"),
       "utf-8",
     );
-    expect(content).not.toMatch(/fetch\(["']\/api\/uploadthing/);
+    expect(fileDrop).not.toMatch(/uploadthing|uploadEvidence/);
   });
 });
 
