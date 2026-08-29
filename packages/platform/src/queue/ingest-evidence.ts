@@ -15,6 +15,10 @@
 //   9. Mark attempt SUCCEEDED
 //  10. Transition run → NORMALIZING
 //  11. Audit EVIDENCE_INGESTED     (ONLY after all persistence succeeded)
+//  12. Normalize → persist NormalizedExtraction   (attemptId-keyed, idempotent)
+//  13. Audit NORMALIZATION_STORED  (forward path only; skipped for re-entrant)
+//  14. Transition run → ANALYZING  + audit NORMALIZATION_COMPLETED (only when
+//                                  the transition actually applied)
 //
 // Failures: retryable → record attempt FAILED and rethrow (BullMQ retries);
 // retry-exhausted or non-retryable → attempt FAILED + run → FAILED, rethrow.
@@ -22,12 +26,13 @@
 // "failed" event listener.
 //
 // RE-ENTRANT COMPLETION: the completion path is idempotent. If a late failure
-// (e.g. on the NORMALIZING transition or the audit step) triggers a retry
-// AFTER the RawExtraction was persisted, the retry detects the existing
-// RawExtraction and short-circuits to the (no-op) completion transition —
-// no duplicate RawExtraction, no re-acquisition, no retry storm, and no run
-// left INGESTING with valid extraction data. New evidence jobs for a
-// FAILED / CANCELLED / COMPLETED run are rejected before any work.
+// (e.g. on the NORMALIZING transition, the audit step, or the ANALYZING
+// completion) triggers a retry AFTER the RawExtraction was persisted, the
+// retry rehydrates the stored row, skips extract/normalize re-computations it
+// can prove are stale/no-ops, and drives the run through to ANALYZING — no
+// duplicate RawExtraction / NormalizedExtraction, no re-acquisition, no retry
+// storm, and no run left NORMALIZING with valid extraction data. New evidence
+// jobs for a FAILED / CANCELLED / COMPLETED run are rejected before any work.
 // ============================================================================
 
 import { UnrecoverableError, type Job } from "bullmq";
@@ -35,16 +40,28 @@ import {
   IngestionJobPayloadSchema,
   type IngestionError,
   type IngestionJobPayload,
+  type NormalizedExtraction,
 } from "@indago/contracts";
-import { deterministicSourceId } from "@indago/ingestion";
+import {
+  deterministicSourceId,
+  NORMALIZER_ID,
+  NORMALIZER_VERSION,
+  parseStoredRawExtraction,
+  type RawExtraction,
+} from "@indago/ingestion";
 import { logAuditEvent } from "../audit/logger.js";
 import { db } from "../db/prisma.js";
 import { ingestionStore } from "../persistence/ingestion-store.js";
 import { emitProgressEvent } from "../realtime/sse.js";
-import { acquisitionService, extractionService } from "./ingest-deps.js";
+import {
+  acquisitionService,
+  extractionService,
+  normalizationService,
+} from "./ingest-deps.js";
 import {
   transitionRunToIngesting,
   transitionRunToNormalizing,
+  transitionRunToAnalyzing,
   transitionRunToPermanentFailure,
 } from "./transitions.js";
 
@@ -165,15 +182,44 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
 
   // ---- 3b. Re-entrancy gate. If a previous pass of this exact attempt
   // already durably persisted the RawExtraction (a late failure on the
-  // NORMALIZING transition or the audit step), do NOT re-acquire/re-extract.
-  // Copying the progress, we simply recognize the completed state and leave —
-  // the completion transition is a safe no-op for a run already past
-  // INGESTING (transitions.ts). This closes the post-success retry wedge.
+  // NORMALIZING transition, the audit step, or the ANALYZING completion), do
+  // NOT re-acquire/re-extract. Rehydrate the stored row and drive the run
+  // through normalization completion to ANALYZING (idempotent — see
+  // completeNormalization below). A corrupt stored row is a permanent failure.
   const alreadyExtracted = await ingestionStore.findRawExtractionByAttempt(
     attempt.id,
   );
   if (alreadyExtracted) {
-    await transitionRunToNormalizing(runId);
+    let raw: RawExtraction;
+    try {
+      raw = parseStoredRawExtraction({
+        attemptId: alreadyExtracted.attemptId,
+        artifactId: alreadyExtracted.artifactId,
+        parserId: alreadyExtracted.parserId,
+        parserVersion: alreadyExtracted.parserVersion,
+        format: alreadyExtracted.format,
+        extraction: alreadyExtracted.extraction,
+        warnings: alreadyExtracted.warnings,
+        extractedAt: alreadyExtracted.extractedAt,
+      });
+    } catch (cause) {
+      await failNormalizationPermanently({
+        payload,
+        runId,
+        attemptId: attempt.id,
+        artifactId: alreadyExtracted.artifactId,
+        cause,
+      });
+      return;
+    }
+    await completeNormalization({
+      payload,
+      runId,
+      attemptId: attempt.id,
+      caseId: run.caseId,
+      artifactId: alreadyExtracted.artifactId,
+      raw,
+    });
     return;
   }
 
@@ -289,12 +335,138 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
     description: `Durably ingested ${extraction.format} content for ${payload.evidenceTitle} (attempt ${attemptNumber}, case ${run.caseId})`,
   });
 
-  emitProgressEvent(
-    payload.investigationId,
-    "NORMALIZING",
-    `Extraction complete and persisted for ${artifact.originalFilename ?? "document"}.`,
-    { ...correlate, artifactId: artifact.artifactId },
+  // ---- 12-14. Normalize → persist → complete to ANALYZING
+  await completeNormalization({
+    payload,
+    runId,
+    attemptId: attempt.id,
+    caseId: run.caseId,
+    artifactId: artifact.artifactId,
+    raw: extraction,
+  });
+}
+
+/**
+ * M-A05 normalization completion — forward and re-entrant paths.
+ *
+ * Idempotent end-to-end:
+ *   - NormalizedExtraction is attemptId-keyed, so a re-entry that already
+ *     wrote the normalized row skips BOTH the (pure) normalize recomputation
+ *     and the NORMALIZATION_STORED audit (append-only log stays single-value).
+ *   - transitionRunToAnalyzing reports whether THIS call applied NORMALIZING →
+ *     ANALYZING; NORMALIZATION_COMPLETED is audited only when it did. A re-entry
+ *     whose run is already ANALYZING must not audit a second COMPLETED event.
+ *
+ * DB failures propagate as retryable errors (BullMQ retries). A permanent
+ * failure during the pure normalize step is terminal — see
+ * failNormalizationPermanently.
+ */
+async function completeNormalization(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  attemptId: string;
+  caseId: string;
+  artifactId: string;
+  raw: RawExtraction;
+}): Promise<void> {
+  const { payload, runId, attemptId, caseId, artifactId, raw } = params;
+
+  const existing =
+    await ingestionStore.findNormalizedExtractionByAttempt(attemptId);
+
+  if (!existing) {
+    let normalized: NormalizedExtraction;
+    try {
+      normalized = normalizationService.normalize(raw, {
+        attemptId,
+        investigationId: payload.investigationId,
+        caseId,
+      });
+    } catch (cause) {
+      await failNormalizationPermanently({
+        payload,
+        runId,
+        attemptId,
+        artifactId,
+        cause,
+      });
+      return;
+    }
+
+    await ingestionStore.upsertNormalizedExtractionByAttempt(normalized);
+
+    await logAuditEvent({
+      investigationId: payload.investigationId,
+      action: "NORMALIZATION_STORED",
+      actor: "NORMALIZATION_PIPELINE",
+      targetType: "EVIDENCE",
+      targetId: artifactId,
+      description: `Stored NormalizedExtraction for ${artifactId} via ${NORMALIZER_ID} ${NORMALIZER_VERSION}`,
+    });
+  }
+
+  // Re-entrancy can arrive while the run is still INGESTING (the NORMALIZING
+  // transition itself failed on a prior pass). Walk the ladder INGESTING →
+  // NORMALIZING (skip-if-past), then NORMALIZING → ANALYZING below — so a
+  // re-entry always leaves the run in ANALYZING, never stranded mid-ingest.
+  await transitionRunToNormalizing(runId);
+
+  const didTransition = await transitionRunToAnalyzing(runId);
+  if (didTransition) {
+    await logAuditEvent({
+      investigationId: payload.investigationId,
+      action: "NORMALIZATION_COMPLETED",
+      actor: "NORMALIZATION_PIPELINE",
+      targetType: "EVIDENCE",
+      targetId: artifactId,
+      description: `Normalization complete for ${artifactId} via ${NORMALIZER_ID} ${NORMALIZER_VERSION}; run moved to ANALYZING`,
+    });
+    emitProgressEvent(
+      payload.investigationId,
+      "ANALYZING",
+      `Normalization complete for ${artifactId}; run is now ANALYZING.`,
+      {
+        operationId: payload.operationId,
+        correlationId: payload.correlationId,
+        runId,
+        artifactId,
+      },
+    );
+  }
+}
+
+/**
+ * Permanent normalization failure. The pure normalize/rehydrate step proved
+ * unsatisfiable (e.g. corrupt stored RawExtraction or a contract violation) —
+ * never retried, never re-attempted. The successful extraction attempt is
+ * left truthful (SUCCEEDED); the RUN is terminal-failed and the failure is
+ * audited exactly once. Throws an UnrecoverableError so BullMQ stops.
+ */
+async function failNormalizationPermanently(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  attemptId: string;
+  artifactId: string;
+  cause: unknown;
+}): Promise<void> {
+  const { payload, runId, attemptId, artifactId, cause } = params;
+  const message = cause instanceof Error ? cause.message : String(cause);
+
+  await logAuditEvent({
+    investigationId: payload.investigationId,
+    action: "NORMALIZATION_FAILED",
+    actor: "NORMALIZATION_PIPELINE",
+    targetType: "EVIDENCE",
+    targetId: artifactId,
+    description: `Normalization failed permanently for ${artifactId} (attempt ${attemptId}): ${message}`,
+  });
+
+  await transitionRunToPermanentFailure(
+    runId,
+    `NORMALIZATION_FAILED: ${message}`,
   );
+
+  throw new UnrecoverableError(`NORMALIZATION_FAILED: ${message}`);
 }
 
 /**
