@@ -13,7 +13,7 @@
 
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
-import type { IngestionError } from "@indago/contracts";
+import type { IngestionError, NormalizedExtraction } from "@indago/contracts";
 import { db } from "../db/prisma.js";
 
 export interface ArtifactWriteRecord {
@@ -255,6 +255,77 @@ export class IngestionStore {
 
   async findRawExtractionByAttempt(attemptId: string) {
     return this.prisma.rawExtraction.findUnique({ where: { attemptId } });
+  }
+
+  /**
+   * Read seam (M-A05 §21): query RawExtraction rows within authorization
+   * boundaries. investigationId/caseId filters resolve through the owning
+   * IngestionAttempt — RawExtraction itself carries no case columns.
+   * All filters are optional; omitted filters are ignored.
+   */
+  async listRawExtractions(filter: {
+    investigationId?: string;
+    caseId?: string;
+    artifactId?: string;
+    format?: string;
+  }) {
+    return this.prisma.rawExtraction.findMany({
+      where: {
+        artifactId: filter.artifactId,
+        format: filter.format,
+        attempt: {
+          investigationId: filter.investigationId,
+          caseId: filter.caseId,
+        },
+      },
+    });
+  }
+
+  /**
+   * Idempotent NormalizedExtraction write keyed on attemptId (unique).
+   *
+   * M-A05 re-entrancy: a worker retry AFTER the normalized row was written
+   * must not duplicate it. Returns the existing row when one is already
+   * present — for both the pre-check and the P2002 race — so the invariant
+   * "normalized output persisted + completion repeated → safe no-op" holds.
+   */
+  async upsertNormalizedExtractionByAttempt(normalized: NormalizedExtraction) {
+    const data: Prisma.NormalizedExtractionUncheckedCreateInput = {
+      attemptId: normalized.attemptId,
+      artifactId: normalized.artifactId,
+      investigationId: normalized.investigationId,
+      caseId: normalized.caseId,
+      normalizerId: normalized.normalizerId,
+      normalizerVersion: normalized.normalizerVersion,
+      config: toJson(normalized.config) as Prisma.InputJsonObject,
+      canonicalFields: toJson(normalized.canonicalFields) as Prisma.InputJsonObject,
+      quality: toJson(normalized.quality) as Prisma.InputJsonObject,
+      lexicalStatistics: toJson(normalized.lexicalStatistics) as Prisma.InputJsonObject,
+    };
+
+    const existing = await this.prisma.normalizedExtraction.findUnique({
+      where: { attemptId: normalized.attemptId },
+    });
+    if (existing) return existing;
+
+    try {
+      return await this.prisma.normalizedExtraction.create({ data });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const raced = await this.prisma.normalizedExtraction.findUnique({
+          where: { attemptId: normalized.attemptId },
+        });
+        if (raced) return raced;
+      }
+      throw err;
+    }
+  }
+
+  async findNormalizedExtractionByAttempt(attemptId: string) {
+    return this.prisma.normalizedExtraction.findUnique({ where: { attemptId } });
   }
 }
 
