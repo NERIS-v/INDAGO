@@ -267,9 +267,21 @@ describe('Failure Transitions (INGESTION_PERMANENT_FAILURE)', () => {
     expect(t!.trigger).toBe('INGESTION_PERMANENT_FAILURE');
   });
 
+  it('NORMALIZING → FAILED is a valid transition (M-A05 permanent normalization failure)', () => {
+    const t = DEFAULT_RUN_STATE_CONFIGURATION.validTransitions.find(
+      (x) => x.from === 'NORMALIZING' && x.to === 'FAILED',
+    );
+    expect(t).toBeDefined();
+    expect(t!.trigger).toBe('INGESTION_PERMANENT_FAILURE');
+  });
+
   it('FAILED is reachable only through the INGESTION_PERMANENT_FAILURE trigger from pipeline states', () => {
     const intoFailed = DEFAULT_RUN_STATE_CONFIGURATION.validTransitions.filter(
-      (x) => x.to === 'FAILED' && x.from !== 'INGESTING' && x.from !== 'CREATED',
+      (x) =>
+        x.to === 'FAILED' &&
+        x.from !== 'INGESTING' &&
+        x.from !== 'CREATED' &&
+        x.from !== 'NORMALIZING',
     );
     expect(intoFailed).toHaveLength(0);
   });
