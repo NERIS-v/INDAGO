@@ -7,6 +7,7 @@
 //   transitionState              — cross-checked, checkpointer, audited transition
 //   transitionRunToIngesting     — CREATED → INGESTING (skips if already past)
 //   transitionRunToNormalizing   — INGESTING → NORMALIZING (skips if already past)
+//   transitionRunToAnalyzing     — NORMALIZING → ANALYZING (returns whether applied)
 //   transitionRunToPermanentFailure — terminal FAILED (only after retry exhaustion)
 // ============================================================================
 
@@ -74,6 +75,22 @@ export async function transitionRunToNormalizing(runId: string) {
   if (run.state === "INGESTING") {
     await transitionState(runId, "NORMALIZING", "INGESTION_COMPLETE");
   }
+}
+
+/**
+ * NORMALIZING → ANALYZING via NORMALIZATION_COMPLETE (skip if already past).
+ * Returns true ONLY when this call actually applied the transition — the
+ * caller uses this as the idempotency fence for the NORMALIZATION_COMPLETED
+ * audit (M-A05 §39: transition then audit; a re-entrant retry whose run is
+ * already ANALYZING must NOT audit again).
+ */
+export async function transitionRunToAnalyzing(runId: string): Promise<boolean> {
+  const run = await db.investigationRun.findUniqueOrThrow({ where: { id: runId } });
+  if (run.state === "NORMALIZING") {
+    await transitionState(runId, "ANALYZING", "NORMALIZATION_COMPLETE");
+    return true;
+  }
+  return false;
 }
 
 /**

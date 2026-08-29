@@ -15,6 +15,7 @@ import {
   ExtractionService,
   createDefaultParserRegistry,
   createTesseractOcrProvider,
+  NormalizationService,
 } from "@indago/ingestion";
 import { artifactFetchPolicyFromEnv } from "./artifact-fetch-policy.js";
 
@@ -56,3 +57,8 @@ export const extractionService = new ExtractionService(
   parserRegistry,
   { ocrProvider },
 );
+
+// M-A05: the canonical NormalizationService. Pure and deterministic — safe to
+// share across workers (no mutable engine state beyond the versioned default
+// configuration).
+export const normalizationService = new NormalizationService();

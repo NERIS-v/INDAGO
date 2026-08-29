@@ -46,6 +46,9 @@ export const AuditActionSchema = z.enum([
   'EVIDENCE_QUEUED',
   'INGESTION_JOB_QUEUED',
   'INGESTION_JOB_FAILED',
+  'NORMALIZATION_STORED',
+  'NORMALIZATION_COMPLETED',
+  'NORMALIZATION_FAILED',
   'SYSTEM_ACTION',
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

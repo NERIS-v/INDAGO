@@ -1,9 +1,10 @@
 // ============================================================================
 // Built-in Parser Factory
 //
-// Creates a ParserRegistry pre-populated with M-PR2 stub parsers.
-// Each stub declares capability and implements canParse().
-// parse() throws "not implemented" — M-PR3 implements extraction.
+// Creates a ParserRegistry pre-populated with the M-PR3 real parsers.
+// Each parser implements canParse() + parse() and produces a structured
+// RawExtraction with provenance. XLSX remains a declared-capability stub
+// (known M-PR3 gap).
 // ============================================================================
 
 import { ParserRegistry } from '../parser-registry.js';
@@ -17,7 +18,7 @@ import { createXmlParser } from './xml-parser.js';
 import { createImageParser } from './image-parser.js';
 
 /**
- * Create a ParserRegistry pre-populated with all M-PR2 stub parsers.
+ * Create a ParserRegistry pre-populated with all M-PR3 real parsers.
  *
  * Usage:
  * ```ts

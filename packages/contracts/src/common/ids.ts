@@ -70,6 +70,9 @@ export type AuditEventId = z.infer<typeof AuditEventIdSchema>;
 export const InvestigationRunIdSchema = z.string().uuid();
 export type InvestigationRunId = z.infer<typeof InvestigationRunIdSchema>;
 
+export const IngestionAttemptIdSchema = z.string().uuid();
+export type IngestionAttemptId = z.infer<typeof IngestionAttemptIdSchema>;
+
 export const CheckpointIdSchema = z.string().uuid();
 export type CheckpointId = z.infer<typeof CheckpointIdSchema>;
 

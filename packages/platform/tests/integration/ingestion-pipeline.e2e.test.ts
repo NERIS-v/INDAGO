@@ -151,7 +151,7 @@ describeOrSkip("E2E: POST → ingest-evidence → durable persistence", () => {
 
     await handleIngestEvidenceJob(makeJob());
     const reloaded = await prisma.investigationRun.findUnique({ where: { id: run.id } });
-    expect(reloaded!.state).toBe("NORMALIZING");
+    expect(reloaded!.state).toBe("ANALYZING");
     expect(reloaded!.status).toBe("RUNNING");
   });
 
@@ -222,14 +222,63 @@ describeOrSkip("E2E: POST → ingest-evidence → durable persistence", () => {
     expect(audit!.actor).toBe("INGESTION_PIPELINE");
     expect(audit!.description).toContain("Durably ingested");
 
+    const stored = await prisma.auditEvent.findFirst({
+      where: { investigationId, action: "NORMALIZATION_STORED" },
+    });
+    expect(stored).not.toBeNull();
+    expect(stored!.actor).toBe("NORMALIZATION_PIPELINE");
+
+    const completed = await prisma.auditEvent.findFirst({
+      where: { investigationId, action: "NORMALIZATION_COMPLETED" },
+    });
+    expect(completed).not.toBeNull();
+    expect(completed!.description).toContain("ANALYZING");
+
     const transitions = await prisma.auditEvent.findMany({
       where: { investigationId, action: "SYSTEM_ACTION", actor: "ORCHESTRATOR" },
     });
-    // CREATED → INGESTING and INGESTING → NORMALIZING
-    expect(transitions.length).toBe(2);
+    // CREATED → INGESTING, INGESTING → NORMALIZING, NORMALIZING → ANALYZING
+    expect(transitions.length).toBe(3);
 
     const checkpoints = await prisma.agentCheckpoint.count();
-    expect(checkpoints).toBe(2);
+    expect(checkpoints).toBe(3);
+  });
+
+  it("persists the real NormalizedExtraction with canonical output and quality metadata", async () => {
+    const attempt = await prisma.ingestionAttempt.findUnique({
+      where: {
+        investigationId_idempotencyKey: {
+          investigationId,
+          idempotencyKey: `evidence-${investigationId}-fixture.txt`,
+        },
+      },
+    });
+
+    const normalized = await prisma.normalizedExtraction.findUnique({
+      where: { attemptId: attempt!.id },
+    });
+
+    expect(normalized).not.toBeNull();
+    expect(normalized!.normalizerId).toBe("indago-text-canonicalizer");
+    expect(normalized!.normalizerVersion).toBe("1.0.0");
+    expect(normalized!.artifactId).toBe(attempt!.artifactId);
+    expect(normalized!.investigationId).toBe(investigationId);
+    expect(normalized!.caseId).toBe(caseId);
+
+    const fields = normalized!.canonicalFields as Array<{ rawValue: string; normalizationStatus: string }>;
+    // The fixture is a real TXT with content — the engine must produce fields.
+    expect(fields.length).toBeGreaterThan(0);
+    for (const f of fields) {
+      expect(f.normalizationStatus).toMatch(/^(NORMALIZED|UNCHANGED|AMBIGUOUS|UNPARSED|INVALID)$/);
+      expect(f.rawValue.length).toBeGreaterThan(0);
+    }
+
+    const quality = normalized!.quality as { completeness: number };
+    expect(quality.completeness).toBeGreaterThanOrEqual(0);
+    expect(quality.completeness).toBeLessThanOrEqual(1);
+
+    const lexical = normalized!.lexicalStatistics as { tokenCount?: number };
+    expect((lexical.tokenCount ?? 0)).toBeGreaterThan(0);
   });
 
   it("content-addressed dedup: identical bytes via another job → same artifact row", async () => {

@@ -127,6 +127,7 @@ export const DEFAULT_RUN_STATE_CONFIGURATION: RunStateConfiguration = {
     { from: 'INGESTING', to: 'NORMALIZING', trigger: 'INGESTION_COMPLETE' },
     { from: 'INGESTING', to: 'FAILED', trigger: 'INGESTION_PERMANENT_FAILURE' },
     { from: 'NORMALIZING', to: 'ANALYZING', trigger: 'NORMALIZATION_COMPLETE' },
+    { from: 'NORMALIZING', to: 'FAILED', trigger: 'INGESTION_PERMANENT_FAILURE' },
     { from: 'ANALYZING', to: 'DISCOVERING', trigger: 'ANALYSIS_COMPLETE' },
     { from: 'DISCOVERING', to: 'REVIEW_REQUIRED', trigger: 'DISCOVERY_REQUIRES_REVIEW' },
     { from: 'DISCOVERING', to: 'WAITING_FOR_EVIDENCE', trigger: 'EVIDENCE_NEEDED' },

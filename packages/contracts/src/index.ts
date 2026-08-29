@@ -56,6 +56,7 @@ export * from './intelligence/artifact-reference.js';
 export * from './intelligence/evidence-submission.js';
 export * from './intelligence/upload-router.js';
 export * from './intelligence/ingestion-job-payload.js';
+export * from './intelligence/normalization.js';
 
 // Execution contracts
 export * from './execution/investigation-run.js';
