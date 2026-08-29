@@ -108,8 +108,9 @@ model Artifact {
   providerMetadata Json?
   ingestedAt       DateTime @default(now())
 
-  attempts      IngestionAttempt[]
-  extractions   RawExtraction[]
+  attempts        IngestionAttempt[]
+  extractions     RawExtraction[]
+  normalizations  NormalizedExtraction[]
 
   @@index([investigationId])
   @@index([idempotencyKey])
@@ -144,6 +145,7 @@ model IngestionAttempt {
 
   artifact    Artifact?      @relation(fields: [artifactId], references: [id], onDelete: SetNull)
   extractions RawExtraction[]
+  normalization NormalizedExtraction?
 
   @@unique([investigationId, idempotencyKey])
   @@index([idempotencyKey])
@@ -175,4 +177,36 @@ model RawExtraction {
 
   @@unique([attemptId])
   @@index([artifactId, extractedAt])
+}
+
+// ============================================================================
+// P-05: Durable NormalizedExtraction (M-A05 persisted)
+//
+// One row per ingestion attempt (attemptId @unique) — the canonical
+// representative of the raw material. Stores the full NormalizedExtraction
+// contract (versioned config + canonical fields + quality + lexical
+// statistics) as JSON; queryable columns mirror provenance + engine identity.
+// Normalization NEVER mutates the RawExtraction; a new normalizer version
+// yields a new attempt → new row, preserving the evidence trail.
+// This table creates NO observations / entities / relations (pre-MA06).
+// ============================================================================
+model NormalizedExtraction {
+  id                String   @id @default(uuid())
+  attemptId         String   @unique
+  artifactId        String
+  investigationId   String
+  caseId            String
+  normalizerId      String
+  normalizerVersion String
+  config            Json
+  canonicalFields   Json
+  quality           Json
+  lexicalStatistics Json
+  createdAt         DateTime @default(now())
+
+  attempt  IngestionAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  artifact Artifact         @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+
+  @@index([investigationId])
+  @@index([artifactId, createdAt])
 }
