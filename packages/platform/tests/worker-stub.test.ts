@@ -8,7 +8,10 @@ import { IngestionJobPayloadSchema } from "@indago/contracts";
 //   validate → resolve run → attempt RUNNING → INGESTING →
 //   acquire → persist artifact → extract → persist RawExtraction →
 //   attempt SUCCEEDED → NORMALIZING → audit EVIDENCE_INGESTED (only after
-//   persistence). Retryable vs permanent failure semantics + case identity.
+//   persistence) → normalize → persist NormalizedExtraction →
+//   NORMALIZATION_STORED → ANALYZING → NORMALIZATION_COMPLETED (M-A05).
+//   Retryable vs permanent failure semantics + case identity + idempotent
+//   re-entrant completion.
 // ============================================================================
 
 // ============================================================================
@@ -28,7 +31,9 @@ const h = vi.hoisted(() => {
   const acquire = vi.fn();
   const extract = vi.fn();
   const deterministicSourceId = vi.fn();
-  return { acquire, extract, deterministicSourceId };
+  const normalize = vi.fn();
+  const parseStoredRawExtraction = vi.fn();
+  return { acquire, extract, deterministicSourceId, normalize, parseStoredRawExtraction };
 });
 
 /** Loose shape of the mocked Prisma `db` object. */
@@ -42,6 +47,7 @@ type MockedDb = {
   artifact: { upsert: Mock; findUnique: Mock };
   ingestionAttempt: { upsert: Mock; findUnique: Mock };
   rawExtraction: { create: Mock; findUnique: Mock };
+  normalizedExtraction: { findUnique: Mock; create: Mock };
 };
 
 interface FakeJob {
@@ -74,6 +80,7 @@ vi.mock("../src/db/prisma.js", () => ({
     artifact: { upsert: vi.fn(), findUnique: vi.fn() },
     ingestionAttempt: { upsert: vi.fn(), findUnique: vi.fn() },
     rawExtraction: { create: vi.fn(), findUnique: vi.fn() },
+    normalizedExtraction: { findUnique: vi.fn(), create: vi.fn() },
   },
 }));
 
@@ -94,6 +101,10 @@ vi.mock("@indago/ingestion", () => ({
   createDefaultParserRegistry: vi.fn(),
   createTesseractOcrProvider: vi.fn(),
   deterministicSourceId: h.deterministicSourceId,
+  NormalizationService: vi.fn().mockImplementation(() => ({ normalize: h.normalize })),
+  parseStoredRawExtraction: h.parseStoredRawExtraction,
+  NORMALIZER_ID: "indago-text-canonicalizer",
+  NORMALIZER_VERSION: "1.0.0",
 }));
 
 vi.mock("../src/security/grounding.js", () => ({
@@ -186,6 +197,19 @@ const TXT_EXTRACTION = {
   warnings: [],
 };
 
+const VALID_NORMALIZED = {
+  attemptId: "attempt-1",
+  artifactId: VALID_ARTIFACT_ID,
+  investigationId: VALID_INV_ID,
+  caseId: VALID_CASE_ID,
+  normalizerId: "indago-text-canonicalizer",
+  normalizerVersion: "1.0.0",
+  config: {},
+  canonicalFields: [],
+  quality: {},
+  lexicalStatistics: {},
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
 
@@ -211,6 +235,9 @@ beforeEach(() => {
   db.rawExtraction.create.mockResolvedValue({ id: "rx-1" });
   // No pre-existing extraction on the happy path.
   db.rawExtraction.findUnique.mockResolvedValue(null);
+  // No pre-existing normalized output on the happy path.
+  db.normalizedExtraction.findUnique.mockResolvedValue(null);
+  db.normalizedExtraction.create.mockResolvedValue({ id: "ne-1" });
 
   h.acquire.mockResolvedValue({
     ok: true,
@@ -230,6 +257,8 @@ beforeEach(() => {
   });
   h.extract.mockResolvedValue({ ok: true, extraction: TXT_EXTRACTION });
   h.deterministicSourceId.mockResolvedValue(VALID_SOURCE_ID);
+  h.normalize.mockReturnValue(VALID_NORMALIZED);
+  h.parseStoredRawExtraction.mockImplementation(() => TXT_EXTRACTION);
 });
 
 describe("I-PR2 Worker Stub: durable ingest-evidence", () => {
@@ -272,7 +301,7 @@ describe("I-PR2 Worker Stub: durable ingest-evidence", () => {
     );
   });
 
-  it("persists artifact, persists raw extraction, marks attempt SUCCEEDED, transitions to NORMALIZING", async () => {
+  it("persists artifact + raw extraction, marks attempt SUCCEEDED, normalizes, and completes to ANALYZING", async () => {
     await capturedHandler!(makeFakeJob());
 
     expect(db.artifact.upsert).toHaveBeenCalledWith(
@@ -311,10 +340,39 @@ describe("I-PR2 Worker Stub: durable ingest-evidence", () => {
       (c) => c[0]?.data?.state === "NORMALIZING",
     );
     expect(norm).toBeDefined();
-    expect(runState.state).toBe("NORMALIZING");
+
+    // ---- M-A05 normalization completion
+    expect(h.normalize).toHaveBeenCalledWith(
+      TXT_EXTRACTION,
+      expect.objectContaining({
+        attemptId: "attempt-1",
+        investigationId: VALID_INV_ID,
+        caseId: VALID_CASE_ID,
+      }),
+    );
+    expect(db.normalizedExtraction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          attemptId: "attempt-1",
+          artifactId: VALID_ARTIFACT_ID,
+        }),
+      }),
+    );
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "NORMALIZATION_STORED", targetId: VALID_ARTIFACT_ID }),
+    );
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "NORMALIZATION_COMPLETED", targetId: VALID_ARTIFACT_ID }),
+    );
+
+    const analyzing = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "ANALYZING",
+    );
+    expect(analyzing).toBeDefined();
+    expect(runState.state).toBe("ANALYZING");
   });
 
-  it("§4: progress state mirrors DB — NORMALIZING emitted only after RawExtraction persisted", async () => {
+  it("§4: progress state mirrors DB — NORMALIZING/ANALYZING frames emitted only after RawExtraction persisted", async () => {
     await capturedHandler!(makeFakeJob());
 
     const calls = emitProgressEvent.mock.calls as unknown as [string, string, string][];
@@ -332,6 +390,14 @@ describe("I-PR2 Worker Stub: durable ingest-evidence", () => {
     const rxOrder = db.rawExtraction.create.mock.invocationCallOrder[0] ?? 0;
     const normOrder = emitProgressEvent.mock.invocationCallOrder[firstNorm] ?? 0;
     expect(normOrder).toBeGreaterThan(rxOrder);
+
+    // The ANALYZING (normalization-complete) frame must only fire after the
+    // normalized row was persisted.
+    const firstAnalyzing = calls.findIndex((_, idx) => stateOf(idx) === "ANALYZING");
+    expect(firstAnalyzing).toBeGreaterThanOrEqual(0);
+    const neOrder = db.normalizedExtraction.create.mock.invocationCallOrder[0] ?? 0;
+    const analyzingOrder = emitProgressEvent.mock.invocationCallOrder[firstAnalyzing] ?? 0;
+    expect(analyzingOrder).toBeGreaterThan(neOrder);
   });
 
   it("audits EVIDENCE_INGESTED ONLY after artifact + raw extraction are persisted", async () => {
@@ -535,8 +601,8 @@ describe("Deterministic source identity", () => {
   });
 });
 
-describe("Re-entrant completion (P1-5): RawExtraction persisted + retry", () => {
-  it("retry after raw persisted, run still INGESTING (transition failed) → completes transition, NO re-acquire, NO duplicate", async () => {
+describe("Re-entrant completion (M-A05): RawExtraction persisted + retry", () => {
+  it("retry after raw persisted, run still INGESTING (transition failed) → completes through ANALYZING, NO re-acquire, NO duplicate raw", async () => {
     runState.state = "INGESTING";
     runState.status = "RUNNING";
     db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
@@ -546,53 +612,152 @@ describe("Re-entrant completion (P1-5): RawExtraction persisted + retry", () => 
     expect(h.acquire).not.toHaveBeenCalled();
     expect(db.artifact.upsert).not.toHaveBeenCalled();
     expect(db.rawExtraction.create).not.toHaveBeenCalled();
+    // Rehydrated stored row drives normalization without re-extraction.
+    expect(h.parseStoredRawExtraction).toHaveBeenCalled();
+    expect(h.normalize).toHaveBeenCalled();
+    expect(db.normalizedExtraction.create).toHaveBeenCalled();
+    // INGESTING → NORMALIZING → ANALYZING on the re-entry.
     const norm = db.investigationRun.update.mock.calls.find(
       (c) => c[0]?.data?.state === "NORMALIZING",
     );
     expect(norm).toBeDefined();
-    expect(runState.state).toBe("NORMALIZING");
+    const analyzing = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "ANALYZING",
+    );
+    expect(analyzing).toBeDefined();
+    expect(runState.state).toBe("ANALYZING");
   });
 
-  it("already-NORMALIZING run with existing extraction → safe no-op (no transition, no re-acquire)", async () => {
+  it("already-NORMALIZING run with existing source + normalized output → re-entry completes to ANALYZING without duplicate writes/audits", async () => {
     runState.state = "NORMALIZING";
     runState.status = "RUNNING";
     db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+    db.normalizedExtraction.findUnique.mockResolvedValue({ id: "ne-1", attemptId: "attempt-1" });
 
     await capturedHandler!(makeFakeJob());
 
     expect(h.acquire).not.toHaveBeenCalled();
     // RUNNING attempt is (re)established — that is idempotent and expected.
     expect(db.ingestionAttempt.upsert).toHaveBeenCalledTimes(1);
-    // …but the attempt never advances to SUCCEEDED again.
     const statuses = db.ingestionAttempt.upsert.mock.calls.map(
       (c) => c[0]?.update?.status,
     );
     expect(statuses).toEqual(["RUNNING"]);
-    expect(db.investigationRun.update).not.toHaveBeenCalled();
-    expect(db.rawExtraction.create).not.toHaveBeenCalled();
+    // Normalized row already exists → NO re-normalize, NO re-persist,
+    // NO NORMALIZATION_STORED re-audit.
+    expect(h.normalize).not.toHaveBeenCalled();
+    expect(db.normalizedExtraction.create).not.toHaveBeenCalled();
+    expect(
+      logAuditEvent.mock.calls.filter((c) => c[0]?.action === "NORMALIZATION_STORED"),
+    ).toHaveLength(0);
+    // …but NORMALIZING → ANALYZING applies + is audited once.
+    expect(runState.state).toBe("ANALYZING");
+    expect(
+      logAuditEvent.mock.calls.filter((c) => c[0]?.action === "NORMALIZATION_COMPLETED"),
+    ).toHaveLength(1);
   });
 
-  it("duplicate completion call is idempotent (invariant: persisted + completed → safe no-op)", async () => {
-    // Realistic retry: the run is already INGESTING with extraction persisted.
+  it("duplicate completion call is idempotent — one NormalizedExtraction, one STORED, one COMPLETED, run lands ANALYZING", async () => {
+    // Realistic retry: first pass normalizes + writes the row; second pass
+    // re-enters with the run already ANALYZING and the normalized row present.
     runState.state = "INGESTING";
     runState.status = "RUNNING";
     db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+    // completeNormalization's existence check AND the upsert pre-check both hit
+    // findUnique — both must miss on the first pass for create to fire once.
+    db.normalizedExtraction.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ id: "ne-1", attemptId: "attempt-1" }); // second pass → no-op
 
     await capturedHandler!(makeFakeJob());
     await capturedHandler!(makeFakeJob());
 
     expect(h.acquire).not.toHaveBeenCalled();
     expect(db.rawExtraction.create).not.toHaveBeenCalled();
-    // First call completed the pending transition; the second found a run
-    // already past INGESTING (skip-if-past) → no further transition.
-    const normCalls = db.investigationRun.update.mock.calls.filter(
-      (c) => c[0]?.data?.state === "NORMALIZING",
-    );
-    expect(normCalls).toHaveLength(1);
-    expect(runState.state).toBe("NORMALIZING");
+    expect(db.normalizedExtraction.create).toHaveBeenCalledTimes(1);
+    expect(
+      logAuditEvent.mock.calls.filter((c) => c[0]?.action === "NORMALIZATION_STORED"),
+    ).toHaveLength(1);
+    expect(
+      logAuditEvent.mock.calls.filter((c) => c[0]?.action === "NORMALIZATION_COMPLETED"),
+    ).toHaveLength(1);
+    expect(runState.state).toBe("ANALYZING");
   });
 
-  it("P2002 race on insert (pre-check missed, create collided) → recovered as already persisted", async () => {
+  it("run already ANALYZING with raw + normalized → re-entry completes with zero duplicate audits and NO regression", async () => {
+    runState.state = "ANALYZING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+    db.normalizedExtraction.findUnique.mockResolvedValue({ id: "ne-1", attemptId: "attempt-1" });
+
+    await capturedHandler!(makeFakeJob());
+
+    expect(h.acquire).not.toHaveBeenCalled();
+    expect(h.normalize).not.toHaveBeenCalled();
+    expect(db.investigationRun.update).not.toHaveBeenCalled();
+    expect(runState.state).toBe("ANALYZING");
+    expect(logAuditEvent.mock.calls).toHaveLength(0);
+  });
+
+  it("corrupt stored row (rehydration throws) → NORMALIZATION_FAILED audit, run permanently FAILED, UnrecoverableError", async () => {
+    runState.state = "NORMALIZING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({
+      id: "rx-1",
+      attemptId: "attempt-1",
+      artifactId: VALID_ARTIFACT_ID,
+    });
+    h.parseStoredRawExtraction.mockImplementation(() => {
+      throw new Error("corrupt stored extraction JSON");
+    });
+
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow("NORMALIZATION_FAILED");
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "NORMALIZATION_FAILED",
+        targetId: VALID_ARTIFACT_ID,
+        description: expect.stringContaining("corrupt stored extraction JSON"),
+      }),
+    );
+    const failed = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "FAILED",
+    );
+    expect(failed).toBeDefined();
+    expect(failed![0]?.data).toEqual(
+      expect.objectContaining({ status: "FAILED" }),
+    );
+    expect(runState.state).toBe("FAILED");
+    // The SUCCEEDED extraction attempt is never touched — no re-Upsert beyond RUNNING.
+    expect(h.acquire).not.toHaveBeenCalled();
+  });
+
+  it("normalize pure-step throws (contract violation) → permanent NORMALIZATION_FAILED, run FAILED, no ANALYZING", async () => {
+    runState.state = "NORMALIZING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
+    h.normalize.mockImplementation(() => {
+      throw new Error("normalized output failed contract validation");
+    });
+
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow("NORMALIZATION_FAILED");
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "NORMALIZATION_FAILED",
+        description: expect.stringContaining("contract validation"),
+      }),
+    );
+    expect(db.normalizedExtraction.create).not.toHaveBeenCalled();
+    const analyzing = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "ANALYZING",
+    );
+    expect(analyzing).toBeUndefined();
+    expect(runState.state).toBe("FAILED");
+  });
+
+  it("P2002 race on raw insert (pre-check missed, create collided) → recovered, completes to ANALYZING", async () => {
     db.rawExtraction.findUnique
       .mockResolvedValueOnce(null) // worker re-entrancy gate
       .mockResolvedValueOnce(null) // ensureRawExtraction pre-check
@@ -608,7 +773,7 @@ describe("Re-entrant completion (P1-5): RawExtraction persisted + retry", () => 
     await capturedHandler!(makeFakeJob());
 
     expect(db.rawExtraction.create).toHaveBeenCalled();
-    expect(runState.state).toBe("NORMALIZING");
+    expect(runState.state).toBe("ANALYZING");
   });
 });
 
