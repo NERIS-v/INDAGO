@@ -1,6 +1,8 @@
 import { describe, expect, beforeAll, afterAll, it } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import { DEFAULT_NORMALIZATION_CONFIG } from "@indago/contracts";
+import type { NormalizedExtraction } from "@indago/contracts";
 import { IngestionStore } from "../../src/persistence/ingestion-store.js";
 import type {
   ArtifactWriteRecord,
@@ -75,9 +77,46 @@ describe.skipIf(!TEST_DATABASE_URL)(
       };
     }
 
+    function makeNormalized(attemptId: string, artifactId: string): NormalizedExtraction {
+      return {
+        attemptId,
+        artifactId,
+        investigationId,
+        caseId,
+        normalizerId: "indago-text-canonicalizer",
+        normalizerVersion: "1.0.0",
+        config: DEFAULT_NORMALIZATION_CONFIG,
+        canonicalFields: [
+          {
+            rawValue: "42",
+            normalizedValue: "42",
+            type: "integer",
+            normalizationStatus: "UNCHANGED",
+            confidence: 1,
+            sourceReference: { kind: "txt-line", detail: { lineNumber: 1, charStart: 0, charEnd: 2 } },
+          },
+        ],
+        quality: {
+          completeness: 1,
+          statusCounts: { normalized: 0, unchanged: 1, ambiguous: 0, unparsed: 0, invalid: 0 },
+          perFieldConfidence: [1],
+          cleanliness: {},
+          warnings: { totalCount: 0, byCode: {} },
+        },
+        lexicalStatistics: {
+          tokenCount: 1,
+          uniqueTokenCount: 1,
+          averageTokenLength: 2,
+          topTokens: [{ token: "42", count: 1 }],
+          topBigrams: [],
+        },
+      };
+    }
+
     beforeAll(async () => {
       prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL! } } });
       store = new IngestionStore(prisma);
+      await prisma.normalizedExtraction.deleteMany({});
       await prisma.rawExtraction.deleteMany({});
       await prisma.ingestionAttempt.deleteMany({});
       await prisma.artifact.deleteMany({});
@@ -87,6 +126,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
     });
 
     afterAll(async () => {
+      await prisma.normalizedExtraction.deleteMany({});
       await prisma.rawExtraction.deleteMany({});
       await prisma.ingestionAttempt.deleteMany({});
       await prisma.artifact.deleteMany({});
@@ -237,6 +277,118 @@ describe.skipIf(!TEST_DATABASE_URL)(
           extractedAt: new Date().toISOString(),
         }),
       ).rejects.toThrow();
+    });
+
+    it("M-A05: upsertNormalizedExtractionByAttempt writes one row per attempt and is idempotent", async () => {
+      const artifact = await store.upsertArtifact(
+        makeArtifact({ id: randomUUID(), contentHash: contentHashOf(`ne-${Date.now()}`) }),
+      );
+      const attempt = await store.upsertAttempt({
+        ...makeAttempt("SUCCEEDED", 1),
+        artifactId: artifact.id,
+        parserId: "txt-parser",
+        parserVersion: "1.0.0",
+        format: "TXT",
+      });
+
+      const written = await store.upsertNormalizedExtractionByAttempt(
+        makeNormalized(attempt.id, artifact.id),
+      );
+      expect(written.attemptId).toBe(attempt.id);
+      expect(written.normalizerId).toBe("indago-text-canonicalizer");
+
+      // Idempotent repeat with different content → existing row returned unchanged.
+      const again = await store.upsertNormalizedExtractionByAttempt(
+        makeNormalized(attempt.id, artifact.id),
+      );
+      expect(again.id).toBe(written.id);
+      expect(
+        await prisma.normalizedExtraction.count({ where: { attemptId: attempt.id } }),
+      ).toBe(1);
+    });
+
+    it("M-A05: concurrent upserts on the same attempt (P2002 race) collapse to one row", async () => {
+      const artifact = await store.upsertArtifact(
+        makeArtifact({ id: randomUUID(), contentHash: contentHashOf(`race-${Date.now()}`) }),
+      );
+      const attempt = await store.upsertAttempt({
+        ...makeAttempt("SUCCEEDED", 1),
+        idempotencyKey: `evidence-${investigationId}-race.txt`,
+        artifactId: artifact.id,
+      });
+
+      const [a, b] = await Promise.all([
+        store.upsertNormalizedExtractionByAttempt(makeNormalized(attempt.id, artifact.id)),
+        store.upsertNormalizedExtractionByAttempt(makeNormalized(attempt.id, artifact.id)),
+      ]);
+      expect(a.attemptId).toBe(attempt.id);
+      expect(b.attemptId).toBe(attempt.id);
+      expect(
+        await prisma.normalizedExtraction.count({ where: { attemptId: attempt.id } }),
+      ).toBe(1);
+    });
+
+    it("M-A05: findNormalizedExtractionByAttempt returns the durable row or null", async () => {
+      const artifact = await store.upsertArtifact(
+        makeArtifact({ id: randomUUID(), contentHash: contentHashOf(`find-${Date.now()}`) }),
+      );
+      const attempt = await store.upsertAttempt({
+        ...makeAttempt("SUCCEEDED", 1),
+        idempotencyKey: `evidence-${investigationId}-find.txt`,
+        artifactId: artifact.id,
+      });
+      await store.upsertNormalizedExtractionByAttempt(makeNormalized(attempt.id, artifact.id));
+
+      const found = await store.findNormalizedExtractionByAttempt(attempt.id);
+      expect(found).not.toBeNull();
+      expect(found!.attemptId).toBe(attempt.id);
+      expect((found!.canonicalFields as Array<{ rawValue: string }>)[0]!.rawValue).toBe("42");
+
+      expect(await store.findNormalizedExtractionByAttempt(randomUUID())).toBeNull();
+    });
+
+    it("M-A05: listRawExtractions filters by investigationId, caseId, artifactId and format", async () => {
+      const artifact = await store.upsertArtifact(
+        makeArtifact({ id: randomUUID(), contentHash: contentHashOf(`list-${Date.now()}`) }),
+      );
+      const attempt = await store.upsertAttempt({
+        ...makeAttempt("SUCCEEDED", 1),
+        idempotencyKey: `evidence-${investigationId}-list.txt`,
+        artifactId: artifact.id,
+        format: "TXT",
+        parserId: "txt-parser",
+        parserVersion: "1.0.0",
+      });
+      const extraction = {
+        format: "TXT",
+        lines: ["ledger", "balance 42000.00"],
+      };
+      await store.insertRawExtraction({
+        attemptId: attempt.id,
+        artifactId: artifact.id,
+        parserId: "txt-parser",
+        parserVersion: "1.0.0",
+        format: "TXT",
+        extraction,
+        warnings: undefined,
+        extractedAt: new Date().toISOString(),
+      });
+
+      const byAll = await store.listRawExtractions({
+        investigationId,
+        caseId,
+        artifactId: artifact.id,
+        format: "TXT",
+      });
+      expect(byAll.map((r) => r.attemptId)).toContain(attempt.id);
+
+      const byForeignInvestigation = await store.listRawExtractions({
+        investigationId: randomUUID(),
+      });
+      expect(byForeignInvestigation.some((r) => r.attemptId === attempt.id)).toBe(false);
+
+      const byWrongFormat = await store.listRawExtractions({ format: "PDF" });
+      expect(byWrongFormat.some((r) => r.attemptId === attempt.id)).toBe(false);
     });
   },
 );

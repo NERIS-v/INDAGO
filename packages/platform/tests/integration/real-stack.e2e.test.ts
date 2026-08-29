@@ -175,6 +175,11 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     await prisma.agentCheckpoint.deleteMany({});
     await prisma.investigationRun.deleteMany({});
 
+    // Pre-warm the shared app Prisma singleton so its query engine is up
+    // before the first /start request (avoids a cold-start engine race).
+    const { db: appDb } = await import("../../src/db/prisma.js");
+    await appDb.$connect();
+
     // Dynamic import AFTER env is set: creates the REAL Queue + Worker.
     const { apiRouter } = await import("../../src/api/routes.js");
     const orchestrator = await import("../../src/queue/orchestrator.js");
@@ -239,7 +244,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     expect(run?.caseId).toBe(caseId);
   });
 
-  it("REAL end-to-end: POST evidence → BullMQ → worker → RawExtraction → NORMALIZING → SSE frames", async () => {
+  it("REAL end-to-end: POST evidence → BullMQ → worker → RawExtraction → NormalizedExtraction → ANALYZING → SSE frames", async () => {
     const sse = openSse(investigationId);
     await waitForSseConnected(sse);
 
@@ -251,11 +256,12 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     );
     expect(post.status).toBe(202);
 
-    const reachedNormalizing = await pollUntil(async () => {
+    const reachedAnalyzing = await pollUntil(async () => {
       const s = await getStatus(investigationId, caseId);
-      return s.body.state === "NORMALIZING";
+      return s.body.state === "ANALYZING";
     });
-    expect(reachedNormalizing).toBe(true);
+    expect(reachedAnalyzing).toBe(true);
+    const reachedAt = Date.now();
 
     // --- Durable persistence assertions ---
     const artifact = await prisma.artifact.findUnique({
@@ -283,6 +289,18 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     expect(raw!.format).toBe("TXT");
     expect(JSON.stringify(raw!.extraction)).toContain("balance 42000.00");
 
+    // --- M-A05: canonical normalized output persisted for the attempt ---
+    const normalized = await prisma.normalizedExtraction.findUnique({
+      where: { attemptId: attempt!.id },
+    });
+    expect(normalized).not.toBeNull();
+    expect(normalized!.normalizerId).toBe("indago-text-canonicalizer");
+    const canonicalFields = normalized!.canonicalFields as Array<{
+      rawValue: string;
+      status: string;
+    }>;
+    expect(canonicalFields.some((f) => f.rawValue.includes("42000.00"))).toBe(true);
+
     // --- Real SSE frames (ordered lifecycle) ---
     await sleep(300);
     const frames = sse.frames;
@@ -292,6 +310,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     expect(actions).toContain("EVIDENCE_QUEUED");
     expect(actions).toContain("INGESTING");
     expect(actions).toContain("NORMALIZING");
+    expect(actions).toContain("ANALYZING");
     expect(actions).toContain("EVIDENCE_INGESTED");
 
     // §4 guard AT the transport: any NORMALIZING state frame must arrive
@@ -300,6 +319,16 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     const ingestedIdx = frames.findIndex((f) => f.action === "EVIDENCE_INGESTED");
     expect(normIdx).toBeGreaterThanOrEqual(0);
     expect(ingestedIdx).toBeGreaterThan(normIdx);
+
+    // §4 guard AT the transport: the ANALYZING state frame may only fire after
+    // the canonical normalization was durably persisted (audit written).
+    const analyzingIdx = frames.findIndex((f) => f.state === "ANALYZING");
+    expect(analyzingIdx).toBeGreaterThanOrEqual(0);
+    const storedAudit = await prisma.auditEvent.findFirst({
+      where: { investigationId, action: "NORMALIZATION_STORED" },
+    });
+    expect(storedAudit).not.toBeNull();
+    expect(storedAudit!.timestamp.getTime()).toBeLessThan(reachedAt);
 
     sse.close();
   }, 60_000);
@@ -343,7 +372,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     expect(attempts).toBe(1);
 
     const run = await prisma.investigationRun.findUnique({ where: { investigationId: inv2 } });
-    expect(run?.state).toBe("NORMALIZING");
+    expect(run?.state).toBe("ANALYZING");
   }, 60_000);
 
   it("REAL retry + permanent failure: 503 fixture → retried by BullMQ → run FAILED, audited once", async () => {
