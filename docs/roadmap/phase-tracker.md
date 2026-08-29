@@ -99,7 +99,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] M-A02: FIR/narrative ingestion (raw artifacts + source metadata) `[Mayur]`
 - [ ] M-A03: CDR CSV ingestion (normalized communication rows) `[Mayur]`
 - [ ] M-A04: Financial CSV ingestion (normalized transaction rows) `[Mayur]`
-- [ ] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
+- [x] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
 - [ ] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
 - [ ] M-A07: Entity candidate generator (candidate entities) `[Mayur]`
 - [ ] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]`
