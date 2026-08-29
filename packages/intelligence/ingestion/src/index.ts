@@ -153,3 +153,13 @@ export type {
   TesseractOcrConfig,
 } from './extraction/index.js';
 
+// M-A05 Normalization
+export {
+  NormalizationService,
+  NORMALIZER_ID,
+  NORMALIZER_VERSION,
+  parseStoredRawExtraction,
+  RawExtractionBodySchema,
+  PersistedRawExtractionRowSchema,
+} from './normalization/index.js';
+
