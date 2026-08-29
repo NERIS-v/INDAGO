@@ -15,8 +15,8 @@ model InvestigationRun {
   id              String   @id @default(uuid())
   investigationId String   @unique
   caseId          String
-  status          String   // QUEUED, RUNNING, PAUSED, COMPLETED, FAILED
-  state           String   // CREATED, INGESTING, ANALYZING, WAITING_FOR_EVIDENCE
+  status          String   // QUEUED, INITIALIZING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED
+  state           String   // CREATED, INGESTING, NORMALIZING, ANALYZING, DISCOVERING, WAITING_FOR_EVIDENCE, REASSESSING, REVIEW_REQUIRED, PAUSED, FAILED, COMPLETED
   currentStage    String?  // Human readable sub-stage
   contextData     Json     // Stores current knowns/gaps
   error           String?

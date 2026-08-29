@@ -452,7 +452,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | 0 | 10 | 10 | 0 | 0 | 10 |
 | 1 | 40 | 40 | 20 | 6 | 14 |
 | 2A | 16 | 4 | 4 | 0 | 0 |
-| 2B | 12 | 0 | 0 | 12 | 0 |
+| 2B | 12 | 12 | 0 | 12 | 0 |
 | 3 | 12 | 0 | 0 | 6 | 1 |
 | 4 | 16 | 0 | 0 | 6 | 1 |
 | 5 | 18 | 0 | 0 | 8 | 1 |
@@ -463,4 +463,4 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | 10 | 10 | 0 | 0 | 5 | 0 |
 | 11 | 30 | 0 | 0 | 10 | 10 |
 | 12 | 16 | 0 | 0 | 8 | 1 |
-| **Total** | **257** | **54** | **24** | **86** | **51** |
+| **Total** | **257** | **66** | **24** | **86** | **51** |
