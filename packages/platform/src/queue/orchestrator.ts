@@ -8,10 +8,14 @@ import {
 import { handleLegacyRunStateJob } from "./legacy-pipeline.js";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+// Overridable so tests can claim a dedicated queue: a concurrently-running dev
+// worker must never consume test jobs from the shared default queue.
+const QUEUE_NAME =
+  process.env.INVESTIGATION_QUEUE_NAME ?? "investigation-pipeline";
 const connection = new Redis(REDIS_URL);
 const workerConnection = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 
-export const investigationQueue = new Queue("investigation-pipeline", {
+export const investigationQueue = new Queue(QUEUE_NAME, {
   connection,
   defaultJobOptions: {
     attempts: 3,
@@ -28,7 +32,7 @@ export const investigationQueue = new Queue("investigation-pipeline", {
  *                            LEGACY_PIPELINE_ENABLED=true (legacy-pipeline.ts)
  */
 export const investigationWorker = new Worker(
-  "investigation-pipeline",
+  QUEUE_NAME,
   async (job: Job) => {
     if (job.name === "ingest-evidence") {
       return handleIngestEvidenceJob(job);
