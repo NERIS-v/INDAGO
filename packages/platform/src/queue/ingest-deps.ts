@@ -30,7 +30,9 @@ export const artifactStorageDir =
 export const artifactStorage = new FilesystemArtifactStorage(artifactStorageDir);
 
 const parserRegistry = createDefaultParserRegistry();
-const ocrProvider = createTesseractOcrProvider();
+const ocrProvider = createTesseractOcrProvider({
+  language: "eng+hin+tam+tel+ben+mar+guj+kan+urd",
+});
 
 // Outbound fetch policy (artifact-fetch-policy.ts). Defaults are strict:
 // https only, private/loopback/link-local/metadata destinations rejected,

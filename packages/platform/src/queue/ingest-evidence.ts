@@ -36,23 +36,37 @@
 // ============================================================================
 
 import { UnrecoverableError, type Job } from "bullmq";
+import { z } from "zod";
 import {
   IngestionJobPayloadSchema,
+  LexicalStatisticsSchema,
+  NormalizationConfigSchema,
+  NormalizedFieldSchema,
+  QualityMetadataSchema,
   type IngestionError,
   type IngestionJobPayload,
   type NormalizedExtraction,
+  type Observation,
 } from "@indago/contracts";
 import {
+  buildObservationIdentityKey,
   deterministicSourceId,
+  extractObservations,
+  finalizeObservation,
   NORMALIZER_ID,
   NORMALIZER_VERSION,
   parseStoredRawExtraction,
   type RawExtraction,
 } from "@indago/ingestion";
 import { logAuditEvent } from "../audit/logger.js";
+import { Prisma } from "@prisma/client";
 import { db } from "../db/prisma.js";
 import { ingestionStore } from "../persistence/ingestion-store.js";
-import { emitProgressEvent } from "../realtime/sse.js";
+import {
+  deterministicEvidenceId,
+  observationStore,
+} from "../persistence/observation-store.js";
+import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
   extractionService,
@@ -347,6 +361,42 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
 }
 
 /**
+ * Rebuild a NormalizedExtraction from its persisted row (M-A05 re-entrancy).
+ *
+ * The write path persists EVERY NormalizedExtractionSchema field, so this is a
+ * faithful, total reconstruction — never a recomputation.
+ *
+ * Validation is scoped to the JSON content columns (config / canonicalFields /
+ * quality / lexicalStatistics) — the only columns that can carry tampered or
+ * corrupt serialized data. Identity/version strings are typed DB columns that
+ * were already validated at write time and are passed through untouched, so a
+ * strict full-object re-parse (which would re-validate ids) is NOT applied.
+ * Zod .strict() on the content columns makes a corrupt stored row surface as
+ * a permanent failure here (mirrors the RawExtraction rehydration doctrine).
+ */
+function rehydrateStoredNormalized(
+  row: Prisma.NormalizedExtractionGetPayload<Record<string, never>>,
+): NormalizedExtraction {
+  const config = NormalizationConfigSchema.parse(row.config);
+  const canonicalFields = z.array(NormalizedFieldSchema).parse(row.canonicalFields);
+  const quality = QualityMetadataSchema.parse(row.quality);
+  const lexicalStatistics = LexicalStatisticsSchema.parse(row.lexicalStatistics);
+
+  return {
+    attemptId: row.attemptId,
+    artifactId: row.artifactId,
+    investigationId: row.investigationId,
+    caseId: row.caseId,
+    normalizerId: row.normalizerId,
+    normalizerVersion: row.normalizerVersion,
+    config,
+    canonicalFields,
+    quality,
+    lexicalStatistics,
+  };
+}
+
+/**
  * M-A05 normalization completion — forward and re-entrant paths.
  *
  * Idempotent end-to-end:
@@ -374,8 +424,29 @@ async function completeNormalization(params: {
   const existing =
     await ingestionStore.findNormalizedExtractionByAttempt(attemptId);
 
-  if (!existing) {
-    let normalized: NormalizedExtraction;
+  // M-A05 re-entrancy invariant: when the normalized row already exists we
+  // NEVER re-run the (pure) normalizer — we rehydrate the persisted row. The
+  // InputJsonObject columns were an exact serialization of a NormalizedExtraction
+  // that already passed schema validation at write time, and they cover every
+  // field of the contract (nothing is lost, so recomputation is unnecessary).
+  // A corrupt stored row surfaces here as a permanent failure. MA06 consumes
+  // whatever value is durable — freshly computed on the forward pass,
+  // rehydrated on the re-entry.
+  let normalized: NormalizedExtraction;
+  if (existing) {
+    try {
+      normalized = rehydrateStoredNormalized(existing);
+    } catch (cause) {
+      await failNormalizationPermanently({
+        payload,
+        runId,
+        attemptId,
+        artifactId,
+        cause,
+      });
+      return;
+    }
+  } else {
     try {
       normalized = normalizationService.normalize(raw, {
         attemptId,
@@ -405,6 +476,19 @@ async function completeNormalization(params: {
     });
   }
 
+  // ---- M-A06: extract + persist durable observations (idempotent slot).
+  // Runs after the normalized output is durable and BEFORE the run moves to
+  // ANALYZING — the extraction boundary is fully persisted first.
+  await completeMA06({
+    payload,
+    runId,
+    attemptId,
+    caseId,
+    artifactId,
+    raw,
+    normalized,
+  });
+
   // Re-entrancy can arrive while the run is still INGESTING (the NORMALIZING
   // transition itself failed on a prior pass). Walk the ladder INGESTING →
   // NORMALIZING (skip-if-past), then NORMALIZING → ANALYZING below — so a
@@ -433,6 +517,145 @@ async function completeNormalization(params: {
       },
     );
   }
+}
+
+/**
+ * M-A06 durable observation extraction.
+ *
+ * Idempotent end-to-end (mirrors completeNormalization):
+ *   - Source/Evidence rows are upserted by deterministic identity — retries
+ *     never duplicate them.
+ *   - The pure extraction is computed only when the evidence has no durable
+ *     observations yet; createMany skipDuplicates makes the write a safe
+ *     no-op under a concurrent/retried pass.
+ *   - OBSERVATION_EXTRACTED is audited (and the typed SSE frame emitted) ONLY
+ *     when rows were actually inserted — the append-only audit log stays
+ *     single-value and no observation content is ever broadcast.
+ *
+ * Faithful to the locked design:
+ *   - evidenceId includes the stable operation identity (edit #1).
+ *   - invalid client source catalog has ALREADY been resolved to MANUAL by the
+ *     queue producer (sourceCatalog validated); declaredSourceCatalog preserves
+ *     the original declaration on the Source row for audit (edit #3).
+ *   - locationRef/observedAt/provenance are never fabricated; exact locations
+ *     live on Observation.provenance (edit #2).
+ */
+async function completeMA06(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  attemptId: string;
+  caseId: string;
+  artifactId: string;
+  raw: RawExtraction;
+  normalized: NormalizedExtraction;
+}): Promise<void> {
+  const { payload, runId, caseId, artifactId, raw, normalized } = params;
+  const investigationId = payload.investigationId;
+
+  // Same deterministic source seed the acquisition step used (stable across
+  // retries) — one Source row per (investigation, fileKey).
+  const sourceId = await deterministicSourceId(
+    `${investigationId}:${extractFileKey(payload)}`,
+  );
+
+  const evidenceId = await deterministicEvidenceId(
+    investigationId,
+    payload.operationId,
+    artifactId,
+  );
+
+  // 1. Durable Source (idempotent). Catalog is already platform-validated;
+  //    the raw declaration (if any) is preserved verbatim (edit #3).
+  await observationStore.upsertSource({
+    id: sourceId,
+    caseId,
+    investigationId,
+    catalog: payload.sourceCatalog,
+    declaredCatalog: payload.declaredSourceCatalog,
+    name: payload.sourceName,
+    description: payload.sourceDescription,
+  });
+
+  // 2. Durable Evidence (idempotent, retry-safe identity).
+  await observationStore.upsertEvidence({
+    id: evidenceId,
+    investigationId,
+    caseId,
+    operationId: payload.operationId,
+    sourceId,
+    sourceName: payload.sourceName,
+    sourceDescription: payload.sourceDescription,
+    evidenceType: payload.evidenceType,
+    title: payload.evidenceTitle,
+    description: payload.evidenceDescription,
+    observedAt: payload.observedAt,
+    artifactId,
+  });
+
+  // 3. Observations — only extract when none durable yet.
+  const existing = await observationStore.countObservationsByEvidence(evidenceId);
+  if (existing > 0) {
+    emitProgressEvent(
+      investigationId,
+      "ANALYZING",
+      `Observations already durable for evidence ${evidenceId}; skipping re-extraction (${existing} present).`,
+      {
+        operationId: payload.operationId,
+        correlationId: payload.correlationId,
+        runId,
+        artifactId,
+      },
+    );
+    return;
+  }
+
+  const extracted = await extractObservations({
+    raw,
+    normalized,
+    evidenceId,
+    sourceId,
+  });
+
+  const nowIso = new Date().toISOString();
+  const entries: { identityKey: string; observation: Observation }[] = [];
+  for (const draft of extracted.observations) {
+    const observation = await finalizeObservation({ draft, nowIso });
+    entries.push({
+      identityKey: buildObservationIdentityKey({
+        evidenceId: observation.evidenceId,
+        sourceId: observation.sourceId,
+        locationKey: draft.locationKey,
+        type: observation.type,
+        canonicalContent: observation.content,
+      }),
+      observation,
+    });
+  }
+
+  const { created } = await observationStore.ensureObservations(entries, {
+    investigationId,
+    caseId,
+  });
+  if (created === 0) return; // a concurrent pass already made this durable
+
+  // 4. Audit exactly once, only after rows are durable.
+  await logAuditEvent({
+    investigationId,
+    action: "OBSERVATION_EXTRACTED",
+    actor: "OBSERVATION_PIPELINE",
+    targetType: "OBSERVATION",
+    targetId: evidenceId,
+    description: `Extracted ${created} observation(s) from evidence ${evidenceId} (source ${sourceId}, catalog ${payload.sourceCatalog}, case ${caseId})`,
+  });
+
+  // 5. Typed frame — metadata only, no observation content (edit #4).
+  emitObservationExtracted({
+    investigationId,
+    caseId,
+    evidenceId,
+    sourceId,
+    observationIds: entries.map((e) => e.observation.id),
+  });
 }
 
 /**
