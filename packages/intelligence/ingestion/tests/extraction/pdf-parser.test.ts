@@ -190,3 +190,25 @@ describe('PDF Parser — Extraction Limits', () => {
     expect((truncated!.details as Record<string, unknown>).maxPages).toBe(2);
   });
 });
+
+describe('PDF Parser — Node Buffer input regression', () => {
+  const parser = createPdfParser();
+
+  it('accepts a Node Buffer (artifact storage returns Buffer) without INVALID_PDF', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([612, 792]);
+    page.drawText('FIR narrative with amount 5000 and date 15/08/2026', {
+      x: 50,
+      y: 700,
+      size: 12,
+    });
+    const pdfBytes = new Uint8Array(await doc.save());
+
+    const result = await parser.parse(Buffer.from(pdfBytes), createParserContext());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.extraction.extractionMethod).toBe('text-layer');
+    const text = result.extraction.pages.flatMap((p) => p.spans).map((s) => s.text).join(' ');
+    expect(text).toContain('5000');
+  });
+});
