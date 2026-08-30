@@ -33,7 +33,24 @@ const h = vi.hoisted(() => {
   const deterministicSourceId = vi.fn();
   const normalize = vi.fn();
   const parseStoredRawExtraction = vi.fn();
-  return { acquire, extract, deterministicSourceId, normalize, parseStoredRawExtraction };
+  // M-A06 observation pipeline stubs (called by completeMA06).
+  const computeContentHash = vi.fn();
+  const bytesToUuid4 = vi.fn();
+  const extractObservations = vi.fn();
+  const finalizeObservation = vi.fn();
+  const buildObservationIdentityKey = vi.fn();
+  return {
+    acquire,
+    extract,
+    deterministicSourceId,
+    normalize,
+    parseStoredRawExtraction,
+    computeContentHash,
+    bytesToUuid4,
+    extractObservations,
+    finalizeObservation,
+    buildObservationIdentityKey,
+  };
 });
 
 /** Loose shape of the mocked Prisma `db` object. */
@@ -81,6 +98,15 @@ vi.mock("../src/db/prisma.js", () => ({
     ingestionAttempt: { upsert: vi.fn(), findUnique: vi.fn() },
     rawExtraction: { create: vi.fn(), findUnique: vi.fn() },
     normalizedExtraction: { findUnique: vi.fn(), create: vi.fn() },
+    // M-A06 stores. Defaults keep MA06 a no-op (0 observations durable): the
+    // existing MA05 completion tests must run through ANALYZING unchanged.
+    source: { upsert: vi.fn().mockResolvedValue({ id: "src-1", catalog: "INTEL" }) },
+    evidence: { upsert: vi.fn().mockResolvedValue({ id: "ev-1" }) },
+    observation: {
+      count: vi.fn().mockResolvedValue(0),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 
@@ -105,6 +131,16 @@ vi.mock("@indago/ingestion", () => ({
   parseStoredRawExtraction: h.parseStoredRawExtraction,
   NORMALIZER_ID: "indago-text-canonicalizer",
   NORMALIZER_VERSION: "1.0.0",
+  // M-A06 pipeline exports (completeMA06 imports all of these). Defaults keep
+  // the extraction a safe no-op so MA05 completion tests are unaffected.
+  computeContentHash: h.computeContentHash.mockResolvedValue("ab".repeat(32)),
+  bytesToUuid4: h.bytesToUuid4.mockReturnValue("550e8400-e29b-41d4-a716-446655440000"),
+  extractObservations: h.extractObservations.mockResolvedValue({
+    observations: [],
+    warnings: [],
+  }),
+  finalizeObservation: h.finalizeObservation.mockResolvedValue({ id: "obs-1" }),
+  buildObservationIdentityKey: h.buildObservationIdentityKey.mockReturnValue("obs-identity-1"),
 }));
 
 vi.mock("../src/security/grounding.js", () => ({
@@ -170,6 +206,7 @@ function makeValidPayload() {
     correlationId: VALID_CORR_ID,
     operationId: VALID_OP_ID,
     sourceName: "Test Source",
+    sourceCatalog: "INTEL",
     evidenceType: "COMMUNICATION",
     evidenceTitle: "Test Evidence",
   };
@@ -209,6 +246,59 @@ const VALID_NORMALIZED = {
   quality: {},
   lexicalStatistics: {},
 };
+
+/**
+ * Schema-valid STORED normalized row (mirrors the full column set that
+ * upsertNormalizedExtractionByAttempt persists) used when a re-entry must
+ * REHYDRATE an already-durable NormalizedExtraction. Every field must satisfy
+ * NormalizedExtractionSchema — the worker rehydrates via schema.parse.
+ */
+function makeStoredNormalizedRow() {
+  return {
+    id: "ne-1",
+    attemptId: "attempt-1",
+    artifactId: VALID_ARTIFACT_ID,
+    investigationId: VALID_INV_ID,
+    caseId: VALID_CASE_ID,
+    normalizerId: "indago-text-canonicalizer",
+    normalizerVersion: "1.0.0",
+    config: {
+      policyVersion: "indago-normalization-policy@1",
+      datePolicyVersion: "date-policy@1",
+      numberPolicyVersion: "number-policy@1",
+      unicodePolicyVersion: "unicode-policy@1",
+      tokenHints: {
+        maxTokens: 100000,
+        maxUniqueTokens: 50000,
+        maxTopTokens: 20,
+        maxTopBigrams: 20,
+        maxTokenLength: 128,
+      },
+      bounds: { maxFields: 5000, maxFieldLength: 100000 },
+    },
+    canonicalFields: [],
+    quality: {
+      completeness: 1,
+      statusCounts: {
+        normalized: 0,
+        unchanged: 0,
+        ambiguous: 0,
+        unparsed: 0,
+        invalid: 0,
+      },
+      perFieldConfidence: [],
+      cleanliness: {},
+      warnings: { totalCount: 0, byCode: {} },
+    },
+    lexicalStatistics: {
+      tokenCount: 0,
+      uniqueTokenCount: 0,
+      averageTokenLength: 0,
+      topTokens: [],
+      topBigrams: [],
+    },
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -632,7 +722,7 @@ describe("Re-entrant completion (M-A05): RawExtraction persisted + retry", () =>
     runState.state = "NORMALIZING";
     runState.status = "RUNNING";
     db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
-    db.normalizedExtraction.findUnique.mockResolvedValue({ id: "ne-1", attemptId: "attempt-1" });
+    db.normalizedExtraction.findUnique.mockResolvedValue(makeStoredNormalizedRow());
 
     await capturedHandler!(makeFakeJob());
 
@@ -668,7 +758,7 @@ describe("Re-entrant completion (M-A05): RawExtraction persisted + retry", () =>
     db.normalizedExtraction.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
-      .mockResolvedValue({ id: "ne-1", attemptId: "attempt-1" }); // second pass → no-op
+      .mockResolvedValue(makeStoredNormalizedRow()); // second pass → no-op
 
     await capturedHandler!(makeFakeJob());
     await capturedHandler!(makeFakeJob());
@@ -689,7 +779,7 @@ describe("Re-entrant completion (M-A05): RawExtraction persisted + retry", () =>
     runState.state = "ANALYZING";
     runState.status = "RUNNING";
     db.rawExtraction.findUnique.mockResolvedValue({ id: "rx-1", attemptId: "attempt-1" });
-    db.normalizedExtraction.findUnique.mockResolvedValue({ id: "ne-1", attemptId: "attempt-1" });
+    db.normalizedExtraction.findUnique.mockResolvedValue(makeStoredNormalizedRow());
 
     await capturedHandler!(makeFakeJob());
 
@@ -731,6 +821,36 @@ describe("Re-entrant completion (M-A05): RawExtraction persisted + retry", () =>
     expect(runState.state).toBe("FAILED");
     // The SUCCEEDED extraction attempt is never touched — no re-Upsert beyond RUNNING.
     expect(h.acquire).not.toHaveBeenCalled();
+  });
+
+  it("corrupt stored NORMALIZED row (rehydration throws) → NORMALIZATION_FAILED, run FAILED, UnrecoverableError", async () => {
+    runState.state = "NORMALIZING";
+    runState.status = "RUNNING";
+    db.rawExtraction.findUnique.mockResolvedValue({
+      id: "rx-1",
+      attemptId: "attempt-1",
+      artifactId: VALID_ARTIFACT_ID,
+    });
+    db.normalizedExtraction.findUnique.mockResolvedValue({
+      ...makeStoredNormalizedRow(),
+      canonicalFields: "garbage", // breaks the content-column schema
+    });
+
+    await expect(capturedHandler!(makeFakeJob())).rejects.toThrow("NORMALIZATION_FAILED");
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "NORMALIZATION_FAILED",
+        targetId: VALID_ARTIFACT_ID,
+      }),
+    );
+    const failed = db.investigationRun.update.mock.calls.find(
+      (c) => c[0]?.data?.state === "FAILED",
+    );
+    expect(failed).toBeDefined();
+    expect(runState.state).toBe("FAILED");
+    // The normalizer is NEVER re-run on a re-entry — even to learn the row is bad.
+    expect(h.normalize).not.toHaveBeenCalled();
   });
 
   it("normalize pure-step throws (contract violation) → permanent NORMALIZATION_FAILED, run FAILED, no ANALYZING", async () => {

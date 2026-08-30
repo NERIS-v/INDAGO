@@ -60,6 +60,7 @@ describeOrSkip("E2E: POST → ingest-evidence → durable persistence", () => {
       correlationId: randomUUID(),
       operationId: randomUUID(),
       sourceName: "E2E Integration Test",
+      sourceCatalog: "INTEL",
       evidenceType: "COMMUNICATION",
       evidenceTitle: "Monthly Ledger",
       ...overrides,
