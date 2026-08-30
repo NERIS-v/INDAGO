@@ -54,6 +54,7 @@ export {
   deterministicArtifactId,
   deterministicSourceId,
   detectMimeType,
+  bytesToUuid4,
 } from './acquisition/index.js';
 export type {
   ArtifactFetcher,
@@ -162,4 +163,33 @@ export {
   RawExtractionBodySchema,
   PersistedRawExtractionRowSchema,
 } from './normalization/index.js';
+
+// M-A06 Observation Extraction
+export {
+  extractObservations,
+  finalizeObservation,
+  OBSERVATION_IDENTITY_DERIVATION,
+  OBSERVATION_EXTRACTOR_ID,
+  OBSERVATION_EXTRACTOR_VERSION,
+  OBSERVATION_EXTRACTOR_REF,
+  STRUCTURED_STRENGTH_BASELINE,
+  NARRATIVE_STRENGTH_BASELINE,
+  RECONSTRUCTED_STRENGTH_BASELINE,
+  OBSERVATION_BOUNDS,
+  OBSERVATION_IDENTITY_NAMESPACE,
+  OBSERVATION_IDENTITY_VERSION,
+  buildObservationIdentityKey,
+  deterministicObservationId,
+  serializeSourceLocation,
+} from './observation/index.js';
+export type {
+  ObservationDraft,
+  ObservationExtractionResult,
+  ObservationExtractionWarning,
+  ObservationExtractorWarningCode,
+  ObservationExtractorInput,
+  ObservationFinalizeInput,
+  ObservationIdentityInput,
+  LocationStructureKind,
+} from './observation/index.js';
 
