@@ -166,6 +166,10 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     // public-hosts-only.
     process.env.ARTIFACT_ALLOW_HTTP = "true";
     process.env.ARTIFACT_ALLOW_PRIVATE_HOSTS = "true";
+    // Isolate this suite from any concurrently-running dev worker: a dedicated
+    // queue name keeps the REAL Redis/BullMQ worker honest while guaranteeing
+    // a dev worker on the default queue can never claim these test jobs.
+    process.env.INVESTIGATION_QUEUE_NAME = "investigation-pipeline-e2e";
 
     prisma = new PrismaClient();
     await prisma.rawExtraction.deleteMany({});
