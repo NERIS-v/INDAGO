@@ -38,7 +38,6 @@ export function GraphCanvas({
   const panOrigin = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const [reducedMotion, setReducedMotion] = useState(false);
 
-  // Two-phase entrance state to orchestrate layout calculation before paint
   const [bloom, setBloom] = useState(false);
 
   useEffect(() => {
@@ -92,7 +91,6 @@ export function GraphCanvas({
   const computeFit = useCallback((): { zoom: number; pan: { x: number; y: number } } | null => {
     if (!layoutNodes.length || !dimensions.width || !dimensions.height) return null;
 
-    // Pad to accommodate extended radial text bounds
     const LABEL_PAD_X = 150;
     const LABEL_PAD_Y = 90;
 
@@ -149,7 +147,6 @@ export function GraphCanvas({
     if (controlsRef) controlsRef.current = { zoomIn, zoomOut, fit };
   }, [controlsRef, zoomIn, zoomOut, fit]);
 
-  // Non-passive wheel listener required to safely intercept browser scrolling
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -191,6 +188,9 @@ export function GraphCanvas({
   const DUR_NORMAL = "var(--transition-duration-normal, 400ms)";
   const DUR_FAST = "var(--transition-duration-fast, 200ms)";
   const EASE = "var(--ease-restrained, cubic-bezier(0.22, 1, 0.36, 1))";
+  
+  // Custom spring bezier for the organic "pop" scaling effect
+  const SPRING_EASE = "cubic-bezier(0.175, 0.885, 0.32, 1.15)";
 
   const cx = dimensions.width / 2;
   const cy = dimensions.height / 2;
@@ -242,24 +242,30 @@ export function GraphCanvas({
           style={{ transition: isPanning ? "none" : `transform ${DUR_NORMAL} ${EASE}` }}
         >
           <g id="community-layer">
-            {communities.map((c, i) => (
-              <circle
-                key={`fog-${c.id}`}
-                cx={c.cx}
-                cy={c.cy}
-                r={c.r}
-                fill="url(#fog-gradient)"
-                style={{
-                  opacity: bloom ? 1 : 0,
-                  transition: reducedMotion ? "none" : `opacity ${DUR_SLOW} ${EASE} ${i * 60}ms`,
-                }}
-              />
-            ))}
+            {communities.map((c) => {
+              // Calculate spatial ripple delay from center
+              const distFromCenter = Math.hypot(c.cx - cx, c.cy - cy);
+              const rippleDelay = Math.max(0, distFromCenter * 1.5);
+
+              return (
+                <circle
+                  key={`fog-${c.id}`}
+                  cx={c.cx}
+                  cy={c.cy}
+                  r={c.r}
+                  fill="url(#fog-gradient)"
+                  style={{
+                    opacity: bloom ? 1 : 0,
+                    transition: reducedMotion ? "none" : `opacity ${DUR_SLOW} ${EASE} ${rippleDelay + 200}ms`,
+                  }}
+                />
+              );
+            })}
           </g>
 
           <g id="edge-layer">
             {layoutNodes.length > 0 &&
-              layoutEdges.map((edge, i) => {
+              layoutEdges.map((edge) => {
                 const source = layoutNodes.find((n) => n.id === edge.sourceNodeId);
                 const target = layoutNodes.find((n) => n.id === edge.targetNodeId);
                 if (!source || !target) return null;
@@ -286,13 +292,29 @@ export function GraphCanvas({
                   y2 = target.y - (dy / dist) * (targetRadius + 4);
                 }
 
+                // Calculate edge ripple delay based on its midpoint distance from center
+                const midX = (source.x + target.x) / 2;
+                const midY = (source.y + target.y) / 2;
+                const distFromCenter = Math.hypot(midX - cx, midY - cy);
+                const edgeDelay = Math.max(0, distFromCenter * 1.5) + 100;
+
+                // SVG Direction Trick: Calculate which node is closer to the center.
+                // By applying a negative offset to backward lines, we force all lines
+                // to visually draw "outwards" from the core of the graph, mimicking a blast.
+                const sourceDist = Math.hypot(source.x - cx, source.y - cy);
+                const targetDist = Math.hypot(target.x - cx, target.y - cy);
+                const drawsBackward = sourceDist > targetDist;
+                const initialOffset = drawsBackward ? -length : length;
+
                 const colorClass = isContradicted
                   ? "stroke-danger"
                   : isConnected && !isOutOfBounds
                   ? "stroke-accent-rose"
                   : "stroke-surface-600";
 
-                const dashArray = isContradicted ? "4 4" : isLowConfidence ? "6 6" : reducedMotion ? undefined : length;
+                const dashArray = isContradicted ? "4 4" : isLowConfidence ? "6 6" : reducedMotion ? undefined : `${length} ${length}`;
+                const dashOffset = isLowConfidence || isContradicted || reducedMotion ? 0 : bloom ? 0 : initialOffset;
+                
                 const baseOpacity = isOutOfBounds
                   ? 0.03
                   : isContradicted
@@ -314,7 +336,7 @@ export function GraphCanvas({
                     y2={y2}
                     strokeLinecap="round"
                     strokeDasharray={showTrace ? "6 4" : dashArray}
-                    strokeDashoffset={isLowConfidence || isContradicted || reducedMotion ? 0 : bloom ? 0 : length}
+                    strokeDashoffset={dashOffset}
                     markerEnd={edge.directed && !isOutOfBounds ? "url(#edge-arrow)" : undefined}
                     className={colorClass}
                     strokeWidth={isConnected ? 2.25 : Math.max(1, (edge.structuralImportance ?? support ?? 0.5) * 2)}
@@ -322,7 +344,7 @@ export function GraphCanvas({
                     style={{
                       transition: reducedMotion
                         ? "none"
-                        : `stroke-dashoffset ${DUR_SLOW} ${EASE} ${120 + i * 18}ms, stroke-opacity ${DUR_NORMAL} ${EASE}, stroke ${DUR_FAST} ${EASE}`,
+                        : `stroke-dashoffset 800ms ${EASE} ${edgeDelay}ms, stroke-opacity ${DUR_NORMAL} ${EASE} ${edgeDelay}ms, stroke ${DUR_FAST} ${EASE}`,
                     }}
                   >
                     {showTrace && (
@@ -336,24 +358,31 @@ export function GraphCanvas({
           <g id="bridge-layer">
             {layoutNodes
               .filter((n) => n.isBridge)
-              .map((node, i) => (
-                <circle
-                  key={`bridge-${node.id}`}
-                  cx={node.x}
-                  cy={node.y}
-                  r={nodeVisualRadius(node.structuralImportance) + 14}
-                  fill="url(#bridge-halo-gradient)"
-                  className={reducedMotion ? "" : "animate-slow-pulse"}
-                  style={{
-                    opacity: bloom ? 1 : 0,
-                    transition: reducedMotion ? "none" : `opacity ${DUR_SLOW} ${EASE} ${600 + i * 80}ms`,
-                  }}
-                />
-              ))}
+              .map((node) => {
+                const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
+                const nodeDelay = Math.max(0, distFromCenter * 1.5);
+
+                return (
+                  <circle
+                    key={`bridge-${node.id}`}
+                    cx={node.x}
+                    cy={node.y}
+                    r={nodeVisualRadius(node.structuralImportance) + 14}
+                    fill="url(#bridge-halo-gradient)"
+                    className={reducedMotion ? "" : "animate-slow-pulse"}
+                    style={{
+                      opacity: bloom ? 1 : 0,
+                      transform: bloom ? "scale(1)" : "scale(0.01)",
+                      transformOrigin: `${node.x}px ${node.y}px`,
+                      transition: reducedMotion ? "none" : `opacity ${DUR_SLOW} ${EASE} ${nodeDelay + 200}ms, transform 500ms ${SPRING_EASE} ${nodeDelay + 200}ms`,
+                    }}
+                  />
+                );
+              })}
           </g>
 
           <g id="node-layer">
-            {layoutNodes.map((node, i) => {
+            {layoutNodes.map((node) => {
               const inTimeRange = isNodeInTimeRange(node.id);
               const isActive = hoveredNode === node.id || focusedNode === node.id;
               const isDimmed =
@@ -368,6 +397,9 @@ export function GraphCanvas({
 
               const radius = nodeVisualRadius(node.structuralImportance);
               const isEntity = node.type === "ENTITY";
+              
+              const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
+              const nodeDelay = Math.max(0, distFromCenter * 1.5);
 
               return (
                 <circle
@@ -388,13 +420,11 @@ export function GraphCanvas({
                   strokeWidth={isActive && inTimeRange ? 2 : 1.5}
                   style={{
                     opacity: isDimmed ? 0.1 : bloom ? 1 : 0,
-                    transform: bloom ? "scale(1)" : "scale(0.8)",
+                    transform: bloom ? "scale(1)" : "scale(0.01)",
                     transformOrigin: `${node.x}px ${node.y}px`,
                     transition: reducedMotion
                       ? "none"
-                      : `opacity ${DUR_NORMAL} ${EASE} ${260 + i * 20}ms, transform ${DUR_NORMAL} ${EASE} ${
-                          260 + i * 20
-                        }ms, fill ${DUR_FAST} ${EASE}, stroke ${DUR_FAST} ${EASE}`,
+                      : `opacity ${DUR_NORMAL} ${EASE} ${nodeDelay}ms, transform 500ms ${SPRING_EASE} ${nodeDelay}ms, fill ${DUR_FAST} ${EASE}, stroke ${DUR_FAST} ${EASE}`,
                   }}
                 >
                   <title>
@@ -439,6 +469,10 @@ export function GraphCanvas({
               const isDimmed = !inTimeRange || (hoveredNode !== null && !isActive);
               const radius = nodeVisualRadius(node.structuralImportance);
 
+              const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
+              // Delay the text slightly after the node pop completes
+              const labelDelay = Math.max(0, distFromCenter * 1.5) + 150;
+
               const dx = node.x - cx;
               const dy = node.y - cy;
               const angle = Math.atan2(dy, dx);
@@ -462,7 +496,12 @@ export function GraphCanvas({
                     className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${
                       isActive && inTimeRange ? "fill-surface-900 font-bold" : "fill-surface-600 font-medium"
                     }`}
-                    style={{ opacity: isDimmed ? 0.05 : isActive ? 1 : 0.9, stroke: "var(--color-surface-0)", strokeWidth: 2 }}
+                    style={{ 
+                      opacity: isDimmed ? 0.05 : bloom ? (isActive ? 1 : 0.9) : 0, 
+                      stroke: "var(--color-surface-0)", 
+                      strokeWidth: 2,
+                      transition: reducedMotion ? "none" : `opacity ${DUR_NORMAL} ${EASE} ${labelDelay}ms`,
+                    }}
                   >
                     {node.label}
                   </text>
