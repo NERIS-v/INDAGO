@@ -73,12 +73,18 @@ async function addFile() {
   await screen.findByText("Uploaded");
 }
 
+async function clickReview() {
+  const nextBtn = screen.getByRole("button", { name: /Next: Review/ });
+  await waitFor(() => expect(nextBtn).not.toBeDisabled());
+  fireEvent.click(nextBtn);
+}
+
 describe("EvidenceIntake", () => {
   it("progresses through context → files → review steps", async () => {
     renderIntake();
     await fillContext();
     await addFile();
-    fireEvent.click(screen.getByRole("button", { name: /Next: Review/ }));
+    await clickReview();
     expect(screen.getByText("Review Submission")).toBeInTheDocument();
     expect(screen.getByText("Suspect call records")).toBeInTheDocument();
     expect(screen.getByText("financial-report.pdf")).toBeInTheDocument();
@@ -103,7 +109,7 @@ describe("EvidenceIntake", () => {
     const { onSubmitEvidence, onComplete } = renderIntake();
     await fillContext();
     await addFile();
-    fireEvent.click(screen.getByRole("button", { name: /Next: Review/ }));
+    await clickReview();
     fireEvent.click(screen.getByRole("button", { name: /Submit Evidence/ }));
 
     await waitFor(() =>
@@ -128,7 +134,7 @@ describe("EvidenceIntake", () => {
     const { onComplete } = renderIntake({ onSubmitEvidence });
     await fillContext();
     await addFile();
-    fireEvent.click(screen.getByRole("button", { name: /Next: Review/ }));
+    await clickReview();
 
     fireEvent.click(screen.getByRole("button", { name: /Submit Evidence/ }));
     expect(await screen.findByText(/Backend rejected/)).toBeInTheDocument();

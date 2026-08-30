@@ -212,7 +212,9 @@ export function createPdfParser(): ArtifactParser {
       let pdf: pdfjsLib.PDFDocumentProxy;
 
       try {
-        pdf = await loadPdfDocument(input);
+        pdf = await loadPdfDocument(
+          Buffer.isBuffer(input) ? new Uint8Array(input) : input,
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Invalid PDF';
         return {

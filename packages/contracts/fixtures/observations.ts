@@ -12,6 +12,7 @@ export const FIXTURE_OBSERVATION_1: Observation = {
   type: 'FINANCIAL',
   content: 'Entity A transferred $50,000 to Entity B on 2024-12-01',
   entityIds: [FIXTURE_IDS.entity1, FIXTURE_IDS.entity2],
+  candidateMentions: ['Entity A', 'Entity B', '$50,000', '2024-12-01'],
   strength: 0.85,
   provenance: {
     sourceId: FIXTURE_IDS.source1,
@@ -30,6 +31,7 @@ export const FIXTURE_OBSERVATION_2: Observation = {
   type: 'COMMUNICATION',
   content: 'Email from alice@corp.com to bob@corp.com dated 2024-11-28',
   entityIds: [FIXTURE_IDS.entity1],
+  candidateMentions: ['alice@corp.com', 'bob@corp.com', '2024-11-28'],
   candidateEntityHypothesisIds: [FIXTURE_IDS.entityHypothesis1],
   strength: 0.72,
   provenance: {
@@ -49,6 +51,7 @@ export const FIXTURE_OBSERVATION_3: Observation = {
   type: 'TEMPORAL',
   content: 'Entity B was at location X on 2024-12-01 between 14:00-16:00',
   entityIds: [FIXTURE_IDS.entity2],
+  candidateMentions: ['Entity B', 'location X', '2024-12-01'],
   strength: 0.90,
   provenance: {
     sourceId: FIXTURE_IDS.source1,

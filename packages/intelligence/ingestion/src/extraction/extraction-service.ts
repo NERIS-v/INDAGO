@@ -91,6 +91,12 @@ export class ExtractionService {
       };
     }
 
+    // Storage.read returns a Node Buffer for binary artifacts; strict parsers
+    // (pdf.js, etc.) reject Buffer. Normalize to a plain Uint8Array copy.
+    if (Buffer.isBuffer(bytes)) {
+      bytes = new Uint8Array(bytes);
+    }
+
     // Step 2: Classify (or use provided classification)
     const classification = options?.classification ?? classifyArtifact(artifact, bytes);
 

@@ -12,6 +12,9 @@ import type {
   StartInvestigationResponse,
   EvidenceSubmissionRequest,
   EvidenceSubmissionResponse,
+  ObservationsResponse,
+  EvidenceListResponse,
+  CasesResponse,
   HealthResponse,
   ApiError,
 } from "./types.js";
@@ -124,6 +127,38 @@ export async function submitEvidence(
       body: JSON.stringify(parsed.data),
     },
   );
+}
+
+// ============================================================================
+// Observations (M-A06)
+// ============================================================================
+
+export async function listObservations(
+  investigationId: string,
+): Promise<ObservationsResponse> {
+  return platformFetch<ObservationsResponse>(
+    `/api/v1/investigations/${investigationId}/observations`,
+  );
+}
+
+// ============================================================================
+// Evidence List (M-A06)
+// ============================================================================
+
+export async function listEvidence(
+  investigationId: string,
+): Promise<EvidenceListResponse> {
+  return platformFetch<EvidenceListResponse>(
+    `/api/v1/investigations/${investigationId}/evidence`,
+  );
+}
+
+// ============================================================================
+// Case Catalogue (dashboard)
+// ============================================================================
+
+export async function listCases(): Promise<CasesResponse> {
+  return platformFetch<CasesResponse>("/api/v1/cases");
 }
 
 // ============================================================================

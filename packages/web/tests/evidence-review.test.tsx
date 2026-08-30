@@ -8,6 +8,7 @@ const META: EvidenceMetadata = {
   sourceName: "CDR Export",
   sourceDescription: "From telecom",
   evidenceType: "COMMUNICATION",
+  sourceCatalog: "CDR",
   evidenceTitle: "Call records for suspect",
   evidenceDescription: "CDR details",
   observedAt: "2024-01-15",
@@ -43,6 +44,7 @@ describe("EvidenceReview", () => {
     );
     expect(screen.getByText("CDR Export")).toBeInTheDocument();
     expect(screen.getByText("Communication")).toBeInTheDocument();
+    expect(screen.getByText("CDR (Call Detail Record)")).toBeInTheDocument();
     expect(screen.getByText("Call records for suspect")).toBeInTheDocument();
     expect(screen.getByText("Court order")).toBeInTheDocument();
   });

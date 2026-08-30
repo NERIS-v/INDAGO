@@ -310,6 +310,7 @@ describe("Queue Payload", () => {
     correlationId: randomUUID(),
     operationId: randomUUID(),
     sourceName: "Test Source",
+    sourceCatalog: "INTEL",
     evidenceType: "COMMUNICATION",
     evidenceTitle: "Test Evidence",
   };
@@ -365,6 +366,7 @@ describe("Queue Payload", () => {
       "idempotencyKey",
       "investigationId",
       "operationId",
+      "sourceCatalog",
       "sourceName",
     ]);
   });

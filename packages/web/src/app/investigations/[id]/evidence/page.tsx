@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { toProviderError } from "@/lib/providers";
-import type { Evidence } from "@indago/contracts";
+import type { EvidenceListItem } from "@/lib/api/types";
 import { EvidenceList } from "@/components/evidence/evidence-list";
 import {
   EvidenceIntake,
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function EvidencePage() {
   const workspace = useWorkspace();
-  const [items, setItems] = useState<Evidence[] | null>(null);
+  const [items, setItems] = useState<EvidenceListItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);

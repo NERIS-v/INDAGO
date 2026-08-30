@@ -4,12 +4,18 @@ import {
   startInvestigation as apiStart,
   getInvestigationStatus as apiGetStatus,
   submitEvidence as apiSubmitEvidence,
+  listObservations as apiListObservations,
+  listEvidence as apiListEvidence,
+  listCases as apiListCases,
 } from "@/lib/api/server";
 import type {
   StartInvestigationResponse,
   InvestigationStatusResponse,
   EvidenceSubmissionRequest,
   EvidenceSubmissionResponse,
+  ObservationsResponse,
+  EvidenceListResponse,
+  CasesResponse,
 } from "@/lib/api/types";
 
 export async function startInvestigation(params: {
@@ -31,4 +37,20 @@ export async function submitEvidence(
   request: Omit<EvidenceSubmissionRequest, "investigationId">,
 ): Promise<EvidenceSubmissionResponse> {
   return apiSubmitEvidence(investigationId, request);
+}
+
+export async function listObservations(
+  investigationId: string,
+): Promise<ObservationsResponse> {
+  return apiListObservations(investigationId);
+}
+
+export async function listEvidence(
+  investigationId: string,
+): Promise<EvidenceListResponse> {
+  return apiListEvidence(investigationId);
+}
+
+export async function listCases(): Promise<CasesResponse> {
+  return apiListCases();
 }

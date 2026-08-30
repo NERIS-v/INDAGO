@@ -69,6 +69,13 @@ export const EvidenceSubmissionRequestSchema = z.object({
   sourceName: z.string().min(1).max(200).describe('Human-readable source name'),
   sourceDescription: z.string().max(5000).optional().describe('Optional source description'),
 
+  // Source catalog (M-A06)
+  // Untrusted client-supplied dropdown value. The platform validates it
+  // strictly against SourceCatalogSchema; an exact match is used, anything
+  // else (wrong casing, stale frontend build, unknown value) falls back to
+  // MANUAL and is logged — never a silently created catalog row.
+  sourceCatalog: z.string().max(50).optional().describe('Source material catalog category (untrusted, validated server-side)'),
+
   // Evidence context (maps to EvidenceSchema fields)
   evidenceType: EvidenceTypeSchema.describe('Evidence classification'),
   evidenceTitle: z.string().min(1).max(500).describe('Title for this evidence package'),

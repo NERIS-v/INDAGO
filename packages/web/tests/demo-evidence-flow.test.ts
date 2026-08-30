@@ -10,7 +10,8 @@ import {
 import { CASE_ID, INVESTIGATION_ID } from "@/lib/providers/demo/demo-fixtures/lookup";
 import { demoFixtures } from "@/lib/providers/demo/demo-fixtures";
 import type { DataModeConfig } from "@/lib/providers/types";
-import type { Evidence, UploadedFileReference } from "@indago/contracts";
+import type { UploadedFileReference } from "@indago/contracts";
+import type { EvidenceListItem } from "@/lib/api/types";
 
 // Near-instant simulated latency so the flow runs fast but stays deterministic.
 const fastEnv: NodeJS.ProcessEnv = {

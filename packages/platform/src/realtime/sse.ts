@@ -59,3 +59,43 @@ export function emitProgressEvent(
     buildProgressPayload(investigationId, state, message, detail),
   );
 }
+
+// ============================================================================
+// M-A06 typed OBSERVATION_EXTRACTED frame
+//
+// Metadata-ONLY (edit #4): never broadcasts observation content. The payload
+// carries identity + count so the UI can refresh its observation list from the
+// authoritative GET endpoint. observationIds is bounded by the extractor cap
+// (maxObservations). Rides the existing per-investigation 'progress' channel
+// so streamEventsHandler forwards it unchanged to the right SSE subscriber.
+// ============================================================================
+export interface ObservationExtractedFrame {
+  readonly investigationId: string;
+  readonly type: "OBSERVATION_EXTRACTED";
+  readonly caseId: string;
+  readonly evidenceId: string;
+  readonly sourceId: string;
+  readonly observationCount: number;
+  readonly observationIds: readonly string[];
+  readonly timestamp: string;
+}
+
+export function emitObservationExtracted(params: {
+  investigationId: string;
+  caseId: string;
+  evidenceId: string;
+  sourceId: string;
+  observationIds: readonly string[];
+}): void {
+  const frame: ObservationExtractedFrame = {
+    investigationId: params.investigationId,
+    type: "OBSERVATION_EXTRACTED",
+    caseId: params.caseId,
+    evidenceId: params.evidenceId,
+    sourceId: params.sourceId,
+    observationCount: params.observationIds.length,
+    observationIds: params.observationIds,
+    timestamp: new Date().toISOString(),
+  };
+  realtimeEvents.emit("progress", frame);
+}

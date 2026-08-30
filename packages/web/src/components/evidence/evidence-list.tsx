@@ -1,6 +1,6 @@
 "use client";
 
-import type { Evidence } from "@indago/contracts";
+import type { EvidenceListItem } from "@/lib/api/types";
 import { EvidenceItem } from "./evidence-item";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 
 interface EvidenceListProps {
-  readonly items: Evidence[] | null;
+  readonly items: EvidenceListItem[] | null;
   readonly loading: boolean;
   readonly error: string | null;
   readonly onRetry?: () => void;
@@ -31,7 +31,7 @@ export function EvidenceList({
     return (
       <EmptyState
         title="Evidence listing not available in this mode"
-        description="Submit evidence through the intake flow. The catalog endpoint is not exposed by the connected platform yet."
+        description="Submit evidence through the intake flow. The evidence catalog could not be loaded for this investigation."
         action={onRetry ? <Button variant="ghost" size="sm" onClick={onRetry}>Retry</Button> : undefined}
       />
     );

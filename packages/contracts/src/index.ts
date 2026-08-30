@@ -80,6 +80,7 @@ export * from './events/investigation-events.js';
 export * from './events/evidence-events.js';
 export * from './events/graph-events.js';
 export * from './events/analysis-events.js';
+export * from './events/observation-events.js';
 export * from './events/execution-events.js';
 
 // Security contracts

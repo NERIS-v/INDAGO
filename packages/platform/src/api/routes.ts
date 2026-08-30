@@ -6,8 +6,14 @@ import { investigationQueue } from "../queue/orchestrator.js";
 import { logAuditEvent } from "../audit/logger.js";
 import { streamEventsHandler } from "../realtime/sse.js";
 import { realtimeEvents } from "../realtime/sse.js";
+import { observationStore } from "../persistence/observation-store.js";
+import { caseStore } from "../persistence/case-store.js";
 import { requireAuth, requireRole, requireCaseAccess, verifyCaseAccess } from "./auth.js";
-import { EvidenceSubmissionRequestSchema, CaseIdSchema } from "@indago/contracts";
+import {
+  EvidenceSubmissionRequestSchema,
+  SourceCatalogSchema,
+  CaseIdSchema,
+} from "@indago/contracts";
 
 export const apiRouter: Router = Router();
 
@@ -69,6 +75,31 @@ apiRouter.get(
   streamEventsHandler
 );
 
+// 1a. List Cases (case catalogue / dashboard)
+apiRouter.get(
+  "/cases",
+  requireAuth,
+  async (req, res) => {
+    try {
+      let cases = await caseStore.listCases();
+      // Production scope: the authenticated principal's allowedCases drive the
+      // catalogue. (verifyCaseAccess short-circuits to true in development, so
+      // the dev catalogue is intentionally un-scoped.)
+      if (process.env.NODE_ENV === "production") {
+        const allowed = new Set(req.user?.allowedCases ?? []);
+        cases = cases.filter((c) => allowed.has(c.id));
+      }
+      return res.status(200).json({
+        count: cases.length,
+        cases,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list cases:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
 // 1b. Get Investigation Status
 apiRouter.get(
   "/investigations/:investigationId",
@@ -123,6 +154,105 @@ apiRouter.get(
   }
 );
 
+// 1c. List Observations (M-A06)
+//
+// Server-side caseId derivation (edit #5): the client NEVER supplies the case
+// boundary. Auth → latest run → authoritative run.caseId → case-access check →
+// scoped read. Returns full ObservationSchema records for the investigation.
+apiRouter.get(
+  "/investigations/:investigationId/observations",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      // The persisted run is the ONLY source of truth for the case boundary —
+      // never trust a client-supplied caseId here.
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const observations = await observationStore.listObservations({
+        investigationId,
+        caseId,
+      });
+
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        count: observations.length,
+        observations,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list observations:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1d. List Evidence (M-A06)
+//
+// Mirrors the observations seam: auth → latest run → authoritative run.caseId →
+// case-access check → scoped read. Returns the documented EvidenceProjection
+// shape — the platform persists a narrower Evidence row than the canonical
+// EvidenceSchema and refuses to fabricate the missing fields.
+apiRouter.get(
+  "/investigations/:investigationId/evidence",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const evidence = await observationStore.listEvidenceByInvestigation({
+        investigationId,
+        caseId,
+      });
+
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        count: evidence.length,
+        evidence,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list evidence:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
 // 2. Lock down the Start Investigation Endpoint
 apiRouter.post(
   "/investigations/start",
@@ -147,6 +277,11 @@ apiRouter.post(
           contextData: { caseId },
         }
       });
+
+      // Case catalogue (P-09): the case boundary is provisioned the moment a
+      // run is created (idempotent), so the dashboard never lags a newly seen
+      // case. The authorized principal is persisted as the assignee.
+      await caseStore.ensureCase(caseId, req.user!.id);
 
       await logAuditEvent({
         investigationId,
@@ -222,6 +357,12 @@ apiRouter.post(
       const operationId = randomUUID();
       const correlationId = randomUUID();
 
+      // 5b. M-A06: resolve the untrusted client catalog string against the
+      // canonical SourceCatalog set (exact match wins, everything else falls
+      // back to MANUAL — matching the evidence-submission contract doctrine).
+      const parsedCatalog = SourceCatalogSchema.safeParse(submission.sourceCatalog);
+      const resolvedSourceCatalog = parsedCatalog.success ? parsedCatalog.data : "MANUAL";
+
       // 6. Construct ArtifactReference + enqueue one job per file
       const jobIds: string[] = [];
       for (const file of submission.files) {
@@ -248,6 +389,12 @@ apiRouter.post(
             artifactReference,
             sourceName: submission.sourceName,
             sourceDescription: submission.sourceDescription,
+            // Source catalog (M-A06): the client string is untrusted. A strict
+            // SourceCatalogSchema match is used; anything else (or absent)
+            // falls back to MANUAL. The verbatim declaration is preserved so
+            // any fallback is auditable on the persisted Source row.
+            sourceCatalog: resolvedSourceCatalog,
+            declaredSourceCatalog: submission.sourceCatalog,
             evidenceType: submission.evidenceType,
             evidenceTitle: submission.evidenceTitle,
             evidenceDescription: submission.evidenceDescription,

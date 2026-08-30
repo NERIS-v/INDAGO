@@ -19,7 +19,6 @@
 import type {
   Case,
   Investigation,
-  Evidence,
   Observation,
   Entity,
   Lead,
@@ -35,7 +34,7 @@ import type {
   EvidenceSubmissionRequest,
   UploadedFileReference,
 } from "@indago/contracts";
-import type { EvidenceSubmissionResponse } from "@/lib/api/types";
+import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
 
 // ============================================================================
@@ -239,8 +238,12 @@ export interface InvestigationProvider {
 }
 
 export interface EvidenceProvider {
-  listByInvestigation(investigationId: string, query?: ProviderQuery): Promise<Paginated<Evidence>>;
-  get(id: string): Promise<Evidence>;
+  /** List evidence for an investigation. Returns the documented local
+   *  EvidenceListItem projection — the platform persists a narrower Evidence
+   *  row than the canonical EvidenceSchema (no strength / posture / extractor)
+   *  and refuses to fabricate those fields. */
+  listByInvestigation(investigationId: string, query?: ProviderQuery): Promise<Paginated<EvidenceListItem>>;
+  get(id: string): Promise<EvidenceListItem>;
   /** Upload raw File objects into a transport, returning provider-supplied
    *  file references. Keeps UploadThing out of UI components. In demo this is
    *  deterministic and synthesizes references without a network upload. */

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { EVIDENCE_TYPE_LABELS } from "@/lib/contracts/types";
+import {
+  EVIDENCE_TYPE_LABELS,
+  SOURCE_CATALOG_LABELS,
+  DEFAULT_SOURCE_CATALOG,
+} from "@/lib/contracts/types";
+import type { SourceCatalog } from "@/lib/contracts/types";
 import { Input, Textarea, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +24,7 @@ export interface EvidenceMetadata {
   sourceName: string;
   sourceDescription: string;
   evidenceType: EvidenceTypeValue;
+  sourceCatalog: SourceCatalog;
   evidenceTitle: string;
   evidenceDescription: string;
   observedAt: string;
@@ -35,6 +41,7 @@ const INITIAL: EvidenceMetadata = {
   sourceName: "",
   sourceDescription: "",
   evidenceType: "DOCUMENT",
+  sourceCatalog: DEFAULT_SOURCE_CATALOG,
   evidenceTitle: "",
   evidenceDescription: "",
   observedAt: "",
@@ -42,6 +49,10 @@ const INITIAL: EvidenceMetadata = {
 };
 
 const EVIDENCE_TYPE_OPTIONS = Object.entries(EVIDENCE_TYPE_LABELS).map(
+  ([value, label]) => ({ value, label }),
+);
+
+const SOURCE_CATALOG_OPTIONS = Object.entries(SOURCE_CATALOG_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
 
@@ -58,7 +69,12 @@ export function EvidenceMetadataForm({
   const set = (field: keyof EvidenceMetadata, value: string) =>
     setForm((prev) => ({
       ...prev,
-      [field]: field === "evidenceType" ? (value as EvidenceTypeValue) : value,
+      [field]:
+        field === "evidenceType"
+          ? (value as EvidenceTypeValue)
+          : field === "sourceCatalog"
+            ? (value as SourceCatalog)
+            : value,
     }));
 
   const canSubmit = form.sourceName.trim() && form.evidenceTitle.trim();
@@ -87,6 +103,13 @@ export function EvidenceMetadataForm({
           options={EVIDENCE_TYPE_OPTIONS}
         />
       </div>
+
+      <Select
+        label="Source Catalog"
+        value={form.sourceCatalog}
+        onChange={(e) => set("sourceCatalog", e.target.value)}
+        options={SOURCE_CATALOG_OPTIONS}
+      />
 
       <Input
         label="Evidence Title *"

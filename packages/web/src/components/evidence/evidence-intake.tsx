@@ -61,6 +61,7 @@ export function EvidenceIntake({
         sourceName: metadata.sourceName,
         sourceDescription: metadata.sourceDescription || undefined,
         evidenceType: metadata.evidenceType,
+        sourceCatalog: metadata.sourceCatalog,
         evidenceTitle: metadata.evidenceTitle,
         evidenceDescription: metadata.evidenceDescription || undefined,
         observedAt: metadata.observedAt
