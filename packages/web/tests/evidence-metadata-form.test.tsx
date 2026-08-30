@@ -7,6 +7,7 @@ const VALID_META: EvidenceMetadata = {
   sourceName: "CDR Export from Telecom A",
   sourceDescription: "Exported from telecom provider",
   evidenceType: "COMMUNICATION",
+  sourceCatalog: "CDR",
   evidenceTitle: "Call records for suspect",
   evidenceDescription: "CDR for +91-XXXXXXXXXX",
   observedAt: "2024-01-15",
@@ -20,6 +21,7 @@ describe("EvidenceMetadataForm", () => {
     );
     expect(screen.getByLabelText(/Source.*Origin/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Evidence Type/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Source Catalog/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Evidence Title/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Source Description/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Evidence Description/)).toBeInTheDocument();
@@ -37,6 +39,7 @@ describe("EvidenceMetadataForm", () => {
     );
     expect(screen.getByLabelText(/Source.*Origin/)).toHaveValue("CDR Export from Telecom A");
     expect(screen.getByLabelText(/Evidence Title/)).toHaveValue("Call records for suspect");
+    expect(screen.getByLabelText(/Source Catalog/)).toHaveValue("CDR");
   });
 
   it("disables submit when required fields are empty", () => {
@@ -75,12 +78,16 @@ describe("EvidenceMetadataForm", () => {
     fireEvent.change(screen.getByLabelText(/Evidence Type/), {
       target: { value: "FINANCIAL" },
     });
+    fireEvent.change(screen.getByLabelText(/Source Catalog/), {
+      target: { value: "MANUAL" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /Next.*Select Files/ }));
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceName: "CDR Export",
         evidenceTitle: "Call records",
         evidenceType: "FINANCIAL",
+        sourceCatalog: "MANUAL",
       }),
     );
   });

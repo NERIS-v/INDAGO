@@ -2,7 +2,10 @@
 
 import type { EvidenceMetadata } from "./evidence-metadata-form";
 import type { UploadedFileRef } from "@/lib/api/types";
-import { EVIDENCE_TYPE_LABELS } from "@/lib/contracts/types";
+import {
+  EVIDENCE_TYPE_LABELS,
+  SOURCE_CATALOG_LABELS,
+} from "@/lib/contracts/types";
 import { Button } from "@/components/ui/button";
 
 interface EvidenceReviewProps {
@@ -54,6 +57,12 @@ export function EvidenceReview({
             <dt className="text-surface-500 text-[11px]">Evidence Type</dt>
             <dd className="text-surface-700">
               {EVIDENCE_TYPE_LABELS[metadata.evidenceType] ?? metadata.evidenceType}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-surface-500 text-[11px]">Source Catalog</dt>
+            <dd className="text-surface-700">
+              {SOURCE_CATALOG_LABELS[metadata.sourceCatalog] ?? metadata.sourceCatalog}
             </dd>
           </div>
           <div>

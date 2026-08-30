@@ -4,11 +4,11 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import type {
   Investigation,
-  Evidence,
   Entity,
   Lead,
   InvestigativeGap,
 } from "@indago/contracts";
+import type { EvidenceListItem } from "@/lib/api/types";
 import { toProviderError, type ProviderEvent } from "@/lib/providers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
 interface OverviewData {
   readonly investigation: Investigation;
   /** null = blocked/unavailable (backend endpoint not exposed), distinct from empty. */
-  readonly evidence: Evidence[] | null;
+  readonly evidence: EvidenceListItem[] | null;
   readonly entities: Entity[] | null;
   readonly leads: Lead[] | null;
   readonly gaps: InvestigativeGap[] | null;

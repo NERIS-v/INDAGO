@@ -5,8 +5,13 @@
 // Local type definitions where contracts don't cover the API shape.
 // ============================================================================
 
-export { InvestigationRunStateSchema, InvestigationRunStatusSchema } from "@indago/contracts";
-export type { InvestigationRunState, InvestigationRunStatus } from "@indago/contracts";
+export {
+  InvestigationRunStateSchema,
+  InvestigationRunStatusSchema,
+  SourceCatalogSchema,
+  DEFAULT_SOURCE_CATALOG,
+} from "@indago/contracts";
+export type { InvestigationRunState, InvestigationRunStatus, SourceCatalog } from "@indago/contracts";
 export { DEFAULT_RUN_STATE_CONFIGURATION } from "@indago/contracts";
 
 // ============================================================================
@@ -68,4 +73,20 @@ export const EVIDENCE_TYPE_LABELS: Record<string, string> = {
   FINANCIAL: "Financial",
   COMMUNICATION: "Communication",
   OTHER: "Other",
+} as const;
+
+// ============================================================================
+// Source catalog labels (values come from the canonical SourceCatalogSchema
+// enum; the dropdown is generated from this map + the schema, never hand-typed
+// in a second location)
+// ============================================================================
+
+export const SOURCE_CATALOG_LABELS: Record<string, string> = {
+  FIR: "FIR (First Information Report)",
+  CDR: "CDR (Call Detail Record)",
+  FINANCIAL: "Financial Records",
+  SURVEILLANCE: "Surveillance",
+  SOCIAL: "Social Media",
+  INTEL: "Intelligence",
+  MANUAL: "Manual Entry",
 } as const;

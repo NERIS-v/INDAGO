@@ -1,10 +1,10 @@
 "use client";
 
-import type { Evidence } from "@indago/contracts";
+import type { EvidenceListItem } from "@/lib/api/types";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
 
-function statusBadge(status: Evidence["status"]): {
+function statusBadge(status: EvidenceListItem["status"]): {
   variant: BadgeVariant;
   pulse: boolean;
 } {
@@ -33,7 +33,7 @@ function formatEventTime(value: string): string {
 }
 
 interface EvidenceItemProps {
-  readonly evidence: Evidence;
+  readonly evidence: EvidenceListItem;
   readonly index?: number;
 }
 
@@ -60,7 +60,9 @@ export function EvidenceItem({ evidence, index = 0 }: EvidenceItemProps) {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Badge variant="muted">{evidence.type}</Badge>
-        <ConfidenceIndicator value={evidence.strength} label="Strength" />
+        {evidence.strength !== undefined && (
+          <ConfidenceIndicator value={evidence.strength} label="Strength" />
+        )}
         <span className="type-mono-small text-text-muted">
           {evidence.artifactIds.length} file
           {evidence.artifactIds.length === 1 ? "" : "s"}
@@ -71,7 +73,7 @@ export function EvidenceItem({ evidence, index = 0 }: EvidenceItemProps) {
           </span>
         )}
         <span className="type-mono-small ml-auto text-text-faint">
-          src:{evidence.provenance.sourceId}
+          src:{evidence.sourceRef}
         </span>
       </div>
     </li>

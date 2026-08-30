@@ -40,6 +40,7 @@ const o1: Observation = {
   content:
     "Account 0092 received a cumulative 1.4M from Shell Two and disbursed recurring payments to intermediaries.",
   entityIds: [ENT_SHELL_ONE, ENT_SHELL_TWO],
+  candidateMentions: [],
   strength: 0.78,
   provenance: { sourceId: SRC_BANK_RECORDS, extractor: "ledger.extractor.v1" },
   observedAt: evt("2024-02-15", "day"),
@@ -55,6 +56,7 @@ const o2: Observation = {
   content:
     "Intermediary account 0093 received funds from Shell One and passed them to Shell Two within 48 hours.",
   entityIds: [ENT_BANK],
+  candidateMentions: [],
   strength: 0.74,
   provenance: { sourceId: SRC_BANK_RECORDS, extractor: "ledger.extractor.v1" },
   observedAt: evt("2024-02-20", "day"),
@@ -69,6 +71,7 @@ const o3: Observation = {
   type: "FINANCIAL",
   content: "Wire 2045: Shell One transferred 250,000 to intermediary account 0093.",
   entityIds: [ENT_SHELL_ONE, ENT_BANK],
+  candidateMentions: [],
   strength: 0.68,
   provenance: { sourceId: SRC_BANK_RECORDS, extractor: "wire.extractor.v1" },
   observedAt: evt("2024-02-05", "day"),
@@ -83,6 +86,7 @@ const o4: Observation = {
   type: "FINANCIAL",
   content: "Wire 2046: intermediary account 0093 transferred 245,000 to Shell Two.",
   entityIds: [ENT_BANK, ENT_SHELL_TWO],
+  candidateMentions: [],
   strength: 0.66,
   provenance: { sourceId: SRC_BANK_RECORDS, extractor: "wire.extractor.v1" },
   observedAt: evt("2024-02-06", "day"),
@@ -97,6 +101,7 @@ const o5: Observation = {
   type: "FINANCIAL",
   content: "Wire 2077: Shell Two disbursed 180,000 to an unvetted third-party vendor.",
   entityIds: [ENT_SHELL_TWO],
+  candidateMentions: [],
   strength: 0.55,
   provenance: { sourceId: SRC_BANK_RECORDS, extractor: "wire.extractor.v1" },
   observedAt: evt("2024-03-18", "day"),
@@ -112,6 +117,7 @@ const o6: Observation = {
   content:
     "Correspondence authorizes routing invoices between Shell One and Shell Two, referencing account 0093.",
   entityIds: [ENT_VICTOR, ENT_MARIA],
+  candidateMentions: [],
   strength: 0.6,
   provenance: { sourceId: SRC_COMMS, extractor: "mail.extractor.v1" },
   observedAt: evt("2023-12-20", "day"),
@@ -126,6 +132,7 @@ const o7: Observation = {
   type: "COMMUNICATION",
   content: "Message confirms Maria holds signing authority for intermediary account 0093.",
   entityIds: [ENT_MARIA, ENT_BANK],
+  candidateMentions: [],
   strength: 0.58,
   provenance: { sourceId: SRC_COMMS, extractor: "mail.extractor.v1" },
   observedAt: evt("2024-01-22", "day"),
@@ -141,6 +148,7 @@ const o8: Observation = {
   content:
     "Registry lists a nominee director for Shell One with residential address shared with Victor.",
   entityIds: [ENT_SHELL_ONE, ENT_VICTOR],
+  candidateMentions: [],
   strength: 0.8,
   provenance: { sourceId: SRC_REGISTRY, extractor: "registry.extractor.v1" },
   observedAt: evt("2023-11-05", "day"),

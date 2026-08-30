@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useRef, useState, useEffect, type ChangeEvent, type DragEvent } from "react";
 import type { EvidenceProvider } from "@/lib/providers";
 import type { UploadedFileReference } from "@indago/contracts";
 import { toProviderError } from "@/lib/providers";
@@ -49,16 +49,26 @@ export function EvidenceFileDrop({
   const [rejected, setRejected] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSyncedRef = useRef("");
+
+  // Sync the uploaded references up to the parent. Notifying inside a state
+  // updater would call setState during the parent's render phase (React error),
+  // so this runs in a post-commit effect and only fires when the set of
+  // uploaded artifact IDs actually changes.
+  useEffect(() => {
+    const uploaded = entries
+      .filter((e) => e.status === "uploaded" && e.ref)
+      .map((e) => e.ref!);
+    const key = uploaded.map((r) => r.fileKey).join("|");
+    if (key !== lastSyncedRef.current) {
+      lastSyncedRef.current = key;
+      onRefsChange(uploaded);
+    }
+  }, [entries, onRefsChange]);
 
   const uploaded = entries.filter((e) => e.status === "uploaded" && e.ref);
   const readyCount = refs.length;
   const anyUploading = entries.some((e) => e.status === "uploading");
-
-  function syncRefs(next: Entry[]): void {
-    onRefsChange(
-      next.filter((e) => e.status === "uploaded" && e.ref).map((e) => e.ref!),
-    );
-  }
 
   function updateEntry(id: string, patch: Partial<Entry>): void {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
@@ -81,15 +91,13 @@ export function EvidenceFileDrop({
         });
         return;
       }
-      setEntries((prev) => {
-        const next = prev.map((e) =>
+      setEntries((prev) =>
+        prev.map((e) =>
           e.id === entry.id
             ? { ...e, status: "uploaded" as const, progress: 100, ref }
             : e,
-        );
-        syncRefs(next);
-        return next;
-      });
+        ),
+      );
     } catch (err) {
       updateEntry(entry.id, {
         status: "failed",
@@ -140,11 +148,7 @@ export function EvidenceFileDrop({
   }
 
   function removeEntry(id: string): void {
-    setEntries((prev) => {
-      const next = prev.filter((e) => e.id !== id);
-      syncRefs(next);
-      return next;
-    });
+    setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
   function retryEntry(entry: Entry): void {

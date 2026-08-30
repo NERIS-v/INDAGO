@@ -29,10 +29,11 @@ import type {
 import { ProviderError } from "../types";
 import type {
   Case,
+  Evidence,
   EvidenceSubmissionRequest,
   UploadedFileReference,
 } from "@indago/contracts";
-import type { EvidenceSubmissionResponse } from "@/lib/api/types";
+import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import { createDemoWorkspaceState, logDemoEvent } from "./state";
 import type { DemoWorkspaceState } from "./state";
 import { createDemoRealtimeProvider } from "./realtime";
@@ -135,7 +136,7 @@ export class DemoEvidenceProvider implements EvidenceProvider {
   async listByInvestigation(
     investigationId: string,
     query?: ProviderQuery,
-  ): Promise<Paginated<import("@indago/contracts").Evidence>> {
+  ): Promise<Paginated<EvidenceListItem>> {
     await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
     throwIfAborted(resolveSignal(query));
     if (investigationId !== this.state.investigation.id) {
@@ -143,18 +144,39 @@ export class DemoEvidenceProvider implements EvidenceProvider {
     }
     const fixtureEvidence = [...this.state.evidenceById.values()];
     const submitted = listDemoSessionEvidence(investigationId);
-    return paginate([...fixtureEvidence, ...submitted], query);
+    return paginate(
+      [...fixtureEvidence, ...submitted].map((e) => this.toListItem(e)),
+      query,
+    );
   }
 
-  async get(id: string): Promise<import("@indago/contracts").Evidence> {
+  async get(id: string): Promise<EvidenceListItem> {
     await deterministicSleep(baseLatency(this.config));
     const it = this.state.evidenceById.get(id);
-    if (it) return it;
+    if (it) return this.toListItem(it);
     const submitted = listDemoSessionEvidence(this.state.investigation.id).find(
       (e) => e.id === id,
     );
-    if (submitted) return submitted;
+    if (submitted) return this.toListItem(submitted);
     throw ProviderError.notFound();
+  }
+
+  private toListItem(evidence: Evidence): EvidenceListItem {
+    return {
+      id: evidence.id,
+      caseId: evidence.caseId,
+      investigationId: evidence.investigationId ?? this.state.investigation.id,
+      type: evidence.type,
+      title: evidence.title,
+      description: evidence.description ?? null,
+      status: evidence.status,
+      sourceRef: evidence.provenance.sourceId,
+      observedAt: evidence.observedAt ?? null,
+      observationCount: evidence.observationIds.length,
+      artifactIds: evidence.artifactIds,
+      strength: evidence.strength,
+      createdAt: evidence.createdAt.value,
+    };
   }
 
   async prepareUpload(
