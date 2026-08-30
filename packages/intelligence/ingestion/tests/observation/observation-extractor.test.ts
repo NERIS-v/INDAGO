@@ -436,3 +436,199 @@ describe('M-A06 deterministic order', () => {
     expect(a.observations.map((o) => o.content)).toEqual(b.observations.map((o) => o.content));
   });
 });
+
+// ============================================================================
+// M-A06 hardening (Option A) — visual-line reconstruction
+//
+// Optical spans that share a visual baseline are merged into ONE source-faithful
+// candidate BEFORE type inference, mentions, and observedAt. This is physical
+// layout reconstruction only — never semantic inference.
+// ============================================================================
+
+describe('M-A06 visual-line merge (§Option A)', () => {
+  it('merges OCR lines on the same baseline so the address keyword keeps its value', async () => {
+    const raw = baseFields({
+      format: 'IMAGE',
+      extractionMethod: 'ocr',
+      text: 'Address:\n123 Main St, Mumbai',
+      ocrLines: [
+        { text: 'Address:', confidence: 0.9, bbox: { x0: 0, y0: 10, x1: 60, y1: 22 }, words: [] },
+        { text: '123 Main St, Mumbai', confidence: 0.9, bbox: { x0: 64, y0: 12, x1: 190, y1: 24 }, words: [] },
+      ],
+    });
+    const { observations } = await extract(raw);
+    expect(observations).toHaveLength(1);
+    const o = observations[0]!;
+    expect(o.content).toBe('Address: 123 Main St, Mumbai');
+    expect(o.type).toBe('SPATIAL');
+    expect(o.candidateMentions).toContain('Mumbai');
+    expect(o.strength).toBe(NARRATIVE_STRENGTH_BASELINE);
+  });
+
+  it('keeps OCR lines on different baselines as separate candidates', async () => {
+    const raw = baseFields({
+      format: 'IMAGE',
+      extractionMethod: 'ocr',
+      text: 'First paragraph here.\nSecond paragraph here.',
+      ocrLines: [
+        { text: 'First paragraph here.', confidence: 0.9, bbox: { x0: 0, y0: 10, x1: 120, y1: 22 }, words: [] },
+        { text: 'Second paragraph here.', confidence: 0.9, bbox: { x0: 0, y0: 200, x1: 130, y1: 212 }, words: [] },
+      ],
+    });
+    const { observations } = await extract(raw);
+    expect(observations).toHaveLength(2);
+    expect(observations[0]!.content).toBe('First paragraph here');
+    expect(observations[1]!.content).toBe('Second paragraph here');
+    expect(observations[0]!.provenance.spanRef).toBe('line 1');
+    expect(observations[1]!.provenance.spanRef).toBe('line 2');
+  });
+
+  it('merges PDF text-layer spans sharing a baseline and reports the contiguous range', async () => {
+    const raw = baseFields({
+      format: 'PDF',
+      extractionMethod: 'text-layer',
+      pages: [
+        {
+          pageNumber: 1,
+          spans: [
+            {
+              text: 'Address:',
+              sourceLocation: {
+                kind: 'pdf-page',
+                pageNumber: 1,
+                pageTextOffset: { start: 100, end: 108 },
+                boundingBox: { x: 40, y: 90, w: 40, h: 10 },
+              },
+            },
+            {
+              text: '123 Main St, Mumbai',
+              sourceLocation: {
+                kind: 'pdf-page',
+                pageNumber: 1,
+                pageTextOffset: { start: 109, end: 127 },
+                boundingBox: { x: 82, y: 92, w: 100, h: 10 },
+              },
+            },
+            {
+              text: 'Notes on the next visual line.',
+              sourceLocation: {
+                kind: 'pdf-page',
+                pageNumber: 1,
+                pageTextOffset: { start: 128, end: 158 },
+                boundingBox: { x: 40, y: 160, w: 160, h: 10 },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const { observations } = await extract(raw);
+    expect(observations).toHaveLength(2);
+    const address = observations.find((o) => o.content.startsWith('Address:'));
+    const note = observations.find((o) => o.content.startsWith('Notes on the next'));
+    expect(address).toBeDefined();
+    expect(address!.type).toBe('SPATIAL');
+    expect(address!.provenance.pageRef).toBe('page 1');
+    expect(address!.provenance.spanRef).toBe('span 100-127');
+    expect(note).toBeDefined();
+    expect(note!.provenance.spanRef).toBe('span 128-158');
+  });
+
+  it('merges OCR-fallback PDF spans the same way', async () => {
+    const raw = baseFields({
+      format: 'PDF',
+      extractionMethod: 'ocr',
+      pages: [
+        {
+          pageNumber: 1,
+          spans: [
+            {
+              text: 'Recipient:',
+              sourceLocation: {
+                kind: 'pdf-page',
+                pageNumber: 1,
+                pageTextOffset: { start: 0, end: 10 },
+                boundingBox: { x: 0, y: 20, w: 60, h: 12 },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const { observations } = await extract(raw);
+    expect(observations).toHaveLength(1);
+    expect(observations[0]!.content).toBe('Recipient');
+    expect(observations[0]!.provenance.spanRef).toBe('span 0-10');
+  });
+
+  it('leaves spans without geometry untouched as isolated candidates', async () => {
+    const raw = baseFields({
+      format: 'PDF',
+      extractionMethod: 'text-layer',
+      pages: [
+        {
+          pageNumber: 1,
+          spans: [
+            {
+              text: 'Geeta travelled to Delhi on 2024-01-05.',
+              sourceLocation: { kind: 'pdf-page', pageNumber: 1, pageTextOffset: { start: 10, end: 44 } },
+            },
+          ],
+        },
+      ],
+    });
+    const { observations } = await extract(raw);
+    expect(observations).toHaveLength(1);
+    expect(observations[0]!.content).toBe('Geeta travelled to Delhi on 2024-01-05');
+    expect(observations[0]!.provenance.spanRef).toBe('span 10-44');
+  });
+
+  it('produces identical ids for the same merged material across runs', async () => {
+    const raw = baseFields({
+      format: 'IMAGE',
+      extractionMethod: 'ocr',
+      text: 'Address:\n123 Main St, Mumbai',
+      ocrLines: [
+        { text: 'Address:', confidence: 0.9, bbox: { x0: 0, y0: 10, x1: 60, y1: 22 }, words: [] },
+        { text: '123 Main St, Mumbai', confidence: 0.9, bbox: { x0: 64, y0: 12, x1: 190, y1: 24 }, words: [] },
+      ],
+    });
+    const first = (await extract(raw)).observations[0]!;
+    const second = (await extract(raw)).observations[0]!;
+    expect(first.content).toBe(second.content);
+    expect(first.provenance.spanRef).toBe(second.provenance.spanRef);
+    expect((await finalizeObservation({ draft: first, nowIso: '2026-01-01T00:00:00.000Z' })).id).toBe(
+      (await finalizeObservation({ draft: second, nowIso: '2026-01-01T00:00:00.000Z' })).id,
+    );
+  });
+
+  it('a merged observation and a fragmented observation get different ids', async () => {
+    const mergedRaw = baseFields({
+      format: 'IMAGE',
+      extractionMethod: 'ocr',
+      text: 'Address:\n123 Main St, Mumbai',
+      ocrLines: [
+        { text: 'Address:', confidence: 0.9, bbox: { x0: 0, y0: 10, x1: 60, y1: 22 }, words: [] },
+        { text: '123 Main St, Mumbai', confidence: 0.9, bbox: { x0: 64, y0: 12, x1: 190, y1: 24 }, words: [] },
+      ],
+    });
+    const fragmentedRaw = baseFields({
+      format: 'IMAGE',
+      extractionMethod: 'ocr',
+      text: 'Address:\n123 Main St, Mumbai',
+      ocrLines: [
+        { text: 'Address:', confidence: 0.9, bbox: { x0: 0, y0: 10, x1: 60, y1: 22 }, words: [] },
+        { text: '123 Main St, Mumbai', confidence: 0.9, bbox: { x0: 64, y0: 120, x1: 190, y1: 132 }, words: [] },
+      ],
+    });
+    const merged = (await extract(mergedRaw)).observations[0]!;
+    const fragmented = (await extract(fragmentedRaw)).observations[0]!;
+    expect(merged.content).toBe('Address: 123 Main St, Mumbai');
+    expect(fragmented.content).toBe('123 Main St, Mumbai');
+    expect(
+      (await finalizeObservation({ draft: merged, nowIso: '2026-01-01T00:00:00.000Z' })).id,
+    ).not.toBe(
+      (await finalizeObservation({ draft: fragmented, nowIso: '2026-01-01T00:00:00.000Z' })).id,
+    );
+  });
+});

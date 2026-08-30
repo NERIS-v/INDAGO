@@ -59,6 +59,104 @@ export const OBSERVATION_BOUNDS = {
 } as const;
 
 // ============================================================================
+// Visual-line reconstruction (M-A06 hardening, Option A)
+//
+// OCR/PDF extraction can split one logical visual line across several spans
+// ("Address:" + "123 Main St, Mumbai"). Physical-layout grouping joins spans
+// that share a visual baseline into ONE source-faithful candidate so type
+// inference, mentions, and observedAt see the complete context.
+//
+// This reconstructs PHYSICAL TEXT LAYOUT only. It NEVER infers semantic
+// relationships between lines that are not visually adjacent.
+// ============================================================================
+
+/**
+ * Maximum vertical drift (as a fraction of the taller span) for two adjacent
+ * spans to be considered the same visual line. Locked deterministic constant.
+ */
+export const Y_TOLERANCE = 0.5;
+
+/** A single extractor span that can participate in visual-line grouping. */
+export interface MergeableSpan {
+  readonly text: string;
+  /** Top of the span's bounding box (page/screen coordinates). */
+  readonly y: number;
+  /** Span height (y1 - y0). */
+  readonly h: number;
+  /** Contiguous source range start (provided by the source when it has one). */
+  readonly start: number;
+  /** Contiguous source range end. */
+  readonly end: number;
+}
+
+/** A merged visual line: source-faithful join plus its contiguous range. */
+export interface MergedSpan {
+  readonly text: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+/**
+ * Group adjacent spans that sit on the same visual line into single merged
+ * units. PURE and DETERMINISTIC: no I/O, no clock, no randomness, no sorting.
+ *
+ * Input order is authoritative — the parser guarantees reading order, so only
+ * adjacent spans are compared. Two adjacent spans belong to the same visual
+ * line when the vertical drift between their baselines is within
+ * `max(hA, hB) * yTolerance`; otherwise a new merged unit starts.
+ *
+ * Joined text is NOT canonicalized here — the caller canonicalizes once after
+ * joining so whitespace normalization is applied to the merged unit exactly
+ * once. Text is never paraphrased, rewritten, or reordered.
+ */
+export function mergeSameLineSpans(
+  spans: readonly MergeableSpan[],
+  yTolerance: number,
+): MergedSpan[] {
+  const merged: MergedSpan[] = [];
+  let parts: string[] | null = null;
+  let start = 0;
+  let end = 0;
+  let lastY = 0;
+  let lastH = 0;
+
+  const flush = () => {
+    if (parts === null) return;
+    merged.push({ text: parts.join(' '), start, end });
+    parts = null;
+  };
+
+  for (const span of spans) {
+    if (parts === null) {
+      parts = [span.text];
+      start = span.start;
+      end = span.end;
+      lastY = span.y;
+      lastH = span.h;
+      continue;
+    }
+    const drift = Math.abs(lastY - span.y);
+    const tolerance = Math.max(lastH, span.h) * yTolerance;
+    if (drift <= tolerance) {
+      parts.push(span.text);
+      end = span.end;
+      lastY = span.y;
+      lastH = span.h;
+      continue;
+    }
+    flush();
+    parts = [span.text];
+    start = span.start;
+    end = span.end;
+    lastY = span.y;
+    lastH = span.h;
+  }
+  flush();
+
+  return merged;
+}
+
+// ============================================================================
 // Source-faithful canonicalization
 //
 // Mechanical only. Whitespace/Unicode canonicalization distinguishes identity;
