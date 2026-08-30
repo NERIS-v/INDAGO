@@ -154,14 +154,17 @@ Added UI + integration suites (all green):
 ## Backend Dependencies
 
 - Case catalog endpoint (live) — not yet exposed; surfaces as typed unavailable.
-- Investigation/evidence list endpoints (live) — not yet exposed; typed unavailable.
+- Investigation/evidence list endpoints (live) — evidence listing IS exposed
+  (`GET /investigations/:id/evidence` → `EvidenceListItem` projection) and
+  drives the Evidence tab in live mode; evidence single-get/artifact detail is
+  not yet exposed (surfaces as typed unavailable).
 - Existing duplicate/idempotency handling in evidence submission — the provider result is preserved and surfaced as-is; no client dedup invented.
 - Real content hashing / artifact identity — remains backend responsibility (demo uses a clearly-marked placeholder).
 
 ## Deferred F-PR4+
 
 - Live case-list catalog ingestion.
-- Live evidence listing/retrieval endpoints and artifact detail views.
+- Live evidence single-get/artifact detail views.
 - SSE/progress-driven updates surface submitted evidence incrementally once live event contracts exist.
 - Branding/visual polish pass beyond the F-PR1 system.
 

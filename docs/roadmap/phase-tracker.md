@@ -100,7 +100,8 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] M-A03: CDR CSV ingestion (normalized communication rows) `[Mayur]`
 - [ ] M-A04: Financial CSV ingestion (normalized transaction rows) `[Mayur]`
 - [x] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
-- [ ] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
+- [x] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
+  - [x] Evidence read seam: durable `GET /investigations/:id/evidence` (`EvidenceProjection` — documented local shape, no fabricated strength/posture), live `listEvidence` server action + `LiveEvidenceProvider.listByInvestigation`, Evidence tab renders persisted artifacts in live mode `[Mayur]`
 - [ ] M-A07: Entity candidate generator (candidate entities) `[Mayur]`
 - [ ] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]`
 - [ ] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]`
