@@ -39,11 +39,18 @@ import type {
 import { ProviderError } from "../types";
 import type {
   Investigation,
-  Evidence,
+  Observation,
+  Case,
   EvidenceSubmissionRequest,
   UploadedFileReference,
 } from "@indago/contracts";
-import type { EvidenceSubmissionResponse } from "@/lib/api/types";
+import type {
+  EvidenceSubmissionResponse,
+  EvidenceListResponse,
+  EvidenceListItem,
+  ObservationsResponse,
+  CasesResponse,
+} from "@/lib/api/types";
 import { createLiveRealtimeProvider } from "./realtime";
 import { providerUnsupported, providerUnsupportedPaginated } from "./unsupported";
 import { toLiveProviderError } from "./errors";
@@ -52,6 +59,9 @@ import {
   getInvestigationStatus,
   startInvestigation as apiStartInvestigation,
   submitEvidence as apiSubmitEvidence,
+  listObservations as apiListObservations,
+  listEvidence as apiListEvidence,
+  listCases as apiListCases,
 } from "@/lib/api/server-action";
 import { uploadEvidence } from "@/lib/upload/uploadthing";
 
@@ -113,18 +123,41 @@ export class LiveInvestigationProvider implements InvestigationProvider {
  *
  * submit() → platform POST /investigations/:id/evidence (via server action).
  * prepareUpload() → the platform's UploadThing casePackUploader (client-side
- * helper), returning UploadThing file references. listByInvestigation()/get()
- * have no platform GET endpoint yet and stay UNSUPPORTED.
+ * helper), returning UploadThing file references. listByInvestigation() →
+ * platform GET /investigations/:id/evidence (via server action), mapped into
+ * the documented EvidenceListItem projection — the platform persists a
+ * narrower Evidence row than the canonical EvidenceSchema (no strength /
+ * posture / provenance.extractor) and refuses to fabricate those fields, so
+ * strength is never supplied here. get() has no platform single-get endpoint
+ * yet and stays UNSUPPORTED.
  */
 export class LiveEvidenceProvider implements EvidenceProvider {
   async listByInvestigation(
-    _investigationId: string,
-    _query?: ProviderQuery,
-  ): Promise<Paginated<Evidence>> {
-    return providerUnsupportedPaginated("evidence.listByInvestigation");
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<EvidenceListItem>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: EvidenceListResponse;
+    try {
+      response = await apiListEvidence(investigationId);
+    } catch (err) {
+      // A backend failure is NEVER turned into a fabricated evidence list.
+      throw toLiveProviderError(err);
+    }
+    const page = query?.page ?? 1;
+    const pageSize = query?.pageSize ?? 20;
+    const start = (page - 1) * pageSize;
+    const slice = response.evidence.slice(start, start + pageSize);
+    return {
+      items: slice,
+      page,
+      pageSize,
+      totalItems: response.evidence.length,
+      hasMore: start + pageSize < response.evidence.length,
+    };
   }
 
-  get(_id: string): Promise<Evidence> {
+  get(_id: string): Promise<EvidenceListItem> {
     return providerUnsupported("evidence.get");
   }
 
@@ -169,31 +202,82 @@ export class LiveEvidenceProvider implements EvidenceProvider {
   }
 }
 
+/**
+ * Live implementation of ObservationProvider.
+ *
+ * listByInvestigation() → platform GET /investigations/:id/observations (via
+ * server action). The platform returns the full case-scoped set (caseId is
+ * derived server-side from the persisted run — never client-supplied); paging
+ * is applied here over that authoritative list. listByEntity() has no platform
+ * endpoint yet and stays UNSUPPORTED rather than fabricating a filter.
+ */
+export class LiveObservationProvider implements ObservationProvider {
+  async listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<Observation>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: ObservationsResponse;
+    try {
+      response = await apiListObservations(investigationId);
+    } catch (err) {
+      // A backend failure is NEVER turned into a fabricated observation list.
+      throw toLiveProviderError(err);
+    }
+    const page = query?.page ?? 1;
+    const pageSize = query?.pageSize ?? 20;
+    const start = (page - 1) * pageSize;
+    const slice = response.observations.slice(start, start + pageSize);
+    return {
+      items: slice,
+      page,
+      pageSize,
+      totalItems: response.observations.length,
+      hasMore: start + pageSize < response.observations.length,
+    };
+  }
+
+  listByEntity(): Promise<Paginated<Observation>> {
+    return providerUnsupportedPaginated("observations.listByEntity");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Unsupported live providers (platform endpoints not yet exposed).
 // Each method throws an explicit UNSUPPORTED ProviderError.
 // ---------------------------------------------------------------------------
 
 /**
- * Live CaseProvider. The platform does not yet expose a case-list endpoint,
- * so every method throws an explicit UNSUPPORTED ProviderError rather than
- * fabricating cases.
+ * Live CaseProvider. list() → platform GET /api/v1/cases (via server action);
+ * the platform reassembles durable Case rows into canonical CaseSchema objects
+ * (id = caseId, read-time derived counts), so no projection or fabrication
+ * happens here. get() has no platform single-case endpoint yet and stays
+ * UNSUPPORTED.
  */
 export class LiveCaseProvider implements CaseProvider {
-  list(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("cases.list");
+  async list(query?: ProviderQuery): Promise<Paginated<Case>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: CasesResponse;
+    try {
+      response = await apiListCases();
+    } catch (err) {
+      // A backend failure is NEVER turned into a fabricated case list.
+      throw toLiveProviderError(err);
+    }
+    const page = query?.page ?? 1;
+    const pageSize = query?.pageSize ?? 20;
+    const start = (page - 1) * pageSize;
+    const slice = response.cases.slice(start, start + pageSize);
+    return {
+      items: slice,
+      page,
+      pageSize,
+      totalItems: response.cases.length,
+      hasMore: start + pageSize < response.cases.length,
+    };
   }
-  get(): Promise<never> {
+  get(_id: string): Promise<Case> {
     return providerUnsupported("cases.get");
-  }
-}
-
-class UnsupportedObservationProvider implements ObservationProvider {
-  listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("observations.listByInvestigation");
-  }
-  listByEntity(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("observations.listByEntity");
   }
 }
 
@@ -288,7 +372,7 @@ export function createLiveWorkspaceProviders(
     cases: new LiveCaseProvider(),
     investigations: new LiveInvestigationProvider(identity.caseId),
     evidence: new LiveEvidenceProvider(),
-    observations: new UnsupportedObservationProvider(),
+    observations: new LiveObservationProvider(),
     entities: new UnsupportedEntityProvider(),
     graph: new UnsupportedGraphProvider(),
     timeline: new UnsupportedTimelineProvider(),
