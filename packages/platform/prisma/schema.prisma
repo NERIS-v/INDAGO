@@ -210,3 +210,124 @@ model NormalizedExtraction {
   @@index([investigationId])
   @@index([artifactId, createdAt])
 }
+
+// ============================================================================
+// P-06: Durable Source (M-A06 persisted)
+//
+// One deterministic Source row per ingested artifact's source seed. The
+// catalog stores the platform-VALIDATED SourceCatalogSchema value; when the
+// client-supplied declaration failed validation, catalog falls back to MANUAL
+// and the ORIGINAL declaration is preserved verbatim in declaredCatalog so
+// the fallback is fully auditable (never a silent drop).
+// DOES NOT determine Observation strength (source catalog ≠ strength).
+// ============================================================================
+model Source {
+  id               String   @id // deterministic SourceId (SHA-256 of investigationId:fileKey)
+  caseId           String
+  investigationId  String
+  catalog          String   // validated SourceCatalogSchema value (FIR|CDR|FINANCIAL|…|MANUAL)
+  declaredCatalog  String?  // original untrusted declaration preserved verbatim
+  name             String   // payload.sourceName
+  description      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  evidence Evidence[]
+
+  @@index([caseId])
+  @@index([investigationId])
+}
+
+// ============================================================================
+// P-07: Durable Evidence (M-A06 persisted)
+//
+// One row per (investigationId, operationId, artifactId). evidenceId is the
+// deterministic SHA-256 → SHA-256-UUID of that triple — retry-safe and
+// includes the stable submission/operation identity (edit #1). observedAt is
+// the payload's declared real-world event time (never fabricated).
+// ============================================================================
+model Evidence {
+  id                 String   @id // deterministic EvidenceId (SHA-256(investigationId:operationId:artifactId))
+  investigationId    String
+  caseId             String
+  operationId        String   // stable batch identity — part of EvidenceId triple
+  sourceId           String?
+  sourceName         String
+  sourceDescription  String?
+  evidenceType       String   // EvidenceTypeSchema value
+  title              String
+  description        String?
+  observedAt         Json?    // EventTime (value + precision) from the submission
+  artifactId         String
+  createdAt          DateTime @default(now())
+
+  source       Source?        @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  observations Observation[]
+
+  @@unique([investigationId, operationId, artifactId])
+  @@index([caseId])
+  @@index([sourceId])
+}
+
+// ============================================================================
+// P-08: Durable Observation (M-A06 persisted)
+//
+// identityKey is the versioned canonical identity (buildObservationIdentityKey
+// — evidenceId:sourceId:locationKey:type:canonicalContent) and is UNIQUE:
+// the DB rejects exact-duplicate rows authored by concurrent/retried MA06
+// passes. candidateMentions are lexical hints for MA07 — never entities.
+// entityIds is ALWAYS [] in M-A06 (no entity linking here). Observations are
+// content-verified by ObservationSchema on every read.
+// ============================================================================
+model Observation {
+  id                String   @id // deterministic ObservationId (SHA-256 of identityKey)
+  identityKey       String   @unique // versioned canonical identity — exact-dedup guard
+  evidenceId        String
+  sourceId          String
+  investigationId   String
+  caseId            String
+  type              String   // ObservationTypeSchema value
+  content           String
+  strength          Float
+  candidateMentions Json     // readonly string[] (≤50)
+  provenance        Json     // ProvenanceSchema
+  observedAt        Json?    // EventTime (only when unambiguous in content)
+  entityIds         Json     // [] — MA06 never creates entity links
+  createdAt         DateTime @default(now())
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([investigationId, caseId])
+  @@index([sourceId])
+  @@index([evidenceId])
+}
+
+// ============================================================================
+// P-09: Durable Case (case catalogue — dashboard)
+//
+// One row per case boundary the platform has ever seen. Rows are
+// auto-provisioned (create-or-nothing, id = caseId) when an investigation run
+// is created (POST /investigations/start) and reconciled on read
+// (GET /api/v1/cases) so pre-existing runs surface immediately.
+//
+// title / status / assignedTo carry platform-owned STANDARD defaults because
+// the canonical CaseSchema makes them mandatory and no case-creation/edit flow
+// exists yet — these are explicit persisted values, never invented per
+// response. investigationIds / evidenceIds / entityIds are DERIVED at read time
+// from durable run/evidence/observation rows — never stored denormalized.
+//
+// No Prisma FK is declared (caseId on InvestigationRun / Artifact / Source /
+// Evidence / Observation is a plain indexed column) so the case catalogue stays
+// decoupled from the run lifecycle, mirroring the Artifact decoupling comment.
+// ============================================================================
+model Case {
+  id           String   @id // canonical case ID == InvestigationRun.caseId
+  title        String
+  description  String?
+  status       String   @default("OPEN") // OPEN, ACTIVE, CLOSED, ARCHIVED
+  assignedTo   String
+  jurisdiction String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  closedAt     DateTime?
+}
