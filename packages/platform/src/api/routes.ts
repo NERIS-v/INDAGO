@@ -100,6 +100,43 @@ apiRouter.get(
   }
 );
 
+// 1a/i. Delete Case (case catalogue). Hard-remove the boundary and every
+// durable row scoped to it; refuses while an active investigation run exists
+// (409) so the orchestrator never orphans in-flight work. Deleting unblocks the
+// whole case — this is intended destructive tooling for INV/ADMIN roles only.
+apiRouter.delete(
+  "/cases/:caseId",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const caseId = String(req.params.caseId);
+      if (!CaseIdSchema.safeParse(caseId).success) {
+        return res.status(400).json({ error: "Invalid case ID" });
+      }
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const result = await caseStore.deleteCase(caseId);
+      if (result.outcome === "not_found") {
+        return res.status(404).json({ error: "Case not found" });
+      }
+      if (result.outcome === "active_runs") {
+        return res.status(409).json({
+          error: "Case has active investigations; wait for them to finish",
+        });
+      }
+      return res.status(200).json({ deleted: true, caseId });
+    } catch (error: unknown) {
+      console.error("Failed to delete case:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
 // 1b. Get Investigation Status
 apiRouter.get(
   "/investigations/:investigationId",
