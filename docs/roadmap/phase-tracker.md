@@ -137,11 +137,11 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ### Mayur
 
-- [ ] Expose ingestion API `[Mayur]`
-- [ ] Expose observation API `[Mayur]`
-- [ ] Expose entity resolution API `[Mayur]`
-- [ ] Expose graph projection/query API `[Mayur]`
-- [ ] Seed one deliberately messy synthetic case `[Mayur]`
+- [x] Expose ingestion API `[Mayur]` — `POST /investigations/:id/evidence`: submission body → artifact fetch/sha256-verify/mime-detect → BullMQ job → worker; verified in the REAL-STACK E2E and the live case-deletion gate
+- [x] Expose observation API `[Mayur]` — `GET /investigations/:id/observations` (full ObservationSchema records, case-scoped via auth → latest run → run.caseId; routes.ts)
+- [ ] Expose entity resolution API `[Mayur]` — blocked on M-A07–A10 (not built)
+- [ ] Expose graph projection/query API `[Mayur]` — blocked on M-A11–A13 (not built)
+- [ ] Seed one deliberately messy synthetic case `[Mayur]` — no seed script exists (only test fixtures + legacy mock-ingestion toggle)
 
 ### Gurashish
 
@@ -155,6 +155,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 ### Joint Integration Test
 
 - [ ] FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI `[Both]`
+  - Partial: the `INGEST > OBSERVATIONS > INVESTIGATION STATE > SSE > UI(live)` leg is proven by the REAL-STACK E2E (HTTP → BullMQ → worker → Postgres → SSE) plus the M-A06 Option A live re-ingest test. The `ENTITY HYPOTHESES > RELATIONS > GRAPH` leg is not yet built (depends on M-A07–A13).
 
 ---
 
@@ -454,7 +455,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | 1 | 40 | 40 | 20 | 6 | 14 |
 | 2A | 16 | 4 | 4 | 0 | 0 |
 | 2B | 12 | 12 | 0 | 12 | 0 |
-| 3 | 12 | 0 | 0 | 6 | 1 |
+| 3 | 12 | 8 | 2 | 6 | 1 |
 | 4 | 16 | 0 | 0 | 6 | 1 |
 | 5 | 18 | 0 | 0 | 8 | 1 |
 | 6 | 20 | 0 | 0 | 8 | 4 |
@@ -464,4 +465,4 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | 10 | 10 | 0 | 0 | 5 | 0 |
 | 11 | 30 | 0 | 0 | 10 | 10 |
 | 12 | 16 | 0 | 0 | 8 | 1 |
-| **Total** | **257** | **66** | **24** | **86** | **51** |
+| **Total** | **257** | **74** | **26** | **86** | **51** |
