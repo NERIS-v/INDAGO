@@ -7,6 +7,7 @@ import express from "express";
 import type { Server, AddressInfo } from "node:http";
 import http from "node:http";
 import { PrismaClient } from "@prisma/client";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 
 // ============================================================================
 // REAL-STACK E2E — real Redis/BullMQ + real worker + real HTTP API + real
@@ -59,6 +60,24 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
   const fixtureHash = createHash("sha256").update(fixtureBytes).digest("hex");
 
   const auth = { authorization: "Bearer demo-token" };
+
+  // --- M-A06 Option A §28 live fixture: a controlled PDF whose two visible
+  // text runs share ONE visual baseline (Address: keyword + its value split by
+  // layout) plus a third run on a separate line. pdfjs emits one bbox'd span
+  // per text run in content-stream order, so the real parser produces two
+  // same-baseline spans with contiguous pageTextOffset — mergeable. ---
+  let mergedPdfBytes: Buffer;
+  let mergedPdfHash: string;
+
+  async function buildMergedPdf(): Promise<Buffer> {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([612, 792]);
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    page.drawText("Address:", { x: 40, y: 720, size: 12, font });
+    page.drawText("123 Main St, Mumbai", { x: 90, y: 720, size: 12, font });
+    page.drawText("Notes for the file", { x: 40, y: 680, size: 12, font });
+    return Buffer.from(await doc.save());
+  }
 
   function sleep(ms: number) {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -171,6 +190,9 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     // a dev worker on the default queue can never claim these test jobs.
     process.env.INVESTIGATION_QUEUE_NAME = "investigation-pipeline-e2e";
 
+    mergedPdfBytes = await buildMergedPdf();
+    mergedPdfHash = createHash("sha256").update(mergedPdfBytes).digest("hex");
+
     prisma = new PrismaClient();
     await prisma.rawExtraction.deleteMany({});
     await prisma.ingestionAttempt.deleteMany({});
@@ -203,6 +225,11 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     });
     app.get("/absent.txt", (_req, res) => {
       res.status(404).setHeader("content-type", "text/plain").end("not found");
+    });
+    app.get("/merged.pdf", (_req, res) => {
+      res.setHeader("content-type", "application/pdf");
+      res.setHeader("content-length", String(mergedPdfBytes.length));
+      res.end(mergedPdfBytes);
     });
     app.use("/api/v1", apiRouter);
 
@@ -336,6 +363,90 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
     sse.close();
   }, 60_000);
+
+  it("M-A06 Option A live: a PDF with a layout-split 'Address:' line is re-ingested as ONE merged SPATIAL observation", async () => {
+    const invPdf = randomUUID();
+    const cid = randomUUID();
+    const start = await fetch(`${baseUrl}/api/v1/investigations/start`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth },
+      body: JSON.stringify({ caseId: cid, investigationId: invPdf }),
+    });
+    expect(start.status).toBe(202);
+
+    const post = await fetch(
+      `${baseUrl}/api/v1/investigations/${invPdf}/evidence`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", ...auth },
+        body: JSON.stringify({
+          investigationId: invPdf,
+          sourceName: "Real-Stack E2E",
+          evidenceType: "COMMUNICATION",
+          evidenceTitle: "Split-line address PDF",
+          files: [
+            {
+              fileKey: "address.pdf",
+              fileUrl: `${baseUrl}/merged.pdf`,
+              fileName: "address.pdf",
+              fileSize: mergedPdfBytes.length,
+              mimeType: "application/pdf",
+              sha256Hash: mergedPdfHash,
+            },
+          ],
+        }),
+      },
+    );
+    expect(post.status).toBe(202);
+
+    const reachedAnalyzing = await pollUntil(async () => {
+      const s = await getStatus(invPdf, cid);
+      return s.body.state === "ANALYZING";
+    });
+    expect(reachedAnalyzing).toBe(true);
+
+    const attempt = await prisma.ingestionAttempt.findFirst({
+      where: { investigationId: invPdf },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(attempt?.status).toBe("SUCCEEDED");
+    const raw = await prisma.rawExtraction.findUnique({
+      where: { attemptId: attempt!.id },
+    });
+    expect(raw?.format).toBe("PDF");
+
+    const obs = await prisma.observation.findMany({
+      where: { investigationId: invPdf },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(obs).toHaveLength(2);
+
+    const address = obs.find((o) => o.content.startsWith("Address:"));
+    expect(address).toBeDefined();
+    expect(address!.content).toBe("Address: 123 Main St, Mumbai");
+    expect(address!.type).toBe("SPATIAL");
+    expect(address!.strength).toBe(0.6);
+    const mentions = address!.candidateMentions as string[];
+    expect(mentions).toContain("Mumbai");
+    expect(mentions).toContain("Main St");
+    const prov = address!.provenance as { spanRef?: string; pageRef?: string };
+    expect(prov.pageRef).toBe("page 1");
+    // The merged range must START at the stream beginning (Address: is the
+    // first run) and COVER both same-baseline runs. pdfjs may add a leading
+    // space to later runs in the page text stream, so assert coverage, not the
+    // exact pdfjs spacing-derived end offset (canonicalization collapses the
+    // duplicate space in the content contract).
+    expect(prov.spanRef).toMatch(/^span 0-\d+$/);
+
+    const notes = obs.find((o) => o.content.startsWith("Notes for the file"));
+    expect(notes).toBeDefined();
+    const notesProv = notes!.provenance as { spanRef?: string };
+    expect(notesProv.spanRef).toMatch(/^span \d+-\d+$/);
+    expect(Number(notesProv.spanRef!.match(/^span (\d+)-(\d+)$/)![1])).toBeGreaterThanOrEqual(
+      Number(prov.spanRef!.match(/^span (\d+)-(\d+)$/)![2]),
+    );
+    expect(notes!.identityKey).not.toBe(address!.identityKey);
+  }, 90_000);
 
   it("BullMQ producer dedup: same idempotencyKey POST twice → job processed once", async () => {
     const inv2 = randomUUID();
