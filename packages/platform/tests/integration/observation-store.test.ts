@@ -247,6 +247,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
     it("listEvidenceByInvestigation projects persisted rows with observationCount and derived status", async () => {
       const evWithObs = randomUUID();
       const evWithoutObs = randomUUID();
+      const evArtifactId = randomUUID();
       const listCaseId = randomUUID();
       const listSourceId = randomUUID();
       await store.upsertSource(makeSource({ id: listSourceId, caseId: listCaseId }));
@@ -254,10 +255,10 @@ describe.skipIf(!TEST_DATABASE_URL)(
         makeEvidence(evWithObs, {
           caseId: listCaseId,
           sourceId: listSourceId,
-          operationId: randomUUID(),
-          artifactId: randomUUID(),
-          title: "Ledger Export Q1",
-        }),
+operationId: randomUUID(),
+        artifactId: evArtifactId,
+        title: "Ledger Export Q1",
+      }),
       );
       await store.upsertEvidence(
         makeEvidence(evWithoutObs, {
@@ -293,6 +294,8 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(withObs.operationId).toBeTruthy();
       expect(withObs.artifactId).toBeTruthy();
       expect(withObs.observationCount).toBe(1);
+      expect(withObs.artifactIds).toEqual([evArtifactId]);
+      expect(withObs.sourceRef).toBe("Ledger Export");
       expect(withObs.status).toBe("PROCESSED");
       expect(withObs.observedAt).toEqual({
         value: "2026-08-01T00:00:00.000Z",

@@ -107,6 +107,8 @@ export interface EvidenceProjection {
   operationId: string;
   artifactId: string;
   observationCount: number;
+  artifactIds: string[];
+  sourceRef: string;
   status: "INGESTED" | "PROCESSED";
   createdAt: string;
 }
@@ -300,6 +302,8 @@ export class ObservationStore {
       operationId: row.operationId,
       artifactId: row.artifactId,
       observationCount: row._count.observations,
+      artifactIds: row.artifactId ? [row.artifactId] : [],
+      sourceRef: row.sourceName,
       status: row._count.observations > 0 ? "PROCESSED" : "INGESTED",
       createdAt: row.createdAt.toISOString(),
     };
