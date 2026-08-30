@@ -1,11 +1,23 @@
-import { InvestigationScaffold } from "../investigation-scaffold";
+"use client";
 
-export default function GraphPage() {
+import { useState } from "react";
+import { GraphPanel } from "@/components/graph/graph-panel";
+import { TimelinePanel } from "@/components/timeline/timeline-panel";
+
+export default function GraphTabPage() {
+  const [timeRange, setTimeRange] = useState<[number, number] | null>(null);
+
   return (
-    <InvestigationScaffold
-      title="Graph"
-      domain="Entities & Relations"
-      description="Entity/relation graph rendering, layout, and graph holes. The GraphProvider and graph fixture exist, but the renderer is intentionally deferred to F-PR4."
-    />
+    <div className="flex flex-col h-full w-full gap-4 overflow-hidden">
+
+      <div className="flex-1 min-h-0 relative">
+        <GraphPanel activeTimeRange={timeRange} />
+      </div>
+
+      <div className="shrink-0">
+        <TimelinePanel onTimeRangeChange={setTimeRange} />
+      </div>
+      
+    </div>
   );
 }
