@@ -83,13 +83,25 @@ export class DemoCaseProvider implements CaseProvider {
   async list(query?: ProviderQuery): Promise<Paginated<Case>> {
     await deterministicSleep(heavyLatency(this.config), query?.signal);
     throwIfAborted(query?.signal);
-    return paginate([this.state.case], query);
+    return paginate(this.state.case ? [this.state.case] : [], query);
   }
 
   async get(id: string): Promise<Case> {
     await deterministicSleep(baseLatency(this.config));
-    if (id !== this.state.case.id) throw ProviderError.notFound();
+    if (!this.state.case || id !== this.state.case.id) {
+      throw ProviderError.notFound();
+    }
     return this.state.case;
+  }
+
+  async remove(id: string): Promise<void> {
+    await deterministicSleep(baseLatency(this.config));
+    if (!this.state.case || id !== this.state.case.id) {
+      throw ProviderError.notFound();
+    }
+    // The demo list-case store owns exactly one case boundary; removing it
+    // empties the catalogue (honest: no fabricated replacement case).
+    this.state.case = null;
   }
 }
 
@@ -111,7 +123,9 @@ export class DemoInvestigationProvider implements InvestigationProvider {
   ): Promise<Paginated<import("@indago/contracts").Investigation>> {
     await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
     throwIfAborted(resolveSignal(query));
-    if (caseId !== this.state.case.id) return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
+    if (!this.state.case || caseId !== this.state.case.id) {
+      return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
+    }
     return paginate([this.state.investigation], query);
   }
 
@@ -222,6 +236,9 @@ export class DemoEvidenceProvider implements EvidenceProvider {
     }
 
     const full: EvidenceSubmissionRequest = { ...request, investigationId };
+    if (!this.state.case) {
+      throw ProviderError.validation("Cannot submit evidence: no case is open.");
+    }
     const ids = demoSubmissionIds(
       investigationId,
       full.files,
@@ -485,7 +502,9 @@ export class DemoCrossCaseProvider implements CrossCaseProvider {
   ): Promise<Paginated<import("@indago/contracts").CrossCaseMatch>> {
     await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
     throwIfAborted(resolveSignal(query));
-    if (caseId !== this.state.case.id) return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
+    if (!this.state.case || caseId !== this.state.case.id) {
+      return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
+    }
     return paginate(demoFixtures.crossCase, query);
   }
 }

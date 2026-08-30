@@ -15,6 +15,7 @@ import type {
   ObservationsResponse,
   EvidenceListResponse,
   CasesResponse,
+  DeleteCaseResponse,
   HealthResponse,
   ApiError,
 } from "./types.js";
@@ -159,6 +160,12 @@ export async function listEvidence(
 
 export async function listCases(): Promise<CasesResponse> {
   return platformFetch<CasesResponse>("/api/v1/cases");
+}
+
+export async function deleteCase(caseId: string): Promise<DeleteCaseResponse> {
+  return platformFetch<DeleteCaseResponse>(`/api/v1/cases/${caseId}`, {
+    method: "DELETE",
+  });
 }
 
 // ============================================================================

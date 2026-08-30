@@ -264,6 +264,8 @@ export interface EvidenceProvider {
 export interface CaseProvider {
   list(query?: ProviderQuery): Promise<Paginated<Case>>;
   get(id: string): Promise<Case>;
+  /** Hard-delete a case boundary. Provider implementors decide semantics. */
+  remove(id: string): Promise<void>;
 }
 
 export interface ObservationProvider {
