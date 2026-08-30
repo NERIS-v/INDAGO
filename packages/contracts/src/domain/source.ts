@@ -35,6 +35,35 @@ export const SourceStatusSchema = z.enum([
 ]);
 export type SourceStatus = z.infer<typeof SourceStatusSchema>;
 
+// ============================================================================
+// Source Catalog (M-A06)
+//
+// A fixed catalog of investigative SOURCE MATERIAL CATEGORIES. This is a
+// distinct semantic from SourceTypeSchema (which describes how a source is
+// INTEGRATED: FILE_UPLOAD / API_IMPORT / ...). The catalog describes WHAT KIND
+// of material the source holds.
+//
+// The catalog lives here as the SINGLE SOURCE OF TRUTH. The web dropdown is
+// generated from this enum (never hand-typed in a second location), and the
+// platform validates any client-supplied catalog string against it before it
+// reaches persistence.
+//
+// Source type does NOT automatically determine Observation strength.
+// ============================================================================
+
+export const SourceCatalogSchema = z.enum([
+  'FIR',
+  'CDR',
+  'FINANCIAL',
+  'SURVEILLANCE',
+  'SOCIAL',
+  'INTEL',
+  'MANUAL',
+]);
+export type SourceCatalog = z.infer<typeof SourceCatalogSchema>;
+
+export const DEFAULT_SOURCE_CATALOG: SourceCatalog = 'MANUAL';
+
 export const SourceSchema = z.object({
   id: SourceIdSchema,
   caseId: CaseIdSchema,

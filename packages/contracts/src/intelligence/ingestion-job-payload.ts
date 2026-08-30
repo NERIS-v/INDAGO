@@ -6,6 +6,7 @@ import {
   CorrelationIdSchema,
 } from '../common/ids.js';
 import { EvidenceTypeSchema } from '../domain/evidence.js';
+import { SourceCatalogSchema } from '../domain/source.js';
 import { EventTimeSchema } from '../common/timestamps.js';
 import { ArtifactReferenceSchema } from './artifact-reference.js';
 
@@ -46,6 +47,14 @@ export const IngestionJobPayloadSchema = z.object({
   // Source semantic metadata (maps to SourceSchema)
   sourceName: z.string().min(1).max(200),
   sourceDescription: z.string().max(5000).optional(),
+
+  // Source catalog (M-A06)
+  // sourceCatalog is the platform-VALIDATED catalog value (one of the fixed
+  // SourceCatalogSchema values, after the untrusted client string passed the
+  // strict server-side check). declaredSourceCatalog preserves the original
+  // declaration verbatim so any fallback-to-MANUAL is auditable.
+  sourceCatalog: SourceCatalogSchema,
+  declaredSourceCatalog: z.string().max(50).optional(),
 
   // Evidence semantic metadata (maps to EvidenceSchema)
   evidenceType: EvidenceTypeSchema,

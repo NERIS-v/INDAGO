@@ -54,6 +54,10 @@ export const ObservationSchema = z.object({
     .describe('The assertion extracted from evidence'),
   entityIds: z.array(EntityIdSchema)
     .describe('Canonical entities this observation is already linked to'),
+  candidateMentions: z.array(
+    z.string().min(1).max(200).describe('Lexical mention hint for MA07 entity resolution'),
+  ).min(0).max(50)
+    .describe('Deterministic lexical spans/hints for downstream entity resolution. NOT entities, entity IDs, hypotheses, or relations.'),
   candidateEntityHypothesisIds: z.array(EntityHypothesisIdSchema).optional()
     .describe('Identity-resolution hypotheses that could explain an unresolved entity mention. NOT canonical EntityIds.'),
   hypothesisIds: z.array(HypothesisIdSchema).optional()

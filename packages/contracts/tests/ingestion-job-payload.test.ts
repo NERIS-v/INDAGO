@@ -31,6 +31,7 @@ const validPayload = {
   correlationId: VALID_CORRELATION_ID,
   operationId: VALID_OPERATION_ID,
   sourceName: 'CDR Export from Telecom A',
+  sourceCatalog: 'CDR',
   evidenceType: 'COMMUNICATION',
   evidenceTitle: 'Call records for suspect phone number',
 };
@@ -121,6 +122,22 @@ describe('IngestionJobPayloadSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects invalid sourceCatalog', () => {
+    const result = IngestionJobPayloadSchema.safeParse({
+      ...validPayload,
+      sourceCatalog: 'NOT_A_CATALOG_VALUE',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts declaredSourceCatalog alongside valid sourceCatalog', () => {
+    const result = IngestionJobPayloadSchema.safeParse({
+      ...validPayload,
+      declaredSourceCatalog: 'cdr',
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('JSON round-trip preserves all fields', () => {
     const parsed = IngestionJobPayloadSchema.parse(validPayload);
     const roundTripped = JSON.parse(JSON.stringify(parsed));
@@ -133,6 +150,7 @@ describe('IngestionJobPayloadSchema', () => {
       'idempotencyKey',
       'investigationId',
       'operationId',
+      'sourceCatalog',
       'sourceName',
     ]);
   });
