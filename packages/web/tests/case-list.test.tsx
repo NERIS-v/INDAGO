@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { CaseList } from "@/components/case-list/case-list";
 import type { CaseProvider } from "@/lib/providers";
 import { ProviderError } from "@/lib/providers";
@@ -12,8 +12,8 @@ const demoCase = createDemoWorkspaceState("case-list:test").case;
 
 function mockProvider(
   impl: Partial<CaseProvider> = {},
-): { cases: CaseProvider; list: ReturnType<typeof vi.fn> } {
-  const list = vi.fn(() =>
+): { cases: CaseProvider; list: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> } {
+  const list = impl.list ?? vi.fn(() =>
     Promise.resolve({
       items: [demoCase],
       page: 1,
@@ -22,8 +22,10 @@ function mockProvider(
       hasMore: false,
     }),
   );
-  const cases: CaseProvider = { list, get: vi.fn(), ...impl };
-  return { cases, list };
+  const remove = impl.remove ?? vi.fn(() => Promise.resolve());
+  const get = impl.get ?? vi.fn();
+  const cases: CaseProvider = { list, get, remove };
+  return { cases, list, remove };
 }
 
 describe("CaseList", () => {
@@ -102,12 +104,147 @@ describe("CaseList", () => {
         totalItems: 1,
         hasMore: false,
       });
-    const cases: CaseProvider = { list, get: vi.fn() };
+    const cases: CaseProvider = { list, get: vi.fn(), remove: vi.fn() };
     render(<CaseList cases={cases} mode="demo" />);
     await screen.findByText(/try again/);
-    screen.getByRole("button", { name: /Retry/ }).click();
+    fireEvent.click(screen.getByRole("button", { name: /Retry/ }));
     await waitFor(() =>
       expect(screen.getByText(/Operation Financial Shadow/)).toBeInTheDocument(),
     );
+  });
+
+  it("shows delete controls and removes only the selected case after confirm", async () => {
+    const { cases, remove, list } = mockProvider({
+      list: vi.fn().mockResolvedValue({
+        items: [
+          { ...demoCase, id: "case-1", title: "Alpha Case" },
+          { ...demoCase, id: "case-2", title: "Beta Case" },
+        ],
+        page: 1,
+        pageSize: 100,
+        totalItems: 2,
+        hasMore: false,
+      }),
+    });
+    render(<CaseList cases={cases} mode="live" />);
+    await screen.findByText(/Alpha Case/);
+
+    // Select only Alpha, then arm + confirm the delete.
+    fireEvent.click(screen.getByRole("checkbox", { name: /Select Alpha Case/ }));
+    const selectedButton = screen.getByRole("button", {
+      name: /Delete selected \(1\)/,
+    });
+    expect(selectedButton).not.toBeDisabled();
+    fireEvent.click(selectedButton);
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/ }));
+
+    // The confirm bar closed and nothing was removed yet.
+    expect(remove).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+
+    // Re-arm and actually confirm.
+    fireEvent.click(screen.getByRole("button", { name: /Delete selected \(1\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(1));
+    expect(remove).toHaveBeenCalledWith("case-1");
+    expect(remove).not.toHaveBeenCalledWith("case-2");
+    // Reloaded after success.
+    expect(list).toHaveBeenCalledTimes(2);
+  });
+
+  it("delete all cases removes every listed case after confirm", async () => {
+    const { cases, remove } = mockProvider({
+      list: vi.fn().mockResolvedValue({
+        items: [
+          { ...demoCase, id: "case-1", title: "Alpha Case" },
+          { ...demoCase, id: "case-2", title: "Beta Case" },
+        ],
+        page: 1,
+        pageSize: 100,
+        totalItems: 2,
+        hasMore: false,
+      }),
+    });
+    render(<CaseList cases={cases} mode="live" />);
+    await screen.findByText(/Alpha Case/);
+
+    fireEvent.click(screen.getByRole("button", { name: /Delete all cases/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(2));
+    expect(remove).toHaveBeenCalledWith("case-1");
+    expect(remove).toHaveBeenCalledWith("case-2");
+  });
+
+  it("skips already-deleted (NOT_FOUND) cases and completes the delete", async () => {
+    const { cases, remove } = mockProvider({
+      list: vi.fn().mockResolvedValue({
+        items: [
+          { ...demoCase, id: "case-1", title: "Alpha Case" },
+          { ...demoCase, id: "case-2", title: "Beta Case" },
+        ],
+        page: 1,
+        pageSize: 100,
+        totalItems: 2,
+        hasMore: false,
+      }),
+      remove: vi
+        .fn()
+        .mockRejectedValueOnce(ProviderError.notFound())
+        .mockResolvedValueOnce(undefined),
+    });
+    render(<CaseList cases={cases} mode="live" />);
+    await screen.findByText(/Alpha Case/);
+
+    fireEvent.click(screen.getByRole("button", { name: /Delete all cases/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(2));
+    // The NOT_FOUND was treated as already-gone success: no error surfaced.
+    expect(screen.queryByText(/Could not delete case/)).toBeNull();
+  });
+
+  it("surfaces a delete failure and keeps the confirm bar armed for retry", async () => {
+    const { cases, remove } = mockProvider({
+      list: vi.fn().mockResolvedValue({
+        items: [{ ...demoCase, id: "case-1", title: "Alpha Case" }],
+        page: 1,
+        pageSize: 100,
+        totalItems: 1,
+        hasMore: false,
+      }),
+      remove: vi
+        .fn()
+        .mockRejectedValueOnce(ProviderError.server("Backend exploded")),
+    });
+    render(<CaseList cases={cases} mode="live" />);
+    await screen.findByText(/Alpha Case/);
+
+    fireEvent.click(screen.getByRole("button", { name: /Delete all cases/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+    await screen.findByText(/Backend exploded/);
+    // Confirm bar stays armed (Cancel still present) so the operator can retry.
+    expect(screen.getByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("select-all toggles every case", async () => {
+    const { cases } = mockProvider({
+      list: vi.fn().mockResolvedValue({
+        items: [
+          { ...demoCase, id: "case-1", title: "Alpha Case" },
+          { ...demoCase, id: "case-2", title: "Beta Case" },
+        ],
+        page: 1,
+        pageSize: 100,
+        totalItems: 2,
+        hasMore: false,
+      }),
+    });
+    render(<CaseList cases={cases} mode="live" />);
+    await screen.findByText(/Alpha Case/);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select all cases" }));
+    expect(screen.getByRole("checkbox", { name: /Select Alpha Case/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Select Beta Case/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: /Delete selected \(2\)/ })).not.toBeDisabled();
   });
 });

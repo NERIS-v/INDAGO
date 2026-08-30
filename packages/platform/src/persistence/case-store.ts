@@ -31,6 +31,22 @@ import { db } from "../db/prisma.js";
  */
 const LEGACY_ASSIGNEE = "UNASSIGNED";
 
+/**
+ * Non-terminal run statuses that block a case deletion (a live pipeline owns
+ * rows inside this case boundary; removing them mid-flight would orphan the
+ * orchestration or silently strand ingest work).
+ */
+const ACTIVE_RUN_STATUSES = ["QUEUED", "INITIALIZING", "RUNNING", "PAUSED"];
+
+/**
+ * Outcome of deleteCase(), discriminated so the API boundary can map it to a
+ * precise HTTP response (404 / 409 / 200) without stringly logic.
+ */
+export type DeleteCaseResult =
+  | { outcome: "deleted"; caseId: string }
+  | { outcome: "not_found"; caseId: string }
+  | { outcome: "active_runs"; caseId: string };
+
 export class CaseStore {
   constructor(private readonly prisma: PrismaClient = db) {}
 
@@ -133,6 +149,91 @@ export class CaseStore {
       }
       return base;
     });
+  }
+
+  /**
+   * Hard-delete a case boundary and every durable row scoped to it, in FK-safe
+   * dependency order, inside one transaction. Refuses when the case still has
+   * active (QUEUED/INITIALIZING/RUNNING/PAUSED) investigation runs — deleting
+   * mid-pipeline would orphan the orchestrator's work.
+   *
+   * Artifacts are CONTENT-ADDRESSED AND GLOBAL: one Artifact row per content
+   * hash, potentially referenced by other cases' evidence/attempts. Only
+   * artifacts with no remaining Evidence/IngestionAttempt reference anywhere
+   * are deleted; any still-shared row survives intact.
+   */
+  async deleteCase(caseId: string): Promise<DeleteCaseResult> {
+    // The default interactive-transaction timeout is 5000 ms, which the full
+    // delete (several round-trips over a remote/pooled Postgres) can exceed —
+    // pass an explicit generous timeout so a slow-but-healthy run is not torn
+    // down mid-delete.
+    return this.prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.case.findUnique({ where: { id: caseId } });
+        if (!existing) return { outcome: "not_found", caseId };
+
+        const activeRuns = await tx.investigationRun.count({
+          where: { caseId, status: { in: ACTIVE_RUN_STATUSES } },
+        });
+        if (activeRuns > 0) return { outcome: "active_runs", caseId };
+
+        // Candidate artifacts referenced by this case's own rows, before those
+        // rows are removed.
+        const [evidences, attempts] = await Promise.all([
+          tx.evidence.findMany({
+            where: { caseId },
+            select: { artifactId: true },
+          }),
+          tx.ingestionAttempt.findMany({
+            where: { caseId },
+            select: { artifactId: true },
+          }),
+        ]);
+
+        // Case-scoped rows, dependency-first. Evidence/IngestionAttempt
+        // cascade their dependent rows (Observations, Raw/Normalized
+        // extractions); InvestigationRun cascades checkpoints and tool
+        // executions.
+        await tx.observation.deleteMany({ where: { caseId } });
+        await tx.evidence.deleteMany({ where: { caseId } });
+        await tx.source.deleteMany({ where: { caseId } });
+        await tx.ingestionAttempt.deleteMany({ where: { caseId } });
+        await tx.investigationRun.deleteMany({ where: { caseId } });
+        await tx.case.delete({ where: { id: caseId } });
+
+        // Artifact GC: delete only content-addresses this deletion orphaned.
+        const candidateIds = [
+          ...new Set(
+            [...evidences, ...attempts]
+              .map((row) => row.artifactId)
+              .filter((id): id is string => id !== null),
+          ),
+        ];
+        if (candidateIds.length > 0) {
+          const [keptEvidence, keptAttempts] = await Promise.all([
+            tx.evidence.findMany({
+              where: { artifactId: { in: candidateIds } },
+              select: { artifactId: true },
+            }),
+            tx.ingestionAttempt.findMany({
+              where: { artifactId: { in: candidateIds } },
+              select: { artifactId: true },
+            }),
+          ]);
+          const keep = new Set(
+            [...keptEvidence, ...keptAttempts]
+              .map((row) => row.artifactId)
+              .filter((id): id is string => id !== null),
+          );
+          const removable = candidateIds.filter((id) => !keep.has(id));
+          if (removable.length > 0) {
+            await tx.artifact.deleteMany({ where: { id: { in: removable } } });
+          }
+        }
+        return { outcome: "deleted", caseId };
+      },
+      { timeout: 30_000 },
+    );
   }
 }
 

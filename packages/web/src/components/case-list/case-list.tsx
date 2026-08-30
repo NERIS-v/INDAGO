@@ -41,9 +41,12 @@ function formatUpdated(value: Case["updatedAt"]): string {
 interface CaseCardProps {
   readonly caseItem: Case;
   readonly mode: AppDataMode;
+  readonly selected: boolean;
+  readonly disabled: boolean;
+  readonly onToggle: (id: string) => void;
 }
 
-function CaseCard({ caseItem, mode }: CaseCardProps) {
+function CaseCard({ caseItem, mode, selected, disabled, onToggle }: CaseCardProps) {
   const badge = statusBadge(caseItem.status);
   const primaryInvestigation = caseItem.investigationIds[0];
 
@@ -63,9 +66,19 @@ function CaseCard({ caseItem, mode }: CaseCardProps) {
             </p>
           )}
         </div>
-        <Badge variant={badge.variant} dot dotPulse={badge.pulse}>
-          {caseItem.status}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            aria-label={`Select ${caseItem.title}`}
+            checked={selected}
+            disabled={disabled}
+            onChange={() => onToggle(caseItem.id)}
+            className="h-4 w-4 rounded border-border-standard accent-accent-rose"
+          />
+          <Badge variant={badge.variant} dot dotPulse={badge.pulse}>
+            {caseItem.status}
+          </Badge>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-text-muted">
@@ -109,6 +122,13 @@ export function CaseList({ cases, mode }: CaseListProps) {
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
+  const [selected, setSelected] = useState<string[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<"selected" | "all" | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -133,7 +153,57 @@ export function CaseList({ cases, mode }: CaseListProps) {
     void load();
   }, [load]);
 
+  const toggleSelected = useCallback((id: string) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) =>
+      prev.length === items!.length ? [] : items!.map((c) => c.id),
+    );
+  }, [items]);
+
+  const runDelete = useCallback(
+    async (ids: string[]) => {
+      setDeleting(true);
+      setDeleteError(null);
+      let failed = false;
+      for (const id of ids) {
+        try {
+          await cases.remove(id);
+        } catch (err) {
+          const pe = toProviderError(err);
+          // NOT_FOUND means another session already removed the case — the
+          // outcome the operator asked for holds, so keep going.
+          if (pe.code !== "NOT_FOUND") {
+            setDeleteError(pe.message);
+            failed = true;
+            break;
+          }
+        }
+      }
+      // On partial/full failure the confirm bar stays armed so the operator
+      // can retry (already-removed cases are skipped) or cancel.
+      if (!failed) {
+        setPendingDelete(null);
+        setSelected([]);
+      }
+      setDeleting(false);
+      await load();
+    },
+    [cases, load],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!items) return;
+    const ids = pendingDelete === "all" ? items.map((c) => c.id) : selected;
+    await runDelete(ids);
+  }, [items, pendingDelete, selected, runDelete]);
+
   const isEmpty = !loading && !error && !unavailable && items !== null && items.length === 0;
+  const allSelected = items !== null && items.length > 0 && selected.length === items.length;
 
   return (
     <div className="space-y-4">
@@ -156,11 +226,89 @@ export function CaseList({ cases, mode }: CaseListProps) {
       ) : isEmpty ? (
         <EmptyState title="No cases" description="There are no cases to display in this catalogue." />
       ) : items ? (
-        <ul className="grid gap-4 md:grid-cols-2">
-          {items.map((c) => (
-            <CaseCard key={c.id} caseItem={c} mode={mode} />
-          ))}
-        </ul>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <label className="inline-flex items-center gap-2 text-xs text-text-muted">
+              <input
+                type="checkbox"
+                aria-label="Select all cases"
+                checked={allSelected}
+                disabled={deleting}
+                onChange={toggleAll}
+                className="h-4 w-4 rounded border-border-standard accent-accent-rose"
+              />
+              {items.length} case{items.length === 1 ? "" : "s"}
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={selected.length === 0 || deleting}
+                onClick={() => setPendingDelete("selected")}
+              >
+                Delete selected
+                {selected.length > 0 ? ` (${selected.length})` : ""}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={deleting}
+                onClick={() => setPendingDelete("all")}
+              >
+                Delete all cases
+              </Button>
+            </div>
+          </div>
+
+          {deleteError && (
+            <ErrorDisplay title="Could not delete case" message={deleteError} />
+          )}
+
+          {pendingDelete && (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/20 bg-danger/5 px-3 py-2"
+            >
+              <p className="text-xs text-text-secondary">
+                {pendingDelete === "all"
+                  ? `Delete all ${items.length} case${items.length === 1 ? "" : "s"}?`
+                  : `Delete ${selected.length} selected case${selected.length === 1 ? "" : "s"}?`}{" "}
+                This cannot be undone.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={deleting}
+                  onClick={() => setPendingDelete(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={deleting}
+                  onClick={() => void confirmDelete()}
+                >
+                  Confirm delete
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <ul className="grid gap-4 md:grid-cols-2">
+            {items.map((c) => (
+              <CaseCard
+                key={c.id}
+                caseItem={c}
+                mode={mode}
+                selected={selected.includes(c.id)}
+                disabled={deleting}
+                onToggle={toggleSelected}
+              />
+            ))}
+          </ul>
+        </div>
       ) : null}
     </div>
   );

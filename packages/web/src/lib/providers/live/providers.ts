@@ -62,6 +62,7 @@ import {
   listObservations as apiListObservations,
   listEvidence as apiListEvidence,
   listCases as apiListCases,
+  deleteCase as apiDeleteCase,
 } from "@/lib/api/server-action";
 import { uploadEvidence } from "@/lib/upload/uploadthing";
 
@@ -278,6 +279,16 @@ export class LiveCaseProvider implements CaseProvider {
   }
   get(_id: string): Promise<Case> {
     return providerUnsupported("cases.get");
+  }
+  /** remove() → platform DELETE /api/v1/cases/:caseId (via server action). */
+  async remove(id: string): Promise<void> {
+    try {
+      await apiDeleteCase(id);
+    } catch (err) {
+      // 404 (already gone elsewhere), 403 (access), 409 (active runs) and
+      // 5xx are surfaced as typed ProviderErrors for the UI.
+      throw toLiveProviderError(err);
+    }
   }
 }
 

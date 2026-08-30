@@ -29,7 +29,8 @@ import type { InvestigationTimeline } from "../types";
 
 export interface DemoWorkspaceState {
   readonly workspaceId: string;
-  case: Case;
+  /** Nullable so listCaseProviders can hard-delete its single demo case. */
+  case: Case | null;
   investigation: Investigation;
   evidenceById: Map<string, Evidence>;
   observationById: Map<string, Observation>;

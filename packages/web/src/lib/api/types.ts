@@ -151,3 +151,15 @@ export interface CasesResponse {
   readonly count: number;
   readonly cases: Case[];
 }
+
+// ============================================================================
+// Delete Case
+//
+// Shape returned by DELETE /api/v1/cases/:caseId. 409-if-active and 404-from
+// the platform map to `ApiError` status before this is ever resolved.
+// ============================================================================
+
+export interface DeleteCaseResponse {
+  readonly deleted: true;
+  readonly caseId: string;
+}

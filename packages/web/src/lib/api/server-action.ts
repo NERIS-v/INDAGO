@@ -7,6 +7,7 @@ import {
   listObservations as apiListObservations,
   listEvidence as apiListEvidence,
   listCases as apiListCases,
+  deleteCase as apiDeleteCase,
 } from "@/lib/api/server";
 import type {
   StartInvestigationResponse,
@@ -16,6 +17,7 @@ import type {
   ObservationsResponse,
   EvidenceListResponse,
   CasesResponse,
+  DeleteCaseResponse,
 } from "@/lib/api/types";
 
 export async function startInvestigation(params: {
@@ -53,4 +55,8 @@ export async function listEvidence(
 
 export async function listCases(): Promise<CasesResponse> {
   return apiListCases();
+}
+
+export async function deleteCase(caseId: string): Promise<DeleteCaseResponse> {
+  return apiDeleteCase(caseId);
 }
