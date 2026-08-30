@@ -24,7 +24,10 @@ export {
   NARRATIVE_STRENGTH_BASELINE,
   RECONSTRUCTED_STRENGTH_BASELINE,
   OBSERVATION_BOUNDS,
+  Y_TOLERANCE,
+  mergeSameLineSpans,
 } from './observation-rules.js';
+export type { MergeableSpan, MergedSpan } from './observation-rules.js';
 export {
   canonicalizeContent,
   isAssertiveContent,

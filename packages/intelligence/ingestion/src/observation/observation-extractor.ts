@@ -36,6 +36,7 @@ import {
   RECONSTRUCTED_STRENGTH_BASELINE,
   STRUCTURED_STRENGTH_BASELINE,
   OBSERVATION_EXTRACTOR_REF,
+  Y_TOLERANCE,
   canonicalizeContent,
   composeStructuredRow,
   detectObservedAt,
@@ -44,6 +45,8 @@ import {
   inferStructuredRelation,
   isAssertiveContent,
   isMeaningfulLeafPath,
+  mergeSameLineSpans,
+  type MergeableSpan,
 } from './observation-rules.js';
 import {
   OBSERVATION_IDENTITY_VERSION,
@@ -188,20 +191,59 @@ function docxCandidates(extraction: Extract<RawExtraction, { readonly format: 'D
 
 function pdfCandidates(extraction: Extract<RawExtraction, { readonly format: 'PDF' }>): Candidate[] {
   const candidates: Candidate[] = [];
+  const maxLength = OBSERVATION_BOUNDS.maxContentLength;
+
   for (const page of extraction.pages) {
+    // Consecutive spans that carry native geometry + offsets are merged into
+    // visual-line units; spans without geometry stay isolated candidates.
+    const gathers: { spans: MergeableSpan[]; flush: () => void } = {
+      spans: [],
+      flush: () => {
+        if (gathers.spans.length === 0) return;
+        for (const unit of mergeSameLineSpans(gathers.spans, Y_TOLERANCE)) {
+          const content = canonicalizeContent(unit.text, maxLength);
+          if (!isAssertiveContent(content)) continue;
+          candidates.push({
+            kind: 'line',
+            locationRef: {
+              page: page.pageNumber,
+              charStart: unit.start,
+              charEnd: unit.end,
+            },
+            content,
+          });
+        }
+        gathers.spans = [];
+      },
+    };
+
     for (const span of page.spans) {
-      const content = canonicalizeContent(span.text, OBSERVATION_BOUNDS.maxContentLength);
+      const boundingBox = span.sourceLocation.boundingBox;
+      const offsets = span.sourceLocation.pageTextOffset;
+      if (boundingBox !== undefined && offsets !== undefined) {
+        gathers.spans.push({
+          text: span.text,
+          y: boundingBox.y,
+          h: boundingBox.h,
+          start: offsets.start,
+          end: offsets.end,
+        });
+        continue;
+      }
+      gathers.flush();
+      const content = canonicalizeContent(span.text, maxLength);
       if (!isAssertiveContent(content)) continue;
       candidates.push({
         kind: 'line',
         locationRef: {
           page: page.pageNumber,
-          charStart: span.sourceLocation.pageTextOffset?.start,
-          charEnd: span.sourceLocation.pageTextOffset?.end,
+          charStart: offsets?.start,
+          charEnd: offsets?.end,
         },
         content,
       });
     }
+    gathers.flush();
   }
   return candidates;
 }
@@ -260,10 +302,39 @@ function imageCandidates(
   extraction: Extract<RawExtraction, { readonly format: 'IMAGE' }>,
 ): Candidate[] {
   const candidates: Candidate[] = [];
-  const lines =
-    extraction.ocrLines?.map((l) => l.text) ?? (extraction.text ? extraction.text.split('\n') : []);
-  lines.forEach((lineText, index) => {
-    const content = canonicalizeContent(lineText, OBSERVATION_BOUNDS.maxContentLength);
+  const maxLength = OBSERVATION_BOUNDS.maxContentLength;
+
+  // OCR lines carry bounding boxes — group spans that share a visual baseline
+  // into one source-faithful candidate (missing geometry falls back to the
+  // raw line split below).
+  if (extraction.ocrLines !== undefined && extraction.ocrLines.length > 0) {
+    let offset = 0;
+    const spans: MergeableSpan[] = extraction.ocrLines.map((l) => {
+      const start = offset;
+      const end = offset + l.text.length;
+      offset = end;
+      return {
+        text: l.text,
+        y: l.bbox.y0,
+        h: l.bbox.y1 - l.bbox.y0,
+        start,
+        end,
+      };
+    });
+    mergeSameLineSpans(spans, Y_TOLERANCE).forEach((unit, index) => {
+      const content = canonicalizeContent(unit.text, maxLength);
+      if (!isAssertiveContent(content)) return;
+      candidates.push({
+        kind: 'line',
+        locationRef: { line: index + 1 },
+        content,
+      });
+    });
+    return candidates;
+  }
+
+  (extraction.text?.split('\n') ?? []).forEach((lineText, index) => {
+    const content = canonicalizeContent(lineText, maxLength);
     if (!isAssertiveContent(content)) return;
     candidates.push({
       kind: 'line',
