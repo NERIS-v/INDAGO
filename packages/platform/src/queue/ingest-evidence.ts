@@ -47,11 +47,15 @@ import {
   type IngestionJobPayload,
   type NormalizedExtraction,
   type Observation,
+  type EntityMentionCandidate,
 } from "@indago/contracts";
 import {
   buildObservationIdentityKey,
+  buildEntityMentionIdentityKey,
   deterministicSourceId,
+  extractEntityMentions,
   extractObservations,
+  finalizeEntityMention,
   finalizeObservation,
   NORMALIZER_ID,
   NORMALIZER_VERSION,
@@ -66,6 +70,7 @@ import {
   deterministicEvidenceId,
   observationStore,
 } from "../persistence/observation-store.js";
+import { entityMentionStore } from "../persistence/entity-mention-store.js";
 import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
@@ -489,6 +494,20 @@ async function completeNormalization(params: {
     normalized,
   });
 
+  // ---- M-A07: extract + persist entity-like mention candidates (idempotent).
+  // Runs after the MA06 observations are durable — every candidate is grounded
+  // to an Observation → Evidence → Artifact provenance chain. Purely
+  // deterministic; M-A07 NEVER writes canonical Entity rows.
+  await completeMA07({
+    payload,
+    runId,
+    attemptId,
+    caseId,
+    artifactId,
+    raw,
+    normalized,
+  });
+
   // Re-entrancy can arrive while the run is still INGESTING (the NORMALIZING
   // transition itself failed on a prior pass). Walk the ladder INGESTING →
   // NORMALIZING (skip-if-past), then NORMALIZING → ANALYZING below — so a
@@ -655,6 +674,118 @@ async function completeMA06(params: {
     evidenceId,
     sourceId,
     observationIds: entries.map((e) => e.observation.id),
+  });
+}
+
+/**
+ * M-A07 durable entity-like mention candidate extraction.
+ *
+ * Idempotent end-to-end (mirrors completeMA06):
+ *   - Candidates are grounded to the durable MA06 Observations read back from
+ *     the store — same observationId → same identityKey → never duplicated.
+ *   - The pure extraction is computed only when the evidence has no durable
+ *     candidates yet; createMany skipDuplicates makes the write a safe no-op
+ *     under a concurrent/retried pass.
+ *   - ENTITY_MENTION_EXTRACTED is audited ONLY when rows were actually
+ *     inserted — the append-only audit log stays single-value and no mention
+ *     content is ever broadcast.
+ *
+ * M-A07 boundary (enforced):
+ *   - extracts entity-like mentions only — NEVER writes canonical Entity rows.
+ *   - NEVER assigns EntityId / ResolutionScore.
+ *   - provenance is inherited verbatim from each Observation (never
+ *     fabricated); entityType may be NULL (explicit uncertainty).
+ */
+async function completeMA07(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  attemptId: string;
+  caseId: string;
+  artifactId: string;
+  raw: RawExtraction;
+  normalized: NormalizedExtraction;
+}): Promise<void> {
+  const { payload, runId, caseId, artifactId } = params;
+  const investigationId = payload.investigationId;
+
+  // M-A07 consumes the MA06 Observation output (the source-supported
+  // assertions), grounded via the same deterministic EvidenceId MA06 used.
+  const evidenceId = await deterministicEvidenceId(
+    investigationId,
+    payload.operationId,
+    artifactId,
+  );
+
+  // 1. Read the durable MA06 observations for this evidence. Candidates are
+  //    grounded to these observations — never to raw text.
+  const observations = await observationStore.listObservations({
+    investigationId,
+    caseId,
+    evidenceId,
+  });
+  if (observations.length === 0) return; // nothing to ground mentions to
+
+  // 2. Only extract when none are durable yet (idempotent slot). M-A07 is a
+  //    pure downstream consumer: it reads observations, never mutates them.
+  const observationIds = observations.map((o) => o.id);
+  const alreadyDurable = await entityMentionStore.countByObservationIds(observationIds);
+  if (alreadyDurable > 0) {
+    emitProgressEvent(
+      investigationId,
+      "ANALYZING",
+      `Entity mention candidates already durable for evidence ${artifactId}; skipping re-extraction.`,
+      {
+        operationId: payload.operationId,
+        correlationId: payload.correlationId,
+        runId,
+        artifactId,
+      },
+    );
+    return;
+  }
+
+  // 3. Pure, deterministic extraction (no clock, no I/O). No gazetteer data is
+  //    injected yet — M-A07 ships with the empty gazetteer (all mentions are
+  //    pattern/contextual/heuristic). ENTITY_MENTION_BOUNDS caps output.
+  const nowIso = new Date().toISOString();
+  const candidateEntries: {
+    identityKey: string;
+    candidate: EntityMentionCandidate;
+  }[] = [];
+  for (const observation of observations) {
+    const { drafts } = await extractEntityMentions(observation);
+    for (const draft of drafts) {
+      const candidate = await finalizeEntityMention({ draft, nowIso });
+      candidateEntries.push({
+        identityKey: buildEntityMentionIdentityKey({
+          observationId: draft.observationId,
+          start: draft.start,
+          end: draft.end,
+          entityType: draft.entityType,
+          canonicalMatchValue: draft.canonicalMatchValue,
+        }),
+        candidate,
+      });
+    }
+  }
+  if (candidateEntries.length === 0) return; // no entity-like mentions found
+
+  // 4. Idempotent durable write (skipDuplicates). Audit only when inserted.
+  const { created } = await entityMentionStore.ensureEntityMentions(candidateEntries, {
+    investigationId,
+    caseId,
+  });
+  if (created === 0) return; // a concurrent pass already made this durable
+
+  // Audit exactly once, only after rows are durable. Metadata only — no
+  // mention content is ever audited or broadcast.
+  await logAuditEvent({
+    investigationId,
+    action: "ENTITY_MENTION_EXTRACTED",
+    actor: "ENTITY_MENTION_PIPELINE",
+    targetType: "OBSERVATION",
+    targetId: artifactId,
+    description: `Extracted ${created} entity mention candidate(s) from evidence ${artifactId} (case ${caseId})`,
   });
 }
 
