@@ -47,11 +47,19 @@ import {
   type IngestionJobPayload,
   type NormalizedExtraction,
   type Observation,
+  type EntityMentionCandidate,
+  type CandidatePair,
 } from "@indago/contracts";
 import {
   buildObservationIdentityKey,
+  buildEntityMentionIdentityKey,
+  buildCandidatePairIdentityKey,
+  blockCandidates,
   deterministicSourceId,
+  extractEntityMentions,
   extractObservations,
+  finalizeCandidatePair,
+  finalizeEntityMention,
   finalizeObservation,
   NORMALIZER_ID,
   NORMALIZER_VERSION,
@@ -66,6 +74,8 @@ import {
   deterministicEvidenceId,
   observationStore,
 } from "../persistence/observation-store.js";
+import { entityMentionStore } from "../persistence/entity-mention-store.js";
+import { candidatePairStore } from "../persistence/candidate-pair-store.js";
 import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
@@ -489,6 +499,31 @@ async function completeNormalization(params: {
     normalized,
   });
 
+  // ---- M-A07: extract + persist entity-like mention candidates (idempotent).
+  // Runs after the MA06 observations are durable — every candidate is grounded
+  // to an Observation → Evidence → Artifact provenance chain. Purely
+  // deterministic; M-A07 NEVER writes canonical Entity rows.
+  await completeMA07({
+    payload,
+    runId,
+    attemptId,
+    caseId,
+    artifactId,
+    raw,
+    normalized,
+  });
+
+  // ---- M-A08: generate candidate pairs over the case-scoped comparison
+  // universe (idempotent, per-pair). Runs after the MA07 candidates are
+  // durable. Blocking produces a pre-resolution COMPARISON UNIVERSE — it
+  // NEVER resolves identities, assigns EntityId, or computes a ResolutionScore.
+  await completeMA08({
+    payload,
+    runId,
+    caseId,
+    artifactId,
+  });
+
   // Re-entrancy can arrive while the run is still INGESTING (the NORMALIZING
   // transition itself failed on a prior pass). Walk the ladder INGESTING →
   // NORMALIZING (skip-if-past), then NORMALIZING → ANALYZING below — so a
@@ -656,6 +691,209 @@ async function completeMA06(params: {
     sourceId,
     observationIds: entries.map((e) => e.observation.id),
   });
+}
+
+/**
+ * M-A07 durable entity-like mention candidate extraction.
+ *
+ * Idempotent end-to-end (mirrors completeMA06):
+ *   - Candidates are grounded to the durable MA06 Observations read back from
+ *     the store — same observationId → same identityKey → never duplicated.
+ *   - The pure extraction is computed only when the evidence has no durable
+ *     candidates yet; createMany skipDuplicates makes the write a safe no-op
+ *     under a concurrent/retried pass.
+ *   - ENTITY_MENTION_EXTRACTED is audited ONLY when rows were actually
+ *     inserted — the append-only audit log stays single-value and no mention
+ *     content is ever broadcast.
+ *
+ * M-A07 boundary (enforced):
+ *   - extracts entity-like mentions only — NEVER writes canonical Entity rows.
+ *   - NEVER assigns EntityId / ResolutionScore.
+ *   - provenance is inherited verbatim from each Observation (never
+ *     fabricated); entityType may be NULL (explicit uncertainty).
+ */
+async function completeMA07(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  attemptId: string;
+  caseId: string;
+  artifactId: string;
+  raw: RawExtraction;
+  normalized: NormalizedExtraction;
+}): Promise<void> {
+  const { payload, runId, caseId, artifactId } = params;
+  const investigationId = payload.investigationId;
+
+  // M-A07 consumes the MA06 Observation output (the source-supported
+  // assertions), grounded via the same deterministic EvidenceId MA06 used.
+  const evidenceId = await deterministicEvidenceId(
+    investigationId,
+    payload.operationId,
+    artifactId,
+  );
+
+  // 1. Read the durable MA06 observations for this evidence. Candidates are
+  //    grounded to these observations — never to raw text.
+  const observations = await observationStore.listObservations({
+    investigationId,
+    caseId,
+    evidenceId,
+  });
+  if (observations.length === 0) return; // nothing to ground mentions to
+
+  // 2. Only extract when none are durable yet (idempotent slot). M-A07 is a
+  //    pure downstream consumer: it reads observations, never mutates them.
+  const observationIds = observations.map((o) => o.id);
+  const alreadyDurable = await entityMentionStore.countByObservationIds(observationIds);
+  if (alreadyDurable > 0) {
+    emitProgressEvent(
+      investigationId,
+      "ANALYZING",
+      `Entity mention candidates already durable for evidence ${artifactId}; skipping re-extraction.`,
+      {
+        operationId: payload.operationId,
+        correlationId: payload.correlationId,
+        runId,
+        artifactId,
+      },
+    );
+    return;
+  }
+
+  // 3. Pure, deterministic extraction (no clock, no I/O). No gazetteer data is
+  //    injected yet — M-A07 ships with the empty gazetteer (all mentions are
+  //    pattern/contextual/heuristic). ENTITY_MENTION_BOUNDS caps output.
+  const nowIso = new Date().toISOString();
+  const candidateEntries: {
+    identityKey: string;
+    candidate: EntityMentionCandidate;
+  }[] = [];
+  for (const observation of observations) {
+    const { drafts } = await extractEntityMentions(observation);
+    for (const draft of drafts) {
+      const candidate = await finalizeEntityMention({ draft, nowIso });
+      candidateEntries.push({
+        identityKey: buildEntityMentionIdentityKey({
+          observationId: draft.observationId,
+          start: draft.start,
+          end: draft.end,
+          entityType: draft.entityType,
+          canonicalMatchValue: draft.canonicalMatchValue,
+        }),
+        candidate,
+      });
+    }
+  }
+  if (candidateEntries.length === 0) return; // no entity-like mentions found
+
+  // 4. Idempotent durable write (skipDuplicates). Audit only when inserted.
+  const { created } = await entityMentionStore.ensureEntityMentions(candidateEntries, {
+    investigationId,
+    caseId,
+  });
+  if (created === 0) return; // a concurrent pass already made this durable
+
+  // Audit exactly once, only after rows are durable. Metadata only — no
+  // mention content is ever audited or broadcast.
+  await logAuditEvent({
+    investigationId,
+    action: "ENTITY_MENTION_EXTRACTED",
+    actor: "ENTITY_MENTION_PIPELINE",
+    targetType: "OBSERVATION",
+    targetId: artifactId,
+    description: `Extracted ${created} entity mention candidate(s) from evidence ${artifactId} (case ${caseId})`,
+  });
+}
+
+/**
+ * M-A08 case-scoped multi-pass blocking → CandidatePair generation.
+ *
+ * Blocking answers "which candidates are WORTH comparing", never "are these the
+ * same entity" — this stage performs NO resolution (M-A09). It produces an
+ * unordered, same-case, deterministic CandidatePair universe from the durable
+ * M-A07 candidates.
+ *
+ * Case-wide universe (not per-evidence): a candidate pair is meaningful across
+ * the whole case, so the engine reads ALL durable candidates for the case and
+ * blocks them together. This is safe to run for every evidence because the
+ * write is PER-PAIR idempotent:
+ *
+ *   - Pair.identityKey @unique + createMany skipDuplicates → a retry/concurrent
+ *     pass adds only pairs that did not already exist. There is DELIBERATELY
+ *     NO whole-batch "already has pairs → skip" gate (the M-A07 L-2 partial
+ *     failure lesson fixed): if pair A persists and pair B fails, a retry
+ *     creates only B and leaves A untouched.
+ *
+ * M-A08 boundary (enforced):
+ *   - PURE input: only durable EntityMentionCandidate rows are read.
+ *   - NEVER re-runs MA07, NEVER consumes raw Observation.candidateMentions.
+ *   - NEVER writes Entity/EntityHypothesis rows, assigns EntityId, or computes
+ *     ResolutionScore.
+ *   - No ML/LLM/embeddings/fuzzy similarity — three deterministic rule passes
+ *     unioned. No cross-case pairing (v1 is same-case only).
+ */
+async function completeMA08(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  caseId: string;
+  artifactId: string;
+}): Promise<void> {
+  const { payload, runId, caseId, artifactId } = params;
+  const investigationId = payload.investigationId;
+
+  // 1. Case-wide comparison universe: every durable M-A07 candidate in the case.
+  const candidates = await entityMentionStore.listByCase(caseId, { investigationId });
+  if (candidates.length < 2) return; // a pair requires at least two candidates
+
+  const nowIso = new Date().toISOString();
+
+  // 2. Pure, deterministic blocking (no clock, no I/O, no resolution).
+  const { drafts, metrics } = blockCandidates(
+    { candidates, caseId, investigationId },
+    {}, // default config: same-observation pairs excluded
+  );
+  if (drafts.length === 0) return; // nothing worth comparing yet
+
+  // 3. Finalize → per-pair identityKey → idempotent write (partial-retry safe).
+  const entries: { identityKey: string; pair: CandidatePair }[] = [];
+  for (const draft of drafts) {
+    const pair = await finalizeCandidatePair({ draft, nowIso });
+    entries.push({
+      identityKey: buildCandidatePairIdentityKey({
+        caseId: pair.caseId,
+        leftCandidateId: pair.leftCandidateId,
+        rightCandidateId: pair.rightCandidateId,
+      }),
+      pair,
+    });
+  }
+
+  const { created } = await candidatePairStore.ensureCandidatePairs(entries);
+
+  emitProgressEvent(
+    investigationId,
+    "ANALYZING",
+    `Blocking generated ${created} new candidate pair(s) for case ${caseId} (${metrics.uniquePairsAfterUnion} total in universe, ${metrics.blocksGenerated} blocks, ${metrics.blocksSkippedOversized} oversized skipped).`,
+    {
+      operationId: payload.operationId,
+      correlationId: payload.correlationId,
+      runId,
+      artifactId,
+    },
+  );
+
+  // Audit exactly once, only when pairs were actually inserted. Metadata only —
+  // no pair content is ever audited or broadcast.
+  if (created > 0) {
+    await logAuditEvent({
+      investigationId,
+      action: "CANDIDATE_PAIR_GENERATED",
+      actor: "CANDIDATE_PAIR_PIPELINE",
+      targetType: "CANDIDATE_PAIR",
+      targetId: caseId,
+      description: `Generated ${created} candidate pair(s) for case ${caseId} (universe ${metrics.uniquePairsAfterUnion}, blocks ${metrics.blocksGenerated}, oversized skipped ${metrics.blocksSkippedOversized})`,
+    });
+  }
 }
 
 /**

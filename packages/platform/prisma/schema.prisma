@@ -296,10 +296,89 @@ model Observation {
   createdAt         DateTime @default(now())
 
   evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  entityMentions EntityMentionCandidate[]
 
   @@index([investigationId, caseId])
   @@index([sourceId])
   @@index([evidenceId])
+}
+
+// ============================================================================
+// P-08b: Durable EntityMentionCandidate (M-A07 persisted)
+//
+// identityKey is the versioned canonical identity
+// (buildEntityMentionIdentityKey — observationId:start:end:entityType:
+// canonicalMatchValue) and is UNIQUE: the DB rejects duplicate rows authored
+// by concurrent/retried MA07 passes. id is the deterministic SHA-256 → UUID of
+// that same key.
+//
+// M-A07 boundary: this table stores PRE-RESOLUTION entity-like mentions. It is
+// NOT an Entity / EntityCandidate / EntityHypothesis and carries NO canonical
+// EntityId or resolution score. Same textual name in different observations →
+// separate candidates (resolution is a FUTURE stage). provenance is inherited
+// verbatim from the parent Observation — never fabricated.
+// ============================================================================
+model EntityMentionCandidate {
+  id                 String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey        String   @unique // versioned canonical identity — exact-dedup guard
+  observationId      String
+  investigationId    String
+  caseId             String
+  text               String
+  start              Int
+  end                Int
+  entityType         String?  // EntityTypeSchema value or NULL (explicit uncertainty)
+  extractionMethod   String   // ExtractionMethodSchema value
+  canonicalMatchValue String? // normalized matching value (distinct from text)
+  provenance         Json     // ProvenanceSchema (inherited from Observation)
+  createdAt          DateTime @default(now())
+
+  observation Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+
+  leftCandidatePairs  CandidatePair[] @relation("LeftCandidatePairs")
+  rightCandidatePairs CandidatePair[] @relation("RightCandidatePairs")
+
+  @@index([observationId])
+  @@index([investigationId, caseId])
+  @@index([entityType])
+}
+
+// ============================================================================
+// P-08c: Durable CandidatePair (M-A08 multi-pass blocking — persisted)
+//
+// identityKey is the versioned canonical identity
+// (buildCandidatePairIdentityKey — namespace:v1:caseId:minCandidateId:
+// maxCandidateId) and is UNIQUE: the DB rejects duplicate rows authored by
+// concurrent/retried MA08 passes, so a partial batch is recoverable (per-pair
+// skipDuplicates, never a whole-batch gate). id is the deterministic SHA-256 →
+// UUID of that same key.
+//
+// blockingPasses (Json) preserves EVERY blocking pass that discovered the pair
+// (union semantics — ORDER-INDEPENDENT, deterministic). left/right candidate
+// ids are canonical (min/max lexical) because the pair is UNORDERED.
+//
+// M-A08 boundary: this table stores a comparison UNIVERSE — pairs that are
+// worth comparing, NOT resolved identities. It carries NO EntityId, NO
+// ResolutionScore, NO hypothesis. Candidate↔Entity resolution is a FUTURE
+// stage and is deliberately absent here.
+// ============================================================================
+model CandidatePair {
+  id               String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey      String   @unique // versioned canonical identity — exact-dedup guard
+  caseId           String
+  investigationId  String?
+  leftCandidateId  String
+  rightCandidateId String
+  blockingPasses   Json // non-empty, deterministic-ordered array of BlockingPass values
+  createdAt        DateTime @default(now())
+
+  leftCandidate  EntityMentionCandidate @relation("LeftCandidatePairs", fields: [leftCandidateId], references: [id], onDelete: Cascade)
+  rightCandidate EntityMentionCandidate @relation("RightCandidatePairs", fields: [rightCandidateId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([investigationId, caseId])
+  @@index([leftCandidateId])
+  @@index([rightCandidateId])
 }
 
 // ============================================================================

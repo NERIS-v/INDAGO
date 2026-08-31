@@ -193,3 +193,65 @@ export type {
   LocationStructureKind,
 } from './observation/index.js';
 
+// M-A07 Entity Mention Candidate
+export {
+  extractEntityMentions,
+  finalizeEntityMention,
+  ENTITY_MENTION_IDENTITY_DERIVATION,
+  ENTITY_MENTION_IDENTITY_NAMESPACE,
+  ENTITY_MENTION_IDENTITY_VERSION,
+  buildEntityMentionIdentityKey,
+  deterministicEntityMentionId,
+  ENTITY_PATTERN_RULES,
+  matchTypedPatterns,
+  CAPITALIZED_NAME_RE,
+  createGazetteer,
+  EMPTY_GAZETTEER,
+  CONTEXTUAL_RULES,
+  classifyByContext,
+  isContextStopword,
+  HEURISTIC_METHOD,
+  isPlausibleEntityToken,
+  ENTITY_MENTION_BOUNDS,
+} from './entity-mention/index.js';
+export type {
+  EntityMentionExtractorConfig,
+  EntityMentionIdentityInput,
+  EntityPatternRule,
+  Gazetteer,
+  GazetteerEntry,
+  ContextualRule,
+  EntityMentionDraft,
+  EntityMentionExtractionResult,
+} from './entity-mention/index.js';
+
+// M-A08 Candidate Pair / Multi-pass Blocking
+export {
+  blockCandidates,
+} from './blocking/index.js';
+export {
+  finalizeCandidatePair,
+} from './blocking/index.js';
+export {
+  CANDIDATE_PAIR_IDENTITY_NAMESPACE,
+  CANDIDATE_PAIR_IDENTITY_VERSION,
+  buildCandidatePairIdentityKey,
+  canonicalizePairIds,
+  deterministicCandidatePairId,
+} from './blocking/index.js';
+export type { CandidatePairIdentityInput } from './blocking/index.js';
+export {
+  areTypesCompatible,
+  deriveSurnameInitial,
+} from './blocking/index.js';
+export {
+  CANDIDATE_PAIR_BOUNDS,
+} from './blocking/index.js';
+export type {
+  BlockingCandidate,
+  BlockingConfig,
+  BlockingMetrics,
+  BlockingResult,
+  CandidatePairDraft,
+} from './blocking/index.js';
+

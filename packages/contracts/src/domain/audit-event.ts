@@ -50,6 +50,8 @@ export const AuditActionSchema = z.enum([
   'NORMALIZATION_COMPLETED',
   'NORMALIZATION_FAILED',
   'OBSERVATION_EXTRACTED',
+  'ENTITY_MENTION_EXTRACTED',
+  'CANDIDATE_PAIR_GENERATED',
   'SYSTEM_ACTION',
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
@@ -72,6 +74,7 @@ export const AuditEventSchema = z.object({
     'REVIEW_TASK',
     'INVESTIGATION',
     'COMPARISON',
+    'CANDIDATE_PAIR',
     'SYSTEM',
   ]),
   targetId: z.string().min(1)
