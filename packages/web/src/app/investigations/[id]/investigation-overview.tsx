@@ -102,7 +102,12 @@ export function InvestigationOverview({
   useEffect(() => {
     const realtime = workspace.realtime;
     const unsubscribe = realtime.subscribe((event) => {
-      setEvents((prev) => [event, ...prev].slice(0, 50));
+      // Deduplicate incoming events to prevent React key collisions
+      setEvents((prev) => {
+        if (prev.some((e) => e.id === event.id)) return prev;
+        return [event, ...prev].slice(0, 50);
+      });
+      
       // Reconnect resync (Prompt 3 §19/§20): once the stream reconnects, the
       // database is authoritative — re-fetch the run state + lists. The first
       // connect is skipped because the initial load() already covers it (and
@@ -114,16 +119,19 @@ export function InvestigationOverview({
         connectedOnceRef.current = true;
       }
     });
+    
     const timer = window.setInterval(() => {
       setLive(realtime.getStatus() === "connected");
     }, 600);
+    
     realtime.connect(investigationId);
+    
     return () => {
       unsubscribe();
       window.clearInterval(timer);
       realtime.disconnect();
     };
-  }, [workspace, investigationId]);
+  }, [workspace, investigationId, load]);
 
   if (loading && !data) {
     return (
