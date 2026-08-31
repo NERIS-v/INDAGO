@@ -225,3 +225,33 @@ export type {
   EntityMentionExtractionResult,
 } from './entity-mention/index.js';
 
+// M-A08 Candidate Pair / Multi-pass Blocking
+export {
+  blockCandidates,
+} from './blocking/index.js';
+export {
+  finalizeCandidatePair,
+} from './blocking/index.js';
+export {
+  CANDIDATE_PAIR_IDENTITY_NAMESPACE,
+  CANDIDATE_PAIR_IDENTITY_VERSION,
+  buildCandidatePairIdentityKey,
+  canonicalizePairIds,
+  deterministicCandidatePairId,
+} from './blocking/index.js';
+export type { CandidatePairIdentityInput } from './blocking/index.js';
+export {
+  areTypesCompatible,
+  deriveSurnameInitial,
+} from './blocking/index.js';
+export {
+  CANDIDATE_PAIR_BOUNDS,
+} from './blocking/index.js';
+export type {
+  BlockingCandidate,
+  BlockingConfig,
+  BlockingMetrics,
+  BlockingResult,
+  CandidatePairDraft,
+} from './blocking/index.js';
+
