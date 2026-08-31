@@ -21,6 +21,22 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
+  packages/intelligence/entity-resolution:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@indago/ingestion':
+        specifier: workspace:*
+        version: link:../ingestion
+    devDependencies:
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
   packages/intelligence/ingestion:
     dependencies:
       '@indago/contracts':
@@ -63,6 +79,9 @@ importers:
       '@indago/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@indago/entity-resolution':
+        specifier: workspace:*
+        version: link:../intelligence/entity-resolution
       '@indago/ingestion':
         specifier: workspace:*
         version: link:../intelligence/ingestion
