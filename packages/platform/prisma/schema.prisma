@@ -15,30 +15,30 @@ model InvestigationRun {
   id              String   @id @default(uuid())
   investigationId String   @unique
   caseId          String
-  status          String   // QUEUED, INITIALIZING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED
-  state           String   // CREATED, INGESTING, NORMALIZING, ANALYZING, DISCOVERING, WAITING_FOR_EVIDENCE, REASSESSING, REVIEW_REQUIRED, PAUSED, FAILED, COMPLETED
-  currentStage    String?  // Human readable sub-stage
-  contextData     Json     // Stores current knowns/gaps
+  status          String // QUEUED, INITIALIZING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED
+  state           String // CREATED, INGESTING, NORMALIZING, ANALYZING, DISCOVERING, WAITING_FOR_EVIDENCE, REASSESSING, REVIEW_REQUIRED, PAUSED, FAILED, COMPLETED
+  currentStage    String? // Human readable sub-stage
+  contextData     Json // Stores current knowns/gaps
   error           String?
   retryCount      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  checkpoints     AgentCheckpoint[]
-  toolExecutions  ToolExecution[]
+  checkpoints    AgentCheckpoint[]
+  toolExecutions ToolExecution[]
 }
 
 // ============================================================================
 // G-A05: Checkpoint Store for Resume/Replay
 // ============================================================================
 model AgentCheckpoint {
-  id            String   @id @default(uuid())
-  runId         String
-  stepId        String   
-  stateHash     String
-  toolResults   Json?    
-  nextAction    String?  
-  timestamp     DateTime @default(now())
+  id          String   @id @default(uuid())
+  runId       String
+  stepId      String
+  stateHash   String
+  toolResults Json?
+  nextAction  String?
+  timestamp   DateTime @default(now())
 
   run InvestigationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 }
@@ -47,15 +47,15 @@ model AgentCheckpoint {
 // G-A07: Tool Execution Runtime
 // ============================================================================
 model ToolExecution {
-  id              String   @id @default(uuid())
-  runId           String
-  toolId          String
-  status          String   // PENDING, RUNNING, COMPLETED, FAILED
-  parameters      Json
-  output          Json?
-  error           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id         String   @id @default(uuid())
+  runId      String
+  toolId     String
+  status     String // PENDING, RUNNING, COMPLETED, FAILED
+  parameters Json
+  output     Json?
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   run InvestigationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 }
@@ -66,13 +66,13 @@ model ToolExecution {
 model AuditEvent {
   id              String   @id @default(uuid())
   investigationId String
-  action          String   
-  actor           String   // "AGENT", "SYSTEM", or "HUMAN:<ID>"
+  action          String
+  actor           String // "AGENT", "SYSTEM", or "HUMAN:<ID>"
   targetType      String
   targetId        String
   description     String
   timestamp       DateTime @default(now())
-  previousHash    String   // Link to previous audit event
+  previousHash    String // Link to previous audit event
   hash            String   @unique // SHA-256(previousHash + actor + action + targetId + timestamp)
 }
 
@@ -108,9 +108,9 @@ model Artifact {
   providerMetadata Json?
   ingestedAt       DateTime @default(now())
 
-  attempts        IngestionAttempt[]
-  extractions     RawExtraction[]
-  normalizations  NormalizedExtraction[]
+  attempts       IngestionAttempt[]
+  extractions    RawExtraction[]
+  normalizations NormalizedExtraction[]
 
   @@index([investigationId])
   @@index([idempotencyKey])
@@ -133,7 +133,7 @@ model IngestionAttempt {
   operationId     String
   correlationId   String
   attemptNumber   Int
-  status          String   // RUNNING, SUCCEEDED, FAILED
+  status          String // RUNNING, SUCCEEDED, FAILED
   sourceId        String?
   artifactId      String?
   parserId        String?
@@ -143,8 +143,8 @@ model IngestionAttempt {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  artifact    Artifact?      @relation(fields: [artifactId], references: [id], onDelete: SetNull)
-  extractions RawExtraction[]
+  artifact      Artifact?             @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  extractions   RawExtraction[]
   normalization NormalizedExtraction?
 
   @@unique([investigationId, idempotencyKey])
@@ -222,15 +222,15 @@ model NormalizedExtraction {
 // DOES NOT determine Observation strength (source catalog ≠ strength).
 // ============================================================================
 model Source {
-  id               String   @id // deterministic SourceId (SHA-256 of investigationId:fileKey)
-  caseId           String
-  investigationId  String
-  catalog          String   // validated SourceCatalogSchema value (FIR|CDR|FINANCIAL|…|MANUAL)
-  declaredCatalog  String?  // original untrusted declaration preserved verbatim
-  name             String   // payload.sourceName
-  description      String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id // deterministic SourceId (SHA-256 of investigationId:fileKey)
+  caseId          String
+  investigationId String
+  catalog         String // validated SourceCatalogSchema value (FIR|CDR|FINANCIAL|…|MANUAL)
+  declaredCatalog String? // original untrusted declaration preserved verbatim
+  name            String // payload.sourceName
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   evidence Evidence[]
 
@@ -247,21 +247,21 @@ model Source {
 // the payload's declared real-world event time (never fabricated).
 // ============================================================================
 model Evidence {
-  id                 String   @id // deterministic EvidenceId (SHA-256(investigationId:operationId:artifactId))
-  investigationId    String
-  caseId             String
-  operationId        String   // stable batch identity — part of EvidenceId triple
-  sourceId           String?
-  sourceName         String
-  sourceDescription  String?
-  evidenceType       String   // EvidenceTypeSchema value
-  title              String
-  description        String?
-  observedAt         Json?    // EventTime (value + precision) from the submission
-  artifactId         String
-  createdAt          DateTime @default(now())
+  id                String   @id // deterministic EvidenceId (SHA-256(investigationId:operationId:artifactId))
+  investigationId   String
+  caseId            String
+  operationId       String // stable batch identity — part of EvidenceId triple
+  sourceId          String?
+  sourceName        String
+  sourceDescription String?
+  evidenceType      String // EvidenceTypeSchema value
+  title             String
+  description       String?
+  observedAt        Json? // EventTime (value + precision) from the submission
+  artifactId        String
+  createdAt         DateTime @default(now())
 
-  source       Source?        @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  source       Source?       @relation(fields: [sourceId], references: [id], onDelete: SetNull)
   observations Observation[]
 
   @@unique([investigationId, operationId, artifactId])
@@ -286,16 +286,16 @@ model Observation {
   sourceId          String
   investigationId   String
   caseId            String
-  type              String   // ObservationTypeSchema value
+  type              String // ObservationTypeSchema value
   content           String
   strength          Float
-  candidateMentions Json     // readonly string[] (≤50)
-  provenance        Json     // ProvenanceSchema
-  observedAt        Json?    // EventTime (only when unambiguous in content)
-  entityIds         Json     // [] — MA06 never creates entity links
+  candidateMentions Json // readonly string[] (≤50)
+  provenance        Json // ProvenanceSchema
+  observedAt        Json? // EventTime (only when unambiguous in content)
+  entityIds         Json // [] — MA06 never creates entity links
   createdAt         DateTime @default(now())
 
-  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  evidence       Evidence                 @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   entityMentions EntityMentionCandidate[]
 
   @@index([investigationId, caseId])
@@ -319,19 +319,19 @@ model Observation {
 // verbatim from the parent Observation — never fabricated.
 // ============================================================================
 model EntityMentionCandidate {
-  id                 String   @id // deterministic UUID (SHA-256 of identityKey)
-  identityKey        String   @unique // versioned canonical identity — exact-dedup guard
-  observationId      String
-  investigationId    String
-  caseId             String
-  text               String
-  start              Int
-  end                Int
-  entityType         String?  // EntityTypeSchema value or NULL (explicit uncertainty)
-  extractionMethod   String   // ExtractionMethodSchema value
+  id                  String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey         String   @unique // versioned canonical identity — exact-dedup guard
+  observationId       String
+  investigationId     String
+  caseId              String
+  text                String
+  start               Int
+  end                 Int
+  entityType          String? // EntityTypeSchema value or NULL (explicit uncertainty)
+  extractionMethod    String // ExtractionMethodSchema value
   canonicalMatchValue String? // normalized matching value (distinct from text)
-  provenance         Json     // ProvenanceSchema (inherited from Observation)
-  createdAt          DateTime @default(now())
+  provenance          Json // ProvenanceSchema (inherited from Observation)
+  createdAt           DateTime @default(now())
 
   observation Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
 
@@ -372,8 +372,9 @@ model CandidatePair {
   blockingPasses   Json // non-empty, deterministic-ordered array of BlockingPass values
   createdAt        DateTime @default(now())
 
-  leftCandidate  EntityMentionCandidate @relation("LeftCandidatePairs", fields: [leftCandidateId], references: [id], onDelete: Cascade)
-  rightCandidate EntityMentionCandidate @relation("RightCandidatePairs", fields: [rightCandidateId], references: [id], onDelete: Cascade)
+  leftCandidate    EntityMentionCandidate @relation("LeftCandidatePairs", fields: [leftCandidateId], references: [id], onDelete: Cascade)
+  rightCandidate   EntityMentionCandidate @relation("RightCandidatePairs", fields: [rightCandidateId], references: [id], onDelete: Cascade)
+  EntityHypothesis EntityHypothesis[]
 
   @@index([caseId])
   @@index([investigationId, caseId])
@@ -382,7 +383,60 @@ model CandidatePair {
 }
 
 // ============================================================================
-// P-09: Durable Case (case catalogue — dashboard)
+// P-09: Durable EntityHypothesis (M-A09 candidate↔candidate resolution)
+//
+// identityKey is the versioned canonical identity
+// (buildEntityHypothesisIdentityKey — namespace:v1:candidatePairId:
+// scoreModelVersion) and is UNIQUE: a candidatePairId + scoreModelVersion maps
+// to exactly ONE logical hypothesis. id is the deterministic SHA-256 → UUID of
+// that same key (deterministicEntityHypothesisId). A retry / concurrent pass
+// converges to the same row — never a duplicate.
+//
+// M-A09 v1 semantic boundaries (enforced by the store + worker):
+//   - Candidate↔Candidate only: caseId + candidatePairId are required;
+//     entityId / resolvedEntityId are NULL (no canonical Entity fabricated).
+//   - score / comparisonStatus / scoreModelVersion come verbatim from the
+//     PURE resolver. The platform NEVER recalculates or re-weights them.
+//   - status is the hypothesis LIFECYCLE state (PROPOSED at machine proposal;
+//     ACCEPTED / REJECTED / REVERSED are authority/lifecycle states that a
+//     re-resolution MUST NOT clobber).
+//   - supportingObservationIds / contradictingObservationIds are stored as
+//     bounded JSON arrays; their non-overlap is guaranteed by the resolver.
+//
+// No CandidateResolution table: CandidateResolution is a PURE intermediate
+// engine result and is not persisted. Only CandidatePair (source) and
+// EntityHypothesis (output) are durable in M-A09 v1.
+// ============================================================================
+model EntityHypothesis {
+  id                          String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey                 String   @unique // versioned canonical identity — exact-dedup guard
+  caseId                      String
+  investigationId             String?
+  candidatePairId             String
+  entityId                    String? // canonical Entity (future) — NULL in v1 Candidate↔Candidate
+  resolvedEntityId            String? // canonical Entity link (future) — NULL in v1
+  status                      String // EntityResolutionStatusSchema lifecycle value
+  comparisonStatus            String // EntityComparisonStatusSchema comparison value
+  score                       Float // ResolutionScore ranging [0,1] — ranking signal only
+  scoreModelVersion           String
+  supportingCandidateIds      Json // EntityMentionCandidate IDs (positive identity evidence)
+  supportingObservationIds    Json // Observation IDs providing positive identity evidence
+  contradictingObservationIds Json // Observation IDs providing explicit contradiction evidence
+  provenance                  Json // ProvenanceSchema
+  metadata                    Json? // MetadataSchema (nullable)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  candidatePair CandidatePair @relation(fields: [candidatePairId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([investigationId, caseId])
+  @@index([candidatePairId])
+  @@index([status])
+}
+
+// ============================================================================
+// P-10: Durable Case (case catalogue — dashboard)
 //
 // One row per case boundary the platform has ever seen. Rows are
 // auto-provisioned (create-or-nothing, id = caseId) when an investigation run
@@ -400,13 +454,13 @@ model CandidatePair {
 // decoupled from the run lifecycle, mirroring the Artifact decoupling comment.
 // ============================================================================
 model Case {
-  id           String   @id // canonical case ID == InvestigationRun.caseId
+  id           String    @id // canonical case ID == InvestigationRun.caseId
   title        String
   description  String?
-  status       String   @default("OPEN") // OPEN, ACTIVE, CLOSED, ARCHIVED
+  status       String    @default("OPEN") // OPEN, ACTIVE, CLOSED, ARCHIVED
   assignedTo   String
   jurisdiction String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   closedAt     DateTime?
 }

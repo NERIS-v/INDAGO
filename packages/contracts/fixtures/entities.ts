@@ -37,6 +37,7 @@ export const FIXTURE_ENTITY_2: Entity = {
 
 export const FIXTURE_ENTITY_HYPOTHESIS_1: EntityHypothesis = {
   id: FIXTURE_IDS.entityHypothesis1,
+  caseId: FIXTURE_IDS.case1,
   entityId: FIXTURE_IDS.entity1,
   candidateEntities: [
     {
@@ -54,6 +55,7 @@ export const FIXTURE_ENTITY_HYPOTHESIS_1: EntityHypothesis = {
   ],
   comparisonStatus: 'NOT_COMPARED',
   score: 0.92,
+  scoreModelVersion: 'indago:resolution-score:v1',
   status: 'PARTIALLY_RESOLVED',
   provenance: {
     sourceId: FIXTURE_IDS.source1,

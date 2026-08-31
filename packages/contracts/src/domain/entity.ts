@@ -8,6 +8,8 @@ import {
   CaseIdSchema,
   InvestigationIdSchema,
   EntityComparisonIdSchema,
+  CandidatePairIdSchema,
+  EntityMentionCandidateIdSchema,
 } from '../common/ids.js';
 import { ObservedTimeSchema } from '../common/timestamps.js';
 import { ResolutionScoreSchema, RoleSignalSchema } from '../common/confidence.js';
@@ -110,21 +112,66 @@ export type EntityCandidate = z.infer<typeof EntityCandidateSchema>;
 /**
  * EntityHypothesis — proposes that observations refer to specific entity candidates.
  * Proposes identity resolution, not role.
+ *
+ * V1 supports two resolution flows:
+ *   - Candidate↔Candidate (M-A09 v1): candidatePairId is set, entityId is absent.
+ *       References EntityMentionCandidates via supportingCandidateIds.
+ *       supportingObservationIds/contradictingObservationIds carry the evidence
+ *       observation sets. candidateEntities is NOT used in this flow.
+ *   - Entity↔Entity (future): entityId is set and candidateEntities is populated.
+ *       References canonical Entities.
+ *
+ * ResolutionScore is a RANKING / SUPPORT signal. It is NOT a calibrated
+ * probability. High score may create a PROPOSED hypothesis, but must NOT
+ * automatically become ACCEPTED. Acceptance is a deliberate decision path.
+ *
+ * A reversal does NOT delete the hypothesis — it changes status to REVERSED
+ * and creates audit history. REVERSED ≠ MERGED.
+ *
+ * M-A09 v1 semantics (locked):
+ *   - Hypothesis identity is DETERMINISTIC: candidatePairId + scoreModelVersion
+ *       → SHA-256 → stable UUID. The same pair under the same scoring model
+ *       converges to ONE logical hypothesis (no duplicates on retry).
+ *   - scoreModelVersion records the scoring model that produced the score so a
+ *       future re-resolution under a new model yields a NEW hypothesis version
+ *       rather than silently mutating historical data.
+ *   - supportingObservationIds carry ONLY genuine positive identity evidence.
+ *   - contradictingObservationIds carry ONLY explicit mutually-exclusive
+ *       identity evidence (never mere "different observations", never ABSENT).
+ *       The two sets MUST NOT overlap.
+ *   - No canonical Entity is created in v1: entityId/resolvedEntityId are
+ *       absent (NULL) for Candidate↔Candidate.
  */
 export const EntityHypothesisSchema = z.object({
   id: EntityHypothesisIdSchema,
-  entityId: EntityIdSchema
-    .describe('The canonical entity this hypothesis is about'),
-  candidateEntities: z.array(EntityCandidateSchema).min(1)
-    .describe('Typed candidate entities. Not loose strings.'),
+  caseId: CaseIdSchema
+    .describe('Case scope — M-A09 v1 resolves same-case CandidatePairs only'),
+  investigationId: InvestigationIdSchema.optional()
+    .describe('Investigation scope (optional; when known it must match the candidate pair)'),
+  entityId: EntityIdSchema.optional()
+    .describe('Canonical entity (future Entity↔Entity flow). Absent for v1 Candidate↔Candidate.'),
+  candidatePairId: CandidatePairIdSchema.optional()
+    .describe('CandidatePair this hypothesis was derived from (v1 Candidate↔Candidate flow)'),
+  supportingCandidateIds: z.array(EntityMentionCandidateIdSchema).min(1).optional()
+    .describe('EntityMentionCandidate IDs supporting this hypothesis (v1)'),
+  candidateEntities: z.array(EntityCandidateSchema).min(1).optional()
+    .describe('Typed candidate entities (future Entity↔Entity flow). Not used in v1 Candidate↔Candidate.'),
   contradictions: z.array(EntityHypothesisIdSchema).optional()
     .describe('Hypotheses that contradict this one'),
   comparisonStatus: EntityComparisonStatusSchema
     .describe('Current comparison status'),
   score: ResolutionScoreSchema
-    .describe('Support for this identity match'),
+    .describe('Ranking/support signal for identity match. NOT a probability. NOT lifecycle authority — high score creates PROPOSED, never auto-ACCEPTED.'),
+  scoreModelVersion: z.string().min(1)
+    .describe('Deterministic scoring-model version that produced this score/support. Part of hypothesis identity.'),
+  supportingObservationIds: z.array(ObservationIdSchema).optional()
+    .describe('Observations providing genuine POSITIVE identity evidence (M-A09 v1)'),
+  contradictingObservationIds: z.array(ObservationIdSchema).optional()
+    .describe('Observations providing explicit mutually-exclusive identity evidence (M-A09 v1). Never ABSENT, never mere "different observations", never overlapping supporting.'),
   status: EntityResolutionStatusSchema
-    .describe('Current resolution status'),
+    .describe('Hypothesis lifecycle status. REVERSED ≠ MERGED.'),
+  resolvedEntityId: EntityIdSchema.optional()
+    .describe('Canonical entity link (future). Absent in v1 Candidate↔Candidate.'),
   provenance: ProvenanceSchema,
   createdAt: ObservedTimeSchema,
   updatedAt: ObservedTimeSchema,

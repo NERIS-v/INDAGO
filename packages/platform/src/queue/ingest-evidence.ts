@@ -49,6 +49,8 @@ import {
   type Observation,
   type EntityMentionCandidate,
   type CandidatePair,
+  type EntityHypothesis,
+  EntityHypothesisSchema,
 } from "@indago/contracts";
 import {
   buildObservationIdentityKey,
@@ -66,6 +68,11 @@ import {
   parseStoredRawExtraction,
   type RawExtraction,
 } from "@indago/ingestion";
+import {
+  buildEntityHypothesisIdentityKey,
+  compareCandidates,
+  deterministicEntityHypothesisId,
+} from "@indago/entity-resolution";
 import { logAuditEvent } from "../audit/logger.js";
 import { Prisma } from "@prisma/client";
 import { db } from "../db/prisma.js";
@@ -76,6 +83,7 @@ import {
 } from "../persistence/observation-store.js";
 import { entityMentionStore } from "../persistence/entity-mention-store.js";
 import { candidatePairStore } from "../persistence/candidate-pair-store.js";
+import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
 import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
@@ -524,6 +532,19 @@ async function completeNormalization(params: {
     artifactId,
   });
 
+  // ---- M-A09: resolve durable candidate pairs into reversible PROPOSED
+  // EntityHypotheses (idempotent, per-pair). Runs after the MA08 CandidatePairs
+  // are durable. Reads ONLY durable CandidatePair + EntityMentionCandidate rows
+  // — it never re-runs MA07/MA08, never parses artifacts, never calls OCR, and
+  // never fabricates a canonical Entity. A high deterministic score maps to a
+  // PROPOSED hypothesis (never auto-ACCEPTED); low-signal and contradictory
+  // pairs produce no durable proposition.
+  await completeMA09({
+    payload,
+    runId,
+    caseId,
+  });
+
   // Re-entrancy can arrive while the run is still INGESTING (the NORMALIZING
   // transition itself failed on a prior pass). Walk the ladder INGESTING →
   // NORMALIZING (skip-if-past), then NORMALIZING → ANALYZING below — so a
@@ -894,6 +915,193 @@ async function completeMA08(params: {
       description: `Generated ${created} candidate pair(s) for case ${caseId} (universe ${metrics.uniquePairsAfterUnion}, blocks ${metrics.blocksGenerated}, oversized skipped ${metrics.blocksSkippedOversized})`,
     });
   }
+}
+
+/**
+ * Map a pure-engine CandidateResolution + its CasePair + candidate provenance
+ * into a durable EntityHypothesis (v1 Candidate↔Candidate contract).
+ *
+ * This is a pure mapping — it does NOT compute, re-weight, or infer. The score,
+ * comparisonStatus, scoreModelVersion, supportingObservationIds and
+ * contradictingObservationIds arrive verbatim from the pure engine. In v1 the
+ * hypothesis predicate is candidatePairId; entityId / resolvedEntityId stay
+ * absent (no canonical Entity fabrication).
+ *
+ * HYPOTHESIS IDENTITY: deterministic — candidatePairId + scoreModelVersion →
+ * SHA-256 → stable UUID (id) with the identical canonical key (identityKey).
+ * The SAME pair under the SAME model converges to ONE logical hypothesis.
+ *
+ * Provenance is inherited from the in-pair candidates (never fabricated):
+ * sourceId/artifactId come from the left candidate's provenance; derivedFrom
+ * is the union of the pair's observation ids. This preserves the chain
+ * hypothesis → candidatePair → candidates → observations.
+ */
+function candidateResolutionToHypothesis(params: {
+  resolution: import("@indago/contracts").CandidateResolution;
+  pair: CandidatePair;
+  leftCandidate: EntityMentionCandidate;
+  id: string;
+  nowIso: string;
+}): EntityHypothesis {
+  const { resolution, pair, leftCandidate, id, nowIso } = params;
+  const derivedFrom = Array.from(
+    new Set(
+      [...resolution.supportingObservationIds, ...resolution.contradictingObservationIds],
+    ),
+  ).slice(0, resolution.supportingObservationIds.length + resolution.contradictingObservationIds.length);
+  return EntityHypothesisSchema.parse({
+    id,
+    caseId: pair.caseId,
+    ...(pair.investigationId !== undefined ? { investigationId: pair.investigationId } : {}),
+    candidatePairId: pair.id,
+    supportingCandidateIds: [pair.leftCandidateId, pair.rightCandidateId],
+    comparisonStatus: resolution.comparisonStatus,
+    score: resolution.score,
+    scoreModelVersion: resolution.scoreModelVersion,
+    supportingObservationIds: resolution.supportingObservationIds,
+    contradictingObservationIds: resolution.contradictingObservationIds,
+    status: resolution.status,
+    provenance: {
+      sourceId: leftCandidate.provenance.sourceId,
+      ...(leftCandidate.provenance.artifactId !== undefined
+        ? { artifactId: leftCandidate.provenance.artifactId }
+        : {}),
+      ...(derivedFrom.length > 0 ? { derivedFrom } : {}),
+      extractor: "indago:resolution:engine",
+      extractionMethod: resolution.scoreModelVersion,
+    },
+    createdAt: { value: nowIso, precision: "exact" },
+    updatedAt: { value: nowIso, precision: "exact" },
+  });
+}
+
+/**
+ * M-A09 durable candidate↔candidate resolution → reversible hypothesis.
+ *
+ * Consumes the DURABLE CandidatePair universe (M-A08) and the DURABLE
+ * EntityMentionCandidate rows (M-A07) for the case. It does NOT recreate
+ * candidates/pairs, parse artifacts, call OCR, or normalize raw data.
+ *
+ * Idempotency / partial-retry semantics (the M-A07 L-2 lesson):
+ *   - PER-PAIR processing — there is deliberately NO "case already resolved →
+ *     skip all" gate. Pair A with an existing hypothesis is skipped; Pair B
+ *     without one is processed. A retry after a partial failure recovers only
+ *     the missing hypotheses.
+ *   - Each write is idempotent: identityKey @unique + store lifecycle
+ *     preservation guarantee one logical hypothesis per
+ *     (candidatePairId, scoreModelVersion), and an existing ACCEPTED /
+ *     REJECTED / REVERSED hypothesis is never reset to PROPOSED.
+ *
+ * Boundary (enforced):
+ *   - Only pairs whose resolution PROPOSES (status PROPOSED) become durable
+ *     EntityHypotheses — a low-signal (UNRESOLVED) or contradictory
+ *     (CONTRADICTED) pair records no durable positive proposition.
+ *   - Never creates a canonical Entity, never merges/splits, never assigns
+ *     entityId/resolvedEntityId, never resolves across cases (v1 is same-case).
+ */
+async function completeMA09(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  caseId: string;
+}): Promise<void> {
+  const { payload, runId, caseId } = params;
+  const investigationId = payload.investigationId;
+
+  // 1. Case-scoped durable comparison universe (never re-derived).
+  const candidates = await entityMentionStore.listByCase(caseId, { investigationId });
+  if (candidates.length < 2) return;
+  const candidateById = new Map(candidates.map((c) => [c.id, c]));
+
+  const pairs = await candidatePairStore.listByCase(caseId, { investigationId });
+  if (pairs.length === 0) return;
+
+  const nowIso = new Date().toISOString();
+  let proposedEvents = 0;
+
+  // 2. Per-pair deterministic resolution — partial-failure safe.
+  for (const pair of pairs) {
+    // Validate consistency before touching anything for this pair.
+    const leftCandidate = candidateById.get(pair.leftCandidateId);
+    const rightCandidate = candidateById.get(pair.rightCandidateId);
+    if (!leftCandidate || !rightCandidate) {
+      // Typed, contained failure — do not contaminate the rest of the batch.
+      await logAuditEvent({
+        investigationId,
+        action: "SYSTEM_ACTION",
+        actor: "ENTITY_RESOLUTION_PIPELINE",
+        targetType: "CANDIDATE_PAIR",
+        targetId: pair.id,
+        description: `M-A09 skipped candidate pair ${pair.id}: one or both durable candidates missing (left=${pair.leftCandidateId}, right=${pair.rightCandidateId})`,
+      });
+      continue;
+    }
+    if (leftCandidate.id === rightCandidate.id) continue; // self-pair, never resolvable
+    // Case-scoping is enforced by construction: both candidates and the pair
+    // were loaded via case-scoped store queries (listByCase(caseId, ...)), so a
+    // pair can never reach a candidate from a different case here.
+
+    const { candidateResolution, proposed: isProposed } = await compareCandidates({
+      pair,
+      leftCandidate,
+      rightCandidate,
+    });
+    if (!isProposed || candidateResolution.status !== "PROPOSED") {
+      // UNRESOLVED / CONTRADICTED → no durable positive proposition.
+      continue;
+    }
+
+    // 3. Deterministic identity — same pair + same model ⇒ one logical row.
+    const scoreModelVersion = candidateResolution.scoreModelVersion;
+    const identityKey = buildEntityHypothesisIdentityKey({
+      candidatePairId: pair.id,
+      scoreModelVersion,
+    });
+    const id = await deterministicEntityHypothesisId({
+      candidatePairId: pair.id,
+      scoreModelVersion,
+    });
+
+    const hypothesis = candidateResolutionToHypothesis({
+      resolution: candidateResolution,
+      pair,
+      leftCandidate,
+      id,
+      nowIso,
+    });
+
+    // 4. Durable-state-first: persist the row BEFORE emitting any audit event.
+    const result = await entityHypothesisStore.upsertHypothesis({
+      identityKey,
+      hypothesis,
+    });
+
+    // 5. Audit ONLY after the durable row exists, with the ACTUAL hypothesis id
+    //    as the target. On a preserved authority state the row already exists
+    //    and only machine fields refreshed — audit only when a fresh proposal
+    //    actually landed to keep the append-only event single-valued.
+    if (!result.preservedExisting && result.reusedExisting === false) {
+      proposedEvents += 1;
+      await logAuditEvent({
+        investigationId,
+        action: "ENTITY_RESOLUTION_PROPOSED",
+        actor: "ENTITY_RESOLUTION_PIPELINE",
+        targetType: "SYSTEM",
+        targetId: hypothesis.id,
+        description: `Proposed entity identity hypothesis ${hypothesis.id} (case ${caseId}, pair ${pair.id}, score ${candidateResolution.score}, model ${scoreModelVersion})`,
+      });
+    }
+  }
+
+  emitProgressEvent(
+    investigationId,
+    "ANALYZING",
+    `Entity resolution proposed ${proposedEvents} hypothesis(es) for case ${caseId}.`,
+    {
+      operationId: payload.operationId,
+      correlationId: payload.correlationId,
+      runId,
+    },
+  );
 }
 
 /**

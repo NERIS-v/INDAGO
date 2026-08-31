@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",
+    "@indago/entity-resolution": "workspace:*",
     "@indago/ingestion": "workspace:*",
     "@prisma/client": "^5.10.0",
     "bullmq": "^5.0.0",
