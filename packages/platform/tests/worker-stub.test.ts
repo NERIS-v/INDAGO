@@ -39,6 +39,10 @@ const h = vi.hoisted(() => {
   const extractObservations = vi.fn();
   const finalizeObservation = vi.fn();
   const buildObservationIdentityKey = vi.fn();
+  // M-A08 blocking stubs (completeMA08).
+  const blockCandidates = vi.fn();
+  const finalizeCandidatePair = vi.fn();
+  const buildCandidatePairIdentityKey = vi.fn();
   return {
     acquire,
     extract,
@@ -50,6 +54,9 @@ const h = vi.hoisted(() => {
     extractObservations,
     finalizeObservation,
     buildObservationIdentityKey,
+    blockCandidates,
+    finalizeCandidatePair,
+    buildCandidatePairIdentityKey,
   };
 });
 
@@ -65,6 +72,10 @@ type MockedDb = {
   ingestionAttempt: { upsert: Mock; findUnique: Mock };
   rawExtraction: { create: Mock; findUnique: Mock };
   normalizedExtraction: { findUnique: Mock; create: Mock };
+  // M-A07 stores.
+  entityMentionCandidate: { findMany: Mock; count: Mock; createMany: Mock };
+  // M-A08 stores.
+  candidatePair: { count: Mock; createMany: Mock; findMany: Mock };
 };
 
 interface FakeJob {
@@ -107,6 +118,18 @@ vi.mock("../src/db/prisma.js", () => ({
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // M-A07 stores. Defaults keep MA07 a no-op (0 candidates durable).
+    entityMentionCandidate: {
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    // M-A08 stores. Defaults keep MA08 a no-op (< 2 candidates in the case).
+    candidatePair: {
+      count: vi.fn().mockResolvedValue(0),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 
@@ -141,6 +164,10 @@ vi.mock("@indago/ingestion", () => ({
   }),
   finalizeObservation: h.finalizeObservation.mockResolvedValue({ id: "obs-1" }),
   buildObservationIdentityKey: h.buildObservationIdentityKey.mockReturnValue("obs-identity-1"),
+  // M-A08 blocking exports (completeMA08 imports these; defaults no-op).
+  blockCandidates: h.blockCandidates.mockReturnValue({ drafts: [], metrics: null }),
+  finalizeCandidatePair: h.finalizeCandidatePair.mockResolvedValue({ id: "pair-1" }),
+  buildCandidatePairIdentityKey: h.buildCandidatePairIdentityKey.mockReturnValue("pair-identity-1"),
 }));
 
 vi.mock("../src/security/grounding.js", () => ({

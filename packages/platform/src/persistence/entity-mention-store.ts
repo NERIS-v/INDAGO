@@ -116,6 +116,23 @@ export class EntityMentionStore {
     return rows.map((row) => this.rowToCandidate(row));
   }
 
+  /**
+   * Read seam — list ALL durable candidates across a case (the M-A08
+   * comparison universe). Blocking is case-scoped, so the engine reads the
+   * whole case rather than a single evidence batch. Rows are reassembled and
+   * schema-validated.
+   */
+  async listByCase(
+    caseId: string,
+    filter: { investigationId: string },
+  ): Promise<EntityMentionCandidate[]> {
+    const rows = await this.prisma.entityMentionCandidate.findMany({
+      where: { caseId, investigationId: filter.investigationId },
+      orderBy: [{ id: "asc" }],
+    });
+    return rows.map((row) => this.rowToCandidate(row));
+  }
+
   private rowToCandidate(row: EntityMentionCandidateRow): EntityMentionCandidate {
     return EntityMentionCandidateSchema.parse({
       id: row.id,
