@@ -36,9 +36,19 @@ export const ENTITY_PATTERN_RULES: readonly EntityPatternRule[] = [
   },
   {
     entityType: 'PHONE',
-    // Supports +CC prefix, parenthesized area code, and grouped/spaced/dashed
-    // digit groups (2-5 digits each, e.g. +91-98765-43210 or (123) 456-7890).
-    pattern: /(?:\+\d{1,3}[ -]?)?(?:\(\d{1,4}\)[ -]?)?(?:\d{2,5}[ -]?){1,3}\d{2,5}(?!\d)/g,
+    // Explicit, mutually-exclusive phone shapes (NOT a universal 9-16 digit
+    // matcher — a bare run of 9-16 digits with no +CC prefix and no separator
+    // is an account/transaction/identifier, not a phone).
+    //
+    //   A) +CC prefix:  +91 9876543210, +91-98765-43210, +1 (212) 555-0199
+    //   B) (area) code: (123) 456-7890
+    //   C) grouped:     123-456-7890, 98765 43210
+    //   D) bare 10d:    9876543210  (exactly 10 consecutive digits)
+    //
+    // Alternative D is guarded by (?<!\d) / (?!\d) so 11-16 digit identifiers
+    // like 123456789012 are NOT phones — they fall through to ACCOUNT.
+    pattern:
+      /(?:\+\d{1,3}[ -]?(?:\d{2,5}[ -]?\d{2,5}(?:[ -]?\d{2,5})?|\d{7,12})|\(\d{1,4}\)[ -]?\d{3,4}[ -]?\d{3,4}|\d{2,5}[ -]\d{2,5}(?:[ -]\d{2,5})?)(?!\d)|(?<!\d)\d{10}(?!\d)/g,
   },
   {
     entityType: 'ACCOUNT',

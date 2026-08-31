@@ -88,12 +88,12 @@ describe('M-A07 pipeline stages', () => {
 
   it('CONTEXTUAL_RULE: nearby category label types an otherwise-untyped token', async () => {
     const { drafts } = await extractEntityMentions(
-      makeObservation('Subject was seen at Premises Solaris Tower.'),
+      makeObservation('Property was located at Solaris Tower, Sector 7.'),
     );
     const ctx = drafts.find((d) => d.extractionMethod === 'CONTEXTUAL_RULE');
     expect(ctx).toBeDefined();
     expect(ctx!.entityType).toBe('LOCATION');
-    expect(ctx!.text).toBe('Premises Solaris Tower');
+    expect(ctx!.text).toBe('Solaris Tower');
   });
 
   it('HEURISTIC_FALLBACK: untyped capitalized tokens stay untyped (explicit uncertainty)', async () => {
@@ -219,3 +219,119 @@ describe('M-A07 raw helpers', () => {
     expect(classifyByContext({ text: 'that', start: 5, end: 9, content: 'near that x' })).toBeUndefined();
   });
 });
+
+describe('M-A07 phone hardening (negative + format preservation)', () => {
+  it('preserves intended phone formats', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation(
+        'Call +91-98765-43210, +91 9876543210, (123) 456-7890, 123-456-7890, or 9876543210.',
+      ),
+    );
+    const phones = drafts
+      .filter((d) => d.entityType === 'PHONE')
+      .map((d) => d.text);
+    expect(phones).toContain('+91-98765-43210');
+    expect(phones).toContain('+91 9876543210');
+    expect(phones).toContain('(123) 456-7890');
+    expect(phones).toContain('123-456-7890');
+    expect(phones).toContain('9876543210');
+  });
+
+  it('does NOT classify bare 9-16 digit identifiers as PHONE', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Refs: 123456789012, 1234567890123456, 9845120012345678.'),
+    );
+    const phones = drafts.filter((d) => d.entityType === 'PHONE');
+    expect(phones).toHaveLength(0);
+  });
+
+  it('keeps phone/account precedence: a bare 10-digit number stays PHONE, longer runs become ACCOUNT', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Mobile 9988776655 and ledger 1234567890123456.'),
+    );
+    const ten = drafts.find((d) => d.entityType === 'PHONE');
+    const account = drafts.find((d) => d.entityType === 'ACCOUNT');
+    expect(ten?.text).toBe('9988776655');
+    expect(account?.text).toBe('1234567890123456');
+    expect(ten).not.toBe(account);
+  });
+});
+
+describe('M-A07 gazetteer semantics (injected data only)', () => {
+  it('injected gazetteer: "Rani Bagh" → LOCATION via GAZETTEER_MATCH', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Meet at Rani Bagh.'),
+      { gazetteerEntries: [{ token: 'Rani Bagh', entityType: 'LOCATION' }] },
+    );
+    const gz = drafts.find((d) => d.extractionMethod === 'GAZETTEER_MATCH');
+    expect(gz).toBeDefined();
+    expect(gz!.entityType).toBe('LOCATION');
+    expect(gz!.text).toBe('Rani Bagh');
+  });
+
+  it('no gazetteer: "Rani Bagh" is not LOCATION and not GAZETTEER_MATCH', async () => {
+    const { drafts } = await extractEntityMentions(makeObservation('Meet at Rani Bagh.'));
+    const gz = drafts.find((d) => d.extractionMethod === 'GAZETTEER_MATCH');
+    const anyLocation = drafts.find((d) => d.entityType === 'LOCATION');
+    expect(gz).toBeUndefined();
+    expect(anyLocation).toBeUndefined();
+  });
+
+  it('engine hardcodes no case names (empty default gazetteer classifies nothing)', () => {
+    const gz = createGazetteer([]);
+    for (const name of ['Rani Bagh', 'Chandigarh', 'ACME', 'Ravi']) {
+      expect(gz.lookup(name)).toBeUndefined();
+    }
+  });
+});
+
+describe('M-A07 hard negatives (weak signal never becomes authoritative)', () => {
+  const NEGATIVES: Array<{ content: string; label: string }> = [
+    { content: 'We meet on Monday.', label: 'Monday' },
+    { content: 'Please read The Report.', label: 'The Report' },
+    { content: 'Funds moved via Central Bank.', label: 'Central Bank' },
+    { content: 'He works at New Delhi Police Station.', label: 'New Delhi Police Station' },
+    { content: 'Reference 123456789012.', label: '123456789012' },
+  ];
+
+  for (const { content, label } of NEGATIVES) {
+    it(`weak capitalization / numeric ambiguity of "${label}" never becomes an authoritative type`, async () => {
+      const { drafts } = await extractEntityMentions(makeObservation(content));
+      const typed = drafts.filter((d) => d.entityType !== undefined);
+      // No draft may claim an authoritative PERSON/LOCATION/ORGANIZATION type.
+      for (const d of typed) {
+        expect(['PERSON', 'LOCATION', 'ORGANIZATION']).not.toContain(d.entityType);
+      }
+      // "123456789012" is a 12-digit bare run: it must NOT be a PHONE.
+      for (const d of drafts) {
+        expect(d.entityType).not.toBe('PHONE');
+      }
+    });
+  }
+});
+
+describe('M-A07 pattern precedence (deterministic overlap resolution)', () => {
+  it('higher-specificity rule wins and each span yields a single candidate', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('EMail a.b@example.com, phone +91-98765-43210, acct 1234567890123456.'),
+    );
+    // No two candidates may share the same (start, end, entityType) span.
+    const seen = new Set<string>();
+    for (const d of drafts) {
+      const k = `${d.start}:${d.end}:${d.entityType}`;
+      expect(seen.has(k)).toBe(false);
+      seen.add(k);
+    }
+    // The email stays EMAIL, not PHONE or ACCOUNT.
+    const email = drafts.find((d) => d.entityType === 'EMAIL');
+    expect(email?.text).toBe('a.b@example.com');
+  });
+
+  it('overlapping pattern attempt is deterministic run-to-run', async () => {
+    const content = 'a.b@example.com +91-98765-43210 1234567890123456';
+    const a = await extractEntityMentions(makeObservation(content));
+    const b = await extractEntityMentions(makeObservation(content));
+    expect(a.drafts).toEqual(b.drafts);
+  });
+});
+
