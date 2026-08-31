@@ -93,3 +93,6 @@ export type OperationId = z.infer<typeof OperationIdSchema>;
 
 export const ClaimIdSchema = z.string().uuid();
 export type ClaimId = z.infer<typeof ClaimIdSchema>;
+
+export const EntityMentionCandidateIdSchema = z.string().uuid();
+export type EntityMentionCandidateId = z.infer<typeof EntityMentionCandidateIdSchema>;

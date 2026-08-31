@@ -23,6 +23,7 @@ export * from './domain/artifact.js';
 export * from './domain/evidence.js';
 export * from './domain/observation.js';
 export * from './domain/entity.js';
+export * from './domain/entity-mention-candidate.js';
 export * from './domain/relation.js';
 export * from './domain/hypothesis.js';
 export * from './domain/lead.js';

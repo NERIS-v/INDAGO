@@ -50,6 +50,7 @@ export const AuditActionSchema = z.enum([
   'NORMALIZATION_COMPLETED',
   'NORMALIZATION_FAILED',
   'OBSERVATION_EXTRACTED',
+  'ENTITY_MENTION_EXTRACTED',
   'SYSTEM_ACTION',
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
