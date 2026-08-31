@@ -316,6 +316,8 @@ export interface RealtimeProvider {
   disconnect(): void;
   /** Current connection status. */
   getStatus(): RealtimeStatus;
+  /** Fire a named on-demand choreography (demo only). */
+  triggerSequence?(key: string): void;
 }
 
 // ============================================================================

@@ -1,23 +1,15 @@
-// ============================================================================
-// F-PR2 Demo Realtime Provider
-//
-// Replays the deterministic event sequence (from demo-fixtures/events.ts) with
-// scaled timing. Implements the RealtimeProvider lifecycle: connect / subscribe
-// / disconnect / getStatus. Per-workspace instance; shares the workspace state
-// store so emitted events are appended to the workspace event log.
-// ============================================================================
-
-import type {
-  RealtimeProvider,
-  RealtimeStatus,
-  ProviderEvent,
-  DataModeConfig,
-} from "../types";
+import type { RealtimeProvider, RealtimeStatus, ProviderEvent, DataModeConfig } from "../types";
 import { logDemoEvent } from "./state";
 import type { DemoWorkspaceState } from "./state";
 import { streamDelay } from "./latency";
 import { operationFinancialShadowEvents } from "./demo-fixtures/events";
+import { uploadDemoSequence, getSetupEvents } from "./demo-fixtures/upload-demo-sequence";
 import { INVESTIGATION_ID } from "./demo-fixtures/lookup";
+import type { DemoStreamEvent } from "./demo-fixtures/events";
+
+const NAMED_SEQUENCES: Record<string, DemoStreamEvent[]> = {
+  upload: uploadDemoSequence,
+};
 
 export class DemoRealtimeProvider implements RealtimeProvider {
   private readonly listeners = new Set<(event: ProviderEvent) => void>();
@@ -25,6 +17,11 @@ export class DemoRealtimeProvider implements RealtimeProvider {
   private timeouts: ReturnType<typeof setTimeout>[] = [];
   private connectedInvestigationId: string | null = null;
   private emitted = 0;
+  private queuedSequences: DemoStreamEvent[][] = [];
+  private draining = false;
+  
+  // The memory bank: allows nodes to survive tab switching!
+  private history: ProviderEvent[] = [];
 
   constructor(
     private readonly state: DemoWorkspaceState,
@@ -38,19 +35,40 @@ export class DemoRealtimeProvider implements RealtimeProvider {
     }
     this.connectedInvestigationId = investigationId;
     this.status = "connecting";
+    
+    // PRE-LOAD the memory bank with the Courier Firm and the Hole immediately!
+    this.history = getSetupEvents();
+
     this.timeouts.push(
       setTimeout(() => {
         this.status = "connected";
         this.emitted = 0;
         this.scheduleNext();
+        
+        if (this.queuedSequences.length > 0 && !this.draining && this.listeners.size > 0) {
+          this.drainQueue();
+        }
       }, streamDelay(120, this.config)),
     );
+  }
+
+  triggerSequence(key: string): void {
+    const sequence = NAMED_SEQUENCES[key];
+    if (!sequence || sequence.length === 0) return;
+    this.queuedSequences.push(sequence);
+    
+    if (this.status === "connected" && !this.draining && this.listeners.size > 0) {
+      this.drainQueue();
+    }
   }
 
   private scheduleNext(): void {
     if (this.status !== "connected") return;
     const next = operationFinancialShadowEvents[this.emitted];
-    if (!next) return;
+    if (!next) {
+      if (this.listeners.size > 0) this.drainQueue();
+      return;
+    }
     this.emitted += 1;
     this.timeouts.push(
       setTimeout(() => {
@@ -60,20 +78,68 @@ export class DemoRealtimeProvider implements RealtimeProvider {
     );
   }
 
+  private drainQueue(): void {
+    if (this.draining || this.status !== "connected") return;
+    const sequence = this.queuedSequences.shift();
+    if (!sequence) return;
+    this.draining = true;
+    let index = 0;
+    
+    const step = () => {
+      // Pause if user navigates to a different tab mid-animation
+      if (this.status !== "connected" || this.listeners.size === 0) {
+        this.draining = false;
+        if (sequence.slice(index).length > 0) {
+          this.queuedSequences.unshift(sequence.slice(index));
+        }
+        return;
+      }
+      
+      const next = sequence[index];
+      if (!next) {
+        this.draining = false;
+        this.drainQueue();
+        return;
+      }
+      index += 1;
+      this.timeouts.push(
+        setTimeout(() => {
+          this.emit(next);
+          step();
+        }, streamDelay(next.delayMs, this.config)),
+      );
+    };
+    step();
+  }
+
   private emit(event: ProviderEvent): void {
     if (this.status !== "connected") return;
+    
+    // Store every event so we can catch up components that mount later
+    this.history.push(event); 
     logDemoEvent(this.state, event);
+    
     for (const listener of this.listeners) {
       try {
         listener(event);
-      } catch {
-        // A single listener must not break the stream.
-      }
+      } catch {}
     }
   }
 
   subscribe(listener: (event: ProviderEvent) => void): () => void {
     this.listeners.add(listener);
+    
+    // THE MAGIC TRICK: Catch this specific tab up on EVERYTHING it missed while closed!
+    for (const pastEvent of this.history) {
+      try {
+        listener(pastEvent);
+      } catch {}
+    }
+    
+    if (this.status === "connected" && !this.draining && this.queuedSequences.length > 0) {
+      setTimeout(() => this.drainQueue(), 800);
+    }
+    
     return () => {
       this.listeners.delete(listener);
     };
@@ -83,6 +149,8 @@ export class DemoRealtimeProvider implements RealtimeProvider {
     this.status = "disconnected";
     this.connectedInvestigationId = null;
     this.emitted = 0;
+    this.draining = false;
+    this.history = []; // Clear memory on disconnect
     for (const t of this.timeouts) clearTimeout(t);
     this.timeouts = [];
   }
@@ -92,7 +160,6 @@ export class DemoRealtimeProvider implements RealtimeProvider {
   }
 }
 
-/** Build a DemoRealtimeProvider for the given workspace state. */
 export function createDemoRealtimeProvider(
   state: DemoWorkspaceState,
   config: DataModeConfig,
@@ -100,5 +167,4 @@ export function createDemoRealtimeProvider(
   return new DemoRealtimeProvider(state, config);
 }
 
-/** Re-export the canonical demo investigation id used by the realtime stream. */
 export { INVESTIGATION_ID as DEMO_INVESTIGATION_ID };

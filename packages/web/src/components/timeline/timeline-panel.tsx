@@ -32,6 +32,7 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 1. Initial Load
   useEffect(() => {
     let isMounted = true;
     async function fetchTimeline() {
@@ -45,6 +46,44 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
     fetchTimeline();
     return () => { isMounted = false; };
   }, [workspace]);
+
+  // 2. LIVE LISTENER: Adds the Evidence Dot dynamically the moment upload triggers!
+  useEffect(() => {
+    const unsubscribe = workspace.realtime.subscribe((event) => {
+      // Listen for the specific event ID from our F3 upload sequence
+      if (event.id === "upload-evt-1") {
+        setTimeline((prev) => {
+          if (!prev) return prev;
+          
+          const evBand = prev.bands.find((b) => b.kind === "evidence");
+          const bandId = evBand ? evBand.id : "band-evidence";
+          
+          const newBands = evBand 
+            ? prev.bands 
+            : [...prev.bands, { id: bandId, kind: "evidence" as const, label: "Evidence" }];
+
+          const newDot = {
+            id: "live-upload-dot",
+            bandId: bandId,
+            time: "2024-06-18T12:02:00.000Z", // Matches our F3 demo date
+            label: "Uploaded Evidence: ROC Filing & Call Records",
+            precision: "exact" as const,
+          };
+
+          // Prevent adding it twice
+          if (prev.items.some((it) => it.id === newDot.id)) return prev;
+
+          return {
+            ...prev,
+            bands: newBands,
+            items: [...prev.items, newDot],
+          };
+        });
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [workspace.realtime]);
 
   // ROCK-SOLID DOMAIN FALLBACK
   const domain = useMemo(() => {
