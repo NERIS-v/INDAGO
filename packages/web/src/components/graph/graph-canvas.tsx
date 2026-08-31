@@ -2,11 +2,13 @@
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useGraphLayout, nodeVisualRadius } from "./use-graph-layout";
-import type { GraphNode, GraphEdge } from "@indago/contracts";
+import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
+import { GraphHoleBurstLayer } from "./graph-hole-burst-layer";
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  holes: GraphHole[];
   onNodeClick: (nodeId: string) => void;
   activeTimeRange: [number, number] | null;
   controlsRef?: React.MutableRefObject<{
@@ -23,6 +25,7 @@ const FIT_PADDING = 0.85;
 export function GraphCanvas({
   nodes,
   edges,
+  holes,
   onNodeClick,
   activeTimeRange,
   controlsRef,
@@ -39,6 +42,7 @@ export function GraphCanvas({
   const [reducedMotion, setReducedMotion] = useState(false);
 
   const [bloom, setBloom] = useState(false);
+  const hasBloomedRef = useRef(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -68,14 +72,20 @@ export function GraphCanvas({
   );
 
   useEffect(() => {
-    setBloom(false);
     if (!settled) return;
+    if (hasBloomedRef.current) {
+      setBloom(true);
+      return;
+    }
     const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => setBloom(true));
+      const raf2 = requestAnimationFrame(() => {
+        setBloom(true);
+        hasBloomedRef.current = true;
+      });
       return () => cancelAnimationFrame(raf2);
     });
     return () => cancelAnimationFrame(raf1);
-  }, [settled, nodes, edges]);
+  }, [settled]);
 
   const isNodeInTimeRange = useCallback(
     (nodeId: string) => {
@@ -189,7 +199,6 @@ export function GraphCanvas({
   const DUR_FAST = "var(--transition-duration-fast, 200ms)";
   const EASE = "var(--ease-restrained, cubic-bezier(0.22, 1, 0.36, 1))";
   
-  // Custom spring bezier for the organic "pop" scaling effect
   const SPRING_EASE = "cubic-bezier(0.175, 0.885, 0.32, 1.15)";
 
   const cx = dimensions.width / 2;
@@ -243,7 +252,6 @@ export function GraphCanvas({
         >
           <g id="community-layer">
             {communities.map((c) => {
-              // Calculate spatial ripple delay from center
               const distFromCenter = Math.hypot(c.cx - cx, c.cy - cy);
               const rippleDelay = Math.max(0, distFromCenter * 1.5);
 
@@ -292,15 +300,11 @@ export function GraphCanvas({
                   y2 = target.y - (dy / dist) * (targetRadius + 4);
                 }
 
-                // Calculate edge ripple delay based on its midpoint distance from center
                 const midX = (source.x + target.x) / 2;
                 const midY = (source.y + target.y) / 2;
                 const distFromCenter = Math.hypot(midX - cx, midY - cy);
                 const edgeDelay = Math.max(0, distFromCenter * 1.5) + 100;
 
-                // SVG Direction Trick: Calculate which node is closer to the center.
-                // By applying a negative offset to backward lines, we force all lines
-                // to visually draw "outwards" from the core of the graph, mimicking a blast.
                 const sourceDist = Math.hypot(source.x - cx, source.y - cy);
                 const targetDist = Math.hypot(target.x - cx, target.y - cy);
                 const drawsBackward = sourceDist > targetDist;
@@ -354,6 +358,14 @@ export function GraphCanvas({
                 );
               })}
           </g>
+
+          <GraphHoleBurstLayer
+            layoutNodes={layoutNodes}
+            holes={holes}
+            reducedMotion={reducedMotion}
+            zoom={zoom}
+            bloom={bloom}
+          />
 
           <g id="bridge-layer">
             {layoutNodes
@@ -409,6 +421,8 @@ export function GraphCanvas({
                   r={radius}
                   filter={isActive ? "url(#node-glow)" : "url(#ambient-shadow)"}
                   className={`outline-none ${isActive && !reducedMotion ? "animate-breathe" : ""} ${
+                    node.isNewArrival && !reducedMotion ? "animate-fade-in" : ""
+                  } ${
                     isActive && inTimeRange
                       ? "fill-surface-200 stroke-accent-rose"
                       : node.isBridge
@@ -470,7 +484,6 @@ export function GraphCanvas({
               const radius = nodeVisualRadius(node.structuralImportance);
 
               const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
-              // Delay the text slightly after the node pop completes
               const labelDelay = Math.max(0, distFromCenter * 1.5) + 150;
 
               const dx = node.x - cx;

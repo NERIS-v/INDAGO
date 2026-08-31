@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { GraphNode, GraphEdge } from "@indago/contracts";
 
 export interface LayoutNode extends GraphNode {
@@ -10,10 +10,15 @@ export interface LayoutNode extends GraphNode {
   vy: number;
   communityId: number;
   isBridge: boolean;
+  /** True only on the render where this node first appeared. Consumers use
+   *  this to play a "materialize" / burst-arrival treatment instead of the
+   *  full-graph entrance animation replaying on every update. */
+  isNewArrival: boolean;
 }
 
 export interface LayoutEdge extends GraphEdge {
   isBridge: boolean;
+  isNewArrival: boolean;
 }
 
 export interface CommunityRegion {
@@ -74,7 +79,7 @@ function findBridgeEdges(
   return bridgeEdgeIds;
 }
 
-/** 
+/**
  * Computes non-linear node radius based on structural importance.
  * Utilized by both the layout engine (for accurate repulsion scaling) and the canvas renderer.
  */
@@ -84,13 +89,24 @@ export function nodeVisualRadius(importance: number | undefined): number {
 }
 
 /**
- * Deterministic force-directed layout engine.
- * 
- * Note: `communityId` and `isBridge` are computed client-side for presentation 
- * (fog regions and halos). These should be migrated to backend GraphAnalysisResult 
- * fields once the topology analysis API is available.
- * 
- * Physics and structural groupings strictly apply only to ACTIVE edges.
+ * Deterministic force-directed layout engine — now with cross-render POSITION
+ * MEMORY.
+ *
+ * Why this changed: the original implementation seeded every node's initial
+ * position from `(index / nodes.length) * 2π` and ran a full 300-iteration
+ * relaxation from scratch on every call. That's fine for a graph that is
+ * fetched once and never changes. It is actively harmful once the graph is
+ * live: adding a single node changes `nodes.length`, which shifts EVERY
+ * node's initial angle, which means the entire graph visibly reshuffles on
+ * every incoming event instead of the new node quietly joining. Live
+ * updates would have looked worse than the static baseline, not better.
+ *
+ * a module-scoped-per-hook-instance ref caches last-known positions by
+ * node id. Previously-seen nodes are seeded from their last position (so
+ * they barely move — just a gentle re-relax). Genuinely new nodes are
+ * seeded near their strongest existing neighbor (or the canvas center if
+ * they have none) and flagged `isNewArrival` for one render so the caller
+ * can play an entrance treatment exactly once.
  */
 export function useGraphLayout(
   nodes: GraphNode[],
@@ -98,6 +114,10 @@ export function useGraphLayout(
   width: number,
   height: number
 ) {
+  const positionCache = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const seenNodeIds = useRef<Set<string>>(new Set());
+  const seenEdgeIds = useRef<Set<string>>(new Set());
+
   return useMemo<LayoutResult>(() => {
     if (!nodes.length || width === 0 || height === 0) {
       return { layoutNodes: [], layoutEdges: [], communities: [], settled: false };
@@ -150,19 +170,65 @@ export function useGraphLayout(
       }
     });
 
-    // Deterministic initial placement
+    const previouslySeen = seenNodeIds.current;
+    const isFirstLayout = previouslySeen.size === 0;
+    const cache = positionCache.current;
+
+    // Initial placement: reuse cached position when we have one; otherwise
+    // seed a genuinely new node near an already-placed neighbor (so it
+    // visibly "arrives" from an anchored point rather than a random index
+    // angle), falling back to a point near center if it has no placed
+    // neighbor yet.
     const initialized: LayoutNode[] = nodes.map((n, i) => {
       const cId = communityOf.get(n.id) ?? 0;
-      const angle = (i / nodes.length) * 2 * Math.PI;
-      const radius = Math.min(width, height) * 0.35;
+      const cached = cache.get(n.id);
+      const isNewArrival = !isFirstLayout && !previouslySeen.has(n.id);
+
+      let x: number;
+      let y: number;
+
+      if (cached) {
+        x = cached.x;
+        y = cached.y;
+      } else {
+        const neighborIds = [...(adjacency.get(n.id) ?? [])];
+        const placedNeighbor = neighborIds
+          .map((id) => cache.get(id))
+          .find((p): p is { x: number; y: number } => Boolean(p));
+
+        if (placedNeighbor) {
+          // Arrive just off the neighbor, jittered so multiple simultaneous
+          // arrivals don't stack exactly on top of each other.
+          const jitterAngle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
+          x = placedNeighbor.x + Math.cos(jitterAngle) * 40;
+          y = placedNeighbor.y + Math.sin(jitterAngle) * 40;
+        } else if (isFirstLayout) {
+          // No history at all yet — classic ring seed for the very first
+          // paint of the graph.
+          const angle = (i / nodes.length) * 2 * Math.PI;
+          const radius = Math.min(width, height) * 0.35;
+          x = width / 2 + radius * Math.cos(angle);
+          y = height / 2 + radius * Math.sin(angle);
+        } else {
+          // A genuinely orphaned late arrival (no placed neighbor): enter
+          // from just outside the current graph, not dead center, so it
+          // reads as "new" rather than "teleported into the middle".
+          const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
+          const radius = Math.min(width, height) * 0.46;
+          x = width / 2 + radius * Math.cos(angle);
+          y = height / 2 + radius * Math.sin(angle);
+        }
+      }
+
       return {
         ...n,
-        x: width / 2 + radius * Math.cos(angle),
-        y: height / 2 + radius * Math.sin(angle),
+        x,
+        y,
         vx: 0,
         vy: 0,
         communityId: cId,
         isBridge: bridgeNodeIds.has(n.id),
+        isNewArrival,
       };
     });
 
@@ -173,14 +239,17 @@ export function useGraphLayout(
       .map((e) => ({ source: nodeById.get(e.sourceNodeId), target: nodeById.get(e.targetNodeId) }))
       .filter((e): e is { source: LayoutNode; target: LayoutNode } => Boolean(e.source && e.target));
 
-    // Force simulation
-    const iterations = 300;
+    // Force simulation. A first layout gets the full relaxation; an
+    // incremental update (graph already had a settled layout) only needs a
+    // short, gentle relax since most nodes are already near their resting
+    // position — this is what keeps live growth from visibly "boiling".
+    const iterations = isFirstLayout ? 300 : 90;
     const k = Math.sqrt((width * height) / Math.max(nodes.length, 1)) * 1.6;
     const speed = 0.1;
     const centerX = width / 2;
     const centerY = height / 2;
     const gravity = 0.005;
-    let temperature = width / 4;
+    let temperature = isFirstLayout ? width / 4 : width / 14;
 
     for (let iter = 0; iter < iterations; iter++) {
       for (let i = 0; i < initialized.length; i++) {
@@ -196,12 +265,11 @@ export function useGraphLayout(
           }
           const dist = Math.max(10, Math.sqrt(dx * dx + dy * dy));
           const sameCommunity = u.communityId === v.communityId;
-          
-          // Scale repulsion by rendered node radius to prevent overlap among high-centrality hubs
+
           const sizeFactor =
             1 + (nodeVisualRadius(u.structuralImportance) + nodeVisualRadius(v.structuralImportance)) / 24;
           const force = ((k * k) / dist) * (sameCommunity ? 1.0 : 1.5) * sizeFactor;
-          
+
           u.vx += (dx / dist) * force;
           u.vy += (dy / dist) * force;
           v.vx -= (dx / dist) * force;
@@ -218,7 +286,7 @@ export function useGraphLayout(
         }
         const dist = Math.max(10, Math.sqrt(dx * dx + dy * dy));
         const force = (dist * dist) / (k * 1.5);
-        
+
         source.vx -= (dx / dist) * force;
         source.vy -= (dy / dist) * force;
         target.vx += (dx / dist) * force;
@@ -245,6 +313,12 @@ export function useGraphLayout(
       temperature *= 0.98;
     }
 
+    // Persist positions + seen-ids for the next update.
+    const nextCache = new Map<string, { x: number; y: number }>();
+    initialized.forEach((n) => nextCache.set(n.id, { x: n.x, y: n.y }));
+    positionCache.current = nextCache;
+    seenNodeIds.current = new Set(nodes.map((n) => n.id));
+
     // Community fog regions
     const communities: CommunityRegion[] = [];
     for (let c = 0; c < communityCounter; c++) {
@@ -256,11 +330,17 @@ export function useGraphLayout(
       communities.push({ id: c, cx, cy, r });
     }
 
-    // Exclude ARCHIVED edges from the active projection
+    const prevEdgeIds = seenEdgeIds.current;
     const layoutEdges: LayoutEdge[] = edges
       .filter((e) => e.status !== "ARCHIVED")
-      .map((e) => ({ ...e, isBridge: bridgeEdgeIds.has(e.id) }));
+      .map((e) => ({
+        ...e,
+        isBridge: bridgeEdgeIds.has(e.id),
+        isNewArrival: !isFirstLayout && !prevEdgeIds.has(e.id),
+      }));
+    seenEdgeIds.current = new Set(edges.map((e) => e.id));
 
     return { layoutNodes: initialized, layoutEdges, communities, settled: true };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, width, height]);
 }

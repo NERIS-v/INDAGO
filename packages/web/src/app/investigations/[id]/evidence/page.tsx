@@ -11,6 +11,7 @@ import {
 } from "@/components/evidence/evidence-intake";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { triggerOrQueueUploadSequence } from "@/components/graph/graph-live";
 
 export default function EvidencePage() {
   const workspace = useWorkspace();
@@ -49,6 +50,9 @@ export default function EvidencePage() {
   const handleSubmit = useCallback(
     async (request: EvidenceIntakeSubmitRequest) => {
       await workspace.evidence.submit(workspace.investigationId, request);
+      
+      triggerOrQueueUploadSequence(workspace.realtime);
+      
       await load();
     },
     [workspace, load],

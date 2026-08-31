@@ -49,7 +49,8 @@ export function EvidenceIntake({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleRefsChange = useCallback((next: UploadedFileReference[]) => {
-    setRefs(next);
+    // Pushes the update to the next tick to prevent "setState during render" crashes
+    setTimeout(() => setRefs(next), 0);
   }, []);
 
   const handleSubmit = useCallback(async () => {
