@@ -296,10 +296,48 @@ model Observation {
   createdAt         DateTime @default(now())
 
   evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  entityMentions EntityMentionCandidate[]
 
   @@index([investigationId, caseId])
   @@index([sourceId])
   @@index([evidenceId])
+}
+
+// ============================================================================
+// P-08b: Durable EntityMentionCandidate (M-A07 persisted)
+//
+// identityKey is the versioned canonical identity
+// (buildEntityMentionIdentityKey — observationId:start:end:entityType:
+// canonicalMatchValue) and is UNIQUE: the DB rejects duplicate rows authored
+// by concurrent/retried MA07 passes. id is the deterministic SHA-256 → UUID of
+// that same key.
+//
+// M-A07 boundary: this table stores PRE-RESOLUTION entity-like mentions. It is
+// NOT an Entity / EntityCandidate / EntityHypothesis and carries NO canonical
+// EntityId or resolution score. Same textual name in different observations →
+// separate candidates (resolution is a FUTURE stage). provenance is inherited
+// verbatim from the parent Observation — never fabricated.
+// ============================================================================
+model EntityMentionCandidate {
+  id                 String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey        String   @unique // versioned canonical identity — exact-dedup guard
+  observationId      String
+  investigationId    String
+  caseId             String
+  text               String
+  start              Int
+  end                Int
+  entityType         String?  // EntityTypeSchema value or NULL (explicit uncertainty)
+  extractionMethod   String   // ExtractionMethodSchema value
+  canonicalMatchValue String? // normalized matching value (distinct from text)
+  provenance         Json     // ProvenanceSchema (inherited from Observation)
+  createdAt          DateTime @default(now())
+
+  observation Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+
+  @@index([observationId])
+  @@index([investigationId, caseId])
+  @@index([entityType])
 }
 
 // ============================================================================
