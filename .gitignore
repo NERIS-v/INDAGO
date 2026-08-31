@@ -148,4 +148,3 @@ vite.config.ts.timestamp-*
 # M-A07 model/runtime assets (never commit)
 *.traineddata
 packages/platform/.data/
-opencode.json
