@@ -26,6 +26,10 @@ import {
   GraphEdgeSchema,
   CrossCaseMatchSchema,
   RobustnessResultSchema,
+  EntityMentionCandidateSchema,
+  CandidatePairSchema,
+  CandidateResolutionSchema,
+  EntityHypothesisSchema,
 } from "@indago/contracts";
 import { demoFixtures } from "./index";
 
@@ -78,6 +82,10 @@ export function validateDemoFixtures(): ValidationReport {
     ["graphNodes", demoFixtures.graphNodes, GraphNodeSchema],
     ["graphEdges", demoFixtures.graphEdges, GraphEdgeSchema],
     ["crossCase", demoFixtures.crossCase, CrossCaseMatchSchema],
+    ["candidates", demoFixtures.candidates, EntityMentionCandidateSchema],
+    ["candidatePairs", demoFixtures.candidatePairs, CandidatePairSchema],
+    ["resolutions", demoFixtures.resolutions, CandidateResolutionSchema],
+    ["entityHypotheses", demoFixtures.entityHypotheses, EntityHypothesisSchema],
   ];
   for (const [label, arr, schema] of arrays) {
     arr.forEach((item, i) => parseOne(`${label}[${i}]`, item, schema, errors));

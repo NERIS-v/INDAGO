@@ -33,6 +33,13 @@ import type {
   RobustnessResult,
   EvidenceSubmissionRequest,
   UploadedFileReference,
+  RelationHypothesis,
+  Source,
+  Artifact,
+  EntityMentionCandidate,
+  CandidatePair,
+  CandidateResolution,
+  EntityHypothesis,
 } from "@indago/contracts";
 import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
@@ -216,6 +223,102 @@ export interface ProviderQuery {
 }
 
 // ============================================================================
+// Graph Realtime Overlay Catalog (documented local)
+//
+// Maps realtime events to graph deltas so UI components can render live
+// entities/edges/holes without importing demo fixtures. The catalog itself is
+// DATA owned by the provider seam (demo returns its choreography catalog; live
+// returns {} because the platform does not expose graph deltas yet). UI code
+// receives the catalog through GraphProvider.getOverlayCatalog() and never
+// imports demo/live files.
+// ============================================================================
+
+export interface GraphRealtimeCatalogEntry {
+  readonly kind: "node" | "edge" | "hole" | "hole-resolve";
+  readonly node?: GraphNode;
+  readonly edge?: GraphEdge;
+  readonly hole?: GraphHole;
+  readonly extraEdges?: readonly GraphEdge[];
+  readonly resolvesHoleId?: string;
+}
+
+export type GraphRealtimeCatalog = Record<string, GraphRealtimeCatalogEntry>;
+
+/** Deterministic lookup key (action + targetId) for a catalog entry. */
+export function catalogKey(action: string, targetId: string): string {
+  return `${action}:${targetId}`;
+}
+
+// ============================================================================
+// Intelligence domain projections (documented local)
+//
+//  - ObservationContradiction   a first-class, never-auto-resolved A/∼A pairing
+//                               between two observations. Mirrors the canonical
+//                               CounterEvidenceSignal taxonomy (contradictionType
+//                               + EvidenceStrength) while remaining a local
+//                               projection: the canonical signal couples an
+//                               observation to a HYPOTHESIS, but an observation↔
+//                               observation pair has no hypothesis.
+//  - IntelligenceCandidateView  the ER comparison surface the UI renders,
+//                               composing canonical CandidatePair +
+//                               CandidateResolution + EntityHypothesis.
+//  - DiscoveryCandidate         a deterministic structural candidate surfaced
+//                               by Discovery Mode, derived only from canonical
+//                               graph data (degree / structuralImportance /
+//                               cut-edges). NOT a relevance or guilt ranking.
+// ============================================================================
+
+export interface ObservationContradiction {
+  readonly id: string;
+  readonly investigationId: string;
+  /** The observation asserting A. */
+  readonly leftObservationId: string;
+  /** The observation asserting ∼A. */
+  readonly rightObservationId: string;
+  readonly contradictionType:
+    | "DIRECT_REFUTATION"
+    | "TEMPORAL_IMPOSSIBILITY"
+    | "LOGICAL_INCONSISTENCY"
+    | "SOURCE_CREDIBILITY"
+    | "INCOMPLETE_INFORMATION";
+  readonly strength: number;
+  readonly description: string;
+  readonly evidenceIds: readonly [string, string];
+  readonly detectedAt: { readonly value: string; readonly precision: "exact" };
+}
+
+export interface IntelligenceCandidateView {
+  readonly resolutionId: string;
+  readonly pair: CandidatePair;
+  readonly left: EntityMentionCandidate;
+  readonly right: EntityMentionCandidate;
+  /** Canonical hypothesis lifecycle state (UNRESOLVED → ACCEPTED → REVERSED). */
+  readonly hypothesis: EntityHypothesis;
+  /** Deterministic engine comparison output. */
+  readonly comparison: CandidateResolution;
+  /** Canonical entity the RIGHT candidate is currently linked to, if any. The
+   *  LEFT candidate may have NO linked entity — that absence IS the ambiguity. */
+  readonly leftEntity: Entity | null;
+  readonly rightEntity: Entity | null;
+}
+
+export interface DiscoveryCandidate {
+  readonly id: string;
+  readonly nodeId: string;
+  readonly entityId: string;
+  readonly label: string;
+  readonly type: string;
+  readonly degree: number;
+  readonly structuralImportance: number;
+  readonly observationCount: number;
+  readonly sourceCount: number;
+  readonly contradictedEdgeIds: readonly string[];
+  readonly bridgeNote: string | null;
+  readonly reasons: readonly string[];
+  readonly supportingObservationIds: readonly string[];
+}
+
+// ============================================================================
 // Realtime domain types (canonical contract SSE is SseEvent; the realtime
 // seam adds normalization + deduplication on top of that transport).
 // ============================================================================
@@ -283,6 +386,47 @@ export interface GraphProvider {
   getNodes(investigationId: string, query?: ProviderQuery): Promise<Paginated<GraphNode>>;
   getEdges(investigationId: string, query?: ProviderQuery): Promise<Paginated<GraphEdge>>;
   getGraphHoles(investigationId: string, query?: ProviderQuery): Promise<Paginated<GraphHole>>;
+  /** Provider-owned realtime overlay catalog (DATA, not UI). Demo returns its
+   *  deterministic choreography catalog; live returns {} because the platform
+   *  does not expose graph deltas yet (typed unsupported, no fabrication). */
+  getOverlayCatalog(): Promise<GraphRealtimeCatalog>;
+}
+
+export interface RelationProvider {
+  listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<RelationHypothesis>>;
+  get(id: string): Promise<RelationHypothesis>;
+}
+
+export interface IntelligenceProvider {
+  /** All first-class A/∼A observation contradictions for an investigation. */
+  listContradictions(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<ObservationContradiction>>;
+  /** ER comparison candidates (default demo: the OBS_8 identity ambiguity). */
+  listCandidates(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<IntelligenceCandidateView>>;
+  getCandidate(investigationId: string, resolutionId: string): Promise<IntelligenceCandidateView>;
+  /** Deliberate analyst decision: record "keep unresolved". Never auto-resolves. */
+  keepUnresolved(investigationId: string, resolutionId: string): Promise<IntelligenceCandidateView>;
+  /** Deliberate analyst decision: accept the identity match. Records the decision
+   *  only — no canonical entity merge, no silent graph rewire. */
+  accept(investigationId: string, resolutionId: string): Promise<IntelligenceCandidateView>;
+  /** Deliberate analyst decision: reverse a prior resolution. REVERSED ≠ delete —
+   *  the hypothesis keeps its audit history. */
+  reverse(investigationId: string, resolutionId: string): Promise<IntelligenceCandidateView>;
+  /** Deterministic Discovery Mode candidates (structural, NOT relevance). */
+  listDiscovery(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<DiscoveryCandidate>>;
+  getSource(id: string): Promise<Source>;
+  getArtifact(id: string): Promise<Artifact>;
 }
 
 export interface TimelineProvider {
@@ -366,6 +510,8 @@ export interface WorkspaceProviders extends WorkspaceIdentity {
   readonly observations: ObservationProvider;
   readonly entities: EntityProvider;
   readonly graph: GraphProvider;
+  readonly relations: RelationProvider;
+  readonly intelligence: IntelligenceProvider;
   readonly timeline: TimelineProvider;
   readonly leads: LeadProvider;
   readonly gaps: GapProvider;

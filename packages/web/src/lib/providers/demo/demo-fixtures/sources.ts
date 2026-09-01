@@ -17,6 +17,7 @@ import {
   EVID_EMAIL_1,
   EVID_EMAIL_2,
   EVID_REGISTRY,
+  EVID_REGISTRY_2,
 } from "./lookup";
 import { obs } from "./times";
 
@@ -59,7 +60,7 @@ const registry: Source = {
   type: "EXTERNAL_SYSTEM",
   status: "ACTIVE",
   systemOrigin: "registry.gov.v2",
-  evidenceIds: [EVID_REGISTRY],
+  evidenceIds: [EVID_REGISTRY, EVID_REGISTRY_2],
   ingestionStartedAt: { value: "2024-05-23T10:00:00.000Z", precision: "exact" },
   ingestionCompletedAt: { value: "2024-05-23T10:01:00.000Z", precision: "exact" },
   recordCount: 12,

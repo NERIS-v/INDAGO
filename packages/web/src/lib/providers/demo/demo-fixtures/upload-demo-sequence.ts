@@ -1,7 +1,7 @@
 import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
 import type { SseEvent } from "@/lib/realtime/sse-client";
-import type { LiveGraphCatalog } from "@/components/graph/graph-live";
-import { catalogKey } from "@/components/graph/graph-live";
+import type { GraphRealtimeCatalog } from "../../types";
+import { catalogKey } from "../../types";
 import { deterministicUuid } from "../submit";
 import { obs } from "./times";
 import { INVESTIGATION_ID, GRAPH_VERSION, GN_BANK, GN_VICTOR } from "./lookup";
@@ -166,7 +166,7 @@ export const uploadDemoSequence: DemoStreamEvent[] = [
   },
 ];
 
-export const uploadDemoCatalog: LiveGraphCatalog = {
+export const uploadDemoCatalog: GraphRealtimeCatalog = {
   [catalogKey("ENTITY_CREATED", ENT_COURIER)]: {
     kind: "node",
     node: courierNode,
