@@ -20,11 +20,14 @@ import type {
   ReviewProvider,
   RobustnessProvider,
   CrossCaseProvider,
+  RelationProvider,
+  IntelligenceProvider,
   DataModeConfig,
   ProviderQuery,
   Paginated,
   WorkspaceProviders,
   WorkspaceIdentity,
+  GraphRealtimeCatalog,
 } from "../types";
 import { ProviderError } from "../types";
 import type {
@@ -32,6 +35,8 @@ import type {
   Evidence,
   EvidenceSubmissionRequest,
   UploadedFileReference,
+  Source,
+  Artifact,
 } from "@indago/contracts";
 import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import { createDemoWorkspaceState, logDemoEvent } from "./state";
@@ -39,6 +44,14 @@ import type { DemoWorkspaceState } from "./state";
 import { createDemoRealtimeProvider } from "./realtime";
 import { baseLatency, heavyLatency, deterministicSleep } from "./latency";
 import { demoFixtures } from "./demo-fixtures";
+import { uploadDemoCatalog } from "./demo-fixtures/upload-demo-sequence";
+import { ENTITY_LINK_BY_CANDIDATE } from "./demo-fixtures/entity-resolution";
+import { createdNow } from "./demo-fixtures/times";
+import type {
+  IntelligenceCandidateView,
+  ObservationContradiction,
+  DiscoveryCandidate,
+} from "../types";
 import {
   addDemoSessionEvidence,
   listDemoSessionEvidence,
@@ -379,6 +392,10 @@ export class DemoGraphProvider implements GraphProvider {
     }
     return paginate([], query);
   }
+
+  async getOverlayCatalog(): Promise<GraphRealtimeCatalog> {
+    return uploadDemoCatalog;
+  }
 }
 
 export class DemoTimelineProvider implements TimelineProvider {
@@ -509,6 +526,222 @@ export class DemoCrossCaseProvider implements CrossCaseProvider {
   }
 }
 
+export class DemoRelationProvider implements RelationProvider {
+  constructor(
+    private readonly state: DemoWorkspaceState,
+    private readonly config: DataModeConfig,
+  ) {}
+
+  /** List relation hypotheses for an investigation (default demo: REL_1..REL_6). */
+  async listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<import("@indago/contracts").RelationHypothesis>> {
+    await deterministicSleep(baseLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    if (investigationId !== this.state.investigation.id) {
+      throw ProviderError.notFound("Investigation not found.");
+    }
+    return paginate([...this.state.relationById.values()], query);
+  }
+  /** Single relation hypothesis lookup. */
+  async get(id: string): Promise<import("@indago/contracts").RelationHypothesis> {
+    await deterministicSleep(baseLatency(this.config));
+    const it = this.state.relationById.get(id);
+    if (!it) throw ProviderError.notFound();
+    return it;
+  }
+}
+
+export class DemoIntelligenceProvider implements IntelligenceProvider {
+  constructor(
+    private readonly state: DemoWorkspaceState,
+    private readonly config: DataModeConfig,
+  ) {}
+
+  private assertInvestigation(investigationId: string): void {
+    if (investigationId !== this.state.investigation.id) {
+      throw ProviderError.notFound("Investigation not found.");
+    }
+  }
+
+  /** Compose the ER comparison surface from the mutable ER store. The LEFT
+   *  candidate intentionally has NO linked canonical entity — that absence IS
+   *  the ambiguity. */
+  private buildCandidate(resolutionId: string): IntelligenceCandidateView | null {
+    const hypothesis = this.state.entityHypothesisById.get(resolutionId);
+    if (!hypothesis?.candidatePairId) return null;
+    const pair = this.state.candidatePairById.get(hypothesis.candidatePairId);
+    if (!pair) return null;
+    const comparison = this.state.candidateResolutionById.get(pair.id);
+    const left = this.state.candidateById.get(pair.leftCandidateId);
+    const right = this.state.candidateById.get(pair.rightCandidateId);
+    if (!comparison || !left || !right) return null;
+    const leftEntityId = ENTITY_LINK_BY_CANDIDATE[left.id];
+    const rightEntityId = ENTITY_LINK_BY_CANDIDATE[right.id];
+    return {
+      resolutionId: hypothesis.id,
+      pair,
+      left,
+      right,
+      hypothesis,
+      comparison,
+      leftEntity: leftEntityId ? this.state.entityById.get(leftEntityId) ?? null : null,
+      rightEntity: rightEntityId ? this.state.entityById.get(rightEntityId) ?? null : null,
+    };
+  }
+
+  async listCandidates(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<IntelligenceCandidateView>> {
+    await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    this.assertInvestigation(investigationId);
+    const views = [...this.state.entityHypothesisById.values()]
+      .map((h) => this.buildCandidate(h.id))
+      .filter((v): v is IntelligenceCandidateView => v !== null);
+    return paginate(views, query);
+  }
+
+  async listContradictions(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<ObservationContradiction>> {
+    await deterministicSleep(baseLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    this.assertInvestigation(investigationId);
+    return paginate([...this.state.contradictions], query);
+  }
+
+  async getCandidate(
+    investigationId: string,
+    resolutionId: string,
+  ): Promise<IntelligenceCandidateView> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const view = this.buildCandidate(resolutionId);
+    if (!view) throw ProviderError.notFound();
+    return view;
+  }
+
+  /** Deliberate analyst decision — records "keep unresolved". Never auto-resolves. */
+  async keepUnresolved(
+    investigationId: string,
+    resolutionId: string,
+  ): Promise<IntelligenceCandidateView> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const view = this.assertView(resolutionId);
+    const now = createdNow();
+    this.state.entityHypothesisById.set(view.hypothesis.id, {
+      ...view.hypothesis,
+      status: "UNRESOLVED",
+      comparisonStatus: "COMPARED_AND_UNRESOLVED",
+      updatedAt: now,
+    });
+    this.state.candidateResolutionById.set(view.comparison.candidatePairId, {
+      ...view.comparison,
+      status: "UNRESOLVED",
+      comparisonStatus: "COMPARED_AND_UNRESOLVED",
+    });
+    this.state.erAuditById.set(resolutionId, { action: "keep-unresolved", by: "analyst", at: now });
+    return this.requireView(resolutionId);
+  }
+
+  /** Deliberate analyst decision — accepts the identity match. Records the
+   *  decision only: no canonical merge, no silent graph rewire. */
+  async accept(
+    investigationId: string,
+    resolutionId: string,
+  ): Promise<IntelligenceCandidateView> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const view = this.assertView(resolutionId);
+    const now = createdNow();
+    this.state.entityHypothesisById.set(view.hypothesis.id, {
+      ...view.hypothesis,
+      status: "ACCEPTED",
+      comparisonStatus: "RESOLVED_MATCH",
+      updatedAt: now,
+    });
+    this.state.candidateResolutionById.set(view.comparison.candidatePairId, {
+      ...view.comparison,
+      status: "ACCEPTED",
+      comparisonStatus: "RESOLVED_MATCH",
+    });
+    this.state.erAuditById.set(resolutionId, { action: "accept", by: "analyst", at: now });
+    return this.requireView(resolutionId);
+  }
+
+  /** Deliberate analyst decision — reverses a prior resolution. REVERSED keeps
+   *  the hypothesis and its audit history (reversal never deletes). */
+  async reverse(
+    investigationId: string,
+    resolutionId: string,
+  ): Promise<IntelligenceCandidateView> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const view = this.assertView(resolutionId);
+    if (view.hypothesis.status !== "ACCEPTED" && view.hypothesis.status !== "REJECTED") {
+      throw ProviderError.validation(
+        "Only a resolved hypothesis (ACCEPTED or REJECTED) can be reversed.",
+      );
+    }
+    const now = createdNow();
+    this.state.entityHypothesisById.set(view.hypothesis.id, {
+      ...view.hypothesis,
+      status: "REVERSED",
+      comparisonStatus: "COMPARED_AND_UNRESOLVED",
+      updatedAt: now,
+    });
+    this.state.candidateResolutionById.set(view.comparison.candidatePairId, {
+      ...view.comparison,
+      status: "REVERSED",
+      comparisonStatus: "COMPARED_AND_UNRESOLVED",
+    });
+    this.state.erAuditById.set(resolutionId, { action: "reverse", by: "analyst", at: now });
+    return this.requireView(resolutionId);
+  }
+
+  /** Deterministic Discovery Mode candidates (structural, NOT relevance). */
+  async listDiscovery(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<DiscoveryCandidate>> {
+    await deterministicSleep(baseLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    this.assertInvestigation(investigationId);
+    return paginate(demoFixtures.discoveryCandidates, query);
+  }
+
+  async getSource(id: string): Promise<Source> {
+    await deterministicSleep(baseLatency(this.config));
+    const it = this.state.sourceById.get(id);
+    if (!it) throw ProviderError.notFound();
+    return it;
+  }
+
+  async getArtifact(id: string): Promise<Artifact> {
+    await deterministicSleep(baseLatency(this.config));
+    const it = this.state.artifactById.get(id);
+    if (!it) throw ProviderError.notFound();
+    return it;
+  }
+
+  private assertView(resolutionId: string): IntelligenceCandidateView {
+    const view = this.buildCandidate(resolutionId);
+    if (!view) throw ProviderError.notFound();
+    return view;
+  }
+
+  private requireView(resolutionId: string): IntelligenceCandidateView {
+    const view = this.buildCandidate(resolutionId);
+    if (!view) throw ProviderError.server("ER candidate store corrupted.");
+    return view;
+  }
+}
+
 /**
  * Build the full per-workspace demo provider bundle.
  * Creates its own in-memory state and realtime provider, so each bundle is
@@ -536,6 +769,8 @@ export function createWorkspaceDemoProviders(
   const review = new DemoReviewProvider(state, config);
   const robustness = new DemoRobustnessProvider(state, config);
   const crossCase = new DemoCrossCaseProvider(state, config);
+  const relations = new DemoRelationProvider(state, config);
+  const intelligence = new DemoIntelligenceProvider(state, config);
 
   return {
     workspaceId: identity.workspaceId,
@@ -554,6 +789,8 @@ export function createWorkspaceDemoProviders(
     review,
     robustness,
     crossCase,
+    relations,
+    intelligence,
     realtime,
   };
 }

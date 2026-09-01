@@ -22,6 +22,7 @@ export const EVID_WIRE_3 = "b1e0c9a6-0000-4000-8000-000000000025";
 export const EVID_EMAIL_1 = "b1e0c9a6-0000-4000-8000-000000000026";
 export const EVID_EMAIL_2 = "b1e0c9a6-0000-4000-8000-000000000027";
 export const EVID_REGISTRY = "b1e0c9a6-0000-4000-8000-000000000028";
+export const EVID_REGISTRY_2 = "b1e0c9a6-0000-4000-8000-000000000029";
 
 // Observations --------------------------------------------------------------
 export const OBS_1 = "b1e0c9a6-0000-4000-8000-000000000031";
@@ -32,6 +33,16 @@ export const OBS_5 = "b1e0c9a6-0000-4000-8000-000000000035";
 export const OBS_6 = "b1e0c9a6-0000-4000-8000-000000000036";
 export const OBS_7 = "b1e0c9a6-0000-4000-8000-000000000037";
 export const OBS_8 = "b1e0c9a6-0000-4000-8000-000000000038";
+export const OBS_9 = "b1e0c9a6-0000-4000-8000-000000000039";
+
+// Entity mention candidates / ER (F-PR4) -------------------------------------
+export const EMC_NOMINEE = "b1e0c9a6-0000-4000-8000-0000000000a1";
+export const EMC_VICTOR_RESIDENCE = "b1e0c9a6-0000-4000-8000-0000000000a2";
+export const EMC_VICTOR_SURVEILLANCE = "b1e0c9a6-0000-4000-8000-0000000000a3";
+
+export const PAIR_RES_1 = "b1e0c9a6-0000-4000-8000-0000000000b1";
+export const HYP_RES_1 = "b1e0c9a6-0000-4000-8000-0000000000c1";
+export const CONTRADICTION_1 = "b1e0c9a6-0000-4000-8000-0000000000d1";
 
 // Entities ------------------------------------------------------------------
 export const ENT_VICTOR = "b1e0c9a6-0000-4000-8000-000000000041"; // orchestrator

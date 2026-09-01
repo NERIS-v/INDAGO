@@ -41,12 +41,30 @@ export const RelationTypeSchema = z.enum([
 );
 export type RelationType = z.infer<typeof RelationTypeSchema>;
 
+// ============================================================================
+// Relation Status
+//
+// Tracks the HYPOTHESIS LIFECYCLE — the durable state of a relation
+// proposition through its review journey.
+//
+// Lifecycle:
+//   PROPOSED → ACCEPTED
+//   PROPOSED → REJECTED
+//   ACCEPTED → REVERSED
+//   REJECTED → REVERSED
+//
+// REVERSED is hypothesis lifecycle reversal — it does NOT erase the original
+// relation hypothesis. It changes lifecycle state and creates audit history.
+// REVERSED ≠ DELETED.
+//
+// A machine-generated score may produce PROPOSED but MUST NOT silently
+// perform an authoritative acceptance/merge.
+// ============================================================================
 export const RelationStatusSchema = z.enum([
-  'HYPOTHESIZED',
-  'SUPPORTED',
-  'CONTRADICTED',
-  'RESOLVED',
-  'ARCHIVED',
+  'PROPOSED',
+  'ACCEPTED',
+  'REJECTED',
+  'REVERSED',
 ]);
 export type RelationStatus = z.infer<typeof RelationStatusSchema>;
 

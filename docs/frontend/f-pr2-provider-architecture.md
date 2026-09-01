@@ -284,7 +284,10 @@ New F-PR2 tests include:
 
 - No `DemoProvider`/`LiveProvider` imports in `src/app`.
 - Single SSE transport (`createSseClient`), reused by `live/realtime.ts`; no WebSocket
-  (only a comment match), no gsap/framer/redux/zustand/d3/force-graph.
+  (only a comment match), no gsap/framer/redux/zustand, no graph framework.
+- Graph deps are minimal and scoped to physics/interaction only: `d3-force`, `d3-drag`,
+  `d3-selection` (+ their `@types/*`). No `d3` umbrella, no react-force-graph/cytoscape/
+  vis-network, no Three.js/WebGL.
 - No `as any` / `@ts-ignore` / loose `any` in `src/lib/providers`.
 - No stray `*.log` files left in the repo root.
 

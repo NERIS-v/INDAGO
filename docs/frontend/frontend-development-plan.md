@@ -136,7 +136,7 @@ Every day ends with a **runnable demo checkpoint** (see §31).
 - **Styling:** Tailwind CSS v4 (`tailwindcss ^4.3.3`), CSS-first `@theme` in `src/app/globals.css`. **No `tailwind.config.ts`.**
 - **Components:** hand-written primitives; no shadcn/radix.
 - **Animation:** no Framer Motion, no GSAP installed; CSS keyframes only (`fade-in`, `slow-pulse`, `grain`).
-- **Graph:** no graph library in `packages/web`.
+- **Graph:** minimal `d3-force` + `d3-drag` (+ `d3-selection`) for physics/interaction only; rendering stays native SVG. No graph framework (react-force-graph/cytoscape/vis-network), no Three.js/WebGL.
 - **State:** no Redux/Zustand/Jotai; mostly local state.
 - **API:** server-side `platformFetch` + Server Actions (`lib/api/*`).
 - **Upload:** UploadThing client (`lib/upload/uploadthing.ts`, `lib/upload/types.ts`).
@@ -208,9 +208,9 @@ Keep the audited stack. Do not replace it without a demonstrated technical reaso
 | Realtime | reuse SSE client + proxy | existing |
 | Testing | Vitest + Testing Library | existing |
 | Motion | CSS + SVG (default); **GSAP optional** for complex sequences | no dependency added unless spike approves |
-| Graph | SVG renderer + lightweight deterministic layout (evaluate first) | see §22; no WebGL without demonstrated need |
+| Graph | SVG renderer + minimal `d3-force` physics + `d3-drag` interaction (deterministic seed; Obsidian-style always-alive gentle drift) | see §22; no WebGL without demonstrated need |
 
-**Not adding:** a state-management library, a graph library before the Day-2 spike, Three.js/WebGL, recorded-provider in week 1, or a second design system.
+**Not adding:** a state-management library, a graph framework (react-force-graph/cytoscape/vis-network), Three.js/WebGL, recorded-provider in week 1, or a second design system. (Minimal `d3-force`/`d3-drag`/`d3-selection` are in scope for physics/interaction only — see §22.)
 
 ---
 
@@ -1043,7 +1043,7 @@ Each view follows this exact 28-point template:
 23. **Error:** panel-specific graph ErrorDisplay with Retry; **other workspace panels remain available**.
 24. **Recovery:** keep the last good graph; reconcile on reconnect; recovery ring in top shell.
 25. **Accessibility:** keyboard node selection; an accessible **node list representation** (companion list) where practical; color not the only channel (edges also vary by dash/opacity); focus-visible.
-26. **Performance guardrails:** ≤30 demo nodes initially (cap); pause force simulation when settled; memoize nodes/edges; sparse SVG blur (not full-screen); do not animate hundreds of elements simultaneously; no WebGL/Three.js unless the spike proves necessity.
+26. **Performance guardrails:** ≤30 demo nodes initially (cap); always-alive physics hold a **low idle alpha** (gentle drift, not a free-running hot loop); memoize nodes/edges; sparse SVG blur (not full-screen); do not animate hundreds of elements simultaneously; no WebGL/Three.js unless the spike proves necessity. For users with `prefers-reduced-motion`, the simulation is stopped (static layout) and drag moves nodes one-shot.
 27. **Acceptance criteria:** no hardcoded data; renders canonical `GraphNode`/`GraphEdge`; node selection works; graph settles deterministically; low-confidence edge is visually distinct (dashed + more transparent); bridge distinguishable; community fog present; timeline filtering works (View 09 coupling); confidence affects edge treatment.
 28. **Do not:** put graph data in components; do not auto-install a giant graph framework; do not add WebGL without the spike; do not make low-confidence edges glow.
 
@@ -1719,7 +1719,7 @@ Candidate GSAP uses (complex sequences only):
 
 ## 22. Graph Architecture
 
-**Highest technical risk.** No graph library exists in `packages/web`. The old vis-network shell in `packages/platform/public/index.html` is **NOT reusable** by the Next.js graph.
+**Highest technical risk.** The graph uses a **minimal** `d3-force` + `d3-drag` (+ `d3-selection`) engine for physics/interaction only; rendering stays **native SVG** driven by the provider architecture. The old vis-network shell in `packages/platform/public/index.html` is **NOT reusable** by the Next.js graph, and no full graph framework (react-force-graph/cytoscape/vis-network) or Three.js/WebGL is permitted.
 
 ### 22.1 Day-2 spike (required)
 
@@ -1740,7 +1740,7 @@ Evaluate minimum-viable options against:
 
 Measure: beauty, interaction, performance, **repeatability**, implementation complexity. **The chosen layout must support deterministic Judge Mode** (Judge Mode must render identically run-to-run).
 
-**Preferred direction to evaluate first:** SVG-based renderer + lightweight deterministic layout (or force layout) + GSAP/CSS animation. **Do NOT automatically install Three.js/WebGL** — only if the spike demonstrates a concrete requirement.
+**Preferred direction (decided):** SVG renderer + minimal `d3-force` for physics and `d3-drag` for node dragging, seeded deterministically. The simulation is **always-alive (Obsidian-style)**: a low idle alpha holds gentle continuous drift, and hover/drag raise the energy for a springy ripple that eases back to idle on release. Deterministic Judge Mode is preserved by feeding both runs the same deterministic seed; the physics is deterministic (no `Math.random()`), so identical input yields an identical layout trajectory. **Do NOT install a graph framework or Three.js/WebGL** — only if a spike demonstrates a concrete requirement.
 
 ### 22.2 Data rule
 
@@ -1762,7 +1762,7 @@ Document these as presentation rules, not backend semantics, unless canonical co
 ### 22.4 Graph performance guardrails
 
 - node/edge cap for demo (~30 nodes),
-- pause force simulation once settled,
+- always-alive physics hold a low idle alpha (gentle drift, not a free-running hot loop); reduced-motion stops the sim,
 - avoid full-screen backdrop-filter,
 - sparse SVG blur,
 - keep grain lightweight,
@@ -1819,7 +1819,7 @@ Translate every design "moment" into an implementable mechanism. Reference: §20
 | Moment | Mechanism |
 |---|---|
 | Document pile (New Case) | real tile transforms: `translateY + rotate(-2deg) -> 0` stagger ~60ms + negative-margin overlap settle |
-| Graph bloom | §22/§33 sequence (opacity + node stagger + edge dash-draw + bridge halo, settle, pause sim) |
+| Graph bloom | §22/§33 sequence (opacity + node stagger + edge dash-draw + bridge halo) then eases to always-alive gentle drift |
 | Traveling processing filament | thin 1px light segment animating across the top shell (`translateX`), low opacity, `slow-pulse`-like loop, gated by processing state |
 | Recovery ring | calm SVG loop pulse (stroke-dash + opacity), shown only while reconnecting |
 | Cross-case thread | SVG path `stroke-dasharray` + `stroke-dashoffset` animated to 0 (CSS; GSAP only in a larger sequence) |
@@ -1883,7 +1883,7 @@ Minimum baseline (reasonable for a one-week sprint, not overbuilt):
 Concrete guardrails:
 
 - graph node/edge cap for demo (~30 nodes)
-- pause force simulation once settled
+- always-alive physics hold a low idle alpha (gentle drift); reduced-motion stops the sim
 - avoid full-screen backdrop-filter
 - sparse SVG blur
 - lightweight grain
@@ -2007,7 +2007,7 @@ Preserve the core PR structure. Each PR lists: Goal, Scope, Files, Owner, Review
 - **Tests:** graph rendering/purity (no hardcoded data), timeline filtering, node selection.
 - **Acceptance:** graph/timeline work against provider only.
 - **Demo checkpoint:** temporal graph + entity drawer.
-- **Rollback/safety:** SVG-first, deterministic; pause simulation when settled.
+- **Rollback/safety:** SVG-first, deterministic (same seed → same trajectory, no `Math.random()`); always-alive physics hold a low idle alpha.
 - **Risks:** graph is the highest technical risk; spike gated at Day 2.
 
 ### F-PR5 — Intelligence Surfaces

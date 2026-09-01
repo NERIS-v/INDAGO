@@ -74,10 +74,10 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 - **F0** foundation + design system: **complete** ✅
 - **F1** provider seam + demo case: **complete** ✅ (`lib/providers/` — `config.ts`, `factory.ts`, `types.ts`, `demo/*`, `live/*`, `realtime/*`; bundled into a `Workspace` context instead of ten per-domain interface files).
 - **F2** case/evidence workflow: **complete** ✅ (case list, new intake, workspace overview, evidence surface).
-- **F3 / F4 / F5** graph, timeline, intelligence, robustness: **NOT implemented** — all workspace tabs except Evidence are `InvestigationScaffold` placeholders (no intelligence/graph/timeline behavior).
+- **F3 / F4** graph + intelligence surfaces: **substantially implemented** ✅/🔶 — graph view, physics, viewport controls, deep-links and Discovery Mode (F-PR3 graph physics + F-PR4) are real provider-backed surfaces; Observations feed with contradiction badges, navigable provenance (Observation→Evidence→Source→Artifact→Entity→Relation), reversible Entity Resolution workflow, and a right-edge Discovery overlay are implemented. Leads/Gaps/Robustness/Review tabs remain `InvestigationScaffold` placeholders.
 - **F6** realtime: **partial** 🔶 — demo + live realtime, SSE client with reconnect, and `STREAM_CONNECTED` resync are implemented; signature motions + Judge Mode are not started.
 - **F7** polish/freeze: **not started** ❌.
-- **Tests:** 33 web test files present (incl. case-list, evidence-intake, evidence-flow, live-providers, live-run-projection, realtime-live.integration, fixture-validation, mock-leakage, auth-boundary).
+- **Tests:** 36 web test files / 319 tests present (incl. case-list, evidence-intake, evidence-flow, live-providers, live-run-projection, realtime-live.integration, fixture-validation, f-pr4, mock-leakage, auth-boundary).
 
 **Trust hierarchy:** pages with `[x]` are real provider-backed surfaces; rows marked "scaffold-only" render a placeholder that consumes the Workspace context but computes/showcases no intelligence.
 
@@ -192,10 +192,10 @@ Each row is one of the 22 views from `docs/frontend/frontend-development-plan.md
 | 02 | Case List | `InvestigationProvider.getInvestigations()` | `[G]` | `/` | §15 V02 | [x] (`components/case-list/case-list.tsx`) |
 | 03 | New Case Intake | `EvidenceProvider.submitEvidence()` | `[G]` | `/investigations/new` | §15 V03 | [x] (`investigations/new/page.tsx`) |
 | 04 | Investigation Workspace | bundle + realtime | `[G]` | `/investigations/[id]` | §15 V04 | [x] (overview + live/demo realtime wiring; shell + provider bundle) |
-| 05 | Observations Feed | `ObservationProvider` | `[G]` | workspace tab | §15 V05 | [ ] scaffold-only (`InvestigationScaffold`) |
-| 06 | Entity Resolution Queue | `EntityProvider` | `[G]` | workspace tab | §15 V06 | [ ] scaffold-only |
-| 07 | Entity Detail | `EntityProvider` + `GraphProvider` | `[G]` | drawer | §15 V07 | [ ] scaffold-only |
-| 08 | Graph View | `GraphProvider.getGraph()` | `[G]` | workspace panel | §15 V08 | [ ] scaffold-only |
+| 05 | Observations Feed | `ObservationProvider` + `IntelligenceProvider` | `[G]` | workspace tab | §15 V05 | [x] (`app/investigations/[id]/observations/page.tsx` + `components/observations/*`; contradiction badges, `?entity=` deep link) |
+| 06 | Entity Resolution Queue | `IntelligenceProvider` | `[G]` | workspace tab | §15 V06 | [x] (observations page queue driven by `intelligence.listCandidates` + `entity-resolution-panel.tsx`) |
+| 07 | Entity Detail | `EntityProvider` + `GraphProvider` | `[G]` | drawer | §15 V07 | [x] (`components/drawers/entity-drawer.tsx` + linked-observations deep link) |
+| 08 | Graph View | `GraphProvider.getGraph()` | `[G]` | workspace panel | §15 V08 | [x] (`components/graph/*` — `graph-panel.tsx`, `graph-canvas.tsx`, physics, viewport controls, `?focus=` deep link) |
 | 09 | Timeline View | `TimelineProvider.getTimeline()` | `[G]` | workspace panel | §15 V09 | [ ] scaffold-only |
 | 10 | Leads List | `LeadProvider.getLeads()` | `[G]` | workspace tab | §15 V10 | [ ] scaffold-only |
 | 11 | Lead Detail | `LeadProvider` + `CounterEvidence` | `[G]` | drawer | §15 V11 | [ ] scaffold-only |
@@ -204,7 +204,7 @@ Each row is one of the 22 views from `docs/frontend/frontend-development-plan.md
 | 14 | Evidence Request Queue | `EvidenceProvider` / `GapProvider` | `[G]` | workspace tab | §15 V14 | [x] partial — `investigations/[id]/evidence/page.tsx` (list + intake) built; full queue/detail deferred |
 | 15 | Cross-Case Signals | `CrossCaseProvider` (demo) | `[G]` | workspace tab | §15 V15 | [ ] scaffold-only |
 | 16 | Reasoning Ledger | `ReviewProvider` / realtime | `[M]` | workspace tab | §15 V16 | [ ] scaffold-only |
-| 17 | Discovery Mode | `GraphProvider` overlay | `[G]` | interaction mode | §15 V17 | [ ] |
+| 17 | Discovery Mode | `IntelligenceProvider.listDiscovery` overlay | `[G]` | interaction mode | §15 V17 | [x] (Graph Panel "Discovery" toggle → `discovery-panel.tsx` right-edge overlay + `GraphCanvas.focusNode`) |
 | 18 | Boundary Expansion | `GraphProvider` overlay | `[G]` | interaction mode | §15 V18 | [ ] |
 | 19 | Robustness Report | `RobustnessProvider` | `[M]` | workspace tab | §15 V19 | [ ] scaffold-only |
 | 20 | Review Center | `ReviewProvider` | `[G]` | workspace tab | §15 V20 | [ ] scaffold-only |
@@ -249,8 +249,8 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 |---|---|---|---|---|---|
 | F-PR1 | Visual Foundation + Design System | Mayur/Gurashish | — | visual foundation / design-system foundation | ✅ |
 | F-PR2 | Provider Seam + Demo Case | Gurashish/Mayur | F-PR1 | contract-valid coherent case | ✅ |
-| F-PR3 | Core Workspace + Case/Evidence | Gurashish | F-PR1, F-PR2 | case→evidence→provider→intelligence | ✅ (case list, new intake, workspace overview, evidence surface built against provider bundle; intelligence surfaces scaffolded, deferred to F-PR5) |
-| F-PR4 | Graph + Timeline | Gurashish | F-PR2, F-PR3 | graph/timeline via provider | [ ] (tabs scaffolded only) |
+| F-PR3 | Core Workspace + Case/Evidence | Gurashish | F-PR1, F-PR2 | case→evidence→provider→intelligence | ✅ (case list, new intake, workspace overview, evidence surface built against provider bundle; graph physics delivered alongside — `docs/frontend/f-pr3-graph-physics.md`) |
+| F-PR4 | Observations, Provenance, Entity Resolution | Gurashish/Mayur | F-PR2, F-PR3 | evidence→observation→contradiction→ER→discovery, no scaffold | ✅ (`docs/frontend/f-pr4-observations-provenance-er.md` — observations feed + contradiction badges, provenance trail, reversible keep/accept/reverse ER, Discovery Mode overlay, catalog seam via `graph.getOverlayCatalog()`, `?entity=`/`?focus=` deep links) |
 | F-PR5 | Intelligence Surfaces | Gurashish/Mayur | F-PR3 | lead/entity/observation presentation | [ ] |
 | F-PR6 | Signature Motion + Realtime | Gurashish | F-PR2, F-PR4 | realtime + signature moments | 🔶 in-progress — realtime + SSE recovery + reconnect resync done; signature moments + Judge Mode not started |
 | F-PR7 | Judge Mode + Polish | Both | all | 2 clean runs + freeze | [ ] |
@@ -278,8 +278,8 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 | G-F0 | F0 | design system + shell foundation exists | ✅ |
 | G-F1 | F1 | DemoProvider returns contract-valid coherent case | ✅ |
 | G-F2 | F2 | case/evidence workflow works | ✅ |
-| G-F3 | F3 | graph/timeline work against provider only | [ ] (tabs scaffolded only) |
-| G-F4 | F4 | lead/entity/observation presentation works | [ ] |
+| G-F3 | F3 | graph/timeline work against provider only | 🔶 graph implemented + physics via provider; timeline coupling & scrubber open |
+| G-F4 | F4 | lead/entity/observation presentation works | 🔶 observations + entity resolution + discovery done; leads/gaps/robustness open |
 | G-F5 | F5 | lead→gap→evidence→trust story works | [ ] |
 | G-F6 | F6 | realtime + signature moments + Judge Mode works | 🔶 in-progress — realtime + recovery done; signature + Judge Mode open |
 | G-F7 | F7 | two clean demo runs | [ ] |

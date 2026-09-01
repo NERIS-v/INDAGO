@@ -24,8 +24,14 @@ import type {
   GraphEdge,
   CrossCaseMatch,
   RobustnessResult,
+  EntityMentionCandidate,
+  CandidatePair,
+  CandidateResolution,
+  EntityHypothesis,
+  Artifact,
 } from "@indago/contracts";
 import type { InvestigationTimeline } from "../../types";
+import type { ObservationContradiction, DiscoveryCandidate } from "../../types";
 import type { DemoStreamEvent } from "./events";
 import { operationFinancialShadowCase } from "./case";
 import { operationFinancialShadowInvestigation } from "./investigation";
@@ -45,12 +51,20 @@ import { operationFinancialShadowTimeline } from "./timeline";
 import { operationFinancialShadowCrossCase } from "./cross-case";
 import { operationFinancialShadowRobustness } from "./robustness";
 import { operationFinancialShadowEvents } from "./events";
+import {
+  operationFinancialShadowCandidates,
+  operationFinancialShadowCandidatePairs,
+  operationFinancialShadowResolutions,
+  operationFinancialShadowEntityHypotheses,
+} from "./entity-resolution";
+import { operationFinancialShadowContradictions } from "./contradictions";
+import { demoDiscoveryCandidates } from "./discovery";
 
 export interface DemoFixtureSet {
   case: Case;
   investigation: Investigation;
   sources: Source[];
-  artifacts: object[];
+  artifacts: Artifact[];
   evidence: Evidence[];
   observations: Observation[];
   entities: Entity[];
@@ -67,6 +81,12 @@ export interface DemoFixtureSet {
   crossCase: CrossCaseMatch[];
   robustness: RobustnessResult;
   events: DemoStreamEvent[];
+  candidates: EntityMentionCandidate[];
+  candidatePairs: CandidatePair[];
+  resolutions: CandidateResolution[];
+  entityHypotheses: EntityHypothesis[];
+  contradictions: ObservationContradiction[];
+  discoveryCandidates: DiscoveryCandidate[];
 }
 
 /** The single assembled demo dataset (immutable). */
@@ -91,4 +111,10 @@ export const demoFixtures: DemoFixtureSet = {
   crossCase: operationFinancialShadowCrossCase,
   robustness: operationFinancialShadowRobustness,
   events: operationFinancialShadowEvents,
+  candidates: operationFinancialShadowCandidates,
+  candidatePairs: operationFinancialShadowCandidatePairs,
+  resolutions: operationFinancialShadowResolutions,
+  entityHypotheses: operationFinancialShadowEntityHypotheses,
+  contradictions: operationFinancialShadowContradictions,
+  discoveryCandidates: demoDiscoveryCandidates,
 };

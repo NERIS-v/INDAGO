@@ -13,6 +13,7 @@ import {
   OBS_6,
   OBS_7,
   OBS_8,
+  OBS_9,
   EVID_ACCOUNT_1,
   EVID_ACCOUNT_2,
   EVID_WIRE_1,
@@ -21,6 +22,7 @@ import {
   EVID_EMAIL_1,
   EVID_EMAIL_2,
   EVID_REGISTRY,
+  EVID_REGISTRY_2,
   SRC_BANK_RECORDS,
   SRC_COMMS,
   SRC_REGISTRY,
@@ -156,6 +158,22 @@ const o8: Observation = {
   updatedAt: obs("2024-05-23"),
 };
 
+const o9: Observation = {
+  id: OBS_9,
+  evidenceId: EVID_REGISTRY_2,
+  sourceId: SRC_REGISTRY,
+  type: "RELATIONAL",
+  content:
+    "Registry cross-check CC-882 lists the residential address for director V. Aldridge as 8 Rue des Capucines, Lyon — conflicting with the Shell One beneficiary filing's shared-address line (14 Rue de la Paix, Paris).",
+  entityIds: [ENT_VICTOR],
+  candidateMentions: ["V. Aldridge", "8 Rue des Capucines"],
+  strength: 0.62,
+  provenance: { sourceId: SRC_REGISTRY, extractor: "registry.extractor.v1" },
+  observedAt: evt("2023-12-01", "day"),
+  createdAt: obs("2024-05-24"),
+  updatedAt: obs("2024-05-24"),
+};
+
 /** Canonical parsed observations. */
 export const operationFinancialShadowObservations: Observation[] = [
   ObservationSchema.parse(o1),
@@ -166,4 +184,5 @@ export const operationFinancialShadowObservations: Observation[] = [
   ObservationSchema.parse(o6),
   ObservationSchema.parse(o7),
   ObservationSchema.parse(o8),
+  ObservationSchema.parse(o9),
 ];

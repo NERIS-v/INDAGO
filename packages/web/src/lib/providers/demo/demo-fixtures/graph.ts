@@ -43,7 +43,7 @@ const nodes: GraphNode[] = [
   {
     id: GN_VICTOR, investigationId: INVESTIGATION_ID, versionId: GRAPH_VERSION,
     type: "ENTITY", entityId: ENT_VICTOR, label: "Victor Aldridge",
-    structuralImportance: 0.9, observationCount: 2, sourceCount: 2,
+    structuralImportance: 0.9, observationCount: 3, sourceCount: 2,
     createdAt: obs("2023-11-05"), updatedAt: obs("2023-11-05"),
   },
   {

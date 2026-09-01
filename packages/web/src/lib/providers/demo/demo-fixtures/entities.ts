@@ -21,6 +21,7 @@ import {
   OBS_6,
   OBS_7,
   OBS_8,
+  OBS_9,
   EVID_ACCOUNT_1,
   EVID_ACCOUNT_2,
   EVID_WIRE_1,
@@ -29,6 +30,7 @@ import {
   EVID_EMAIL_1,
   EVID_EMAIL_2,
   EVID_REGISTRY,
+  EVID_REGISTRY_2,
 } from "./lookup";
 import { obs } from "./times";
 
@@ -38,8 +40,8 @@ const victor: Entity = {
   investigationId: INVESTIGATION_ID,
   canonicalName: "Victor Aldridge",
   status: "ACTIVE",
-  observationIds: [OBS_6, OBS_8],
-  evidenceIds: [EVID_EMAIL_1, EVID_REGISTRY],
+  observationIds: [OBS_6, OBS_8, OBS_9],
+  evidenceIds: [EVID_EMAIL_1, EVID_REGISTRY, EVID_REGISTRY_2],
   hypothesisIds: [],
   roleHypothesisIds: [],
   sourceIdentifiers: [{ sourceId: "b1e0c9a6-0000-4000-8000-000000000012", identifier: "nominee-director-118" }],

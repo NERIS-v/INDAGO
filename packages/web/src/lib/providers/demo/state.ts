@@ -23,9 +23,16 @@ import type {
   ReviewTask,
   GraphNode,
   GraphEdge,
+  Source,
+  Artifact,
+  RelationHypothesis,
+  EntityMentionCandidate,
+  CandidatePair,
+  CandidateResolution,
+  EntityHypothesis,
 } from "@indago/contracts";
 import { demoFixtures } from "./demo-fixtures";
-import type { InvestigationTimeline } from "../types";
+import type { InvestigationTimeline, ObservationContradiction } from "../types";
 
 export interface DemoWorkspaceState {
   readonly workspaceId: string;
@@ -41,7 +48,23 @@ export interface DemoWorkspaceState {
   reviewTaskById: Map<string, ReviewTask>;
   graphNodeById: Map<string, GraphNode>;
   graphEdgeById: Map<string, GraphEdge>;
+  sourceById: Map<string, Source>;
+  artifactById: Map<string, Artifact>;
+  relationById: Map<string, RelationHypothesis>;
   timeline: InvestigationTimeline;
+  contradictions: readonly ObservationContradiction[];
+  /** ER store — mutable decision state. Fixture constants are never mutated;
+   *  the store holds working copies for accept / keep-unresolved / reverse. */
+  candidateById: Map<string, EntityMentionCandidate>;
+  candidatePairById: Map<string, CandidatePair>;
+  candidateResolutionById: Map<string, CandidateResolution>;
+  entityHypothesisById: Map<string, EntityHypothesis>;
+  /** Deliberate analyst decision audit for ER (local projection; a REVERSED
+   *  hypothesis keeps its history — reversal never deletes). */
+  erAuditById: Map<
+    string,
+    { action: "keep-unresolved" | "accept" | "reverse"; by: string; at: { value: string; precision: "exact" } }
+  >;
   /** Rolling log of emitted (normalized) realtime events. */
   eventLog: unknown[];
 }
@@ -65,7 +88,18 @@ export function createDemoWorkspaceState(workspaceId: string): DemoWorkspaceStat
     reviewTaskById: toMap(demoFixtures.reviewTasks),
     graphNodeById: toMap(demoFixtures.graphNodes),
     graphEdgeById: toMap(demoFixtures.graphEdges),
+    sourceById: toMap(demoFixtures.sources),
+    artifactById: toMap(demoFixtures.artifacts),
+    relationById: toMap(demoFixtures.relations),
     timeline: demoFixtures.timeline,
+    contradictions: demoFixtures.contradictions,
+    candidateById: toMap(demoFixtures.candidates),
+    candidatePairById: toMap(demoFixtures.candidatePairs),
+    candidateResolutionById: new Map(
+      demoFixtures.resolutions.map((r) => [r.candidatePairId, r]),
+    ),
+    entityHypothesisById: toMap(demoFixtures.entityHypotheses),
+    erAuditById: new Map(),
     eventLog: [],
   };
   return s;
@@ -84,7 +118,18 @@ export function resetDemoWorkspaceState(state: DemoWorkspaceState): void {
   state.reviewTaskById = toMap(demoFixtures.reviewTasks);
   state.graphNodeById = toMap(demoFixtures.graphNodes);
   state.graphEdgeById = toMap(demoFixtures.graphEdges);
+  state.sourceById = toMap(demoFixtures.sources);
+  state.artifactById = toMap(demoFixtures.artifacts);
+  state.relationById = toMap(demoFixtures.relations);
   state.timeline = demoFixtures.timeline;
+  state.contradictions = demoFixtures.contradictions;
+  state.candidateById = toMap(demoFixtures.candidates);
+  state.candidatePairById = toMap(demoFixtures.candidatePairs);
+  state.candidateResolutionById = new Map(
+    demoFixtures.resolutions.map((r) => [r.candidatePairId, r]),
+  );
+  state.entityHypothesisById = toMap(demoFixtures.entityHypotheses);
+  state.erAuditById = new Map();
   state.eventLog = [];
 }
 

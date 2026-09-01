@@ -29,12 +29,15 @@ import type {
   ReviewProvider,
   RobustnessProvider,
   CrossCaseProvider,
+  RelationProvider,
+  IntelligenceProvider,
   DataModeConfig,
   ProviderQuery,
   Paginated,
   WorkspaceProviders,
   RealtimeProvider,
   WorkspaceIdentity,
+  GraphRealtimeCatalog,
 } from "../types";
 import { ProviderError } from "../types";
 import type {
@@ -314,6 +317,48 @@ class UnsupportedGraphProvider implements GraphProvider {
   getGraphHoles(): Promise<Paginated<never>> {
     return providerUnsupportedPaginated("graph.getGraphHoles");
   }
+  getOverlayCatalog(): Promise<GraphRealtimeCatalog> {
+    return Promise.resolve({});
+  }
+}
+
+class UnsupportedRelationProvider implements RelationProvider {
+  listByInvestigation(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("relations.listByInvestigation");
+  }
+  get(): Promise<never> {
+    return providerUnsupported("relations.get");
+  }
+}
+
+class UnsupportedIntelligenceProvider implements IntelligenceProvider {
+  listContradictions(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("intelligence.listContradictions");
+  }
+  listCandidates(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("intelligence.listCandidates");
+  }
+  getCandidate(): Promise<never> {
+    return providerUnsupported("intelligence.getCandidate");
+  }
+  keepUnresolved(): Promise<never> {
+    return providerUnsupported("intelligence.keepUnresolved");
+  }
+  accept(): Promise<never> {
+    return providerUnsupported("intelligence.accept");
+  }
+  reverse(): Promise<never> {
+    return providerUnsupported("intelligence.reverse");
+  }
+  listDiscovery(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("intelligence.listDiscovery");
+  }
+  getSource(): Promise<never> {
+    return providerUnsupported("intelligence.getSource");
+  }
+  getArtifact(): Promise<never> {
+    return providerUnsupported("intelligence.getArtifact");
+  }
 }
 
 class UnsupportedTimelineProvider implements TimelineProvider {
@@ -392,6 +437,8 @@ export function createLiveWorkspaceProviders(
     review: new UnsupportedReviewProvider(),
     robustness: new UnsupportedRobustnessProvider(),
     crossCase: new UnsupportedCrossCaseProvider(),
+    relations: new UnsupportedRelationProvider(),
+    intelligence: new UnsupportedIntelligenceProvider(),
     realtime,
   };
 }
