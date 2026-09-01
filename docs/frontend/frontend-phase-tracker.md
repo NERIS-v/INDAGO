@@ -67,17 +67,18 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 ---
 
-# Current Status Snapshot (verified against `packages/web` source on `main` @ `f773366`)
+# Current Status Snapshot (verified against `packages/web` source on `main` @ `6e75f82`)
 
 > Honest, source-verified state as of the last audit pass. Phase tables / page matrix / PR tracker above were reconciled to match this.
 
 - **F0** foundation + design system: **complete** ✅
-- **F1** provider seam + demo case: **complete** ✅ (`lib/providers/` — `config.ts`, `factory.ts`, `types.ts`, `demo/*`, `live/*`, `realtime/*`; bundled into a `Workspace` context instead of ten per-domain interface files).
+- **F1** provider seam + demo case: **complete** ✅ (`lib/providers/` — `config.ts`, `factory.ts`, `types.ts`, `demo/*`, `live/*`, `realtime/*`; bundled into a `Workspace` context instead of ten per-domain interface files). F-PR4 extended the bundle with `relations` + `intelligence` providers and `GraphProvider.getOverlayCatalog()`; canonical contracts gained relation-resolution + audit-event support (platform `intelligence/relation-resolution/` landed on main in the same window).
 - **F2** case/evidence workflow: **complete** ✅ (case list, new intake, workspace overview, evidence surface).
-- **F3 / F4** graph + intelligence surfaces: **substantially implemented** ✅/🔶 — graph view, physics, viewport controls, deep-links and Discovery Mode (F-PR3 graph physics + F-PR4) are real provider-backed surfaces; Observations feed with contradiction badges, navigable provenance (Observation→Evidence→Source→Artifact→Entity→Relation), reversible Entity Resolution workflow, and a right-edge Discovery overlay are implemented. Leads/Gaps/Robustness/Review tabs remain `InvestigationScaffold` placeholders.
+- **F3** graph + timeline: **complete for graph, timeline tab partial** ✅/🔶 — provider-driven graph (zero hardcoded data in components), persistent d3-force physics (single simulation, idle-stop + settled latch, hover/drag `alphaTarget`, memoized structural analysis, position cache, arrival seeding), Tarjan bridge halos, community fog layer, contradicted (dashed red) + low-confidence (dashed) edges, graph-hole burst layer, viewport zoom/pan/fit + auto-fit, `?focus=` deep link, live overlay arrivals; timeline scrubber (time-range bands + density strip) coupled to graph filtering lives on the Graph tab; the **standalone Timeline tab is still a scaffold**.
+- **F4** intelligence surfaces: **substantially implemented** ✅/🔶 — Observations feed with contradiction badges, navigable provenance (Observation→Evidence→Source→Artifact→Entity→Relation), reversible keep/accept/reverse Entity Resolution queue, and a structural Discovery overlay (all `IntelligenceProvider`-driven, no demo/live literals in UI). **Leads, Gaps, Cross-Case, Ledger, Robustness, Review** tabs remain `InvestigationScaffold` placeholders.
 - **F6** realtime: **partial** 🔶 — demo + live realtime, SSE client with reconnect, and `STREAM_CONNECTED` resync are implemented; signature motions + Judge Mode are not started.
 - **F7** polish/freeze: **not started** ❌.
-- **Tests:** 36 web test files / 319 tests present (incl. case-list, evidence-intake, evidence-flow, live-providers, live-run-projection, realtime-live.integration, fixture-validation, f-pr4, mock-leakage, auth-boundary).
+- **Tests:** 36 web test files / 319 tests present (incl. case-list, evidence-intake, evidence-flow, live-providers, live-run-projection, realtime-live.integration, fixture-validation, f-pr4, graph-physics, mock-leakage, auth-boundary).
 
 **Trust hierarchy:** pages with `[x]` are real provider-backed surfaces; rows marked "scaffold-only" render a placeholder that consumes the Workspace context but computes/showcases no intelligence.
 
@@ -109,7 +110,7 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 | F2-02 | F2 | Case List surface (evolve current `/` dashboard) | `[G]` | `[M]` | P0 | F0-06 | `app/page.tsx` | list from provider | render test | ✅ (`app/page.tsx` + `components/case-list/case-list.tsx`, `case-list.test.tsx`) |
 | F2-03 | F2 | New Case Intake wired to provider | `[G]` | `[M]` | P0 | F2-02 | `investigations/new/*` | intake creates via provider | flow test | ✅ (`investigations/new/page.tsx` — `createIntakeProviders`, case coordinator) |
 | F2-04 | F2 | Evidence flow refactor (submit → provider → state) | `[G]` | `[M]` | P0 | F1-03 | `components/evidence/*`, `components/upload/file-upload.tsx` | evidence via provider; live/mock parity | parity test | ✅ (`components/evidence/evidence-intake.tsx`, `evidence-list.tsx`, `evidence-intake.test.tsx`, `evidence-flow.test.ts`) |
-| F2-05 | F2 | Observations semantic content | `[M]` | `[G]` | P0 | F1-04 | `components/intel/*` (new) | observations surface | render test | [ ] (deferred — observations tab ships as `InvestigationScaffold` placeholder until F-PR5) |
+| F2-05 | F2 | Observations semantic content | `[M]` | `[G]` | P0 | F1-04 | `components/intel/*` (new) | observations surface | render test | ✅ (delivered in F-PR4 — observations feed + provenance + contradiction badges; see F4-01) |
 | F2-06 | F2 | Loading/empty/error states for case+evidence surfaces | `[G]` | `[M]` | P0 | F2-04 | `components/ui/empty-state.tsx`, `error-display.tsx` | states wired | state test | ✅ (`empty-state.tsx`, `error-display.tsx`, `loading-spinner.tsx`; used in overview + evidence) |
 
 # Phase F3 — Graph / Timeline
@@ -118,13 +119,13 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F3-01 | F3 | Day-2 graph spike: evaluate SVG renderer + deterministic/force layout; decide tech (no WebGL unless demo requirement) | `[G]` | `[M]` | P0 | F1-01 | `components/graph/*` (new) | spike decision documented (CSS+SVG or GSAP) | spike | [ ] |
-| F3-02 | F3 | Build provider-driven Graph component (no hardcoded graph data in component) | `[G]` | `[M]` | P0 | F3-01, F1-03 | `components/graph/*` (new) | graph renders from `getGraph()` | graph purity test | [ ] |
-| F3-03 | F3 | Graph presentation semantics (node size = demo-only KPP field; edge thickness = confidence; low-confidence dashed; bridge halo; community fog) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*` | presentation rules applied | — | [ ] |
-| F3-04 | F3 | Node interaction → Entity Detail drawer (preserve graph context) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*`, drawer | node click opens drawer | interaction test | [ ] |
-| F3-05 | F3 | Timeline component (case-wide range, scrubber, density strip) coupled to graph filtering | `[G]` | `[M]` | P0 | F1-01 | `components/timeline/*` (new) | scrubber filters graph | timeline filter test | [ ] |
-| F3-06 | F3 | Graph/timeline semantic validation + presentation copy | `[M]` | `[G]` | P0 | F3-03, F3-05 | semantics/notes | wording approved | — | [ ] |
-| F3-07 | F3 | Graph performance guardrails (node cap, pause simulation, memoize, throttle) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*` | guardrails applied | perf smoke | [ ] |
+| F3-01 | F3 | Day-2 graph spike: evaluate SVG renderer + deterministic/force layout; decide tech (no WebGL unless demo requirement) | `[G]` | `[M]` | P0 | F1-01 | `components/graph/*` (new) | spike decision documented (CSS+SVG or GSAP) | spike | ✅ (decision documented in `docs/frontend/f-pr3-graph-physics.md` — SVG layers + persistent d3-force layout; no WebGL, no GSAP) |
+| F3-02 | F3 | Build provider-driven Graph component (no hardcoded graph data in component) | `[G]` | `[M]` | P0 | F3-01, F1-03 | `components/graph/*` (new) | graph renders from `getGraph()` | graph purity test | ✅ (`graph-panel.tsx` + `graph-canvas.tsx` read everything via `workspace.graph.*`; zero hardcoded graph data; `graph-physics.test.tsx`) |
+| F3-03 | F3 | Graph presentation semantics (node size = central/importance; edge thickness = confidence; low-confidence dashed; bridge halo; community fog) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*` | presentation rules applied | — | ✅ (node size = prominence; edge thickness → confidence; low-confidence dashed; contradicted dashed-red; Tarjan bridge halo + community fog layer; legend in `graph-panel.tsx`) |
+| F3-04 | F3 | Node interaction → Entity Detail drawer (preserve graph context) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*`, drawer | node click opens drawer | interaction test | ✅ (node click → `EntityDrawer`, graph context preserved; `?focus=` deep-link focuses a node on load) |
+| F3-05 | F3 | Timeline component (case-wide range, scrubber, density strip) coupled to graph filtering | `[G]` | `[M]` | P0 | F1-01 | `components/timeline/*` (new) | scrubber filters graph | timeline filter test | ✅ (TimelinePanel on the Graph tab: time-range bands + density strip → `activeTimeRange` graph filtering; standalone Timeline tab deferred) |
+| F3-06 | F3 | Graph/timeline semantic validation + presentation copy | `[M]` | `[G]` | P0 | F3-03, F3-05 | semantics/notes | wording approved | — | 🔶 legend + Discovery copy implemented; final wording sign-off pending Mayur |
+| F3-07 | F3 | Graph performance guardrails (node cap, pause simulation, memoize, throttle) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*` | guardrails applied | perf smoke | ✅ (single persistent simulation; idle-stop + `settled` latch; hover/drag `alphaTarget`; memoized structural analysis; position cache; no explicit node-count cap — demo scale is small) |
 
 # Phase F4 — Intelligence
 
@@ -132,11 +133,11 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F4-01 | F4 | Display Observations feed from provider | `[G]` | `[M]` | P0 | F2-05 | `components/intel/observations*` | observations render | render test | [ ] |
-| F4-02 | F4 | Entity resolution review queue + Entity Detail | `[G]` | `[M]` | P0 | F3-04 | `components/intel/entity*`, drawer | queue + detail work | render test | [ ] |
-| F4-03 | F4 | Leads list + Lead Detail drawer | `[G]` | `[M]` | P0 | F1-01 | `components/intel/leads*` | leads work | render test | [ ] |
-| F4-04 | F4 | Gaps list + Gap Detail drawer (graph-hole) | `[G]` | `[M]` | P0 | F1-01 | `components/intel/gaps*` | gaps work | render test | [ ] |
-| F4-05 | F4 | Intelligence presentation copy (lead/gap/evidence wording) | `[M]` | `[G]` | P0 | — | semantics/notes | wording approved | — | [ ] |
+| F4-01 | F4 | Display Observations feed from provider | `[G]` | `[M]` | P0 | F2-05 | `components/intel/observations*` | observations render | render test | ✅ (`app/investigations/[id]/observations/page.tsx` + `components/observations/*`; contradiction badges; `?entity=` deep link; `observations-list.test.tsx`) |
+| F4-02 | F4 | Entity resolution review queue + Entity Detail | `[G]` | `[M]` | P0 | F3-04 | `components/intel/entity*`, drawer | queue + detail work | render test | ✅ (ER queue on observations page via `intelligence.listCandidates` + `entity-resolution-panel.tsx` keep/accept/reverse; `EntityDrawer` detail) |
+| F4-03 | F4 | Leads list + Lead Detail drawer | `[G]` | `[M]` | P0 | F1-01 | `components/intel/leads*` | leads work | render test | [ ] (Leads tab scaffold-only) |
+| F4-04 | F4 | Gaps list + Gap Detail drawer (graph-hole) | `[G]` | `[M]` | P0 | F1-01 | `components/intel/gaps*` | gaps work | render test | [ ] (Gaps tab scaffold-only) |
+| F4-05 | F4 | Intelligence presentation copy (lead/gap/evidence wording) | `[M]` | `[G]` | P0 | — | semantics/notes | wording approved | — | ✅ (semantic naming ref + contradiction/ER/Discovery panel copy in F-PR4; lead/gap wording deferred with F4-03/F4-04) |
 
 # Phase F5 — Differentiation / Trust
 
@@ -144,11 +145,11 @@ Build the production-shaped Investigator frontend **now**, demo-ready within ~7 
 
 | ID | Phase | Task | Owner | Reviewer | Priority | Dependencies | Files | Acceptance | Test | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| F5-01 | F5 | Lead → Gap → Next Evidence narrative scripting in demo | `[Both]` | `[Both]` | P0 | F4-03, F4-04 | `demo-fixtures/events.json`, `components/feedback/*` | narrative order validated | narrative test | [ ] |
-| F5-02 | F5 | Graph-hole visualization (dim graph + hole emphasis) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*`, `components/feedback/*` | hole shown | — | [ ] |
-| F5-03 | F5 | Evidence-arrival visualization (opacity/translate + connection draw) | `[G]` | `[M]` | P0 | F5-01 | `components/feedback/*` | arrival moment renders | — | [ ] |
-| F5-04 | F5 | Signature animations decision (CSS+SVG default; GSAP only if approved by spike) | `[G]` | `[M]` | P0 | F3-01 | `components/feedback/*`, `globals.css` | decision documented | — | [ ] |
-| F5-05 | F5 | Counter-evidence + robustness semantic content/surface | `[M]` | `[G]` | P0 | F1-01 | `components/intel/robustness*` | robustness surface works | render test | [ ] |
+| F5-01 | F5 | Lead → Gap → Next Evidence narrative scripting in demo | `[Both]` | `[Both]` | P0 | F4-03, F4-04 | `demo-fixtures/events.json`, `components/feedback/*` | narrative order validated | narrative test | [ ] (deferred with Leads/Gaps) |
+| F5-02 | F5 | Graph-hole visualization (dim graph + hole emphasis) | `[G]` | `[M]` | P0 | F3-02 | `components/graph/*`, `components/feedback/*` | hole shown | — | ✅ (`GraphHoleBurstLayer` region pulse + candidate emphasis; holes rendered from `getGraphHoles`; legend entry; full dim-graph treatment pending) |
+| F5-03 | F5 | Evidence-arrival visualization (opacity/translate + connection draw) | `[G]` | `[M]` | P0 | F5-01 | `components/feedback/*` | arrival moment renders | — | ✅ (live overlay arrivals: `isNewArrival` node fade-in + edge draw via `useGraphLiveOverlay` on the Graph tab) |
+| F5-04 | F5 | Signature animations decision (CSS+SVG default; GSAP only if approved by spike) | `[G]` | `[M]` | P0 | F3-01 | `components/feedback/*`, `globals.css` | decision documented | — | ✅ (decision recorded in `f-pr3-graph-physics.md` — SVG layers + d3-force + CSS transitions; no GSAP, no WebGL) |
+| F5-05 | F5 | Counter-evidence + robustness semantic content/surface | `[M]` | `[G]` | P0 | F1-01 | `components/intel/robustness*` | robustness surface works | render test | 🔶 (contradicted-link rendering + contradiction panel done; Robustness tab scaffold-only) |
 
 # Phase F6 — Realtime / Animation / Judge
 
@@ -196,7 +197,7 @@ Each row is one of the 22 views from `docs/frontend/frontend-development-plan.md
 | 06 | Entity Resolution Queue | `IntelligenceProvider` | `[G]` | workspace tab | §15 V06 | [x] (observations page queue driven by `intelligence.listCandidates` + `entity-resolution-panel.tsx`) |
 | 07 | Entity Detail | `EntityProvider` + `GraphProvider` | `[G]` | drawer | §15 V07 | [x] (`components/drawers/entity-drawer.tsx` + linked-observations deep link) |
 | 08 | Graph View | `GraphProvider.getGraph()` | `[G]` | workspace panel | §15 V08 | [x] (`components/graph/*` — `graph-panel.tsx`, `graph-canvas.tsx`, physics, viewport controls, `?focus=` deep link) |
-| 09 | Timeline View | `TimelineProvider.getTimeline()` | `[G]` | workspace panel | §15 V09 | [ ] scaffold-only |
+| 09 | Timeline View | `TimelineProvider.getTimeline()` | `[G]` | workspace panel | §15 V09 | [ ] scaffold-only (standalone tab) — scrubber + density strip integrated on the Graph tab via `TimelinePanel` |
 | 10 | Leads List | `LeadProvider.getLeads()` | `[G]` | workspace tab | §15 V10 | [ ] scaffold-only |
 | 11 | Lead Detail | `LeadProvider` + `CounterEvidence` | `[G]` | drawer | §15 V11 | [ ] scaffold-only |
 | 12 | Gaps List | `GapProvider.getGaps()` | `[G]` | workspace tab | §15 V12 | [ ] scaffold-only |
@@ -219,27 +220,27 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 
 | # | Visual QA item | Mode | Status |
 |---|---|---|---|
-| 1 | Graph bloom animation (opacity + node stagger + edge dash-draw + bridge halo, settle, pause sim) | Demo | [ ] |
-| 2 | Timeline scrubber filters graph visibility | Demo + Live | [ ] |
-| 3 | Graph community washes + bridge halo render without clipping | Demo | [ ] |
-| 4 | Node click opens Entity Detail drawer, graph context preserved | Demo + Live | [ ] |
-| 5 | Entity-resolution convergence sequence (candidates → center, equal-weight Merge/Separate) | Demo | [ ] |
-| 6 | Lead reveal (graph dim, surface translate, FOR/AGAINST stagger, alternatives, static confidence) | Demo | [ ] |
-| 7 | Graph-hole dim + region pulse + candidate explanations enter (no red flash) | Demo | [ ] |
-| 8 | Evidence-arrival (opacity/translate + connection draw) updates graph | Demo | [ ] |
-| 9 | Cross-case thread draws (stroke-dasharray → offset 0) | Demo | [ ] |
-| 10 | Reasoning ledger staggered row entrance (≤40ms, capped) | Demo + Live | [ ] |
+| 1 | Graph entrance (opacity + node entrance + edge dash-draw + bridge halo, settle, sim pauses when idle) | Demo | ✅ implemented (source-verified; final visual pass pending) |
+| 2 | Timeline scrubber filters graph visibility | Demo + Live | ✅ implemented (TimelinePanel → `activeTimeRange`) |
+| 3 | Graph community washes + bridge halo render without clipping | Demo | ✅ implemented (source-verified; final visual pass pending) |
+| 4 | Node click opens Entity Detail drawer, graph context preserved | Demo + Live | ✅ implemented |
+| 5 | Entity-resolution convergence sequence (candidates → center, equal-weight Merge/Separate) | Demo | [ ] — F-PR4 design is a deliberate keep/accept/reverse queue grounded in contradiction evidence; centroid-convergence sequence not planned |
+| 6 | Lead reveal (graph dim, surface translate, FOR/AGAINST stagger, alternatives, static confidence) | Demo | [ ] (deferred with Leads) |
+| 7 | Graph-hole dim + region pulse + candidate explanations enter (no red flash) | Demo | 🔶 region pulse + hole layer implemented; dim-graph + candidate-explanation UI pending |
+| 8 | Evidence-arrival (opacity/translate + connection draw) updates graph | Demo | ✅ implemented (live overlay arrivals + edge draw on Graph tab) |
+| 9 | Cross-case thread draws (stroke-dasharray → offset 0) | Demo | [ ] (Cross-Case tab scaffold-only) |
+| 10 | Reasoning ledger staggered row entrance (≤40ms, capped) | Demo + Live | [ ] (Ledger tab scaffold-only) |
 | 11 | Traveling processing filament during state transitions | Demo | [ ] |
-| 12 | Recovery ring on SSE reconnect (calm, keep loaded state) | Live | [ ] |
+| 12 | Recovery ring on SSE reconnect (calm, keep loaded state) | Live | 🔶 reconnect + `STREAM_CONNECTED` resync implemented; recovery ring visual not built |
 | 13 | Judge Mode keyboard-advance + restart; deterministic run-to-run | Demo | [ ] |
-| 14 | Confidence numbers NOT animated (AnalyticalConfidence/ResolutionScore are [0,1], not probability) | All | [ ] |
-| 15 | Robustness = perturbation count [0,100] shown, not truth probability | All | [ ] |
-| 16 | GraphHole vs InvestigativeGap remain distinct (structural vs classification) | All | [ ] |
-| 17 | PII revealed only on explicit toggle (Entity Detail) | All | [ ] |
-| 18 | Low-confidence edges dashed + transparent; edge thickness maps to confidence | Demo | [ ] |
-| 19 | Empty/loading/error/recovery states per surface (§25) | All | [ ] |
-| 20 | `prefers-reduced-motion`: grain loop stops, animations skip/jump-to-end | All | [ ] |
-| 21 | Demo reset restores initial snapshot; Judge restart works | Demo | [ ] |
+| 14 | Confidence numbers NOT animated (AnalyticalConfidence/ResolutionScore are [0,1], not probability) | All | ✅ implemented (static `ConfidenceIndicator`) |
+| 15 | Robustness = perturbation count [0,100] shown, not truth probability | All | [ ] (Robustness tab scaffold-only) |
+| 16 | GraphHole vs InvestigativeGap remain distinct (structural vs classification) | All | ✅ implemented (distinct types + legend entries) |
+| 17 | PII revealed only on explicit toggle (Entity Detail) | All | [ ] (not yet surfaced) |
+| 18 | Low-confidence edges dashed + transparent; edge thickness maps to confidence | Demo | ✅ implemented (dashed low-confidence + contradicted edges; thickness → confidence) |
+| 19 | Empty/loading/error/recovery states per surface (§25) | All | ✅ implemented (`LoadingSpinner`/`ErrorDisplay`/`EmptyState` on evidence, observations, graph surfaces) |
+| 20 | `prefers-reduced-motion`: grain loop stops, animations skip/jump-to-end | All | ✅ implemented (reduced-motion handling in graph-canvas + CSS) |
+| 21 | Demo reset restores initial snapshot; Judge restart works | Demo | [ ] (reset not yet wired; session-scoped demo state) |
 
 ---
 
@@ -251,7 +252,7 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 | F-PR2 | Provider Seam + Demo Case | Gurashish/Mayur | F-PR1 | contract-valid coherent case | ✅ |
 | F-PR3 | Core Workspace + Case/Evidence | Gurashish | F-PR1, F-PR2 | case→evidence→provider→intelligence | ✅ (case list, new intake, workspace overview, evidence surface built against provider bundle; graph physics delivered alongside — `docs/frontend/f-pr3-graph-physics.md`) |
 | F-PR4 | Observations, Provenance, Entity Resolution | Gurashish/Mayur | F-PR2, F-PR3 | evidence→observation→contradiction→ER→discovery, no scaffold | ✅ (`docs/frontend/f-pr4-observations-provenance-er.md` — observations feed + contradiction badges, provenance trail, reversible keep/accept/reverse ER, Discovery Mode overlay, catalog seam via `graph.getOverlayCatalog()`, `?entity=`/`?focus=` deep links) |
-| F-PR5 | Intelligence Surfaces | Gurashish/Mayur | F-PR3 | lead/entity/observation presentation | [ ] |
+| F-PR5 | Intelligence Surfaces (continued) | Gurashish/Mayur | F-PR3 | remaining lead/gap/cross-case/robustness/review + timeline tab | 🔶 partial — observations/ER/discovery delivered in F-PR4; Leads, Gaps, Cross-Case, Ledger, Robustness, Review tabs + standalone Timeline tab remain scaffold-only |
 | F-PR6 | Signature Motion + Realtime | Gurashish | F-PR2, F-PR4 | realtime + signature moments | 🔶 in-progress — realtime + SSE recovery + reconnect resync done; signature moments + Judge Mode not started |
 | F-PR7 | Judge Mode + Polish | Both | all | 2 clean runs + freeze | [ ] |
 
@@ -278,8 +279,9 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 | G-F0 | F0 | design system + shell foundation exists | ✅ |
 | G-F1 | F1 | DemoProvider returns contract-valid coherent case | ✅ |
 | G-F2 | F2 | case/evidence workflow works | ✅ |
-| G-F3 | F3 | graph/timeline work against provider only | 🔶 graph implemented + physics via provider; timeline coupling & scrubber open |
+| G-F3 | F3 | graph/timeline work against provider only | ✅ graph + timeline coupling provider-backed (TimelinePanel on Graph tab); standalone Timeline tab deferred to F-PR5 |
 | G-F4 | F4 | lead/entity/observation presentation works | 🔶 observations + entity resolution + discovery done; leads/gaps/robustness open |
+| G-F5 | F5 | lead→gap→evidence→trust story works | 🔶 graph-hole + evidence-arrival + counter-evidence visuals done; narrative scripting + robustness surface open |
 | G-F5 | F5 | lead→gap→evidence→trust story works | [ ] |
 | G-F6 | F6 | realtime + signature moments + Judge Mode works | 🔶 in-progress — realtime + recovery done; signature + Judge Mode open |
 | G-F7 | F7 | two clean demo runs | [ ] |
@@ -288,20 +290,20 @@ Cross-object interaction check. Row = one interaction/detail to verify visually 
 
 # Demo Checklist
 
-- [ ] Coherent deterministic demo case ("Operation Financial Shadow") contract-valid
-- [ ] Provider bundle consumes demo fixtures, validated via canonical `@indago/contracts`
-- [ ] Demo mode explicitly mock or live; demo day has NO silent fallback
-- [ ] Non-demo cases always live (never mock)
+- [x] Coherent deterministic demo case ("Operation Financial Shadow") contract-valid
+- [x] Provider bundle consumes demo fixtures, validated via canonical `@indago/contracts`
+- [x] Demo mode explicitly mock or live; demo day has NO silent fallback
+- [x] Non-demo cases always live (never mock)
 - [ ] Full narrative: MESSY CASE → OBSERVATIONS → RESOLUTION → TEMPORAL GRAPH → CROSS-CASE SIGNAL → LEAD → EVIDENCE FOR/AGAINST → GRAPH HOLE → GAP → BEST NEXT EVIDENCE → COUNTER-EVIDENCE → ROBUSTNESS → VERIFIED EVIDENCE → GRAPH UPDATE → LEAD REASSESSMENT → REASONING LEDGER
-- [ ] Signature animations implemented (graph bloom, lead reveal, evidence arrival, graph-hole, ledger)
-- [ ] Timeline coupled to graph (scrubber + density + filter)
-- [ ] Graph provider-driven, no hardcoded data in components
-- [ ] Realtime works in mock mode (canonical `InvestigationEvent`)
+- [ ] Signature animations implemented (graph bloom, lead reveal, evidence arrival, graph-hole, ledger) — 🔶 partial: graph entrance + evidence arrival + graph-hole pulse done; lead reveal/ledger/cross-case pending
+- [x] Timeline coupled to graph (scrubber + density + filter)
+- [x] Graph provider-driven, no hardcoded data in components
+- [x] Realtime works in mock mode (canonical `InvestigationEvent`)
 - [ ] Judge Mode deterministic, keyboard-advance, restart/reset, independence from backend latency in mock
-- [ ] Loading/empty/error/recovery states present
+- [x] Loading/empty/error/recovery states present
 - [ ] Demo reset restores initial snapshot
-- [ ] `DEMO_TIMING_SCALE` controls pacing
-- [ ] SSE failure shows calm recovery ring without destroying loaded state
+- [x] `DEMO_TIMING_SCALE` controls pacing
+- [ ] SSE failure shows calm recovery ring without destroying loaded state (🔶 reconnect + resync exist; ring visual pending)
 
 ---
 
