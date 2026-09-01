@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import type { ObservationContradiction } from "@/lib/providers/types";
 
 interface ObservationsListProps {
   readonly items: Observation[] | null;
@@ -16,6 +17,9 @@ interface ObservationsListProps {
   readonly unavailable?: boolean;
   readonly emptyTitle?: string;
   readonly emptyDescription?: string;
+  /** Contradictions keyed by observation id (only contradiction sides appear). */
+  readonly contradictionsById?: ReadonlyMap<string, readonly ObservationContradiction[]>;
+  readonly onSelectObservation?: (observationId: string) => void;
 }
 
 export function ObservationsList({
@@ -26,6 +30,8 @@ export function ObservationsList({
   unavailable = false,
   emptyTitle = "No observations yet",
   emptyDescription = "Observations extracted from ingested evidence will appear here.",
+  contradictionsById,
+  onSelectObservation,
 }: ObservationsListProps) {
   if (unavailable && !loading) {
     return (
@@ -64,7 +70,12 @@ export function ObservationsList({
   return (
     <ul className="space-y-3">
       {items.map((observation) => (
-        <ObservationItem key={observation.id} observation={observation} />
+        <ObservationItem
+          key={observation.id}
+          observation={observation}
+          contradictions={contradictionsById?.get(observation.id) ?? []}
+          onSelect={onSelectObservation}
+        />
       ))}
     </ul>
   );

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useWorkspace } from "@/lib/providers/workspace/context";
+import { investigationUrl } from "@/lib/workspace/url";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
@@ -187,6 +189,13 @@ export function EntityDrawer({
                   <CountChip label="Identity Hypotheses" value={entity.hypothesisIds.length} />
                   <CountChip label="Role Hypotheses" value={entity.roleHypothesisIds.length} />
                 </div>
+                <Link
+                  href={`${investigationUrl(workspace.investigationId, workspace.caseId, "observations")}&entity=${encodeURIComponent(entity.id)}`}
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm text-accent-rose hover:text-accent-rose/80 transition-colors duration-fast ease-restrained"
+                >
+                  View linked observations
+                  <span aria-hidden>→</span>
+                </Link>
               </Section>
 
               <Section title="Source Identifiers">
