@@ -3,21 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
 import type { RealtimeProvider, ProviderEvent } from "@/lib/providers/types";
+import {
+  catalogKey,
+  type GraphRealtimeCatalog,
+  type GraphRealtimeCatalogEntry,
+} from "@/lib/providers/types";
 
-export interface LiveGraphCatalogEntry {
-  readonly kind: "node" | "edge" | "hole" | "hole-resolve";
-  readonly node?: GraphNode;
-  readonly edge?: GraphEdge;
-  readonly hole?: GraphHole;
-  readonly extraEdges?: readonly GraphEdge[];
-  readonly resolvesHoleId?: string;
-}
-
-export type LiveGraphCatalog = Record<string, LiveGraphCatalogEntry>;
-
-export function catalogKey(action: string, targetId: string): string {
-  return `${action}:${targetId}`;
-}
+export type LiveGraphCatalog = GraphRealtimeCatalog;
+export type LiveGraphCatalogEntry = GraphRealtimeCatalogEntry;
+export { catalogKey };
 
 interface LiveGraphOverlayState {
   readonly overlayNodes: GraphNode[];

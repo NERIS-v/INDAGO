@@ -1,6 +1,16 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, useEffect, type MutableRefObject } from "react";
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCollide,
+  forceX,
+  forceY,
+  type SimulationNodeDatum,
+  type SimulationLinkDatum,
+} from "d3-force";
 import type { GraphNode, GraphEdge } from "@indago/contracts";
 
 export interface LayoutNode extends GraphNode {
@@ -8,6 +18,9 @@ export interface LayoutNode extends GraphNode {
   y: number;
   vx: number;
   vy: number;
+  /** d3 drag pinning: when set, the node is pinned at this position. */
+  fx?: number | null;
+  fy?: number | null;
   communityId: number;
   isBridge: boolean;
   /** True only on the render where this node first appeared. Consumers use
@@ -28,21 +41,139 @@ export interface CommunityRegion {
   r: number;
 }
 
-interface LayoutResult {
+/** A live simulation node: intersection (not union) of LayoutNode with d3's
+ *  datum so optional fx/fy resolve against d3's required numeric types. */
+type SimNode = LayoutNode & SimulationNodeDatum;
+
+interface SimLink extends SimulationLinkDatum<SimNode> {
+  id: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  source: SimNode;
+  target: SimNode;
+}
+
+export interface GraphViewport {
+  width: number;
+  height: number;
+}
+
+export interface GraphSimulationControls {
+  hoveredNodeId: string | null;
+  focusedNodeId: string | null;
+  reducedMotion: boolean;
+}
+
+/**
+ * Imperative controls the canvas uses to interact with the live simulation.
+ * The hook owns all physics state; the canvas only calls into this API (and
+ * never branches on DataMode / provider internals).
+ */
+export interface GraphSimAPI {
+  /** True while the simulation is actively re-ticking (settling or dragging). */
+  isActive(): boolean;
+  /** Register a per-tick callback for imperative DOM position sync. */
+  onTick(cb: () => void): void;
+  /** Hover / focus influence the local force field (see focusBias force). */
+  setHover(id: string | null): void;
+  setFocus(id: string | null): void;
+  /** Begin a pinned drag: wake the simulation, hold the node in place. */
+  beginDrag(id: string): void;
+  /** Update the pinned node's world-space position while dragging. */
+  moveNode(id: string, x: number, y: number): void;
+  /** Release the pin; the simulation settles softly. */
+  endDrag(id: string): void;
+}
+
+export interface LayoutBox {
   layoutNodes: LayoutNode[];
   layoutEdges: LayoutEdge[];
   communities: CommunityRegion[];
+}
+
+interface LayoutResult {
+  layoutRef: MutableRefObject<LayoutBox>;
+  apiRef: MutableRefObject<GraphSimAPI>;
   settled: boolean;
 }
 
-const NODE_MARGIN_X = 150;
-const NODE_MARGIN_Y = 90;
+// Boundary clamp margin. Kept small so nodes can spring freely across most of
+// the canvas; we only pull a node back when it genuinely leaves the safe area.
+const NODE_MARGIN_X = 26;
+const NODE_MARGIN_Y = 20;
 
-/**
- * Computes exact bridge edges (cut edges) via Tarjan's DFS low-link algorithm in O(V+E) time.
- * Explicitly excludes parent edge IDs during traversal to safely handle parallel multi-edges.
- */
-function findBridgeEdges(
+// ─── Physics lifecycle ───────────────────────────────────────────────────────
+//
+// The graph is QUIET at rest. It only wakes on meaningful interaction or data
+// change. There is no continuous drift, no random breathing, no perpetual motion.
+//
+//   IDLE  →  (hover / drag / new data)  →  WAKE  →  SETTLE  →  IDLE
+//
+// Alpha model:
+//   - Initial layout: alpha = 1, decays via alphaDecay.
+//   - Hover wake: alphaTarget raised briefly, then dropped to 0.
+//   - Drag: alphaTarget raised for network response.
+//   - Release: alphaTarget dropped to 0, sim decays and stops.
+//   - At rest: simulation timer is stopped (d3 emits `end`).
+const DRAG_ALPHA = 0.17;
+const HOVER_ALPHA = 0.07;
+
+// Velocity / alpha thresholds for detecting idle state.
+const IDLE_ALPHA_MIN = 0.001;
+const IDLE_VELOCITY_MAX = 0.15;
+
+// Interaction-state damping. The graph is more responsive (less damped) while
+// the user is dragging so nearby nodes yield and stretch as real springs, and
+// returns to normal damping so it settles to a calm rest afterward.
+const BASE_VELOCITY_DECAY = 0.42;
+const DRAG_VELOCITY_DECAY = 0.22;
+
+// Safety velocity cap during drag to prevent graph explosion on fast throws.
+// High enough that a normal fast drag feels live, low enough to avoid a blast.
+const DRAG_VELOCITY_CAP = 12;
+
+// ─── Pure coordinate transforms (screen <-> world) ───────────────────────────
+// The SVG content group applies: translate(pan) translate(cx,cy) scale(zoom)
+// translate(-cx,-cy). screenToWorld is the exact inverse, so a node dragged at
+// any zoom/pan stays glued to the cursor. All pure; no DOM access.
+
+/** Convert a pointer position in SVG-local pixels into graph/world units. */
+export function screenToWorld(
+  sx: number,
+  sy: number,
+  pan: { x: number; y: number },
+  zoom: number,
+  cx: number,
+  cy: number
+): { x: number; y: number } {
+  if (zoom === 0) return { x: cx, y: cy };
+  return {
+    x: cx + (sx - pan.x - cx) / zoom,
+    y: cy + (sy - pan.y - cy) / zoom,
+  };
+}
+
+/** Inverse of screenToWorld. */
+export function worldToScreen(
+  x: number,
+  y: number,
+  pan: { x: number; y: number },
+  zoom: number,
+  cx: number,
+  cy: number
+): { x: number; y: number } {
+  return {
+    x: pan.x + cx + zoom * (x - cx),
+    y: pan.y + cy + zoom * (y - cy),
+  };
+}
+
+// ─── Structural analysis (components + Tarjan bridges) ───────────────────────
+// Memoized on data only so it never re-runs every physics tick.
+// Pure graph semantics — NOT physics.
+
+/** Computes exact bridge edges (cut edges) via Tarjan's low-link DFS in O(V+E). */
+export function findBridgeEdges(
   nodeIds: string[],
   adjacency: Map<string, { neighbor: string; edgeId: string }[]>
 ): Set<string> {
@@ -79,115 +210,221 @@ function findBridgeEdges(
   return bridgeEdgeIds;
 }
 
-/**
- * Computes non-linear node radius based on structural importance.
- * Utilized by both the layout engine (for accurate repulsion scaling) and the canvas renderer.
- */
+/** Non-linear node radius based on structural importance. Shared by the layout
+ *  (collision radius) and the canvas renderer. */
 export function nodeVisualRadius(importance: number | undefined): number {
   const clamped = Math.max(0, Math.min(1, importance ?? 0.5));
   return 5 + Math.pow(clamped, 1.3) * 13;
 }
 
+function analyzeCommunityAndBridges(nodes: GraphNode[], edges: GraphEdge[]) {
+  const structuralEdges = edges.filter((e) => e.status === "ACTIVE");
+
+  const adjacency = new Map<string, Set<string>>();
+  nodes.forEach((n) => adjacency.set(n.id, new Set()));
+  structuralEdges.forEach((e) => {
+    adjacency.get(e.sourceNodeId)?.add(e.targetNodeId);
+    adjacency.get(e.targetNodeId)?.add(e.sourceNodeId);
+  });
+
+  const communityOf = new Map<string, number>();
+  let communityCount = 0;
+  nodes.forEach((n) => {
+    if (communityOf.has(n.id)) return;
+    const queue = [n.id];
+    communityOf.set(n.id, communityCount);
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const neighbor of adjacency.get(cur) ?? []) {
+        if (!communityOf.has(neighbor)) {
+          communityOf.set(neighbor, communityCount);
+          queue.push(neighbor);
+        }
+      }
+    }
+    communityCount += 1;
+  });
+
+  const dfsAdjacency = new Map<string, { neighbor: string; edgeId: string }[]>();
+  nodes.forEach((n) => dfsAdjacency.set(n.id, []));
+  structuralEdges.forEach((e) => {
+    dfsAdjacency.get(e.sourceNodeId)?.push({ neighbor: e.targetNodeId, edgeId: e.id });
+    dfsAdjacency.get(e.targetNodeId)?.push({ neighbor: e.sourceNodeId, edgeId: e.id });
+  });
+  const bridgeEdgeIds = findBridgeEdges(
+    nodes.map((n) => n.id),
+    dfsAdjacency
+  );
+  const bridgeNodeIds = new Set<string>();
+  structuralEdges.forEach((e) => {
+    if (bridgeEdgeIds.has(e.id)) {
+      bridgeNodeIds.add(e.sourceNodeId);
+      bridgeNodeIds.add(e.targetNodeId);
+    }
+  });
+
+  return { adjacency, communityOf, communityCount, bridgeNodeIds };
+}
+
+/** Recompute community fog regions from live positions (geometry only). */
+function computeCommunityRegions(
+  nodeArray: SimNode[],
+  communityCount: number
+): CommunityRegion[] {
+  const grouped = new Map<number, SimNode[]>();
+  for (const n of nodeArray) {
+    const arr = grouped.get(n.communityId) ?? [];
+    arr.push(n);
+    grouped.set(n.communityId, arr);
+  }
+  const result: CommunityRegion[] = [];
+  for (let id = 0; id < communityCount; id++) {
+    const members = grouped.get(id);
+    if (!members || members.length < 2) continue;
+    const cx = members.reduce((s, n) => s + n.x, 0) / members.length;
+    const cy = members.reduce((s, n) => s + n.y, 0) / members.length;
+    const r = Math.max(...members.map((n) => Math.hypot(n.x - cx, n.y - cy))) + 46;
+    result.push({ id, cx, cy, r });
+  }
+  return result;
+}
+
 /**
- * Deterministic force-directed layout engine — now with cross-render POSITION
- * MEMORY.
+ * Persistent d3-force physics graph — physical, tactile, calm.
  *
- * Why this changed: the original implementation seeded every node's initial
- * position from `(index / nodes.length) * 2π` and ran a full 300-iteration
- * relaxation from scratch on every call. That's fine for a graph that is
- * fetched once and never changes. It is actively harmful once the graph is
- * live: adding a single node changes `nodes.length`, which shifts EVERY
- * node's initial angle, which means the entire graph visibly reshuffles on
- * every incoming event instead of the new node quietly joining. Live
- * updates would have looked worse than the static baseline, not better.
+ * Architecture boundary (kept from F-PR2/F-PR4): this hook receives canonical
+ * GraphProvider data and only owns MOTION. It never defines intelligence
+ * semantics — community detection, Tarjan bridges, positions cache and
+ * isNewArrival are computed for presentation and live-update stability, not by
+ * d3. D3 owns physics + dragging lifecycle only.
  *
- * a module-scoped-per-hook-instance ref caches last-known positions by
- * node id. Previously-seen nodes are seeded from their last position (so
- * they barely move — just a gentle re-relax). Genuinely new nodes are
- * seeded near their strongest existing neighbor (or the canvas center if
- * they have none) and flagged `isNewArrival` for one render so the caller
- * can play an entrance treatment exactly once.
+ * Lifecycle:
+ *   - QUIET at rest. No continuous drift, no random breathing.
+ *   - Wakes on hover / drag / new data → responds locally → settles → stops.
+ *   - Deterministic: no Math.random() anywhere; first layout uses a fixed
+ *     ring seed and subsequent builds reuse the position cache.
+ *   - Reduced motion: sim is stopped and drag moves nodes one-shot, so
+ *     `prefers-reduced-motion` users see static layout, not continuous flow.
  */
 export function useGraphLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
   width: number,
-  height: number
-) {
+  height: number,
+  controls: GraphSimulationControls = {
+    hoveredNodeId: null,
+    focusedNodeId: null,
+    reducedMotion: false,
+  }
+): LayoutResult {
   const positionCache = useRef<Map<string, { x: number; y: number }>>(new Map());
   const seenNodeIds = useRef<Set<string>>(new Set());
   const seenEdgeIds = useRef<Set<string>>(new Set());
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
+  // Canvas registers its imperative DOM-sync callback here; the hook calls it
+  // from the single d3 lifecycle handlers owned by the build effect.
+  const tickCbRef = useRef<() => void>(() => undefined);
 
-  return useMemo<LayoutResult>(() => {
+  const [settled, setSettled] = useState(false);
+  const settledRef = useRef(false);
+  const settledTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const simRef = useRef<{
+    simulation: ReturnType<typeof forceSimulation<SimNode>>;
+    nodesById: Map<string, SimNode>;
+    nodeArray: SimNode[];
+    links: SimLink[];
+    layoutEdges: LayoutEdge[];
+    communityCount: number;
+    active: boolean;
+    dragging: boolean;
+  } | null>(null);
+
+  const layoutRef = useRef<LayoutBox>({
+    layoutNodes: [],
+    layoutEdges: [],
+    communities: [],
+  });
+
+  const apiRef = useRef<GraphSimAPI>({
+    isActive: () => simRef.current?.active ?? false,
+    onTick: (cb: () => void) => {
+      tickCbRef.current = cb;
+    },
+    setHover: () => undefined,
+    setFocus: () => undefined,
+    beginDrag: () => undefined,
+    moveNode: () => undefined,
+    endDrag: () => undefined,
+  });
+
+  // Structural analysis — memoized on data only, never per physics tick.
+  const structure = useMemo(() => {
+    if (!nodes.length) {
+      return {
+        layoutEdges: [] as LayoutEdge[],
+        adjacency: new Map<string, Set<string>>(),
+        communityOf: new Map<string, number>(),
+        communityCount: 0,
+        bridgeNodeIds: new Set<string>(),
+      };
+    }
+    const { adjacency, communityOf, communityCount, bridgeNodeIds } = analyzeCommunityAndBridges(nodes, edges);
+    const prevEdgeIds = seenEdgeIds.current;
+    const isFirstLayout = seenNodeIds.current.size === 0;
+    const layoutEdges: LayoutEdge[] = edges
+      .filter((e) => e.status !== "ARCHIVED")
+      .map((e) => ({
+        ...e,
+        isBridge: bridgeNodeIds.has(e.sourceNodeId) || bridgeNodeIds.has(e.targetNodeId),
+        isNewArrival: !isFirstLayout && !prevEdgeIds.has(e.id),
+      }));
+    seenEdgeIds.current = new Set(edges.map((e) => e.id));
+    return { layoutEdges, adjacency, communityOf, communityCount, bridgeNodeIds };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges]);
+
+  // (Re)build the persistent simulation when the data shape or viewport changes.
+  useEffect(() => {
     if (!nodes.length || width === 0 || height === 0) {
-      return { layoutNodes: [], layoutEdges: [], communities: [], settled: false };
+      simRef.current = null;
+      layoutRef.current = { layoutNodes: [], layoutEdges: [], communities: [] };
+      settledRef.current = false;
+      setSettled(false);
+      return;
     }
 
-    const structuralEdges = edges.filter((e) => e.status === "ACTIVE");
-
-    // Connected components grouping
-    const adjacency = new Map<string, Set<string>>();
-    nodes.forEach((n) => adjacency.set(n.id, new Set()));
-    structuralEdges.forEach((e) => {
-      adjacency.get(e.sourceNodeId)?.add(e.targetNodeId);
-      adjacency.get(e.targetNodeId)?.add(e.sourceNodeId);
-    });
-
-    const communityOf = new Map<string, number>();
-    let communityCounter = 0;
-    nodes.forEach((n) => {
-      if (communityOf.has(n.id)) return;
-      const queue = [n.id];
-      communityOf.set(n.id, communityCounter);
-      while (queue.length) {
-        const cur = queue.shift()!;
-        for (const neighbor of adjacency.get(cur) ?? []) {
-          if (!communityOf.has(neighbor)) {
-            communityOf.set(neighbor, communityCounter);
-            queue.push(neighbor);
-          }
-        }
-      }
-      communityCounter += 1;
-    });
-
-    // Exact bridge-edge detection
-    const dfsAdjacency = new Map<string, { neighbor: string; edgeId: string }[]>();
-    nodes.forEach((n) => dfsAdjacency.set(n.id, []));
-    structuralEdges.forEach((e) => {
-      dfsAdjacency.get(e.sourceNodeId)?.push({ neighbor: e.targetNodeId, edgeId: e.id });
-      dfsAdjacency.get(e.targetNodeId)?.push({ neighbor: e.sourceNodeId, edgeId: e.id });
-    });
-    const bridgeEdgeIds = findBridgeEdges(
-      nodes.map((n) => n.id),
-      dfsAdjacency
-    );
-    const bridgeNodeIds = new Set<string>();
-    structuralEdges.forEach((e) => {
-      if (bridgeEdgeIds.has(e.id)) {
-        bridgeNodeIds.add(e.sourceNodeId);
-        bridgeNodeIds.add(e.targetNodeId);
-      }
-    });
-
-    const previouslySeen = seenNodeIds.current;
-    const isFirstLayout = previouslySeen.size === 0;
+    const isFirstLayout = seenNodeIds.current.size === 0;
     const cache = positionCache.current;
+    // Live positions of the *previous* simulation, if any. When data changes
+    // mid-settle (a new node arrives while the graph is still moving), existing
+    // nodes must carry over their CURRENT live position — not the stale seed
+    // cache — so they never jump back to the initial ring layout.
+    const prevPositions =
+      simRef.current && !isFirstLayout
+        ? new Map(Array.from(simRef.current.nodesById.entries()).map(([id, n]) => [id, { x: n.x, y: n.y }]))
+        : null;
+    const { adjacency, communityOf, communityCount, bridgeNodeIds } = structure;
 
-    // Initial placement: reuse cached position when we have one; otherwise
-    // seed a genuinely new node near an already-placed neighbor (so it
-    // visibly "arrives" from an anchored point rather than a random index
-    // angle), falling back to a point near center if it has no placed
-    // neighbor yet.
-    const initialized: LayoutNode[] = nodes.map((n, i) => {
+    // Seeding: reuse the current live position for existing nodes (so live
+    // growth never collapses or jumps the graph); genuinely new nodes spawn
+    // near an already-placed neighbor and are flagged isNewArrival.
+    // Deterministic otherwise.
+    const nodeArray: SimNode[] = nodes.map((n, i) => {
       const cId = communityOf.get(n.id) ?? 0;
+      const live = prevPositions?.get(n.id);
       const cached = cache.get(n.id);
-      const isNewArrival = !isFirstLayout && !previouslySeen.has(n.id);
+      const isNewArrival = !isFirstLayout && !seenNodeIds.current.has(n.id);
 
       let x: number;
       let y: number;
-
-      if (cached) {
+      let spawnVx = 0;
+      let spawnVy = 0;
+      if (live) {
+        x = live.x;
+        y = live.y;
+      } else if (cached) {
         x = cached.x;
         y = cached.y;
       } else {
@@ -195,28 +432,39 @@ export function useGraphLayout(
         const placedNeighbor = neighborIds
           .map((id) => cache.get(id))
           .find((p): p is { x: number; y: number } => Boolean(p));
-
-        if (placedNeighbor) {
-          // Arrive just off the neighbor, jittered so multiple simultaneous
-          // arrivals don't stack exactly on top of each other.
-          const jitterAngle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
-          x = placedNeighbor.x + Math.cos(jitterAngle) * 40;
-          y = placedNeighbor.y + Math.sin(jitterAngle) * 40;
-        } else if (isFirstLayout) {
-          // No history at all yet — classic ring seed for the very first
-          // paint of the graph.
-          const angle = (i / nodes.length) * 2 * Math.PI;
+        if (isFirstLayout) {
+          const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
           const radius = Math.min(width, height) * 0.35;
           x = width / 2 + radius * Math.cos(angle);
           y = height / 2 + radius * Math.sin(angle);
         } else {
-          // A genuinely orphaned late arrival (no placed neighbor): enter
-          // from just outside the current graph, not dead center, so it
-          // reads as "new" rather than "teleported into the middle".
-          const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
-          const radius = Math.min(width, height) * 0.46;
-          x = width / 2 + radius * Math.cos(angle);
-          y = height / 2 + radius * Math.sin(angle);
+          // Obsidian-style entrance: the node begins just OUTSIDE the canvas,
+          // along the ray from the viewport center through where it will land
+          // (its nearest placed neighbor, else the canvas center), and is given
+          // a strong inward velocity so it flies in and spring-connects fast.
+          const anchorX = placedNeighbor ? placedNeighbor.x : width / 2;
+          const anchorY = placedNeighbor ? placedNeighbor.y : height / 2;
+          let dirX = anchorX - width / 2;
+          let dirY = anchorY - height / 2;
+          const rayLen = Math.hypot(dirX, dirY);
+          if (rayLen < 1) {
+            const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI + Math.PI / 3;
+            dirX = Math.cos(angle);
+            dirY = Math.sin(angle);
+          } else {
+            dirX /= rayLen;
+            dirY /= rayLen;
+          }
+          const exitX = Math.abs(dirX) > 1e-6 ? width / 2 / Math.abs(dirX) : Infinity;
+          const exitY = Math.abs(dirY) > 1e-6 ? height / 2 / Math.abs(dirY) : Infinity;
+          const exitDist = Math.min(exitX, exitY);
+          x = width / 2 + dirX * (exitDist + 70);
+          y = height / 2 + dirY * (exitDist + 70);
+          const ax = anchorX - x;
+          const ay = anchorY - y;
+          const al = Math.hypot(ax, ay) || 1;
+          spawnVx = (ax / al) * 16;
+          spawnVy = (ay / al) * 16;
         }
       }
 
@@ -224,123 +472,343 @@ export function useGraphLayout(
         ...n,
         x,
         y,
-        vx: 0,
-        vy: 0,
+        vx: spawnVx,
+        vy: spawnVy,
         communityId: cId,
         isBridge: bridgeNodeIds.has(n.id),
         isNewArrival,
-      };
+      } as SimNode;
     });
 
-    const nodeById = new Map<string, LayoutNode>();
-    initialized.forEach((n) => nodeById.set(n.id, n));
+    const nodesById = new Map<string, SimNode>();
+    nodeArray.forEach((n) => nodesById.set(n.id, n));
 
-    const springEdges = structuralEdges
-      .map((e) => ({ source: nodeById.get(e.sourceNodeId), target: nodeById.get(e.targetNodeId) }))
-      .filter((e): e is { source: LayoutNode; target: LayoutNode } => Boolean(e.source && e.target));
+    const links: SimLink[] = structure.layoutEdges
+      .map((e) => {
+        const source = nodesById.get(e.sourceNodeId);
+        const target = nodesById.get(e.targetNodeId);
+        if (!source || !target) return null;
+        return { ...e, id: e.id, source, target } as SimLink;
+      })
+      .filter((l): l is SimLink => l !== null);
 
-    // Force simulation. A first layout gets the full relaxation; an
-    // incremental update (graph already had a settled layout) only needs a
-    // short, gentle relax since most nodes are already near their resting
-    // position — this is what keeps live growth from visibly "boiling".
-    const iterations = isFirstLayout ? 300 : 90;
-    const k = Math.sqrt((width * height) / Math.max(nodes.length, 1)) * 1.6;
-    const speed = 0.1;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const gravity = 0.005;
-    let temperature = isFirstLayout ? width / 4 : width / 14;
+    const simulation = forceSimulation<SimNode>(nodeArray)
+      .force(
+        "link",
+        forceLink<SimNode, SimLink>(links)
+          .id((d) => d.id)
+          // Bounded preferred distance gives each relationship physical room to
+          // stretch. High-importance structures rest tighter (~70px); normal and
+          // low-importance relationships rest looser (up to ~160px). This is
+          // presentation geometry only — importance is never a "truth" force.
+          //   high imp: ~70px   normal (~0.5): ~115px   low: ~160px
+          .distance((d) => {
+            const importance = Math.min(1, (d.source.structuralImportance + d.target.structuralImportance) / 2);
+            return 70 + (1 - importance) * 90;
+          })
+          // Stronger elastic link response (spring pull-back toward equilibrium).
+          .strength(0.5)
+      )
+      // Moderate repulsion — enough to keep nodes apart, not enough to fight
+      // the springs and feel rigid.
+      .force("charge", forceManyBody<SimNode>().strength(-150))
+      .force(
+        "collide",
+        forceCollide<SimNode>().radius((d) => nodeVisualRadius(d.structuralImportance) + (d.isBridge ? 6 : 5))
+      )
+      .force("x", forceX<SimNode>(width / 2).strength(0.018))
+      .force("y", forceY<SimNode>(height / 2).strength(0.018))
+      .velocityDecay(BASE_VELOCITY_DECAY)
+      .alphaDecay(0.03)
+      .alpha(1);
 
-    for (let iter = 0; iter < iterations; iter++) {
-      for (let i = 0; i < initialized.length; i++) {
-        for (let j = i + 1; j < initialized.length; j++) {
-          const u = initialized[i];
-          const v = initialized[j];
-          if (!u || !v) continue;
-          let dx = u.x - v.x;
-          let dy = u.y - v.y;
-          if (dx === 0 && dy === 0) {
-            dx = Math.random() - 0.5;
-            dy = Math.random() - 0.5;
+    // Bounded hover/focus local force — subtle, localized, never rearranges the
+    // graph globally. Only direct neighbors are attracted; nearby unrelated nodes
+    // are gently repelled. The effect scales with alpha so it fades as the
+    // simulation settles.
+    simulation.force("focusBias", (alpha: number) => {
+      const c = controlsRef.current;
+      if (c.reducedMotion) return;
+      const activeId = c.hoveredNodeId ?? c.focusedNodeId;
+      if (!activeId) return;
+      const anchor = nodesById.get(activeId);
+      if (!anchor || !nodeArray.length) return;
+
+      // Scale the effect with alpha so it fades as the simulation settles.
+      const k = Math.min(1, alpha * 4);
+
+      // Build neighbor set for O(1) lookup (only direct links).
+      const neighborIds = new Set<string>();
+      for (const l of links) {
+        if (l.source.id === activeId) neighborIds.add(l.target.id);
+        else if (l.target.id === activeId) neighborIds.add(l.source.id);
+      }
+
+      for (const n of nodeArray) {
+        if (n.id === activeId) continue;
+        const dx = n.x - anchor.x;
+        const dy = n.y - anchor.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+
+        if (neighborIds.has(n.id)) {
+          // Direct neighbors: gentle pull toward equilibrium distance.
+          if (dist > 120) {
+            const pull = Math.min(0.25, (dist - 120) * 0.003) * k;
+            n.vx -= dirX * pull;
+            n.vy -= dirY * pull;
           }
-          const dist = Math.max(10, Math.sqrt(dx * dx + dy * dy));
-          const sameCommunity = u.communityId === v.communityId;
-
-          const sizeFactor =
-            1 + (nodeVisualRadius(u.structuralImportance) + nodeVisualRadius(v.structuralImportance)) / 24;
-          const force = ((k * k) / dist) * (sameCommunity ? 1.0 : 1.5) * sizeFactor;
-
-          u.vx += (dx / dist) * force;
-          u.vy += (dy / dist) * force;
-          v.vx -= (dx / dist) * force;
-          v.vy -= (dy / dist) * force;
+        } else if (dist < 180) {
+          // Unrelated nodes within 180px: gentle push away.
+          const repel = Math.max(0, (180 - dist) * 0.004) * k;
+          n.vx += dirX * repel;
+          n.vy += dirY * repel;
         }
+        // Nodes beyond 180px: completely unaffected.
       }
+    });
 
-      for (const { source, target } of springEdges) {
-        let dx = source.x - target.x;
-        let dy = source.y - target.y;
-        if (dx === 0 && dy === 0) {
-          dx = 0.1;
-          dy = 0.1;
-        }
-        const dist = Math.max(10, Math.sqrt(dx * dx + dy * dy));
-        const force = (dist * dist) / (k * 1.5);
+    // Stop the simulation immediately — it starts idle. It will be woken
+    // by hover, drag, or data change through the API.
+    simulation.stop();
 
-        source.vx -= (dx / dist) * force;
-        source.vy -= (dy / dist) * force;
-        target.vx += (dx / dist) * force;
-        target.vy += (dy / dist) * force;
+    const syncToLayoutRef = () => {
+      if (!simRef.current) return;
+      layoutRef.current.layoutNodes = simRef.current.nodeArray;
+      layoutRef.current.layoutEdges = simRef.current.layoutEdges;
+      layoutRef.current.communities = computeCommunityRegions(
+        simRef.current.nodeArray,
+        simRef.current.communityCount
+      );
+    };
+
+    simRef.current = {
+      simulation,
+      nodesById,
+      nodeArray,
+      links,
+      layoutEdges: structure.layoutEdges,
+      communityCount,
+      // The simulation is considered "active" whenever it is running physics —
+      // true right after build (we call `restart()` to run the initial layout),
+      // false under reduced-motion. It flips back to false when the sim settles
+      // to idle (markIdle) or is stopped in cleanup.
+      active: !controlsRef.current.reducedMotion,
+      dragging: false,
+    };
+    syncToLayoutRef();
+
+    // ─── Idle detection ──────────────────────────────────────────────────
+    // The simulation is idle when alpha is sufficiently low AND no node has
+    // meaningful velocity. This is the true "graph is still" signal.
+    function isIdle(): boolean {
+      if (!simRef.current) return true;
+      const sim = simRef.current.simulation;
+      if (sim.alpha() > IDLE_ALPHA_MIN) return false;
+      let maxV = 0;
+      for (const n of simRef.current.nodeArray) {
+        const v = Math.hypot(n.vx ?? 0, n.vy ?? 0);
+        if (v > maxV) maxV = v;
       }
-
-      for (const node of initialized) {
-        node.vx += (centerX - node.x) * gravity * k;
-        node.vy += (centerY - node.y) * gravity * k;
-        node.vx *= 0.85;
-        node.vy *= 0.85;
-
-        const vMag = Math.sqrt(node.vx * node.vx + node.vy * node.vy) || 1;
-        if (vMag > temperature) {
-          node.vx = (node.vx / vMag) * temperature;
-          node.vy = (node.vy / vMag) * temperature;
-        }
-
-        node.x += node.vx * speed;
-        node.y += node.vy * speed;
-        node.x = Math.max(NODE_MARGIN_X, Math.min(width - NODE_MARGIN_X, node.x));
-        node.y = Math.max(NODE_MARGIN_Y, Math.min(height - NODE_MARGIN_Y, node.y));
-      }
-      temperature *= 0.98;
+      return maxV < IDLE_VELOCITY_MAX;
     }
 
-    // Persist positions + seen-ids for the next update.
-    const nextCache = new Map<string, { x: number; y: number }>();
-    initialized.forEach((n) => nextCache.set(n.id, { x: n.x, y: n.y }));
-    positionCache.current = nextCache;
-    seenNodeIds.current = new Set(nodes.map((n) => n.id));
-
-    // Community fog regions
-    const communities: CommunityRegion[] = [];
-    for (let c = 0; c < communityCounter; c++) {
-      const members = initialized.filter((n) => n.communityId === c);
-      if (members.length < 2) continue;
-      const cx = members.reduce((s, n) => s + n.x, 0) / members.length;
-      const cy = members.reduce((s, n) => s + n.y, 0) / members.length;
-      const r = Math.max(...members.map((n) => Math.hypot(n.x - cx, n.y - cy))) + 46;
-      communities.push({ id: c, cx, cy, r });
+    function markIdle() {
+      if (!simRef.current) return;
+      simRef.current.active = false;
+      simRef.current.dragging = false;
+      // Persist final positions.
+      const nextCache = new Map<string, { x: number; y: number }>();
+      simRef.current.nodeArray.forEach((n) => nextCache.set(n.id, { x: n.x, y: n.y }));
+      positionCache.current = nextCache;
+      seenNodeIds.current = new Set(simRef.current.nodeArray.map((n) => n.id));
+      if (!settledRef.current) {
+        settledRef.current = true;
+        setSettled(true);
+      }
+      tickCbRef.current();
     }
 
-    const prevEdgeIds = seenEdgeIds.current;
-    const layoutEdges: LayoutEdge[] = edges
-      .filter((e) => e.status !== "ARCHIVED")
-      .map((e) => ({
-        ...e,
-        isBridge: bridgeEdgeIds.has(e.id),
-        isNewArrival: !isFirstLayout && !prevEdgeIds.has(e.id),
-      }));
-    seenEdgeIds.current = new Set(edges.map((e) => e.id));
+    // Single d3 lifecycle handlers — immutable tick/end wiring for this sim.
+    simulation.on("tick", () => {
+      if (!simRef.current) return;
+      simRef.current.active = true;
+      const { nodeArray: arr, simulation: sim } = simRef.current;
 
-    return { layoutNodes: initialized, layoutEdges, communities, settled: true };
+      // During drag, lower damping so the network responds / yields like real
+      // springs, and cap excessive velocity to prevent an explosion.
+      if (simRef.current.dragging) {
+        sim.velocityDecay(DRAG_VELOCITY_DECAY);
+        for (const n of arr) {
+          if (n.fx != null) continue;
+          const v = Math.hypot(n.vx ?? 0, n.vy ?? 0);
+          if (v > DRAG_VELOCITY_CAP) {
+            const scale = DRAG_VELOCITY_CAP / v;
+            n.vx = (n.vx ?? 0) * scale;
+            n.vy = (n.vy ?? 0) * scale;
+          }
+        }
+      } else {
+        sim.velocityDecay(BASE_VELOCITY_DECAY);
+      }
+
+      // Soft boundary: only pull a node back when it genuinely leaves the safe
+      // canvas region. Do not anchor nodes to an interior margin — springs must
+      // be able to stretch and move naturally near the edges.
+      for (const n of arr) {
+        n.x = Math.max(NODE_MARGIN_X - 40, Math.min(width - NODE_MARGIN_X + 40, n.x));
+        n.y = Math.max(NODE_MARGIN_Y - 40, Math.min(height - NODE_MARGIN_Y + 40, n.y));
+      }
+      syncToLayoutRef();
+      tickCbRef.current();
+
+      // Precise idle detection: alpha sufficiently low AND no node moving.
+      // Velocity-aware so a fast release that left residual energy keeps
+      // ticking (soft rebound) until it is genuinely still — and only then
+      // the simulation stops/timer ends.
+      if (simRef.current && !simRef.current.dragging && isIdle()) {
+        sim.stop();
+        markIdle();
+      }
+    });
+
+    simulation.on("end", () => {
+      markIdle();
+    });
+
+    // Persist caching/seen sets synchronously so a subsequent build (a newly
+    // arrived node, or a fresh viewport) can restore existing positions and
+    // flag new arrivals even when the simulation stops via the idle timer.
+    positionCache.current = new Map(
+      simRef.current.nodeArray.map((n) => [n.id, { x: n.x, y: n.y }])
+    );
+    seenNodeIds.current = new Set(simRef.current.nodeArray.map((n) => n.id));
+
+    // Start the initial layout — the simulation runs, decays, and stops.
+    // When it stops, `end` fires and marks the graph as idle. The app-level
+    // `settled` flag additionally latches on a short timer so entrance visuals
+    // (auto-fit, bloom) fire promptly after the initial layout converges rather
+    // than waiting for full idle decay. `settled` is a latch: once true it
+    // stays true; it represents "graph is in a restful, stable state".
+    setSettled(false);
+    settledRef.current = false;
+    simulation.alpha(1).restart();
+
+    if (settledTimer.current) clearTimeout(settledTimer.current);
+    settledTimer.current = setTimeout(() => {
+      settledRef.current = true;
+      setSettled(true);
+    }, 500);
+
+    return () => {
+      if (settledTimer.current) {
+        clearTimeout(settledTimer.current);
+        settledTimer.current = null;
+      }
+      simulation.on("tick", null);
+      simulation.on("end", null);
+      simulation.stop();
+      simRef.current = null;
+    };
+    // width/height intentionally captured for viewport changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges, width, height]);
+
+  // ─── Imperative controls ───────────────────────────────────────────────
+  // Setters mutate the running lifecycle and never read provider data or
+  // encode domain meaning.
+
+  apiRef.current.setHover = (id: string | null) => {
+    controlsRef.current.hoveredNodeId = id;
+    const sim = simRef.current;
+    if (!sim || controlsRef.current.reducedMotion || sim.dragging) return;
+    if (id) {
+      // Wake briefly for local hover response. alphaTarget controls how
+      // much energy the sim receives; dropping it to 0 lets it settle
+      // back naturally.
+      sim.simulation.alpha(Math.max(sim.simulation.alpha(), HOVER_ALPHA));
+      sim.simulation.alphaTarget(HOVER_ALPHA);
+      sim.active = true;
+      // restart() is idempotent in d3-timer (safe on a running timer).
+      sim.simulation.restart();
+    } else {
+      // Clear hover: let the sim decay to idle.
+      sim.simulation.alphaTarget(0);
+    }
+  };
+
+  apiRef.current.setFocus = (id: string | null) => {
+    controlsRef.current.focusedNodeId = id;
+    const sim = simRef.current;
+    if (!sim || controlsRef.current.reducedMotion || sim.dragging) return;
+    if (id) {
+      sim.simulation.alpha(Math.max(sim.simulation.alpha(), HOVER_ALPHA));
+      sim.simulation.alphaTarget(HOVER_ALPHA);
+      sim.active = true;
+      sim.simulation.restart();
+    } else {
+      sim.simulation.alphaTarget(0);
+    }
+  };
+
+  apiRef.current.beginDrag = (id: string) => {
+    const sim = simRef.current;
+    if (!sim) return;
+    const node = sim.nodesById.get(id);
+    if (!node) return;
+    node.fx = node.x;
+    node.fy = node.y;
+    sim.active = true;
+    sim.dragging = true;
+    if (controlsRef.current.reducedMotion) {
+      sim.simulation.alpha(0);
+    } else {
+      // Wake the simulation for a visible network response during drag.
+      sim.simulation.alpha(Math.max(sim.simulation.alpha(), DRAG_ALPHA));
+      sim.simulation.alphaTarget(DRAG_ALPHA);
+      sim.simulation.restart();
+    }
+  };
+
+  apiRef.current.moveNode = (id: string, x: number, y: number) => {
+    const sim = simRef.current;
+    if (!sim) return;
+    const node = sim.nodesById.get(id);
+    if (!node) return;
+    node.fx = x;
+    node.fy = y;
+    node.x = x;
+    node.y = y;
+    if (controlsRef.current.reducedMotion) {
+      sim.simulation.tick();
+    }
+    // During normal drag, the pinned position drives the simulation;
+    // link/charge/collision forces react naturally. No manual alpha bump
+    // is needed — the existing DRAG_ALPHA target keeps the network alive.
+  };
+
+  apiRef.current.endDrag = (id: string) => {
+    const sim = simRef.current;
+    if (!sim) return;
+    const node = sim.nodesById.get(id);
+    if (node) {
+      node.fx = null;
+      node.fy = null;
+    }
+    sim.dragging = false;
+    if (controlsRef.current.reducedMotion) {
+      sim.simulation.alphaTarget(0).alpha(0);
+      sim.active = false;
+    } else {
+      // Release: drop the alpha target to 0. The simulation decays from
+      // its current alpha, the released node's velocity causes a brief
+      // elastic rebound, then the graph settles to rest. The node retains
+      // physical velocity from d3-force (fx/fy pinning preserves velocity
+      // state), giving a natural "letting go" feel.
+      sim.simulation.alphaTarget(0);
+    }
+  };
+
+  return { layoutRef, apiRef, settled };
 }

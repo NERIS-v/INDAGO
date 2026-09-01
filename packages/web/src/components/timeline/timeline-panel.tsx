@@ -19,6 +19,12 @@ const BAND_KIND_STYLE: Record<TimelineBand["kind"], string> = {
   relationship: "bg-success",
 };
 
+// How long a full play sweep (start → now) takes in milliseconds.
+const PLAY_DURATION_MS = 8000;
+
+// Number of buckets in the activity density strip above the scrubber track.
+const DENSITY_BUCKETS = 32;
+
 function formatDate(t: number) {
   return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
@@ -28,9 +34,12 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
   const [timeline, setTimeline] = useState<InvestigationTimeline | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [rangePct, setRangePct] = useState<[number, number]>([0, 100]);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [hoverItem, setHoverItem] = useState<{ x: number; label: string; time: string } | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playAnimRef = useRef<number | null>(null);
+  const lastPlayApplyRef = useRef(0);
 
   // 1. Initial Load
   useEffect(() => {
@@ -112,9 +121,65 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [rangePct, applyRange]);
 
+  const spanD = domain.end - domain.start;
+  const itemTimes = timeline
+    ? timeline.items.map((it) => new Date(it.time).getTime()).filter((t) => !Number.isNaN(t))
+    : [];
+  const nowTs = itemTimes.length > 0 ? Math.max(...itemTimes) : domain.end;
+  const nowPct = Math.min(100, Math.max(0, ((nowTs - domain.start) / spanD) * 100));
+
+  // Play: sweep the range from the start (left edge at start) to "now" so the
+  // graph is progressively built up — nodes enter the window left→right and
+  // fly in from outside the canvas in time order (Obsidian-style).
+  const stopPlay = useCallback(() => {
+    if (playAnimRef.current !== null) {
+      cancelAnimationFrame(playAnimRef.current);
+      playAnimRef.current = null;
+    }
+    setIsPlaying(false);
+  }, []);
+
+  const startPlay = useCallback(() => {
+    const startTime = performance.now();
+    const beginPct = 0;
+    // Sweep to the latest known data point ("now"), not the padded domain end,
+    // so the sweep agrees with the "now" marker on the density strip.
+    const targetEnd = nowPct;
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / PLAY_DURATION_MS);
+      // Left handle pinned to the start; right handle sweeps to "now".
+      const end = beginPct + progress * targetEnd;
+      setRangePct((prev) => [beginPct, Math.max(end, prev[1] < beginPct ? beginPct : prev[1])]);
+      // The 50ms debounce on rangePct resets on every frame (16ms), so it never
+      // fires while the sweep is running. Persist the sweep into the graph from
+      // here at a readable cadence so nodes stream in as the range advances.
+      if (now - lastPlayApplyRef.current >= 40) {
+        lastPlayApplyRef.current = now;
+        applyRange([beginPct, end]);
+      }
+      if (progress < 1) {
+        playAnimRef.current = requestAnimationFrame(step);
+      } else {
+        playAnimRef.current = null;
+        setIsPlaying(false);
+      }
+    };
+    setRangePct([beginPct, beginPct + 1]); // collapse to the start point first
+    setIsPlaying(true);
+    lastPlayApplyRef.current = 0;
+    playAnimRef.current = requestAnimationFrame(step);
+  }, [applyRange, nowPct]);
+
+  useEffect(() => () => {
+    if (playAnimRef.current !== null) cancelAnimationFrame(playAnimRef.current);
+  }, []);
+
   const handleDrag = (index: 0 | 1) => () => {
     if (!trackRef.current) return;
     const track = trackRef.current;
+    stopPlay();
 
     const onMove = (moveEvent: PointerEvent) => {
       const rect = track.getBoundingClientRect();
@@ -159,6 +224,14 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
   const bandsPresent = BAND_KIND_ORDER.filter((kind) => timeline.bands.some((b) => b.kind === kind));
   const hasItems = timeline.items.length > 0;
 
+  const densityBins: number[] = new Array(DENSITY_BUCKETS).fill(0);
+  for (const t of itemTimes) {
+    const idx = Math.min(DENSITY_BUCKETS - 1, Math.max(0, Math.floor(((t - domain.start) / span) * DENSITY_BUCKETS)));
+    densityBins[idx] = (densityBins[idx] ?? 0) + 1;
+  }
+  const maxDensity = Math.max(1, ...densityBins);
+  const axisLabels = Array.from({ length: 4 }, (_, i) => domain.start + (span * i) / 3);
+
   return (
     <div className="w-full bg-surface-50 rounded-lg border border-surface-200 mt-4 p-5 animate-fade-in shadow-sm">
       
@@ -172,6 +245,41 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
           </span>
         </span>
         <span className="text-[11px] font-sans text-surface-500 uppercase tracking-widest">{formatDate(domain.end)}</span>
+      </div>
+
+      {/* Play / pause: sweep the range start → now so the graph builds in time order */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => (isPlaying ? stopPlay() : startPlay())}
+          aria-label={isPlaying ? "Pause timeline sweep" : "Play timeline sweep"}
+          className={`w-8 h-8 flex items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 ring-accent-rose ${
+            isPlaying
+              ? "bg-accent-rose border-accent-rose text-surface-0"
+              : "bg-surface-100 border-surface-300 text-surface-700 hover:bg-surface-200 hover:border-accent-rose hover:text-accent-rose"
+          }`}
+        >
+          {isPlaying ? (
+            <span className="block w-2.5 h-2.5">
+              <span className="block h-full w-[3px] mr-[2px] float-left bg-current" />
+              <span className="block h-full w-[3px] float-left bg-current" />
+            </span>
+          ) : (
+            <span className="block w-0 h-0 ml-0.5 border-y-[5px] border-y-transparent border-l-[9px] border-l-current" />
+          )}
+        </button>
+        <span className="text-[10px] font-mono text-surface-500 uppercase tracking-widest">
+          {isPlaying ? "Building graph…" : "Play — watch the graph build from start to now"}
+        </span>
+      </div>
+
+      {/* Date axis — even steps across the case-wide range */}
+      <div className="flex justify-between mb-2">
+        {axisLabels.map((t, i) => (
+          <span key={i} className="text-[10px] font-mono text-surface-500 uppercase tracking-wide">
+            {formatDate(t)}
+          </span>
+        ))}
       </div>
 
       <div className="flex flex-col gap-2 mb-4">
@@ -210,11 +318,42 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
         )}
       </div>
 
+      {/* Activity density strip — histogram of item density across the case-wide range */}
+      {hasItems && (
+        <div className="relative mt-4 mb-1 h-8">
+          <div className="absolute inset-0 flex items-end gap-px overflow-hidden rounded">
+            {densityBins.map((count, i) => (
+              <span
+                key={i}
+                className={`flex-1 rounded-t transition-colors ${
+                  (i / DENSITY_BUCKETS) * 100 <= rangePct[1] ? "bg-accent-rose/30" : "bg-surface-200"
+                }`}
+                style={{ height: `${Math.max(8, (count / maxDensity) * 100)}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div ref={trackRef} className="w-full h-2 bg-surface-200 rounded-full mt-2 relative z-10">
         <div
           className="absolute h-full bg-accent-rose/30 border-y border-accent-rose/50 rounded-full"
           style={{ left: `${rangePct[0]}%`, right: `${100 - rangePct[1]}%` }}
         />
+
+        {/* Now marker */}
+        {hasItems && (
+          <div
+            className="absolute -top-3 -translate-x-1/2 pointer-events-none z-20"
+            style={{ left: `${nowPct}%` }}
+            aria-hidden
+          >
+            <div className="flex flex-col items-center">
+              <span className="text-[9px] font-mono text-surface-700 uppercase tracking-widest mb-0.5">now</span>
+              <span className="block w-px h-6 bg-surface-600/70" />
+            </div>
+          </div>
+        )}
 
         {/* Hover Tooltip */}
         {hoverItem && (
