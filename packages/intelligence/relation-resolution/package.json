@@ -21,7 +21,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@indago/contracts": "workspace:*"
+    "@indago/contracts": "workspace:*",
+    "@indago/ingestion": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

@@ -21,17 +21,17 @@
 //   typeSignal, and hardContradiction.
 // ============================================================================
 
-import type { RelationStatus, Observation } from '@indago/contracts';
+import type { RelationStatus, Observation, RelationType } from '@indago/contracts';
 import {
   RELATION_PROPOSAL_THRESHOLD,
   RELATION_SCORING_V1,
-  type RelationType,
 } from './types.js';
 
 function parseEventTimeMs(observation: Observation): number | null {
   const t = observation.observedAt?.value;
   if (t === undefined) return null;
   const iso = t.split('T')[0];
+  if (iso === undefined) return null;
   const ms = Date.parse(iso);
   return Number.isFinite(ms) ? ms : null;
 }
