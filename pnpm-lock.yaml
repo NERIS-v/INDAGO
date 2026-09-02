@@ -79,6 +79,9 @@ importers:
       '@indago/contracts':
         specifier: workspace:*
         version: link:../../contracts
+      '@indago/ingestion':
+        specifier: workspace:*
+        version: link:../ingestion
     devDependencies:
       typescript:
         specifier: ^5.7.0
