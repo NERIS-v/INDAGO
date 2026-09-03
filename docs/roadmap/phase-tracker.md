@@ -121,7 +121,7 @@ Advanced items are tagged with their status symbol in front of the checkbox. Bac
 - [x] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]` — canonical-entity authority boundary, identity key, worker, audit; **backend-verified (`entity-hypothesis-store` + accept/reject/reverse HTTP); NOT yet surfaced in a full frontend resolution-review surface** 🟡
 - [x] M-A10: Relation resolver (RelationHypothesis) `[Mayur]` — source-grounded scoring v1, canonical Relation decision authority, directionality-aware identity, completeMA10 wiring, Graphology runtime + HTTP routes; **hardened (`caa74cd`, merged via PR #49) — prior 2 P2 findings (audit-log + @relation FK, non-transactional accept) requested and resolved as documented hardening follow-ups**; verified 43/43 platform integration across 5 suites (relation 18, graph 6, graph-http 9, contradiction 2, ingest-http 8)
 - [x] M-A11: Graph projection (GraphNode/GraphEdge) `[Mayur]` — delivered via Graphology (`@indago/graphology-projection`: build-graph/centrality/communities), NOT Neo4j; Neo4j deferred to a reversible §13 seam
-- [ ] M-A12: Temporal projection (intervals + graph versioning) `[Mayur]` — **next major foundation milestone**; **PR0 design locked** (`docs/platform/m-a12-temporal-architecture.md`, dev-plan §23.11); PR1/PR2/PR3 planned (see M-A12 section below)
+- [ ] M-A12: Temporal projection (intervals + graph versioning) `[Mayur]` — **next major foundation milestone**; **PR0 design locked** (`docs/platform/m-a12-temporal-architecture.md`, dev-plan §23.11); **PR1 implemented** (persistence/validation/history; integration suite pending TEST_DATABASE_URL reachability); PR2/PR3 planned (see M-A12 section below)
 - [x] M-A13: Graph query layer (typed graph service APIs) `[Mayur]` — GraphRuntime bounded traversal/centrality/communities + express routes (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`); **backend-verified 9 graph-http integration tests; broad live-mode UI surfacing (entities/graph/relations providers) still stub (`UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider`) — frontend-phase work** 🟡
 
 ### Pre-M-A12 Foundation Audit (gate for M-A12)
@@ -144,20 +144,20 @@ Before M-A12 starts, the following audit items gate it (see `development-plan.md
 **Design lock (authoritative):** `docs/platform/m-a12-temporal-architecture.md` — locked D1–D7, temporal vocabulary, interval/graph-version/history semantics, data model, API/index/test plans, PR breakdown.
 
 - [x] 🔵 M-A12-PR0: Temporal architecture + design lock (design/contract/docs only; **DESIGN / LOCK**) `[Mayur]` — no runtime implementation; all D1–D7 decisions locked; dev-plan §23.11 + design doc updated; PR1/PR2/PR3 remain **planned**
-- [ ] M-A12-PR1: Temporal history + intervals (persist domain event-time + validity intervals + immutable temporal history; runtime validation; indexes; deterministic reconstruction) — maps T1 + T2 `[Mayur]` — **next implementation PR**
+- [x] M-A12-PR1: Temporal history + intervals (persist domain event-time + validity intervals + immutable temporal history; runtime validation; indexes; deterministic reconstruction) — maps T1 + T2 `[Mayur]` — **IMPLEMENTED** (contract fields, D5 validation module, temporal columns + `TemporalStateChange` store, MA06 event-time/source-context propagation + D6 history wiring; PR1 unit suite green; real-Postgres PR1 integration suite written — execution deferred until TEST_DATABASE_URL is reachable)
 - [ ] M-A12-PR2: Graph versions + historical projection (`GraphVersion` D4, version on canonical change D6, current-vs-historical §8) — maps T3 + T4 `[Mayur]`
 - [ ] M-A12-PR3: Temporal/history APIs + checkpoint coupling + full verification — maps T4/T5 `[Mayur]`
 
 And the underlying temporal sub-items (tracked to reflect reality):
 
-- [ ] M-A12-T1: Temporal model (event/ingestion time vs observation time vs validity interval vs materialization/reversal time — **never `updatedAt` as domain-valid time**) `[Mayur]` — model **locked in PR0**; runtime persistence in PR1
-- [ ] M-A12-T2: Interval semantics, open-ended intervals, boundary semantics, late / out-of-order evidence (event order ≠ domain time) `[Mayur]` — semantics **locked in PR0**; runtime enforcement in PR1
+- [x] M-A12-T1: Temporal model (event/ingestion time vs observation time vs validity interval vs materialization/reversal time — **never `updatedAt` as domain-valid time**) `[Mayur]` — model **locked in PR0**; runtime persistence in PR1 **done** (`Observation.eventTime/sourceContextId/validityInterval`, `Relation`/`RelationHypothesis.validityInterval`, `TemporalStateChange`)
+- [x] M-A12-T2: Interval semantics, open-ended intervals, boundary semantics, late / out-of-order evidence (event order ≠ domain time) `[Mayur]` — semantics **locked in PR0**; runtime enforcement in PR1 **done** (`temporal/interval-validation.ts` D5 rules + deterministic reconstruction primitives in `TemporalStateChangeStore`)
 - [ ] M-A12-T3: Graph version boundary + deterministic graph version IDs + checkpoint relationship `[Mayur]` — design **locked in PR0**; runtime in PR2/PR3
 - [ ] M-A12-T4: Temporal reconstruction: Postgres authoritative history → temporal selection → Graphology projection → analytics (Graphology stays disposable) `[Mayur]` — design in PR0; runtime in PR2/PR3
 - [ ] M-A12-T5: Reversal-over-time + interaction with checkpoints (immutable audit history; do not reorder) `[Mayur]` — design in PR0; runtime in PR2/PR3
 
-> **Status:** M-A12-PR0 = DESIGN/LOCK (complete as a design PR). M-A12-PR1/PR2/PR3 = 🔵 PLANNED.
-> **M-A12 itself is NOT IMPLEMENTED.** G1–G8 entry-gate audits above remain the gate; semantic retrieval not required.
+> **Status:** M-A12-PR0 = DESIGN/LOCK (complete as a design PR). M-A12-PR1 = **IMPLEMENTED** (persistence/validation/history; PR1 integration suite pending TEST_DATABASE_URL reachability). M-A12-PR2/PR3 = 🔵 PLANNED.
+> **M-A12 itself is NOT fully implemented** (PR2/PR3 remain). G1–G8 entry-gate audits above remain the gate; semantic retrieval not required.
 
 ---
 
