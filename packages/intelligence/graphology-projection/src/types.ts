@@ -15,17 +15,26 @@
 /**
  * A canonical node in the domain projection. Node identity is the canonical
  * EntityId; node type maps to the existing canonical EntityType.
+ *
+ * `temporalRange` (optional) is the TemporalIntervalSchema value the
+ * authoritative state attaches to the entity for a projected version. It is
+ * carried through verbatim (never fabricated, never inferred) so a historical
+ * projection can expose the element's validity interval.
  */
 export interface GraphNode {
   readonly id: string; // canonical EntityId — NEVER a mention/pair id
   readonly entityType: string | null;
   readonly canonicalName: string;
+  readonly temporalRange?: unknown;
 }
 
 /**
  * A canonical graph edge in the domain projection. Only an ACCEPTED canonical
  * Relation becomes an edge; PROPOSED RelationHypotheses are NOT canonical
  * edges by default (§32).
+ *
+ * `temporalRange` (optional) is the TemporalIntervalSchema value attached to
+ * the canonical Relation for a projected version, carried through verbatim.
  */
 export interface GraphEdge {
   readonly id: string; // canonical RelationId
@@ -36,6 +45,7 @@ export interface GraphEdge {
   readonly targetLabel?: string;
   readonly provenance: unknown;
   readonly directed?: boolean;
+  readonly temporalRange?: unknown;
 }
 
 /**
