@@ -130,6 +130,12 @@ vi.mock("../src/db/prisma.js", () => ({
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // M-A10 canonical entities. Defaults keep MA10 a no-op (< 2 canonical
+    // entities in the case), so the existing MA05 completion tests still run
+    // through ANALYZING unchanged.
+    entity: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 

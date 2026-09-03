@@ -73,6 +73,13 @@ import {
   compareCandidates,
   deterministicEntityHypothesisId,
 } from "@indago/entity-resolution";
+import {
+  buildRelationHypothesisIdentityKey,
+  deterministicRelationHypothesisId,
+  RELATION_PROPOSAL_THRESHOLD,
+  resolveRelationsForCase,
+  type RelationResolution,
+} from "@indago/relation-resolution";
 import { logAuditEvent } from "../audit/logger.js";
 import { Prisma } from "@prisma/client";
 import { db } from "../db/prisma.js";
@@ -84,6 +91,8 @@ import {
 import { entityMentionStore } from "../persistence/entity-mention-store.js";
 import { candidatePairStore } from "../persistence/candidate-pair-store.js";
 import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
+import { entityStore } from "../persistence/entity-store.js";
+import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
 import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
@@ -540,6 +549,20 @@ async function completeNormalization(params: {
   // PROPOSED hypothesis (never auto-ACCEPTED); low-signal and contradictory
   // pairs produce no durable proposition.
   await completeMA09({
+    payload,
+    runId,
+    caseId,
+  });
+
+  // ---- M-A10: resolve source-grounded relations over the CANONICAL entity
+  // universe (idempotent, per-relation). Runs after MA09's propositions and
+  // any M-A09.5 canonical-entity materialization. Reads ONLY durable canonical
+  // Entity + Observation rows — it never re-runs MA06/MA07/MA08/MA09, never
+  // parses artifacts, and never fabricates an EntityId (M-A10 consumes real
+  // canonical EntityIds downstream of the M-A09.5 decision boundary). When no
+  // canonical entities have been accepted yet, this is a truthful no-op — the
+  // machine NEVER auto-accepts an entity or a relation.
+  await completeMA10({
     payload,
     runId,
     caseId,
@@ -1096,6 +1119,233 @@ async function completeMA09(params: {
     investigationId,
     "ANALYZING",
     `Entity resolution proposed ${proposedEvents} hypothesis(es) for case ${caseId}.`,
+    {
+      operationId: payload.operationId,
+      correlationId: payload.correlationId,
+      runId,
+    },
+  );
+}
+
+/**
+ * Map a pure-engine RelationResolution into the durable RelationHypothesis
+ * store input (v1 canonical-entity↔canonical-entity contract).
+ *
+ * Pure mapping — no scoring, no re-weighting, no inference. support,
+ * evidenceBasis, contradictions, evidenceCount, evidenceStrength, source and
+ * temporal coverage, and scoreModelVersion arrive verbatim from the engine.
+ *
+ * IDENTITY: deterministic — sourceEntityId + targetEntityId + relationType +
+ * scoreModelVersion → SHA-256 → stable UUID (id) with the identical canonical
+ * key (identityKey). Canonical ordering (source < target) is inherited from
+ * the engine's buildRelationHypothesisIdentityKey. Same entity pair + same
+ * type + same model ⇒ ONE logical hypothesis across passes/workers.
+ *
+ * ENTITY-ID BOUNDARY: sourceEntityId/targetEntityId ARE canonical EntityIds
+ * (downstream of the M-A09.5 decision boundary). A mention id / candidate pair
+ * id is NEVER substituted here.
+ *
+ * Provenance is derived from the FIRST supporting observation's chain (never
+ * fabricated from graph structure): sourceId/artifactId/derivedFrom trace the
+ * supported relation back to source-grounded observations.
+ */
+function relationResolutionToHypothesisInput(params: {
+  resolution: RelationResolution;
+  id: string;
+  identityKey: string;
+  caseId: string;
+  investigationId?: string;
+  sourceId: string | undefined;
+  artifactId: string | undefined;
+  derivedFrom: readonly string[];
+}): import("../persistence/relation-hypothesis-store.js").RelationHypothesisInput {
+  const { resolution, id, identityKey, caseId, investigationId, sourceId, artifactId, derivedFrom } = params;
+  return {
+    id,
+    identityKey,
+    caseId,
+    investigationId,
+    sourceEntityId: resolution.sourceEntityId,
+    targetEntityId: resolution.targetEntityId,
+    relationType: resolution.relationType,
+    support: resolution.support,
+    evidenceBasis: resolution.evidenceBasis,
+    contradictions: resolution.contradictions,
+    status: "PROPOSED",
+    scoreModelVersion: resolution.scoreModelVersion,
+    evidenceCount: resolution.evidenceCount,
+    evidenceStrength: resolution.evidenceStrength,
+    sourceCoverage: resolution.sourceCoverage,
+    temporalCoverage: resolution.temporalCoverage,
+    directed: resolution.directed,
+    provenance: {
+      ...(sourceId !== undefined ? { sourceId } : {}),
+      ...(artifactId !== undefined ? { artifactId } : {}),
+      ...(derivedFrom.length > 0 ? { derivedFrom: [...derivedFrom] } : {}),
+      extractor: "indago:relation-resolution:engine",
+      extractionMethod: resolution.scoreModelVersion,
+    },
+  };
+}
+
+/**
+ * M-A10 durable canonical-entity relation resolution → reversible hypothesis.
+ *
+ * Consumes DURABLE canonical Entity rows (M-A09.5) + DURABLE Observations
+ * (M-A06) for the case. The engine's resolveRelationsForCase detects
+ * source-grounded co-occurrence pairs, classifies the relation type, and
+ * settles scoring model v1. The platform maps each result into a durable
+ * RelationHypothesis row via the store's lifecycle-preserving upsert.
+ *
+ * Source-grounded only: a relation is created ONLY from explicit observation
+ * co-occurrence — never from graph proximity, never from a blind all-pairs
+ * sweep.
+ *
+ * Idempotency / partial-retry (the M-A07 L-2 lesson):
+ *   - PER-RELATION processing — no "case already resolved → skip all" gate.
+ *     Each write is idempotent (identityKey @unique) and lifecycle-preserving:
+ *     an existing ACCEPTED / REJECTED / REVERSED relation is never reset to
+ *     PROPOSED.
+ *   - RELATION_RESOLUTION_PROPOSED is audited ONLY when a fresh PROPOSED row
+ *     actually landed (append-only event stays single-valued).
+ *
+ * High score → PROPOSED only; the machine NEVER auto-accepts a relation.
+ *
+ * Boundary (enforced):
+ *   - Only PROPOSED resolutions become durable rows (REJECTED / low-signal /
+ *     hard-contradiction resolutions record no positive proposition, exactly
+ *     like MA09).
+ *   - Never creates canonical Entities, never merges/splits, never writes a
+ *     mention/pair id as a canonical EntityId, resolves same-case only.
+ */
+async function completeMA10(params: {
+  payload: IngestionJobPayload;
+  runId: string;
+  caseId: string;
+}): Promise<void> {
+  const { payload, runId, caseId } = params;
+  const investigationId = payload.investigationId;
+
+  // 1. Case-scoped canonical entity universe (never re-derived, never
+  //    fabricated). listByCaseWithObservations excludes ARCHIVED entities and
+  //    carries each entity's linked observationIds — the exact M-A10 input.
+  const entities = await entityStore.listByCaseWithObservations(caseId, {
+    investigationId,
+  });
+  if (entities.length < 2) {
+    // Fewer than two canonical entities — no relation can be grounded. A
+    // truthful no-op: the machine never invents a relation from nothing.
+    return;
+  }
+
+  // 2. Case-scoped observations (bounded by the engine's hard cap).
+  const observations = await observationStore.listObservations({
+    investigationId,
+    caseId,
+  });
+  if (observations.length === 0) return;
+
+  // 3. Build the engine input. EntityEvidence carries the canonical EntityId +
+  //    its linked observationIds — the engine derives every signal from these.
+  const entityEvidence = entities.map((e) => ({
+    id: e.id,
+    observationIds: e.observationIds,
+  }));
+
+  // 4a. Explicit contradiction provenance: carry the observation IDs the
+  //     durable store has already recorded as contradicting any relation in
+  //     this case. This is real, persisted evidence (never mere absence) that
+  //     flows back through the engine so the −0.25 hardContradiction weight is
+  //     applied consistently across re-runs.
+  const explicitContradictions = new Set<string>();
+  for (const existing of await relationHypothesisStore.listByCase(caseId, {
+    investigationId,
+  })) {
+    for (const obsId of existing.contradictions) {
+      explicitContradictions.add(obsId);
+    }
+  }
+
+  // 4. Pure, deterministic resolution over the whole case.
+  const { resolutions, metrics } = resolveRelationsForCase({
+    caseId,
+    investigationId,
+    observations,
+    entities: entityEvidence,
+    explicitContradictions,
+  });
+
+  let proposedEvents = 0;
+
+  // 5. Per-relation durable write — partial-failure safe, lifecycle-preserving.
+  for (const resolution of resolutions) {
+    // Only a PROPOSED, above-threshold resolution becomes a durable positive
+    // proposition (mirrors MA09: UNRESOLVED/CONTRADICTED → no row).
+    if (resolution.support < RELATION_PROPOSAL_THRESHOLD) continue;
+
+    // Deterministic identity — same entity pair + type + model ⇒ one row.
+    const identityKey = buildRelationHypothesisIdentityKey({
+      sourceEntityId: resolution.sourceEntityId,
+      targetEntityId: resolution.targetEntityId,
+      relationType: resolution.relationType,
+      directed: resolution.directed,
+      scoreModelVersion: resolution.scoreModelVersion,
+    });
+    const id = await deterministicRelationHypothesisId({
+      sourceEntityId: resolution.sourceEntityId,
+      targetEntityId: resolution.targetEntityId,
+      relationType: resolution.relationType,
+      directed: resolution.directed,
+      scoreModelVersion: resolution.scoreModelVersion,
+    });
+
+    // Provenance grounding: first supporting observation's source/artifact.
+    let sourceId: string | undefined;
+    let artifactId: string | undefined;
+    const firstObsId = resolution.evidenceBasis[0];
+    const firstObs = firstObsId
+      ? observations.find((o) => o.id === firstObsId)
+      : undefined;
+    if (firstObs) {
+      sourceId = firstObs.sourceId;
+      artifactId = firstObs.provenance?.artifactId;
+    }
+
+    const input = relationResolutionToHypothesisInput({
+      resolution,
+      id,
+      identityKey,
+      caseId,
+      investigationId,
+      sourceId,
+      artifactId,
+      derivedFrom: resolution.evidenceBasis,
+    });
+
+    // 6. Durable-state-first: persist the row BEFORE any audit event.
+    const result = await relationHypothesisStore.upsertHypothesis(input);
+
+    // 7. Audit ONLY after the durable row exists, with the ACTUAL hypothesis id
+    //    as the target. On a preserved authority state the row already exists
+    //    and only machine fields refreshed — audit only when a fresh PROPOSED
+    //    row actually landed.
+    if (!result.preservedExisting && result.reusedExisting === false) {
+      proposedEvents += 1;
+      await logAuditEvent({
+        investigationId,
+        action: "RELATION_RESOLUTION_PROPOSED",
+        actor: "RELATION_RESOLUTION_PIPELINE",
+        targetType: "RELATION_HYPOTHESIS",
+        targetId: result.hypothesis.id,
+        description: `Proposed relation hypothesis ${result.hypothesis.id} (case ${caseId}, ${resolution.sourceEntityId} → ${resolution.targetEntityId}, type ${resolution.relationType}, support ${resolution.support}, model ${resolution.scoreModelVersion})`,
+      });
+    }
+  }
+
+  emitProgressEvent(
+    investigationId,
+    "ANALYZING",
+    `Relation resolution considered ${metrics.pairsConsidered} pair(s), proposed ${proposedEvents} hypothesis(es) for case ${caseId}.`,
     {
       operationId: payload.operationId,
       correlationId: payload.correlationId,

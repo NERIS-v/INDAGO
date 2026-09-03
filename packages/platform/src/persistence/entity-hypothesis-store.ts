@@ -256,6 +256,42 @@ export class EntityHypothesisStore {
   }
 
   /**
+   * Authority decision — mark a PROPOSED hypothesis ACCEPTED and bind it to its
+   * canonical EntityId. This is the explicit identity-materialization boundary
+   * that M-A09.5 / M-A10 depend on: a canonical EntityId is written ONLY here,
+   * from an explicit ACCEPT decision, never fabricated from a score.
+   *
+   * Guards:
+   *   - case-scoped lookup (caseId resolved server-side)
+   *   - only a PROPOSED hypothesis may be accepted; ACCEPTED / REJECTED /
+   *     REVERSED decisions are never clobbered
+   *
+   * Returns null when the hypothesis does not exist in the case or is not
+   * PROPOSED. Returns the durable re-read row in all valid banks.
+   */
+  async markAccepted(
+    id: string,
+    filter: { caseId: string },
+    entityId: string,
+  ): Promise<EntityHypothesis | null> {
+    const existing = await this.prisma.entityHypothesis.findFirst({
+      where: { id, caseId: filter.caseId },
+    });
+    if (!existing) return null;
+    if (existing.status !== "PROPOSED") return null;
+
+    const updated = await this.prisma.entityHypothesis.update({
+      where: { id },
+      data: {
+        status: "ACCEPTED",
+        entityId,
+        updatedAt: new Date(),
+      },
+    });
+    return rowToHypothesis(updated);
+  }
+
+  /**
    * Read seam — fetch a single hypothesis by deterministic id, strictly
    * case-scoped (caseId is resolved SERVER-SIDE; never trusted from a client).
    */

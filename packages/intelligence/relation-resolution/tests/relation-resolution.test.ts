@@ -22,6 +22,9 @@ import {
   RELATION_SCORE_MODEL_VERSION,
   RELATION_PROPOSAL_THRESHOLD,
   RELATION_SCORING_V1,
+  RELATION_DIRECTION,
+  isRelationDirected,
+  resolveRelationDirected,
 } from '../src/index.js';
 import type {
   EntityEvidence,
@@ -328,7 +331,8 @@ describe('M-A10: deterministic identity', () => {
     expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
-  it('canonical ordering — swap source/target yields same id', async () => {
+  it('canonical ordering — swap source/target yields same id (undirected)', async () => {
+    // 'financial' is an UNDIRECTED relation type: A↔B == B↔A.
     const a = await deterministicRelationHypothesisId({
       sourceEntityId: ENT_ID(2),
       targetEntityId: ENT_ID(1),
@@ -340,6 +344,89 @@ describe('M-A10: deterministic identity', () => {
       relationType: 'financial',
     });
     expect(a).toBe(b);
+  });
+
+  it('directed relation — A->B != B->A (source/target preserved)', async () => {
+    // 'ownership' is a DIRECTED relation type: A→B ≠ B→A.
+    const ab = await deterministicRelationHypothesisId({
+      sourceEntityId: ENT_ID(1),
+      targetEntityId: ENT_ID(2),
+      relationType: 'ownership',
+    });
+    const ba = await deterministicRelationHypothesisId({
+      sourceEntityId: ENT_ID(2),
+      targetEntityId: ENT_ID(1),
+      relationType: 'ownership',
+    });
+    expect(ab).not.toBe(ba);
+  });
+
+  it('directed relation — repeated generation is idempotent within the same direction', async () => {
+    const a1 = await deterministicRelationHypothesisId({
+      sourceEntityId: ENT_ID(1),
+      targetEntityId: ENT_ID(2),
+      relationType: 'organizational',
+    });
+    const a2 = await deterministicRelationHypothesisId({
+      sourceEntityId: ENT_ID(1),
+      targetEntityId: ENT_ID(2),
+      relationType: 'organizational',
+    });
+    expect(a1).toBe(a2); // same direction → same id across passes
+  });
+
+  it('all directed types distinguish A->B from B->A', async () => {
+    const directed: RelationType[] = [
+      'ownership',
+      'organizational',
+      'transport',
+      'family',
+      'vehicle',
+    ];
+    for (const type of directed) {
+      const ab = await deterministicRelationHypothesisId({
+        sourceEntityId: ENT_ID(1),
+        targetEntityId: ENT_ID(2),
+        relationType: type,
+      });
+      const ba = await deterministicRelationHypothesisId({
+        sourceEntityId: ENT_ID(2),
+        targetEntityId: ENT_ID(1),
+        relationType: type,
+      });
+      expect(ab).not.toBe(ba);
+    }
+  });
+
+  it('undirected types collapse A-B == B-A', async () => {
+    const undirected: RelationType[] = [
+      'communication',
+      'financial',
+      'co-location',
+      'association',
+      'case-link',
+      'other',
+    ];
+    for (const type of undirected) {
+      const ab = await deterministicRelationHypothesisId({
+        sourceEntityId: ENT_ID(1),
+        targetEntityId: ENT_ID(2),
+        relationType: type,
+      });
+      const ba = await deterministicRelationHypothesisId({
+        sourceEntityId: ENT_ID(2),
+        targetEntityId: ENT_ID(1),
+        relationType: type,
+      });
+      expect(ab).toBe(ba);
+    }
+  });
+
+  it('isRelationDirected / resolveRelationDirected reflect the authoritative map', () => {
+    expect(isRelationDirected('ownership')).toBe(true);
+    expect(isRelationDirected('financial')).toBe(false);
+    expect(resolveRelationDirected('transport')).toBe(true);
+    expect(resolveRelationDirected('co-location')).toBe(false);
   });
 
   it('a different score model version yields a different id', async () => {
@@ -483,6 +570,74 @@ describe('M-A10: end-to-end case resolution', () => {
     // Contradiction reduces score but does NOT zero accumulated evidence —
     // co-occurrence(0.2) + repeated(0.15) + temporal(0.1) − hardContradiction(0.25) = 0.2.
     expect(resolution.support).toBeCloseTo(0.2, 6);
+  });
+
+  it('resolveRelationsForCase threads explicitContradictions — hardContradiction fires with provenance', () => {
+    // Two FINANCIAL co-occurrences would otherwise resolve well above threshold:
+    // co-occurrence(0.2) + repeated(0.15) + temporal(0.1) + type-signal(0.15) = 0.6.
+    // Marking one of them as an explicit contradiction applies −0.25 and
+    // suppresses the hypothesis to REJECTED, carrying the contradicting obs id.
+    const obs = [
+      makeObservation(1, { type: 'FINANCIAL', entityIds: [ENT_ID(1), ENT_ID(2)], observedAt: T0 }),
+      makeObservation(2, { type: 'FINANCIAL', entityIds: [ENT_ID(1), ENT_ID(2)], observedAt: T1 }),
+    ];
+    const uncontradicted = resolveRelationsForCase({
+      caseId: 'case-1',
+      observations: obs,
+      entities: [makeEntity(1, [OBS_ID(1), OBS_ID(2)]), makeEntity(2, [OBS_ID(1), OBS_ID(2)])],
+    });
+    const baseline = uncontradicted.resolutions[0]!;
+    expect(baseline.support).toBeCloseTo(0.6, 6);
+    expect(uncontradicted.metrics.hypothesesProposed).toBe(1);
+
+    const contradicted = resolveRelationsForCase({
+      caseId: 'case-1',
+      observations: obs,
+      entities: [makeEntity(1, [OBS_ID(1), OBS_ID(2)]), makeEntity(2, [OBS_ID(1), OBS_ID(2)])],
+      explicitContradictions: new Set([OBS_ID(1)]),
+    });
+    const res = contradicted.resolutions[0]!;
+    // Exactly −0.25: 0.6 − 0.25 = 0.35.
+    expect(res.support).toBeCloseTo(0.6 + RELATION_SCORING_V1.hardContradiction, 6);
+    expect(res.contradictions).toEqual([OBS_ID(1)]);
+    expect(res.contradictions).not.toContain(OBS_ID(2));
+    expect(contradicted.metrics.hypothesesRejected).toBe(1);
+    expect(contradicted.metrics.hypothesesProposed).toBe(0);
+  });
+
+  it('resolves `directed` from the authoritative relation type', () => {
+    // ownership is DIRECTED; financial is UNDIRECTED.
+    const ownershipObs = [
+      makeObservation(1, { type: 'FACTUAL', content: 'registered to entity', entityIds: [ENT_ID(1), ENT_ID(2)] }),
+    ];
+    const { resolution: ownershipRes } = resolveRelationPair({
+      candidate: {
+        sourceEntityId: ENT_ID(1),
+        targetEntityId: ENT_ID(2),
+        observationIds: [OBS_ID(1)],
+        sourceIds: [SOURCE_ID(1)],
+        suggestedType: 'ownership',
+      },
+      allObservations: ownershipObs,
+      temporalWindowMs: RELATION_RESOLUTION_BOUNDS.temporalProximityWindowMs,
+    });
+    expect(ownershipRes.directed).toBe(true);
+
+    const financialObs = [
+      makeObservation(1, { type: 'FINANCIAL', entityIds: [ENT_ID(1), ENT_ID(2)] }),
+    ];
+    const { resolution: financialRes } = resolveRelationPair({
+      candidate: {
+        sourceEntityId: ENT_ID(1),
+        targetEntityId: ENT_ID(2),
+        observationIds: [OBS_ID(1)],
+        sourceIds: [SOURCE_ID(1)],
+        suggestedType: 'financial',
+      },
+      allObservations: financialObs,
+      temporalWindowMs: RELATION_RESOLUTION_BOUNDS.temporalProximityWindowMs,
+    });
+    expect(financialRes.directed).toBe(false);
   });
 
   it('resolution is well-formed: ids ordered, evidence non-empty, score bounded', () => {

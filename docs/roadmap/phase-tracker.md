@@ -102,13 +102,13 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [x] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
 - [x] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
   - [x] Evidence read seam: durable `GET /investigations/:id/evidence` (`EvidenceProjection` — documented local shape, no fabricated strength/posture), live `listEvidence` server action + `LiveEvidenceProvider.listByInvestigation`, Evidence tab renders persisted artifacts in live mode `[Mayur]`
-- [ ] M-A07: Entity candidate generator (candidate entities) `[Mayur]`
-- [ ] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]`
-- [ ] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]`
-- [ ] M-A10: Relation resolver (RelationHypothesis) `[Mayur]`
-- [ ] M-A11: Neo4j graph projection (GraphNode/GraphEdge) `[Mayur]`
+- [x] M-A07: Entity candidate generator (candidate entities) `[Mayur]` — `completeMA07` mention-candidate extraction wired into worker
+- [x] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]` — `completeMA08` CandidatePair + per-pair idempotent blocking pipeline
+- [x] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]` — canonical-entity authority boundary, identity key, worker, audit
+- [x] M-A10: Relation resolver (RelationHypothesis) `[Mayur]` — source-grounded scoring v1, canonical Relation decision authority, directionality-aware identity, completeMA10 wiring, Graphology runtime + HTTP routes; audited 9.0/10 (2 P2 audit-log/@relation-FK findings + non-transactional accept tracked as documented limitations)
+- [x] M-A11: Graph projection (GraphNode/GraphEdge) `[Mayur]` — delivered via Graphology (`@indago/graphology-projection`: build-graph/centrality/communities), NOT Neo4j; Neo4j deferred to a reversible §13 seam
 - [ ] M-A12: Temporal projection (intervals + graph versioning) `[Mayur]`
-- [ ] M-A13: Graph query layer (typed graph service APIs) `[Mayur]`
+- [x] M-A13: Graph query layer (typed graph service APIs) `[Mayur]` — GraphRuntime bounded traversal/centrality/communities + express routes (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`)
 
 ---
 
@@ -139,8 +139,8 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 - [x] Expose ingestion API `[Mayur]` — `POST /investigations/:id/evidence`: submission body → artifact fetch/sha256-verify/mime-detect → BullMQ job → worker; verified in the REAL-STACK E2E and the live case-deletion gate
 - [x] Expose observation API `[Mayur]` — `GET /investigations/:id/observations` (full ObservationSchema records, case-scoped via auth → latest run → run.caseId; routes.ts)
-- [ ] Expose entity resolution API `[Mayur]` — blocked on M-A07–A10 (not built)
-- [ ] Expose graph projection/query API `[Mayur]` — blocked on M-A11–A13 (not built)
+- [ ] Expose entity resolution API `[Mayur]` — decision authority exists (accept route + canonical materialization); full resolution UX/review surface is frontend-phase work, not yet exposed end-to-end
+- [ ] Expose graph projection/query API `[Mayur]` — projection/query routes exist (graph, traversal, centrality, communities, 404/401 integration-tested); broad UI surfacing is frontend-phase work
 - [ ] Seed one deliberately messy synthetic case `[Mayur]` — no seed script exists (only test fixtures + legacy mock-ingestion toggle)
 
 ### Gurashish
@@ -155,7 +155,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 ### Joint Integration Test
 
 - [ ] FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI `[Both]`
-  - Partial: the `INGEST > OBSERVATIONS > INVESTIGATION STATE > SSE > UI(live)` leg is proven by the REAL-STACK E2E (HTTP → BullMQ → worker → Postgres → SSE) plus the M-A06 Option A live re-ingest test. The `ENTITY HYPOTHESES > RELATIONS > GRAPH` leg is not yet built (depends on M-A07–A13).
+  - Partial: the `INGEST > OBSERVATIONS > INVESTIGATION STATE > SSE > UI(live)` leg is proven by the REAL-STACK E2E (HTTP → BullMQ → worker → Postgres → SSE) plus the M-A06 Option A live re-ingest test. The `ENTITY HYPOTHESES > RELATIONS > GRAPH` leg is now built (M-A07–A10, A13: canonical entity/relation authority + Graphology projection), with the backend proven end-to-end (real Postgres 28/28 integration incl. graph/traversal/centrality/communities over real HTTP); a single full `HTTP → BullMQ → worker → resolution → graph` demo pass and the temporal projection are the remaining gaps.
 
 ---
 
@@ -453,7 +453,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 |---|---|---|---|---|---|
 | 0 | 10 | 10 | 0 | 0 | 10 |
 | 1 | 40 | 40 | 20 | 6 | 14 |
-| 2A | 16 | 4 | 4 | 0 | 0 |
+| 2A | 17 | 13 | 13 | 0 | 0 |
 | 2B | 12 | 12 | 0 | 12 | 0 |
 | 3 | 12 | 8 | 2 | 6 | 1 |
 | 4 | 16 | 0 | 0 | 6 | 1 |
@@ -465,4 +465,4 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | 10 | 10 | 0 | 0 | 5 | 0 |
 | 11 | 30 | 0 | 0 | 10 | 10 |
 | 12 | 16 | 0 | 0 | 8 | 1 |
-| **Total** | **257** | **74** | **26** | **86** | **51** |
+| **Total** | **258** | **83** | **35** | **96** | **51** |

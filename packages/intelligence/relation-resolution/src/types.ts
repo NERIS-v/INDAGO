@@ -124,6 +124,63 @@ export const RELATION_TYPE_SIGNAL_TYPES: Readonly<Record<string, RelationType>> 
 } as const;
 
 /**
+ * AUTHORITATIVE DIRECTIONALITY of each RelationTypeSchema value.
+ *
+ * This is the single source of truth for whether a relation identity MUST
+ * preserve source→target ordering. It is derived from the domain semantics of
+ * each relation predicate (documented in §6 of the M-A10 doc):
+ *
+ *   DIRECTED relation types encode an ASYMMETRIC predicate, i.e. the evidence
+ *   distinguishes a clear source and target (e.g. ownership: "A owns B" ≠
+ *   "B owns A"). Their identity MUST NOT collapse A→B with B→A.
+ *
+ *   UNDIRECTED relation types encode a SYMMETRIC predicate (e.g. co-location:
+ *   "A and B were co-located" has no direction). Their identity MAY collapse
+ *   A↔B with B↔A.
+ *
+ * Directed:
+ *   ownership      — "A owns B" ≠ "B owns A" (asymmetric).
+ *   organizational — "A reports to B" ≠ "B reports to A" (asymmetric).
+ *   transport      — "A transported by B" / "shipment from A to B" (asymmetric).
+ *   vehicle        — "A registered to vehicle B" (A → vehicle B) (asymmetric).
+ *   family         — a specific kinship role infers a direction (father-of) even
+ *                    though some kinship relations are naturally reflexive.
+ *
+ * Undirected:
+ *   communication  — "A communicates with B" is symmetric.
+ *   financial      — "A and B are financially linked" is symmetric.
+ *   co-location    — "A and B were co-located" is symmetric.
+ *   association    — "A is associated with B" is symmetric (co-membership).
+ *   case-link      — "A and B are co-defendants" is symmetric.
+ *   other          — generic co-occurrence has no direction.
+ */
+export const RELATION_DIRECTION: Readonly<Record<RelationType, 'directed' | 'undirected'>> = {
+  communication: 'undirected',
+  financial: 'undirected',
+  ownership: 'directed',
+  'co-location': 'undirected',
+  association: 'undirected',
+  organizational: 'directed',
+  transport: 'directed',
+  family: 'directed',
+  vehicle: 'directed',
+  'case-link': 'undirected',
+  other: 'undirected',
+} as const;
+
+/** True when the given relation type carries asymmetric source→target semantics. */
+export function isRelationDirected(relationType: RelationType): boolean {
+  return RELATION_DIRECTION[relationType] === 'directed';
+}
+
+/** Resolve the effective `directed` flag for a relation type (never overridden to false). */
+export function resolveRelationDirected(
+  relationType: RelationType,
+): boolean {
+  return isRelationDirected(relationType);
+}
+
+/**
  * Evidence input for resolving relations over a case.
  *
  * The engine consumes canonical Entities alongside the observations that
@@ -135,6 +192,13 @@ export interface RelationResolutionInput {
   readonly investigationId?: string;
   readonly observations: readonly Observation[];
   readonly entities: readonly EntityEvidence[];
+  /**
+   * Explicit contradiction observation IDs for the case. An observation in this
+   * set that supports a candidate pair applies the −0.25 hardContradiction
+   * weight and suppresses the hypothesis (NEVER mere absence). When omitted it
+   * is treated as empty — the engine never manufactures a contradiction.
+   */
+  readonly explicitContradictions?: ReadonlySet<string>;
 }
 
 /**
@@ -166,6 +230,7 @@ export interface RelationResolution {
   readonly sourceEntityId: EntityId;
   readonly targetEntityId: EntityId;
   readonly relationType: RelationType;
+  readonly directed: boolean;
   readonly support: RelationSupport;
   readonly evidenceBasis: readonly string[];
   readonly contradictions: readonly string[];

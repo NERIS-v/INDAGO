@@ -37,6 +37,9 @@ export type EntityRoleHypothesisId = z.infer<typeof EntityRoleHypothesisIdSchema
 export const RelationHypothesisIdSchema = z.string().uuid();
 export type RelationHypothesisId = z.infer<typeof RelationHypothesisIdSchema>;
 
+export const RelationIdSchema = z.string().uuid();
+export type RelationId = z.infer<typeof RelationIdSchema>;
+
 export const EntityComparisonIdSchema = z.string().uuid();
 export type EntityComparisonId = z.infer<typeof EntityComparisonIdSchema>;
 

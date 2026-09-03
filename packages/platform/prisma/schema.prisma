@@ -436,7 +436,146 @@ model EntityHypothesis {
 }
 
 // ============================================================================
-// P-10: Durable Case (case catalogue — dashboard)
+// P-09a: Durable Entity (canonical entity materialization)
+//
+// Canonical Entity is materialized ONLY through an explicit authority decision
+// path: EntityHypothesis (PROPOSED) → explicit ACCEPTANCE → Entity.
+//
+// Entity.id is a deterministic UUID derived from a canonical identity key
+// (namespace:v1:caseId:canonicalName:entityType). The same case+name+type
+// converges to one logical entity — no duplicates.
+//
+// observationIds carries the Observation IDs linked to this entity (populated
+// at materialization time from the accepting EntityHypothesis's
+// supportingObservationIds). hypothesisIds records which EntityHypotheses
+// reference this entity.
+//
+// M-A10 boundary: Entity provides the canonical EntityIds that RelationHypothesis
+// endpoints reference. M-A10 NEVER fabricates Entity rows.
+// ============================================================================
+model Entity {
+  id                String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey       String   @unique // versioned canonical identity — exact-dedup guard
+  caseId            String
+  investigationId   String?
+  canonicalName     String   // best-known name for this entity
+  entityType        String?  // EntityTypeSchema value (PERSON, ORGANIZATION, etc.)
+  status            String   @default("ACTIVE") // CANDIDATE, ACTIVE, MERGED, SPLIT, ARCHIVED
+  observationIds    Json     // ObservationId[] — observations linked to this entity
+  hypothesisIds     Json     // EntityHypothesisId[] — hypotheses about this entity
+  sourceIdentifiers Json?    // external source identifiers
+  provenance        Json     // ProvenanceSchema
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([investigationId, caseId])
+  @@index([status])
+}
+
+// ============================================================================
+// P-10b: Durable RelationHypothesis (M-A10 relation resolution)
+//
+// identityKey is the versioned canonical identity
+// (buildRelationHypothesisIdentityKey — namespace:v1:canonicalSource:
+// canonicalTarget:relationType:scoreModelVersion) and is UNIQUE: the same
+// entity pair + relation type + scoring model converges to ONE logical
+// hypothesis. A retry / concurrent MA10 pass never duplicates.
+//
+// M-A10 v1 semantic boundaries (enforced by the store + worker):
+//   - sourceEntityId / targetEntityId reference canonical Entity rows
+//     (materialized from ACCEPTED EntityHypotheses). They are NEVER
+//     EntityMentionCandidateIds or CandidatePairIds.
+//   - support comes verbatim from the pure resolution engine. The platform
+//     NEVER recalculates or re-weights it.
+//   - status is the hypothesis LIFECYCLE state (PROPOSED at machine proposal;
+//     ACCEPTED / REJECTED / REVERSED are authority/lifecycle states that a
+//     re-resolution MUST NOT clobber).
+//   - evidenceBasis / contradictions are stored as bounded JSON arrays of
+//     Observation IDs; their semantics are guaranteed by the pure engine.
+//   - scoreModelVersion records the scoring model for historical interpretability.
+//
+// REVERSED ≠ MERGED: reversal updates status + audit history; it does NOT
+// delete the row. DELETION IS NEVER PERFORMED by this store.
+// ============================================================================
+model RelationHypothesis {
+  id                String   @id // deterministic UUID (SHA-256 of identityKey)
+  identityKey       String   @unique // versioned canonical identity — exact-dedup guard
+  caseId            String
+  investigationId   String?
+  sourceEntityId    String   // canonical Entity.id — NEVER a mention/pair ID
+  targetEntityId    String   // canonical Entity.id — NEVER a mention/pair ID
+  relationType      String   // RelationTypeSchema value
+  support           Float    // RelationSupport [0,1] — ranking signal, NOT probability
+  evidenceBasis     Json     // ObservationId[] — supporting observations
+  contradictions    Json     // ObservationId[] — contradicting observations (may be [])
+  status            String   // RelationStatusSchema lifecycle value
+  scoreModelVersion String   // scoring model version for interpretability
+  evidenceCount     Int      @default(0)
+  evidenceStrength  Float    @default(0)
+  sourceCoverage    Float    @default(0)
+  temporalCoverage  Float    @default(0)
+  directed          Boolean  @default(true)
+  provenance        Json     // ProvenanceSchema
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([investigationId, caseId])
+  @@index([sourceEntityId])
+  @@index([targetEntityId])
+  @@index([status])
+  @@index([relationType])
+}
+
+// ============================================================================
+// Canonical Relation (M-A10 relation authority)
+//
+// The explicit outcome of an ACCEPTED RelationHypothesis — the canonical
+// relation that the Graphology projection consumes. Nothing auto-magically
+// becomes a canonical Relation: this row is created ONLY through the explicit
+// relation-authority accept path (relation-materialization), mirroring how a
+// canonical Entity is created only through entity-materialization.
+//
+//   RelationHypothesis (PROPOSED) --accept--> Canonical Relation
+//
+// Idempotency: relationKey @unique maps one (source, target, relationType,
+// directed, model) to exactly one canonical relation. A reversal records
+// REVERSED; it does not delete the row (REVERSED != MERGED).
+// ============================================================================
+model Relation {
+  id                String  @id // deterministic UUID (SHA-256 of relationKey)
+  relationKey       String  @unique // versioned canonical identity — exact-dedup guard
+  caseId            String
+  investigationId   String?
+  sourceEntityId    String  // canonical Entity.id — NEVER a mention/pair ID
+  targetEntityId    String  // canonical Entity.id — NEVER a mention/pair ID
+  relationType      String  // RelationTypeSchema value
+  directed          Boolean // authoritative directionality of the relation type
+  support           Float   // retained for provenance; NOT required for projection
+  evidenceBasis     Json    // ObservationId[] — supporting observations
+  contradictions    Json    // ObservationId[] — contradicting observations (may be [])
+  status            String  @default("ACTIVE") // ACTIVE / REVERSED
+  scoreModelVersion String
+  evidenceCount     Int     @default(0)
+  provenance        Json    // ProvenanceSchema — links back to the accepted hypothesis
+  hypothesisId      String  // the source RelationHypothesis that was accepted
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  reversedAt        DateTime?
+
+  @@index([caseId])
+  @@index([investigationId, caseId])
+  @@index([sourceEntityId])
+  @@index([targetEntityId])
+  @@index([status])
+  @@index([relationType])
+}
+
+// ============================================================================
+// P-10c: Durable Case (case catalogue — dashboard)
 //
 // One row per case boundary the platform has ever seen. Rows are
 // auto-provisioned (create-or-nothing, id = caseId) when an investigation run

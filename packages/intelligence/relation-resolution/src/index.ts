@@ -10,7 +10,7 @@ export {
   buildObservationsByType,
 } from './resolver.js';
 export type { RelationResolutionMetrics } from './resolver.js';
-export type {
+export type{
   RelationCandidatePair,
   RelationResolutionInput,
   RelationResolution,
@@ -48,4 +48,7 @@ export {
   RELATION_PROPOSAL_THRESHOLD,
   RELATION_SCORING_V1,
   RELATION_TYPE_SIGNAL_TYPES,
+  RELATION_DIRECTION,
+  isRelationDirected,
+  resolveRelationDirected,
 } from './types.js';
