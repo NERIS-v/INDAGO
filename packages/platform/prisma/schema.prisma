@@ -292,6 +292,9 @@ model Observation {
   candidateMentions Json // readonly string[] (≤50)
   provenance        Json // ProvenanceSchema
   observedAt        Json? // EventTime (only when unambiguous in content)
+  eventTime         Json? // M-A12-D1: domain-valid EventTime when confidently extractable (never fabricated)
+  sourceContextId   String? // M-A12-D2: lightweight source-context grouping key (NOT real-world event identity)
+  validityInterval  Json? // M-A12-D5: closed [validFrom, validTo] TemporalInterval
   entityIds         Json // [] — MA06 never creates entity links
   createdAt         DateTime @default(now())
 
@@ -301,6 +304,8 @@ model Observation {
   @@index([investigationId, caseId])
   @@index([sourceId])
   @@index([evidenceId])
+  @@index([sourceContextId])
+  @@index([caseId, sourceContextId])
 }
 
 // ============================================================================
@@ -529,6 +534,7 @@ model RelationHypothesis {
   sourceCoverage    Float    @default(0)
   temporalCoverage  Float    @default(0)
   directed          Boolean  @default(true)
+  validityInterval  Json? // M-A12-D5: proposed closed [validFrom, validTo] TemporalInterval
   provenance        Json     // ProvenanceSchema
   metadata          Json?
   createdAt         DateTime @default(now())
@@ -582,6 +588,7 @@ model Relation {
   evidenceCount     Int     @default(0)
   provenance        Json    // ProvenanceSchema — links back to the accepted hypothesis
   hypothesisId      String  // the source RelationHypothesis that was accepted
+  validityInterval  Json? // M-A12-D5: closed [validFrom, validTo] TemporalInterval (inherited from accepted hypothesis)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   reversedAt        DateTime?
@@ -592,6 +599,58 @@ model Relation {
   @@index([targetEntityId])
   @@index([status])
   @@index([relationType])
+}
+
+// ============================================================================
+// M-A12-D6: Append-only TemporalStateChange history (PR1)
+//
+// An append-only record of canonical state transitions carrying domain/event
+// time, ingestion time, and system transaction time, so canonical temporal
+// state is reconstructable INDEPENDENT of the mutable current rows (D6).
+//
+// Invariants:
+//   - append-only: rows are never updated or deleted once written.
+//   - deterministic ordering: each (caseId, entityType, entityId) gets a
+//     monotonically increasing `sequence`; `@@unique([caseId, entityType,
+//     entityId, sequence])` guarantees the DB rejects duplicates and gives a
+//     stable reconstruction order (§10). Sequence is allocated by the store
+//     application-side (max(existing)+1), not by the DB, so reconstruction is
+//     deterministic across replays.
+//   - `eventTime` / `validityInterval` / `provenance` are the same vocabulary
+//     used on Observation/Relation (D3); when a transition carries domain time
+//     it is recorded here, never fabricated.
+//   - `transactionTime` distinguishes system-write time from `eventTime`
+//     (D1). `ingestedAt` records when the underlying evidence was ingested.
+//   - `stateType` is the canonical lifecycle transition (CREATED / ACCEPTED /
+//     REVERSED / UPDATED / ...).
+//
+// No graph version coupling (D7): this table is NOT a GraphVersion snapshot.
+// GraphVersion is deliberately deferred to PR2.
+//
+// NO-FK DECOUPLING (intentional, consistent with the rest of the schema):
+// caseId / entityId are plain indexed Strings, not Prisma FKs, so history rows
+// survive and remain reconstructable even where the entity rows are replaced.
+// ============================================================================
+model TemporalStateChange {
+  id                String   @id // deterministic UUID (SHA-256 of caseId:entityType:entityId:sequence)
+  caseId            String
+  investigationId   String?
+  entityType        String // canonical entity kind: OBSERVATION | RELATION | RELATION_HYPOTHESIS | ...
+  entityId          String // the canonical entity's deterministic id
+  stateType         String // lifecycle transition (CREATED / ACCEPTED / REVERSED / UPDATED / ...)
+  sequence          Int      // monotonic per (caseId, entityType, entityId)
+  eventTime         Json? // M-A12-D1: domain/event time associated with this transition (may be null)
+  validityInterval  Json? // M-A12-D5: closed [validFrom, validTo] TemporalInterval (may be null)
+  provenance        Json? // M-A12-D2: lineage back to the source observation/extraction
+  ingestedAt        DateTime? // when the underlying evidence was ingested
+  transactionTime   DateTime @default(now()) // system write time (distinct from eventTime, D1)
+  note              String?
+  createdAt         DateTime @default(now())
+
+  @@unique([caseId, entityType, entityId, sequence])
+  @@index([caseId, sequence])
+  @@index([caseId, entityType, entityId])
+  @@index([entityId])
 }
 
 // ============================================================================
