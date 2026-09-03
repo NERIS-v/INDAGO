@@ -33,6 +33,7 @@ import {
   EVID_REGISTRY_2,
 } from "./lookup";
 import { obs } from "./times";
+import { deterministicUuid } from "../submit";
 
 const victor: Entity = {
   id: ENT_VICTOR,
@@ -119,6 +120,34 @@ const witness: Entity = {
   updatedAt: obs("2024-05-20"),
 };
 
+const courier: Entity = {
+  id: deterministicUuid("upload:entity:courier-firm"),
+  caseId: CASE_ID,
+  investigationId: INVESTIGATION_ID,
+  canonicalName: "Meridian Transit Pvt Ltd",
+  status: "ACTIVE",
+  observationIds: [], 
+  evidenceIds: [],
+  hypothesisIds: [],
+  roleHypothesisIds: [],
+  createdAt: obs("2024-06-18"),
+  updatedAt: obs("2024-06-18"),
+};
+
+const sim: Entity = {
+  id: deterministicUuid("upload:entity:unregistered-sim"),
+  caseId: CASE_ID,
+  investigationId: INVESTIGATION_ID,
+  canonicalName: "Unregistered SIM · +91 98•••••42",
+  status: "ACTIVE",
+  observationIds: [],
+  evidenceIds: [],
+  hypothesisIds: [],
+  roleHypothesisIds: [],
+  createdAt: obs("2024-06-18"),
+  updatedAt: obs("2024-06-18"),
+};
+
 /** Canonical parsed entities. */
 export const operationFinancialShadowEntities: Entity[] = [
   EntitySchema.parse(victor),
@@ -127,4 +156,6 @@ export const operationFinancialShadowEntities: Entity[] = [
   EntitySchema.parse(shellTwo),
   EntitySchema.parse(bank),
   EntitySchema.parse(witness),
+  EntitySchema.parse(courier),
+  EntitySchema.parse(sim),
 ];
