@@ -44,6 +44,7 @@ import {
   deriveRelationHypothesisStatus,
   shouldProposeRelationHypothesis,
 } from './scoring.js';
+import { isRelationDirected } from './types.js';
 
 /**
  * Index an observation by id (bounded to the case observation cap for
@@ -212,16 +213,19 @@ export function resolveRelationPair(params: {
   // Deterministic type classification from the actual co-occurrence evidence.
   const relationType = pickRelationType(coOccurrenceObservations);
 
-  // Explicit contradiction evidence (never mere absence).
-  let explicitContradiction = false;
+  // Explicit contradiction evidence (never mere absence). Precision matters:
+  // only an observation that BOTH supports the pair AND is marked as an
+  // explicit contradiction is recorded as a contradiction — never the whole
+  // evidence basis, never an observation that merely co-occurs.
+  const contradictionObservations: string[] = [];
   if (explicitContradictions && explicitContradictions.size > 0) {
     for (const obsId of candidate.observationIds) {
       if (explicitContradictions.has(obsId)) {
-        explicitContradiction = true;
-        break;
+        contradictionObservations.push(obsId);
       }
     }
   }
+  const explicitContradiction = contradictionObservations.length > 0;
 
   const settled = scoreRelationPair({
     coOccurrenceObservations,
@@ -245,9 +249,10 @@ export function resolveRelationPair(params: {
     sourceEntityId: candidate.sourceEntityId,
     targetEntityId: candidate.targetEntityId,
     relationType,
+    directed: isRelationDirected(relationType),
     support: settled.score,
     evidenceBasis: candidate.observationIds,
-    contradictions: explicitContradiction ? [...candidate.observationIds] : [],
+    contradictions: contradictionObservations,
     evidenceCount: candidate.observationIds.length,
     evidenceStrength: settled.evidenceStrength,
     sourceCoverage: settled.sourceCoverage,
@@ -283,7 +288,7 @@ export function resolveRelationsForCase(
   resolutions: RelationResolution[];
   metrics: RelationResolutionMetrics;
 } {
-  const { observations, entities } = input;
+  const { observations, entities, explicitContradictions } = input;
 
   const candidates = detectRelationCandidates({ observations, entities });
   const allObservations = observations.slice(
@@ -303,6 +308,7 @@ export function resolveRelationsForCase(
       candidate,
       observationsByType,
       allObservations,
+      explicitContradictions,
       temporalWindowMs,
       scoreModelVersion,
     });
