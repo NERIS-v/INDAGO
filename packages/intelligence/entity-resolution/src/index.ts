@@ -20,6 +20,14 @@ export {
 export type { EntityHypothesisIdentityInput } from './identity.js';
 
 export {
+  deterministicEntityId,
+  buildEntityIdentityKey,
+  ENTITY_IDENTITY_NAMESPACE,
+  ENTITY_IDENTITY_VERSION,
+} from './canonical-entity-identity.js';
+export type { CanonicalEntityIdentityInput } from './canonical-entity-identity.js';
+
+export {
   settleScore,
   deriveComparisonStatus,
   deriveHypothesisStatus,
