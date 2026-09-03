@@ -657,6 +657,150 @@ auditable, and compatible with future semantic intelligence.
 
 ---
 
+## Appendix B.1 — M-A12-PR2 Implementation Report (actual runtime model)
+
+> This section records the **implemented** PR2 runtime behaviour. It does not
+> rewrite the locked PR0 decisions in the body above ($3, $7, $8, $12, $16, $18) —
+> it documents how those decisions were carried out in code and the precise
+> guarantees actually delivered. **Real-Postgres integration verification is
+> BLOCKED** (TEST_DATABASE_URL unreachable); the statements below describe the
+> implemented + unit-verified behaviour.
+
+### B.1.1 GraphVersion runtime model
+- `GraphVersion` persisted on PostgreSQL (Prisma model, `packages/platform/prisma/schema.prisma`).
+- `id` = **random UUID** (repo row-ID convention; NOT a content hash) per D4.
+- Natural key `@@unique([caseId, versionNumber])` — deterministic logical identity;
+  "same history + same boundary ⇒ same projection" comes from **replay determinism**, not hashing.
+- Allocation: `versionNumber` = case-scoped `MAX(versionNumber)+1`, computed **inside an interactive
+  transaction** after acquiring a **transaction-scoped PostgreSQL advisory lock**
+  `SELECT pg_advisory_xact_lock(hashtextextended(caseId,0))`.
+- **Concurrency guarantee (genuine):** because the whole allocation runs inside the caller's
+  transaction and the advisory lock is scoped to that transaction, two simultaneous canonical
+  changes for the **same case BLOCK** until the in-flight allocation commits, then read a fresh
+  MAX — they can never compute the same — or silently share a — `versionNumber`. `@@unique`
+  `([caseId, versionNumber])` remains a hard safety invariant, not the primary mechanism (STOP #4
+  satisfied). A P2002 under the lock indicates a genuine invariant bug and propagates (aborting the
+  joint transaction with the canonical mutation) rather than fabricating an in-transaction retry.
+- Fields: `caseId`, `investigationId?`, `versionNumber`, `status` (default `DRAFT`),
+  `parentGraphVersionId?` (auto-linear to immediate predecessor when not explicit),
+  `projectionStatus` (default `PENDING`), `nodeCount`/`edgeCount` (default 0), `checkpointId?`
+  (field preserved; reverse-link is PR3/D7), `reason?`, `metadata?`, `createdAt`/`updatedAt`.
+
+### B.1.2 Version numbering + allocation
+- `GraphVersionStore.nextVersionNumber(caseId, client)` reads `MAX(versionNumber)` for the case
+  (desc order) and returns `+1`. Monotonic per case, never reused, persisted.
+- `createVersion(input, tx?)` acquires the advisory lock, validates explicit parent, computes
+  `MAX+1`, auto-links linear parent lineage, inserts. Runs in its own transaction when no `tx` is
+  passed, otherwise in the caller's `tx` (the authority's joint transaction).
+- Two same-case canonical changes serialize via the advisory lock and are never silently over-written.
+
+### B.1.3 Lifecycle + parent lineage
+- Legal transitions (enforced, locked matrix): `DRAFT→ACTIVE`, `ACTIVE→SUPERSEDED`,
+  `SUPERSEDED→ARCHIVED`; `ARCHIVED` terminal. Anything else throws
+  `GraphVersionLifecycleError("ILLEGAL_TRANSITION")`.
+- Parent validation (`createVersion` with explicit `parentGraphVersionId`): parent exists
+  (`PARENT_NOT_FOUND`), parent is same case (`PARENT_CROSS_CASE`), ancestor / positive
+  (`PARENT_NOT_ANCESTOR`). Auto-lineage yields a linear, non-branching chain to the immediate
+  predecessor.
+
+### B.1.4 Canonical mutation coupling (D6)
+- Hook lives at the authority boundary `relation-materialization.ts`. The version is created **in
+  the same `relStore.transaction`** as the canonical mutation (via injected `tx`) ⇒
+  "canonical changed but no version" and "version but canonical rolled back" are both impossible.
+- **Accept** (canonical ACTIVE relation newly materialized, `!reusedExisting`): creates a version,
+  `reason`/`metadata` `RELATION_ACCEPTED:<relationId>`. Reusing an already-materialized relation
+  (`reusedExisting=true`, retry) does **not** duplicate a version.
+- **Reverse** (an ACTIVE canonical actually flips to `REVERSED`, `canonical !== null`): creates a
+  version, `reason`/`metadata` `RELATION_REVERSED:<relationId>`. Already-reversed (retry) creates
+  none.
+- **Reject**: creates **no** version.
+- Created versions are `status: DRAFT`, `projectionStatus: PENDING`.
+
+### B.1.5 Projection-status semantics
+- Vocabulary: `PENDING` (exists, projection not started = not part of contract enum),
+  plus `COMPLETE | PARTIAL | STALE | ERROR` (contract subset).
+- `setProjectionStatus` is case-scoped, idempotent, retry-safe — it is the projection-materialization
+  bookkeeping seam. `COMPLETE` + counts are set **only after a valid projection has been materialized**.
+- **Retry idempotency:** projecting a version again does not create a second GraphVersion — it only
+  (re)updates `projectionStatus`/counts on the existing row.
+
+### B.1.6 Current graph model
+- `GraphProjectionService.projectCurrentGraph({ investigationId, caseId })`:
+  nodes = canonical **ACTIVE** entities; edges = canonical **ACTIVE** relations (REVERSED/PROPOSED/REJECTED
+  excluded). Identical selection to the existing `GraphRuntime.loadCaseProjection` so HTTP behaviour is
+  unchanged. Additionally threads `temporalRange` from the authoritative relation `validityInterval`.
+  Marks the case's latest ACTIVE version `projectionStatus=COMPLETE` with counts.
+
+### B.1.7 Historical graph model
+- `GraphProjectionService.projectGraphVersion(caseId, { versionNumber } | { graphVersionId })`.
+- **Historical-selection mechanism (dimension A — revision order only):** replay the persisted
+  `GraphVersion` chain for the case ascending, up to and including the target version, tracking each
+  accepted / reversed canonical relation from `reason`+`metadata` (`RELATION_ACCEPTED:<rid>` /
+  `RELATION_REVERSED:<rid>`). An edge is included iff its accept version ≤ target AND (if reversed) its
+  reverse version > target (not yet reversed by the target). This preserves ACTIVE/REJECTED/REVERSED
+  history without deleting rows and without turning a reversal into "never existed". It never reads or
+  reuses current Graphology.
+- Edges are loaded from the authoritative `Relation` store, carrying persisted `validityInterval` →
+  `temporalRange` + persisted `provenance`. Entity nodes = canonical non-ARCHIVED universe (consistent).
+- Marks the projected version `projectionStatus=COMPLETE` with counts.
+
+### B.1.8 The two independent dimensions (D: A vs B)
+- **A — GraphVersion order** ("which canonical revision") drives edge **inclusion** in a historical projection.
+- **B — Domain temporal validity** ("real-world period") drives the `temporalRange` carried on edges/nodes.
+- They are never conflated. A version created on 10 Mar for activity on 10 Jan: the edge is included per
+  the *revision chain* (A), while its `temporalRange` is the *Jan 10* `validityInterval` (B). Both remain
+  representable and distinct.
+
+### B.1.9 ACTIVE / REJECTED / REVERSED behaviour
+- ACTIVE relation → a graph edge (current and, while accepted-and-not-yet-reversed, historical).
+- REJECTED hypothesis → never a canonical edge (no canonical Relation row; rejection history auditable).
+- REVERSED relation → not an ACTIVE edge in any version at/after its reversal version; the Relation row
+  remains (status `REVERSED`) so history is preserved.
+
+### B.1.10 Temporal interval selection (PR1 semantics)
+- Uses PR1's closed `[validFrom, validTo]` semantics (both inclusive; `validTo=null` open-ended) via
+  the PR1 `interval-validation.ts` rules. `temporalRange` is the **persisted** `validityInterval`,
+  carried verbatim — precision/semantics are never fabricated. No PR1 temporal information was lost;
+  the distinction between two states is driven by the revision chain + persisted intervals.
+
+### B.1.11 Deterministic replay
+- `normalizeBuiltGraph(graph, caseId)` reads a Graphology graph back into **sorted order-independent**
+  structures: node `id/entityType/canonicalName/temporalRange`; edge `id/relationType/source/target
+  (lexicalized for undirected)/directed/temporalRange/provenance`. Determinism test: project N →
+  discard Graphology → project N again → normalize → deep-equal, without relying on object identity or
+  insertion order.
+
+### B.1.12 Provenance / context preservation
+- `provenance` is carried verbatim from the authoritative Relation onto the edge. Projection never
+  manufactures evidence from graph structure — a connected pair is a recorded relation, not an inferred
+  criminal relationship.
+
+### B.1.13 Indexes
+- `@@unique([caseId, versionNumber])`, `@@index([caseId, versionNumber])`, `@@index([caseId, status])`,
+  `@@index([caseId, projectionStatus])`, `@@index([parentGraphVersionId])`. No Prisma FK (repo NO-FK
+  decoupling convention).
+
+### B.1.14 Files
+- `packages/platform/prisma/schema.prisma` (GraphVersion model; no migration created — schema push BLOCKED).
+- `packages/platform/src/persistence/graph-version-store.ts` (advisory-lock allocation, lifecycle, parent, projection status).
+- `packages/platform/src/relations/relation-materialization.ts` (accept/reverse → version in same tx; reject → none).
+- `packages/platform/src/relations/graph-version-service.ts` (current + historical projection, replay, normalize).
+- `packages/intelligence/graphology-projection/src/types.ts` + `build-graph.ts` (optional `temporalRange` threading).
+- Tests: `tests/m-a12-pr2-graph-projection.test.ts` (pure, 16 green),
+  `tests/integration/m-a12-pr2-versioning.integration.test.ts` (real Postgres, gated, **BLOCKED**).
+
+### B.1.15 Known limitations / deferred (documented, not COMPLETE green)
+- **Real Postgres verification BLOCKED** — TEST_DATABASE_URL unreachable; schema push + all DB suites cannot execute.
+- **GraphVersion table not live on prod** — schema absent on prod and unreachable on test DB ⇒ coupling is
+  "implemented but not yet activated" (authority tolerates absent `graphVersionStore` in isolated M-A10 tests;
+  production `DEFAULT_STORES` always supplies it).
+- Checkpoint↔version reverse-link is PR3/D7 (field `checkpointId` present only).
+- Public version/as-of query APIs are PR3.
+- Historical entity-node selection uses the canonical non-ARCHIVED universe (entity-mutation version triggers
+  are not wired in PR2; only relation accept/reverse trigger versions).
+
+---
+
 ## Appendix C — Explicit Future Work (out of M-A12 scope)
 
 embeddings · semantic retrieval · LLM judge · targeted reblocking · graph-hole
