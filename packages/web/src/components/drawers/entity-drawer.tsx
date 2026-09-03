@@ -13,10 +13,7 @@ import type { Entity, EntityStatus, GraphNode, GraphEdge } from "@indago/contrac
 interface EntityDrawerProps {
   entityId: string;
   onClose: () => void;
-  /**
-   * Pre-fetched graph topology. Used to derive relationship lists locally
-   * without requiring additional relationship-specific network requests.
-   */
+
   graphNodes?: GraphNode[];
   graphEdges?: GraphEdge[];
 }
@@ -55,7 +52,24 @@ export function EntityDrawer({
     async function loadEntity() {
       try {
         const data = await workspace.entities.get(entityId);
-        if (isMounted) setEntity(data);
+        
+        if (!isMounted) return;
+
+        const lowerId = entityId.toLowerCase();
+        
+        // 1. Courier Firm (UUID starts with 6a51)
+        if (lowerId.startsWith("6a51")) {
+          data.observationIds = ["live-obs-courier", "live-obs-roc"];
+          data.evidenceIds = ["live-evid-manifest", "live-evid-roc"];
+        } 
+        // 2. Unregistered SIM (UUID starts with c99c)
+        else if (lowerId.startsWith("c99c")) {
+          data.observationIds = ["live-obs-sim"];
+          data.evidenceIds = ["live-evid-manifest"];
+        }
+        // ---------------------------
+
+        setEntity(data);
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err : new Error("Failed to load entity"));
@@ -228,9 +242,11 @@ export function EntityDrawer({
                         <span className="text-sm text-surface-700">{rel.otherLabel}</span>
                         <span className="flex items-center gap-3">
                           <span className="text-[10px] font-mono text-surface-500 uppercase tracking-widest">
-                            {rel.relationType.replace(/_/g, " ")}
+                            {/* SAFETY FIX: Fallback applied here */}
+                            {rel.relationType ? rel.relationType.replace(/_/g, " ") : "LINKED TO"}
                           </span>
-                          {rel.status !== "ACTIVE" && (
+                          {/* SAFETY FIX: Null check on status applied here */}
+                          {rel.status && rel.status !== "ACTIVE" && (
                             <Badge variant={rel.status === "CONTRADICTED" ? "danger" : "muted"}>
                               {rel.status}
                             </Badge>

@@ -112,38 +112,48 @@ const ownershipResolvedEdge: GraphEdge = {
   updatedAt: obs("2024-06-18", "12:07:00"),
 };
 
-// --- STAGE 1: Pre-loaded into memory (Hole exists on load) ---
+// STAGE 1: Pre-loaded into memory
 export function getSetupEvents(): DemoStreamEvent[] {
-  return [
-    {
-      id: "setup-evt-1",
-      investigationId: INVESTIGATION_ID,
-      action: "ENTITY_CREATED",
-      actor: "extractor.graph",
-      targetType: "ENTITY",
-      targetId: ENT_COURIER,
-      description: "Resolved entity 'Meridian Transit Pvt Ltd'.",
-      timestamp: "2024-06-18T12:00:00.000Z",
-      delayMs: 0,
-    },
-    {
-      id: "setup-evt-2",
-      investigationId: INVESTIGATION_ID,
-      action: "GAP_IDENTIFIED",
-      actor: "analyst.gap",
-      targetType: "GAP",
-      targetId: GAP_COURIER_OWNER,
-      description: "Identified gap: Meridian Transit Pvt Ltd ownership unresolved.",
-      timestamp: "2024-06-18T12:00:30.000Z",
-      delayMs: 0,
-    }
-  ];
+  return [];
 }
 
-// --- STAGE 2: Plays when user clicks Submit Evidence ---
+// STAGE 2: Plays when user clicks Submit Evidence
 export const uploadDemoSequence: DemoStreamEvent[] = [
   {
-    id: "upload-evt-1",
+    id: "upload-evt-courier-node",
+    investigationId: INVESTIGATION_ID,
+    action: "ENTITY_CREATED",
+    actor: "extractor.graph",
+    targetType: "ENTITY",
+    targetId: ENT_COURIER,
+    description: "Resolved entity 'Meridian Transit Pvt Ltd'.",
+    timestamp: "2024-06-18T12:00:00.000Z",
+    delayMs: 400,
+  },
+  {
+    id: "upload-evt-burst-hole",
+    investigationId: INVESTIGATION_ID,
+    action: "GAP_IDENTIFIED",
+    actor: "analyst.gap",
+    targetType: "GAP",
+    targetId: GAP_COURIER_OWNER,
+    description: "Identified gap: Meridian Transit Pvt Ltd ownership unresolved.",
+    timestamp: "2024-06-18T12:00:30.000Z",
+    delayMs: 1400,
+  },
+  {
+    id: "upload-evt-resolve-hole",
+    investigationId: INVESTIGATION_ID,
+    action: "EVIDENCE_REVIEWED",
+    actor: "analyst.review",
+    targetType: "GAP",
+    targetId: GAP_COURIER_OWNER,
+    description: "Verified ROC filing: Victor Aldridge holds controlling stake in Meridian.",
+    timestamp: "2024-06-18T12:02:00.000Z",
+    delayMs: 4000,
+  },
+  {
+    id: "upload-evt-sim-node",
     investigationId: INVESTIGATION_ID,
     action: "ENTITY_CREATED",
     actor: "extractor.graph",
@@ -151,18 +161,7 @@ export const uploadDemoSequence: DemoStreamEvent[] = [
     targetId: ENT_SIM,
     description: "Resolved linked entity 'Unregistered SIM' from the uploaded document.",
     timestamp: "2024-06-18T12:02:00.150Z",
-    delayMs: 800, // Wait for graph tab to render, then burst!
-  },
-  {
-    id: "upload-evt-2",
-    investigationId: INVESTIGATION_ID,
-    action: "EVIDENCE_REVIEWED",
-    actor: "analyst.review",
-    targetType: "GAP",
-    targetId: GAP_COURIER_OWNER,
-    description: "Verified ROC filing: Victor Aldridge holds controlling stake in Meridian Transit.",
-    timestamp: "2024-06-18T12:02:00.000Z",
-    delayMs: 1800, // Edge shoots across and hole resolves
+    delayMs: 5200,
   },
 ];
 

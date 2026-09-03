@@ -17,6 +17,9 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
 
+// F6: Import the visual feedback components
+import { ProcessingFilament, RecoveryRing } from "@/components/feedback/shell-animations";
+
 interface OverviewData {
   readonly investigation: Investigation;
   /** null = blocked/unavailable (backend endpoint not exposed), distinct from empty. */
@@ -60,10 +63,7 @@ export function InvestigationOverview({
     setLoading(true);
     setError(null);
     try {
-      // The investigation itself is authoritative: any failure here surfaces as
-      // the full error state. Domain list resources are tolerated individually
-      // so that live providers without a backend endpoint render a distinct
-      // "unavailable" state rather than taking down the whole overview.
+     
       const investigation = await workspace.investigations.get(investigationId);
       const [evidence, entities, leads, gaps] = await Promise.all([
         settleList(() =>
@@ -135,7 +135,8 @@ export function InvestigationOverview({
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center p-12">
+      <div className="flex items-center justify-center p-12 relative">
+        <ProcessingFilament isProcessing={true} />
         <LoadingSpinner label="Loading workspace…" />
       </div>
     );
@@ -158,7 +159,14 @@ export function InvestigationOverview({
   const { investigation } = data;
 
   return (
-    <div className="space-y-6 p-6 animate-fade-in">
+    <div className="relative space-y-6 p-6 animate-fade-in">
+      
+      {/* F6: Visual Feedback Layer */}
+      <ProcessingFilament isProcessing={loading} />
+      <div className="absolute top-6 right-6 z-50">
+        <RecoveryRing isReconnecting={!live && data !== null} />
+      </div>
+
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
@@ -171,7 +179,8 @@ export function InvestigationOverview({
           </div>
           <p className="type-mono-small">{investigation.id}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pr-24">
+          {/* Added pr-24 to ensure badges don't overlap with the absolute RecoveryRing */}
           <Badge variant="info">{investigation.status}</Badge>
           <Badge variant="accent">{investigation.priority}</Badge>
           {investigation.confidence !== undefined && (
