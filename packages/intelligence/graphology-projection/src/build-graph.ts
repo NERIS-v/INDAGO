@@ -85,11 +85,15 @@ export function buildGraph(input: GraphProjectionInputLike): BuiltGraph {
   for (const id of nodeIds) {
     const node = nodeMap.get(id);
     if (!node) continue;
-    graph.addNode(id, {
+    const nodeAttrs: Record<string, unknown> = {
       entityType: node.entityType,
       canonicalName: node.canonicalName,
       caseId: input.caseId,
-    });
+    };
+    if (node.temporalRange !== undefined) {
+      nodeAttrs.temporalRange = node.temporalRange;
+    }
+    graph.addNode(id, nodeAttrs);
   }
 
   // Deterministic edge insertion order (sorted by relation id).
@@ -112,7 +116,7 @@ export function buildGraph(input: GraphProjectionInputLike): BuiltGraph {
       //   - directed   → Graphology directed edge (source → target)
       //   - undirected → Graphology undirected edge
       const directed = edge.directed ?? isRelationDirected(edge.relationType as RelationType);
-      const attrs = {
+      const attrs: Record<string, unknown> = {
         relationType: edge.relationType,
         relationId: id,
         sourceLabel: edge.sourceLabel,
@@ -120,6 +124,9 @@ export function buildGraph(input: GraphProjectionInputLike): BuiltGraph {
         provenance: edge.provenance,
         caseId: input.caseId,
       };
+      if (edge.temporalRange !== undefined) {
+        attrs.temporalRange = edge.temporalRange;
+      }
       if (directed) {
         graph.addDirectedEdgeWithKey(id, edge.source, edge.target, attrs);
       } else {
