@@ -498,6 +498,18 @@ model Entity {
 //
 // REVERSED ≠ MERGED: reversal updates status + audit history; it does NOT
 // delete the row. DELETION IS NEVER PERFORMED by this store.
+//
+// NO-FK DECOUPLING (intentional, harded-as-audited): sourceEntityId /
+// targetEntityId reference canonical Entity.id but are declared as plain
+// indexed String columns with NO Prisma @relation FK — mirroring the Artifact
+// (lines 87-89) and Case (lines 591-593) decoupling precedent. The dangling-
+// endpoint invariant is guaranteed STRUCTURALLY, not by a DB FK: every
+// RelationHypothesis is proposed only by completeMA10 over
+// entityStore.listByCaseWithObservations(caseId) — the durable canonical-entity
+// universe (ARCHIVED excluded) — so a hypothesis is NEVER created against a
+// missing/mention/pair endpoint. Adding a Prisma FK here would single out
+// Relations/RelationHypotheses from every other FK-free model and break the
+// uniform decoupling stance.
 // ============================================================================
 model RelationHypothesis {
   id                String   @id // deterministic UUID (SHA-256 of identityKey)
@@ -544,6 +556,14 @@ model RelationHypothesis {
 // Idempotency: relationKey @unique maps one (source, target, relationType,
 // directed, model) to exactly one canonical relation. A reversal records
 // REVERSED; it does not delete the row (REVERSED != MERGED).
+//
+// NO-FK DECOUPLING (intentional): sourceEntityId / targetEntityId reference
+// canonical Entity.id as plain indexed String columns with NO Prisma @relation
+// FK — same deliberate stance as RelationHypothesis, Artifact, and Case above.
+// Endpoint integrity is guaranteed structurally: a canonical Relation is
+// materialized ONLY from an ACCEPTED RelationHypothesis (whose endpoints were
+// themselves proposed over the durable canonical-entity universe), never from a
+// dangling / mention / pair id.
 // ============================================================================
 model Relation {
   id                String  @id // deterministic UUID (SHA-256 of relationKey)

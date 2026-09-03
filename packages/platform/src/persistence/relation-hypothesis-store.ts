@@ -183,24 +183,6 @@ export class RelationHypothesisTransitionError extends Error {
   }
 }
 
-function assertTransition(
-  id: string,
-  rowStatus: string,
-  newStatus: string,
-): void {
-  const allowed = RELATION_HYPOTHESIS_TRANSITIONS[newStatus];
-  // A transition is only permitted if the row's CURRENT status is listed as a
-  // valid predecessor of the requested target state.
-  if (allowed === undefined || !allowed.has(rowStatus)) {
-    throw new RelationHypothesisTransitionError(
-      "INVALID_TRANSITION",
-      id,
-      rowStatus,
-      newStatus,
-    );
-  }
-}
-
 export class RelationHypothesisStore {
   constructor(private readonly prisma: PrismaClient = db) {}
 
@@ -403,57 +385,114 @@ export class RelationHypothesisStore {
  *
  * Returns the durable re-read row on success; throws when validation fails.
  */
+  /**
+   * Interactive transaction runner bound to THIS store's Prisma client (so an
+   * injected test-DB store opens its transaction against the test database,
+   * not the global `db`). The authority layer uses this to co-locate the
+   * hypothesis decision with the canonical-relation write in one atomic
+   * boundary.
+   */
+  async transaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(fn);
+  }
+
   async updateStatus(
     id: string,
     filter: { caseId: string },
     newStatus: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<DurableRelationHypothesis | null> {
-    const row = await this.prisma.relationHypothesis.findFirst({
-      where: { id, caseId: filter.caseId },
-    });
-    if (!row) {
-      throw new RelationHypothesisTransitionError(
-        "HYPOTHESIS_NOT_FOUND",
+    const client = tx ?? this.prisma;
+    const allowedSources = RELATION_HYPOTHESIS_TRANSITIONS[newStatus];
+    const now = new Date();
+
+    // Atomic optimistic transition: the write is conditional on the row's
+    // CURRENT status being a permitted predecessor of `newStatus`. Postgres
+    // serializes this so that of N concurrent authority decisions on the same
+    // PROPOSED hypothesis, exactly ONE wins and the rest are refused (no race
+    // window where the read and the write see different states — the old
+    // findFirst→assert→update sequence was TOCTOU-racy). This makes the accept
+    // path one-winner and idempotency total.
+    const updatedRows = await client.relationHypothesis.updateMany({
+      where: {
         id,
+        caseId: filter.caseId,
+        ...(allowedSources && allowedSources.size > 0
+          ? { status: { in: [...allowedSources] } }
+          : {}),
+      },
+      data: { status: newStatus, updatedAt: now },
+    });
+
+    if (updatedRows.count === 0) {
+      // Either the row is missing entirely, or it is already in a state that is
+      // NOT a valid predecessor of `newStatus` (e.g. a concurrent authority
+      // already resolved it — terminal / repeat decisions are refused, never
+      // clobbered). Distinguish the two for a precise error.
+      const existing = await client.relationHypothesis.findFirst({
+        where: { id, caseId: filter.caseId },
+      });
+      if (!existing) {
+        throw new RelationHypothesisTransitionError(
+          "HYPOTHESIS_NOT_FOUND",
+          id,
+        );
+      }
+      if (allowedSources === undefined || !allowedSources.has(existing.status)) {
+        throw new RelationHypothesisTransitionError(
+          "INVALID_TRANSITION",
+          id,
+          existing.status,
+          newStatus,
+        );
+      }
+      // Defensive: the guard can no longer fail here, but refuse loudly rather
+      // than silently succeed if it somehow does.
+      throw new RelationHypothesisTransitionError(
+        "INVALID_TRANSITION",
+        id,
+        existing.status,
+        newStatus,
       );
     }
 
-    const now = new Date();
-    // Authoritative transition guard: only a permitted successor of the row's
-    // current status may be written. Terminal / repeat authority decisions are
-    // refused (the durable decision is never clobbered).
-    assertTransition(id, row.status, newStatus);
-
-    const updated = await this.prisma.relationHypothesis.update({
-      where: { id },
-      data: { status: newStatus, updatedAt: now },
+    const updated = await client.relationHypothesis.findFirst({
+      where: { id, caseId: filter.caseId },
     });
-    return rowToRelationHypothesis(updated);
+    return updated ? rowToRelationHypothesis(updated) : null;
   }
 
   /**
    * Authority decision helpers — thin, transition-guarded wrappers over
    * updateStatus so callers never pass an arbitrary status string.
+   * An optional transaction client lets a caller co-locate the decision with
+   * the canonical-relation write in ONE atomic boundary (see
+   * relation-materialization).
    */
   async acceptHypothesis(
     id: string,
     filter: { caseId: string },
+    tx?: Prisma.TransactionClient,
   ): Promise<DurableRelationHypothesis | null> {
-    return this.updateStatus(id, filter, "ACCEPTED");
+    return this.updateStatus(id, filter, "ACCEPTED", tx);
   }
 
   async rejectHypothesis(
     id: string,
     filter: { caseId: string },
+    tx?: Prisma.TransactionClient,
   ): Promise<DurableRelationHypothesis | null> {
-    return this.updateStatus(id, filter, "REJECTED");
+    return this.updateStatus(id, filter, "REJECTED", tx);
   }
 
   async reverseHypothesis(
     id: string,
     filter: { caseId: string },
+    tx?: Prisma.TransactionClient,
   ): Promise<DurableRelationHypothesis | null> {
-    return this.updateStatus(id, filter, "REVERSED");
+    return this.updateStatus(id, filter, "REVERSED", tx);
   }
 }
 

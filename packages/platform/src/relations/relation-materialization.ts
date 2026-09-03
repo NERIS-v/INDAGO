@@ -42,11 +42,11 @@ import {
 export interface RelationMaterializationStores {
   readonly relationHypothesisStore: Pick<
     typeof relationHypothesisStore,
-    "findById" | "acceptHypothesis" | "rejectHypothesis" | "reverseHypothesis"
+    "transaction" | "findById" | "acceptHypothesis" | "rejectHypothesis" | "reverseHypothesis"
   >;
   readonly relationStore: Pick<
     typeof relationStore,
-    "materializeRelation" | "markReversed" | "findById"
+    "transaction" | "materializeRelation" | "markReversed" | "findById"
   >;
 }
 
@@ -139,48 +139,59 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
     hypothesisId,
   };
 
-  // Durable-state-first: persist the authoritative decision THEN materialize.
-  const updatedHypothesis = await hypStore.acceptHypothesis(hypothesisId, {
-    caseId,
-  });
-  if (!updatedHypothesis) {
-    // The hypothesis passed the PROPOSED guard above, so this is an unexpected
-    // invariant break (e.g. a concurrent authority transitioned it between our
-    // read and write). Refuse rather than materialize a relation for a
-    // hypothesis the durable store no longer honors.
-    throw new RelationMaterializationError("HYPOTHESIS_NOT_PROPOSED", hypothesisId);
-  }
+  // ONE atomic boundary: the hypothesis ACCEPT decision AND the canonical
+  // relation materialization commit together or not at all. No partial accept,
+  // no canonical relation without an accepted hypothesis, no accepted state
+  // without its canonical relation. The audit event is emitted by the caller
+  // AFTER this transaction commits (so no audit claims success on rollback).
+  return relStore.transaction<AcceptRelationResult>(async (tx) => {
+    const updatedHypothesis = await hypStore.acceptHypothesis(
+      hypothesisId,
+      { caseId },
+      tx,
+    );
+    if (!updatedHypothesis) {
+      // The hypothesis passed the PROPOSED guard above, so this is an
+      // invariant break (e.g. a concurrent authority transitioned it between
+      // our read and write). Refuse rather than materialize a relation for a
+      // hypothesis the durable store no longer honors.
+      throw new RelationMaterializationError("HYPOTHESIS_NOT_PROPOSED", hypothesisId);
+    }
 
-  const result = await relStore.materializeRelation({
-    id: relationId,
-    relationKey,
-    caseId,
-    investigationId: hypothesis.investigationId ?? undefined,
-    sourceEntityId: hypothesis.sourceEntityId,
-    targetEntityId: hypothesis.targetEntityId,
-    relationType: hypothesis.relationType,
-    directed: hypothesis.directed,
-    support: hypothesis.support,
-    evidenceBasis: hypothesis.evidenceBasis,
-    contradictions: hypothesis.contradictions,
-    scoreModelVersion: hypothesis.scoreModelVersion,
-    evidenceCount: hypothesis.evidenceCount,
-    provenance,
-    hypothesisId,
-  });
+    const result = await relStore.materializeRelation(
+      {
+        id: relationId,
+        relationKey,
+        caseId,
+        investigationId: hypothesis.investigationId ?? undefined,
+        sourceEntityId: hypothesis.sourceEntityId,
+        targetEntityId: hypothesis.targetEntityId,
+        relationType: hypothesis.relationType,
+        directed: hypothesis.directed,
+        support: hypothesis.support,
+        evidenceBasis: hypothesis.evidenceBasis,
+        contradictions: hypothesis.contradictions,
+        scoreModelVersion: hypothesis.scoreModelVersion,
+        evidenceCount: hypothesis.evidenceCount,
+        provenance,
+        hypothesisId,
+      },
+      tx,
+    );
 
-  return {
-    hypothesis: updatedHypothesis,
-    relationId,
-    materialized: true,
-    reused: result.reusedExisting,
-  };
+    return {
+      hypothesis: updatedHypothesis,
+      relationId,
+      materialized: true,
+      reused: result.reusedExisting,
+    };
+  });
 }
 
 /**
  * Reject a PROPOSED RelationHypothesis. No canonical relation is created. Falls
  * through to the transition-guarded store — an already-resolved hypothesis is
- * refused.
+ * refused. Runs atomically so no partial state can be observed.
  */
 export async function rejectRelationHypothesis(
   params: {
@@ -196,24 +207,39 @@ export async function rejectRelationHypothesis(
   if (!hypothesis) {
     throw new RelationMaterializationError("HYPOTHESIS_NOT_FOUND", hypothesisId);
   }
-  const updated = await hypStore.rejectHypothesis(hypothesisId, { caseId });
-  if (!updated) {
-    throw new RelationMaterializationError("HYPOTHESIS_NOT_REVERSIBLE", hypothesisId);
-  }
-  return updated;
+
+  return hypStore.transaction<DurableRelationHypothesis>(async (tx) => {
+    const updated = await hypStore.rejectHypothesis(hypothesisId, { caseId }, tx);
+    if (!updated) {
+      throw new RelationMaterializationError("HYPOTHESIS_NOT_REVERSIBLE", hypothesisId);
+    }
+    return updated;
+  });
 }
 
 /**
  * Reverse an ACCEPTED (or REJECTED) RelationHypothesis. If a canonical relation
  * exists and is ACTIVE, it is marked REVERSED (REVERSED != MERGED; history kept).
+ *
+ * Runs atomically: the hypothesis REVERSE decision AND the canonical-relation
+ * reversal commit together or not at all — the canonical relation can never be
+ * left ACTIVE while its accepted hypothesis is REVERSED (and vice-versa).
  */
+export interface ReverseRelationResult {
+  readonly hypothesis: DurableRelationHypothesis;
+  /** Canonical relation id, present only when an ACTIVE canonical existed. */
+  readonly canonicalRelationId: string | null;
+  /** True when an ACTIVE canonical relation was actually flipped to REVERSED. */
+  readonly canonicalReversed: boolean;
+}
+
 export async function reverseRelationHypothesis(
   params: {
     caseId: string;
     hypothesisId: string;
   },
   stores: RelationMaterializationStores = DEFAULT_STORES,
-): Promise<DurableRelationHypothesis> {
+): Promise<ReverseRelationResult> {
   const { caseId, hypothesisId } = params;
   const { relationHypothesisStore: hypStore, relationStore: relStore } = stores;
 
@@ -222,25 +248,31 @@ export async function reverseRelationHypothesis(
     throw new RelationMaterializationError("HYPOTHESIS_NOT_FOUND", hypothesisId);
   }
 
-  const updated = await hypStore.reverseHypothesis(hypothesisId, { caseId });
-  if (!updated) {
-    throw new RelationMaterializationError("HYPOTHESIS_NOT_REVERSIBLE", hypothesisId);
-  }
+  const canonicalRelationId = await deterministicRelationId({
+    sourceEntityId: hypothesis.sourceEntityId,
+    targetEntityId: hypothesis.targetEntityId,
+    relationType: hypothesis.relationType,
+    directed: hypothesis.directed,
+    scoreModelVersion: hypothesis.scoreModelVersion,
+  });
 
-  // Reversing also flips an ACTIVE canonical relation to REVERSED if one exists.
-  const canonical = await relStore.findById(
-    await deterministicRelationId({
-      sourceEntityId: hypothesis.sourceEntityId,
-      targetEntityId: hypothesis.targetEntityId,
-      relationType: hypothesis.relationType,
-      directed: hypothesis.directed,
-      scoreModelVersion: hypothesis.scoreModelVersion,
-    }),
-    { caseId },
-  );
-  if (canonical) {
-    await relStore.markReversed(canonical.id, { caseId });
-  }
+  return relStore.transaction<ReverseRelationResult>(async (tx) => {
+    const updated = await hypStore.reverseHypothesis(hypothesisId, { caseId }, tx);
+    if (!updated) {
+      throw new RelationMaterializationError("HYPOTHESIS_NOT_REVERSIBLE", hypothesisId);
+    }
 
-  return updated;
+    // Flip the ACTIVE canonical relation to REVERSED in the same transaction.
+    const canonical = await relStore.markReversed(
+      canonicalRelationId,
+      { caseId },
+      tx,
+    );
+
+    return {
+      hypothesis: updated,
+      canonicalRelationId: canonical ? canonicalRelationId : null,
+      canonicalReversed: canonical !== null,
+    };
+  });
 }

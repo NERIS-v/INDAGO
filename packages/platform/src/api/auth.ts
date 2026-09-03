@@ -32,12 +32,37 @@ export interface AuthenticatedUser {
  * real identity system is not implemented yet), so protected endpoints fail
  * closed in production.
  */
+const DEMO_ALLOWED_CASES = [
+  "550e8400-e29b-41d4-a716-446655440010",
+  "550e8400-e29b-41d4-a716-446655440011",
+];
+
+/**
+ * Dev/test overflow allow-list: a developer or integration suite may opt the
+ * demo principal into ADDITIONAL cases they legitimately create (each is an
+ * explicit, case-grained grant — NOT a blanket "allow anything"). A case id is
+ * reached via the demo credential in development ONLY when it appears here.
+ * Absent the variable, the demo principal is scoped strictly to DEMO_ALLOWED_CASES.
+ */
+function devAllowedCases(extra?: string): string[] {
+  const base = [...DEMO_ALLOWED_CASES];
+  if (!extra) return base;
+  const added = extra
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const c of added) {
+    if (!base.includes(c)) base.push(c);
+  }
+  return base;
+}
+
 export function verifyToken(token: string): AuthenticatedUser | null {
   if (token === "demo-token" && process.env.NODE_ENV !== "production") {
     return {
       id: "usr_demo_123",
       role: "INVESTIGATOR",
-      allowedCases: ["550e8400-e29b-41d4-a716-446655440010", "550e8400-e29b-41d4-a716-446655440011"],
+      allowedCases: devAllowedCases(process.env.INDAGO_DEV_ALLOWED_CASES),
     };
   }
   return null;
@@ -47,6 +72,14 @@ export function verifyToken(token: string): AuthenticatedUser | null {
  * Single authorization boundary. Checks whether the authenticated
  * principal has access to the given case.
  *
+ * FAIL-CLOSED (hardened): the allow-list is enforced in EVERY environment,
+ * including development and test. There is no "return true outside
+ * production" fallback — a principal may reach a case ONLY when that case is
+ * in its `allowedCases`. In development, the demo credential is scoped to
+ * DEMO_ALLOWED_CASES plus any explicit INDAGO_DEV_ALLOWED_CASES grants; every
+ * other case is denied. This makes the case-boundary security claim hold in
+ * all modes, not just production.
+ *
  * Used by both Express requireCaseAccess middleware and UploadThing
  * onUploadComplete callback.
  */
@@ -54,7 +87,6 @@ export function verifyCaseAccess(
   user: AuthenticatedUser,
   caseId: string,
 ): boolean {
-  if (process.env.NODE_ENV !== "production") return true;
   return user.allowedCases.includes(caseId);
 }
 
