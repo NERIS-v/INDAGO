@@ -7,7 +7,7 @@ import {
   SourceIdSchema,
   HypothesisIdSchema,
 } from '../common/ids.js';
-import { ObservedTimeSchema, EventTimeSchema } from '../common/timestamps.js';
+import { ObservedTimeSchema, EventTimeSchema, TemporalIntervalSchema } from '../common/timestamps.js';
 import { ProvenanceSchema } from '../common/provenance.js';
 import { EvidenceStrengthSchema } from '../common/confidence.js';
 import { MetadataSchema } from '../common/metadata.js';
@@ -67,6 +67,15 @@ export const ObservationSchema = z.object({
   provenance: ProvenanceSchema,
   observedAt: EventTimeSchema.optional()
     .describe('When this observation occurred in the real world'),
+  eventTime: EventTimeSchema.optional()
+    .describe('M-A12 D1: domain-valid event time when confidently extractable. ' +
+      'Not a substitute for system time; never fabricated from partial/uncertain prose.'),
+  sourceContextId: z.string().min(1).max(500).optional()
+    .describe('M-A12 D2: lightweight source-context grouping key. Grouping by source ' +
+      'context (same evidence document/section/row), NEVER a claim of real-world event identity.'),
+  validityInterval: TemporalIntervalSchema.optional()
+    .describe('M-A12 D5: closed [validFrom, validTo] interval during which this ' +
+      'observation is treated as temporally valid. Not derived from system time.'),
   createdAt: ObservedTimeSchema,
   updatedAt: ObservedTimeSchema,
   metadata: MetadataSchema.optional(),
