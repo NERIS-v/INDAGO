@@ -108,6 +108,7 @@ export interface DurableRelation {
   readonly evidenceCount: number;
   readonly provenance: unknown;
   readonly hypothesisId: string;
+  readonly validityInterval: unknown | null;
   readonly createdAt: Date;
   readonly reversedAt: Date | null;
 }
@@ -131,6 +132,7 @@ function rowToRelation(row: RelationRow): DurableRelation {
     evidenceCount: row.evidenceCount,
     provenance: row.provenance,
     hypothesisId: row.hypothesisId,
+    validityInterval: row.validityInterval,
     createdAt: row.createdAt,
     reversedAt: row.reversedAt,
   };
@@ -152,6 +154,7 @@ export interface MaterializeRelationInput {
   readonly evidenceCount: number;
   readonly provenance: unknown;
   readonly hypothesisId: string;
+  readonly validityInterval?: unknown;
 }
 
 export interface MaterializeRelationResult {
@@ -214,6 +217,10 @@ export class RelationStore {
               evidenceCount: input.evidenceCount,
               provenance: toJson(input.provenance),
               hypothesisId: input.hypothesisId,
+              validityInterval:
+                input.validityInterval !== undefined
+                  ? toJson(input.validityInterval)
+                  : Prisma.JsonNull,
               createdAt: now,
               updatedAt: now,
             },

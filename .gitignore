@@ -148,3 +148,6 @@ vite.config.ts.timestamp-*
 # M-A07 model/runtime assets (never commit)
 *.traineddata
 packages/platform/.data/
+
+# Root lockfile (never commit)
+package-lock.json

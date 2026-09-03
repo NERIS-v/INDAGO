@@ -975,6 +975,10 @@ packages/
     <td>Shared validation schemas across all packages</td>
   </tr>
   <tr>
+    <td><img src="https://img.shields.io/badge/Temporal-Graph_Versioning-00D4AA?style=flat-square" alt="Temporal"></td>
+    <td>Temporal history store, interval reconstruction, and graph versioning with historical projection</td>
+  </tr>
+  <tr>
     <td><img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square" alt="CI"></td>
     <td>Build, typecheck, test on every push</td>
   </tr>

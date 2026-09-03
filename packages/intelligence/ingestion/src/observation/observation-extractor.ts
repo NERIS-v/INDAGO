@@ -27,6 +27,7 @@ import type {
   Observation,
   ObservationType,
   Provenance,
+  TemporalInterval,
 } from '@indago/contracts';
 import { ObservationSchema } from '@indago/contracts';
 import type { RawExtraction } from '../extraction/types.js';
@@ -67,6 +68,12 @@ export interface ObservationDraft {
   readonly strength: number;
   readonly provenance: Provenance;
   readonly observedAt?: EventTime;
+  /** M-A12-D1: domain-valid event time when confidently extractable (never fabricated) */
+  readonly eventTime?: EventTime;
+  /** M-A12-D2: lightweight source-context grouping key (NOT real-world event identity) */
+  readonly sourceContextId?: string;
+  /** M-A12-D5: closed [validFrom, validTo] TemporalInterval */
+  readonly validityInterval?: TemporalInterval;
 }
 
 export type ObservationExtractorWarningCode =
@@ -391,6 +398,30 @@ function buildProvenance(candidate: Candidate, input: ObservationExtractorInput)
   return provenance;
 }
 
+/**
+ * M-A12-D2: derive a lightweight source-context grouping key from the
+ * provenance coordinates present on an observation.
+ *
+ * The key groups observations that come from the SAME source context (same
+ * evidence document / section / row / paragraph) WITHOUT claiming they are the
+ * same real-world event. Two observations sharing a key are "co-located in the
+ * source narrative", nothing more. When NO coordinate is present we return
+ * undefined (no key) rather than fabricating one.
+ *
+ * The key is built deterministically from canonical coords so it is stable
+ * across re-extractions and retries.
+ */
+function deriveSourceContextId(provenance: Provenance, evidenceId: string): string | undefined {
+  const coords: string[] = [];
+  if (provenance.documentRef) coords.push(`doc:${provenance.documentRef}`);
+  if (provenance.pageRef) coords.push(`page:${provenance.pageRef}`);
+  if (provenance.rowRef) coords.push(`row:${provenance.rowRef}`);
+  if (provenance.spanRef) coords.push(`span:${provenance.spanRef}`);
+  if (coords.length === 0) return undefined;
+  // evidenceId scopes the grouping so keys are unique across the platform.
+  return `${evidenceId}|${coords.join("|")}`;
+}
+
 async function assemble(
   candidate: Candidate,
   input: ObservationExtractorInput,
@@ -399,6 +430,8 @@ async function assemble(
   const locationKey = serializeSourceLocation(candidate.kind, candidate.locationRef);
   const candidateMentions = extractCandidateMentions(candidate.content);
   const observedAt = detectObservedAt(candidate.content);
+  const provenance = buildProvenance(candidate, input);
+  const sourceContextId = deriveSourceContextId(provenance, input.evidenceId);
 
   return {
     evidenceId: input.evidenceId,
@@ -409,8 +442,9 @@ async function assemble(
     locationKey,
     candidateMentions,
     strength: strengthOf(candidate),
-    provenance: buildProvenance(candidate, input),
+    provenance,
     ...(observedAt ? { observedAt } : {}),
+    ...(sourceContextId ? { sourceContextId } : {}),
   };
 }
 
@@ -497,6 +531,13 @@ export async function finalizeObservation(input: ObservationFinalizeInput): Prom
     strength: draft.strength,
     provenance: draft.provenance,
     ...(draft.observedAt ? { observedAt: draft.observedAt } : {}),
+    // M-A12-D1: propagate the confident domain event time. detectObservedAt
+    // already returns only confident, non-fabricated EventTimes, so mirroring
+    // it into the explicit eventTime field is a normalization, not a new
+    // extraction. Never invented when absent.
+    ...(draft.observedAt ? { eventTime: draft.observedAt } : {}),
+    ...(draft.sourceContextId ? { sourceContextId: draft.sourceContextId } : {}),
+    ...(draft.validityInterval ? { validityInterval: draft.validityInterval } : {}),
     createdAt: { value: nowIso, precision: 'exact' },
     updatedAt: { value: nowIso, precision: 'exact' },
   });

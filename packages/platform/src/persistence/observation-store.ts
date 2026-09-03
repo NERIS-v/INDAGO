@@ -232,6 +232,15 @@ export class ObservationStore {
         o.observedAt !== undefined
           ? (toJson(o.observedAt) as Prisma.InputJsonObject)
           : Prisma.JsonNull,
+      eventTime:
+        o.eventTime !== undefined
+          ? (toJson(o.eventTime) as Prisma.InputJsonObject)
+          : Prisma.JsonNull,
+      sourceContextId: o.sourceContextId ?? null,
+      validityInterval:
+        o.validityInterval !== undefined
+          ? (toJson(o.validityInterval) as Prisma.InputJsonObject)
+          : Prisma.JsonNull,
       entityIds: toJson(o.entityIds) as Prisma.InputJsonArray,
     }));
 
@@ -322,6 +331,15 @@ export class ObservationStore {
       provenance: row.provenance,
       ...(row.observedAt !== null && row.observedAt !== undefined
         ? { observedAt: row.observedAt }
+        : {}),
+      ...(row.eventTime !== null && row.eventTime !== undefined
+        ? { eventTime: row.eventTime }
+        : {}),
+      ...(row.sourceContextId !== null && row.sourceContextId !== undefined
+        ? { sourceContextId: row.sourceContextId }
+        : {}),
+      ...(row.validityInterval !== null && row.validityInterval !== undefined
+        ? { validityInterval: row.validityInterval }
         : {}),
       createdAt: { value: row.createdAt.toISOString(), precision: "exact" },
       updatedAt: { value: row.createdAt.toISOString(), precision: "exact" },

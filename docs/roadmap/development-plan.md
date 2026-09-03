@@ -893,3 +893,63 @@ Final recommendation: **READY TO START M-A12**, conditioned on completing + docu
 G1–G8 entry-gate audits (§23.5), chiefly the M-A06 observation-context audit (G1) and the
 DEMO/LIVE/AUTO regression status (G8). Semantic retrieval is intentionally non-blocking for
 M-A12 and lands in Phase 6/8.
+
+### 23.11 M-A12-PR0 — Temporal Architecture + Design Lock (DESIGN/LOCK)
+
+**Status:** 🔵 DESIGN / LOCK — architecture locked; runtime not implemented.
+**Authoritative design doc:** `docs/platform/m-a12-temporal-architecture.md`.
+
+M-A12 is implemented as three PRs. PR0 locks the design; **PR1 (temporal history
++ intervals) and PR2 (graph versioning + historical projection) are implemented**
+(unit-verified; real-Postgres integration verification is **BLOCKED** because
+TEST_DATABASE_URL is unreachable); PR3 remains **planned** (not started). The
+locked decisions (D1–D7) and semantics are recorded in the design doc and must
+not be re-interpreted by downstream PRs.
+
+#### Locked decisions (summary — see design doc for full detail)
+
+- **D1 Event-time anchor — Hybrid:** domain-valid event time persisted where
+  confidently extractable (existing `EventTimeSchema` vocabulary);
+  `RawExtraction` remains authoritative for source context/time; never fabricate
+  a missing year or precision from values such as `"14 March"`.
+- **D2 Cross-observation grouping — Hybrid (source-context, not event
+  identity):** lightweight durable source-context grouping/lineage via
+  `ProvenanceSchema.derivedFrom`; grouping never implies real-world event
+  identity; `RawExtraction` authoritative for rich context.
+- **D3 Temporal contract vocabulary — Adopt** the existing `EventTime`,
+  `ReportedTime`, `ObservedTime`, `IngestionTime`, `TransactionTime`,
+  `TemporalIntervalSchema`, `GraphVersionSchema`. No competing vocabulary.
+- **D4 GraphVersion — Logical revision (PR2):** UUID `GraphVersionId`; natural
+  logical key `(caseId, versionNumber)`; determinism via replay, not content-hash;
+  `parentGraphVersionId`, statuses, projectionStatus, checkpointId per contract.
+- **D5 Interval semantics — Closed `[validFrom, validTo]`**, aligned to
+  `TemporalIntervalSchema`; boundary equality valid; `validTo < validFrom`
+  invalid.
+- **D6 Late/out-of-order evidence — New version on canonical change (PR2);**
+  audit/ingestion order immutable; domain time carried separately; reconstruction
+  from persisted temporal state, not mutable current rows.
+- **D7 Checkpoint relationship — Light one-way coupling (PR2/3);** preserve
+  `AgentCheckpoint`; record `GraphVersion.checkpointId` and a small reverse
+  mapping at the active `stepId`.
+
+#### PR breakdown
+
+| PR | Scope | Status |
+| --- | --- | --- |
+| M-A12-PR0 | Temporal architecture + design lock (this) + dev-plan/tracker updates | 🔵 DESIGN / LOCK (complete as a design PR) |
+| M-A12-PR1 | Temporal history + intervals: persist domain event-time, validity intervals, immutable temporal history for reconstruction; event-time propagation where confident; runtime validation; indexes; deterministic reconstruction primitives; tests | ✅ IMPLEMENTED (`Observation.eventTime/sourceContextId/validityInterval` + `Relation`/`RelationHypothesis.validityInterval`; `temporal/interval-validation.ts` D5 rules; `TemporalStateChange` append-only store; MA06 event-time/source-context propagation + D6 history wiring; PR1 unit suite green; real-Postgres PR1 integration suite written — run deferred until TEST_DATABASE_URL reachable) |
+| M-A12-PR2 | Graph versions + historical graph projection: `GraphVersion`, version creation on canonical change, historical projection via node/edge `temporalRange`, current-vs-historical semantics | ✅ IMPLEMENTED (`GraphVersion` model + store with per-case transaction-scoped advisory-lock serialization of `versionNumber`; enable-on-canonical-change coupling in `relation-materialization.ts` — accept/reverse in the same tx, reject none; `relation/graph-version-service.ts` current + historical projection via revision-order replay, `REJECTED`/`REVERSED` preserve history, dimension A (revision) vs B (domain validity) kept distinct, `normalizeBuiltGraph` deterministic replay; PR2 pure unit suite green (16 tests); real-Postgres PR2 integration suite written — **BLOCKED** until TEST_DATABASE_URL reachable) |
+| M-A12-PR3 | APIs + checkpoints + verification: minimal API surface (`current`, `versions`, `versions/:vid`, `as-of`), checkpoint↔version coupling, full test matrix | 🔵 PLANNED |
+
+#### Temporal model rules (locked; enforced from PR1)
+
+- Temporal concepts kept separate: domain time, source/report time, observation
+  time, ingestion time, transaction/system time, validity interval.
+- `createdAt`/`updatedAt` are **never** substitutes for domain-valid time.
+- `REVERSED` ≠ temporal deletion; reversal preserves workflow + temporal history.
+- No automatic event conversion / relation creation / date fabrication.
+
+#### Future work (explicitly outside M-A12)
+
+embeddings · semantic retrieval · LLM judge · targeted reblocking · graph-hole
+intelligence · cross-observation semantic intelligence (Phase 4/5, 6/8).

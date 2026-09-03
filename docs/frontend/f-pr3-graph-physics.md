@@ -61,7 +61,7 @@ Explicitly out of scope (not shipped): `d3` umbrella, react-force-graph, cytosca
 
 - **Modified**: `packages/web/package.json`, `src/components/graph/{use-graph-layout.ts, graph-canvas.tsx}`, `pnpm-lock.yaml` (dependency install), `docs/frontend/{frontend-development-plan.md, f-pr2-provider-architecture.md}`.
 - **New**: `packages/web/tests/graph-physics.test.tsx`, `docs/frontend/f-pr3-graph-physics.md`.
-- **Untouched**: `packages/platform`, `packages/contracts`, `packages/intelligence` (pre-existing uncommitted changes to `audit-event.ts` / `relation.ts` and untracked `opencode.json` / `intelligence/relation-resolution/` were present before this PR and left alone).
+- **Untouched**: `packages/platform`, `packages/contracts`, `packages/intelligence` (pre-existing uncommitted changes to `audit-event.ts` / `relation.ts` and untracked `intelligence/relation-resolution/` were present before this PR and left alone).
 
 Forbidden-deps grep across `src/components/graph/*` shows **only** `d3-force`, `d3-drag`, `d3-selection` imports (plus ordinary prose); no `d3` umbrella, no graph framework, no Three.js/WebGL.
 

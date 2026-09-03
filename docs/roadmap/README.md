@@ -1,10 +1,12 @@
 # INDAGO Future Capabilities Roadmap
 
 > [!warning]
-> **STATUS: FUTURE / NOT IMPLEMENTED**
+> **This index mixes IMPLEMENTED and PLANNED capabilities.**
 >
-> This document describes planned or exploratory architecture. It is not
-> evidence that the capability currently exists in the repository.
+> Each row carries a status from the vocabulary below. `IMPLEMENTED` means code
+> exists and is exercised by tests. This document is a factual index of intent
+> and current state; it is **not** the milestone source of truth (that is
+> `phase-tracker.md`) and it does not change application behavior.
 
 This is the authoritative index for INDAGO's future capabilities and
 architectural extensions. It consolidates intent already present in the
@@ -63,10 +65,11 @@ this `docs/` tree):
 ### Intelligence artifacts
 | Capability | Status | Evidence |
 | --- | --- | --- |
-| Entity / candidate / hypothesis contracts | `CONTRACT_ONLY` | `packages/contracts/src/domain/entity.ts`, `intelligence/entity-resolution.ts`; zero producers, zero persistence |
-| Entity resolution / canonical entities | `NOT_FOUND` (contracts only) | no store, no API, no worker phase |
-| Relations / hypotheses / graph | `NOT_FOUND` (contracts only) | `RelationTypeSchema`, `GraphNodeTypeSchema` are present; nothing runs them |
-| Corroboration / semantic grouping | `NOT_FOUND` | not contracted; see `observation-corroboration.md` |
+| Entity / candidate / hypothesis contracts | `IMPLEMENTED` | `packages/contracts/src/domain/entity.ts`, `intelligence/entity-resolution.ts`; M-A07 EntityMentionCandidate + M-A08 CandidatePair + M-A09 EntityHypothesis persisted stores |
+| Entity resolution / canonical entities | `IMPLEMENTED` | M-A09 canonical Entity authority (identity key, reversible EntityHypothesis, worker, audit); backend-verified |
+| Relations / hypotheses / graph | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring, reversal); M-A11 Graphology projection; M-A13 graph query APIs — backend-verified |
+| Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2, unit-verified) / `PLANNED` (PR3) | PR0 design locked; **PR1 implemented** (temporal fields, D5 validation, `TemporalStateChange` history store, event-time/source-context propagation); **PR2 implemented** (`GraphVersion` model+store, advisory-lock versioning, canonical-change coupling, internal current/historical projection service, deterministic replay) — real-Postgres integration verification **BLOCKED** (TEST_DATABASE_URL unreachable); PR3 (APIs + checkpoints) planned — `docs/platform/m-a12-temporal-architecture.md` |
+| Corroboration / semantic grouping | `NOT_FOUND` | not contracted; see `observation-corroboration.md`; cross-observation semantic intelligence deferred post-M-A12 |
 | Leads / gaps / robustness | `NOT_FOUND` in backend | phases exist on the tracker; only narrative/UI scaffolds exist |
 
 ### Frontend (`packages/web`)
@@ -107,13 +110,14 @@ flowchart TD
 | 3 | M-PR3 Raw Extraction / OCR | `IMPLEMENTED` (XLSX stub) | XLSX deferred, not needed current milestone |
 | 4 | MA05 Normalization | `IMPLEMENTED / FROZEN` | version-migration is future, see §16 |
 | 5 | MA06 Observation Extraction | `IMPLEMENTED` | semantic grouping is future, NOT M-A06 scope |
-| 6 | MA07 Entity Candidate Generation | `DEFERRED / NEXT` | next milestone; archaeology complete, design pending (see §6 and `entity-resolution.md`) |
-| 7 | Entity Resolution | `CONTRACT_ONLY` | blocked on M-A07 output; see `entity-resolution.md` |
+| 6 | MA07 Entity Candidate Generation | `IMPLEMENTED` | EntityMentionCandidate store; backend-verified |
+| 7 | Entity Resolution | `IMPLEMENTED` | M-A09 canonical Entity + EntityHypothesis authority; reversal; backend-verified |
 | 8 | Observation corroboration | `NOT_FOUND` (future design) | see `observation-corroboration.md` |
 | 9 | Observation contradiction / validation | `NOT_FOUND` (future design) | same doc |
-| 10 | Relation extraction | `CONTRACT_ONLY` | TBD milestone |
-| 11 | Hypothesis generation | `CONTRACT_ONLY` | TBD milestone |
-| 12 | Graph projection | `CONTRACT_ONLY` (backend) / `PARTIALLY_IMPLEMENTED` (UI scaffolds) | blocked on entities + relations |
+| 10 | Relation extraction / resolution | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring v1); backend-verified |
+| 11 | Hypothesis generation | `PARTIALLY_IMPLEMENTED` | EntityHypothesis + RelationHypothesis lifecycle stores exist; full hypothesis UI surfacing deferred |
+| 12 | Graph projection | `IMPLEMENTED` (backend) / `PARTIALLY_IMPLEMENTED` (UI) | M-A11 Graphology projection + M-A13 graph query APIs; broad live-mode UI surfacing still stub (`UnsupportedGraphProvider`) |
+| 12b | Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2, unit-verified) / `PLANNED` (PR3) | PR1 temporal history + intervals done; PR2 graph versions + internal historical projection done (real-Postgres integration BLOCKED); PR3 APIs + checkpoint coupling planned |
 | 13 | Leads | `NOT_FOUND` | tracker Phase 4 |
 | 14 | Claim grounding | `NOT_FOUND` | tracker Phase 6A |
 | 15 | Robustness / counter-evidence | `PARTIALLY_IMPLEMENTED` (tracker 6B complete; UI narrative) | tracker Phase 6 |
@@ -160,10 +164,10 @@ future richer workflows. No milestones are fixed for these.
 
 ## Graph / Hypothesis Roadmap
 
-- Backend: `GraphNodeTypeSchema` / `GraphEdgeTypeSchema` are `CONTRACT_ONLY`; no graph persistence, no projection, no graph API.
-- Analysis-time synthetic graph exists only behind legacy `USE_MOCK_INGESTION`.
-- Frontend: graph presentation scaffolds exist in demo fixtures; rendering is a future UI phase (F-PR4+ per `docs/frontend/frontend-development-plan.md`).
-- Dependency chain `Observation → Entity/Relation → Graph` is preserved but unbuilt.
+- Backend: graph projection, query, and analysis are **IMPLEMENTED** via M-A11 (Graphology projection: build-graph/centrality/communities) and M-A13 (typed graph service APIs + express routes `graph`, `graph/traversal`, `graph/centrality`, `graph/communities`). `GraphNode`/`GraphEdge`/`GraphVersion` contracts are `packages/contracts/src/graph/*`.
+- Graphology is a **derived, disposable** projection; Postgres is the authoritative domain state. No Graphology-based historical/temporal history (temporal projection is M-A12; PR1 history/intervals implemented, graph-version history is PR2/PR3).
+- Frontend: graph presentation scaffolds exist in demo fixtures; live-mode rendering is future UI phase (F-PR4+ per `docs/frontend/frontend-development-plan.md`); live providers are stub (`UnsupportedGraphProvider`).
+- Temporal graph (current vs historical versions) is M-A12; **PR2 internal current/historical projection implemented** (unit-verified; real-Postgres integration BLOCKED); public version/as-of query APIs are PR3 (planned).
 
 ## Frontend Capability Progression
 
@@ -238,22 +242,22 @@ Priorities are derived from the repository's own phase ordering and documented
 dependencies, not from feature preference.
 
 ### P0 — required for core next milestones / correctness
-- M-A07 Entity Candidate Generation (deterministic baseline) — next milestone.
+- M-A12 Temporal projection (PR1 intervals/history **implemented**; PR2 graph versions **implemented** unit-verified, real-Postgres integration **BLOCKED**; PR3 APIs) — **next foundation milestone**; PR0 design locked.
 - Realtime replay endpoint decision (activity-feed replay vs PR open) — pending decision, potentially P0 for the frontend realtime story.
 
 ### P1 — important production/product capability
-- Entity resolution (candidate → canonical) — blocked by M-A07 output.
-- Relations + graph projection — blocked by resolution.
 - Production auth (JWT/OIDC behind `verifyToken`).
 - Production DB migration mechanism.
-- Graph UI + entity-resolution review UI.
+- Graph UI + entity-resolution review UI (live-mode providers are stub: `UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider`).
+- M-A12 temporal/graph version APIs (PR3).
+- Production observability / queue monitoring / secrets management.
 
 ### P2 — later enhancement
 - XLSX extraction.
 - Observation corroboration / contradiction / claim grouping.
 - Evidence review, source administration, source-aware scoring.
 - Realtime event history / reconnect replay endpoint (if the pending decision chooses it).
-- Observability / queue monitoring / secrets management.
+- Cross-observation semantic retrieval, targeted reblocking, graph-hole intelligence (post-M-A12).
 - Robustness / counter-evidence surfacing (backend), leads (backend).
 
 ### P3 — exploratory / future research
@@ -286,21 +290,21 @@ Only nodes supported by repository roadmap or current architecture are included.
 
 - XLSX parsing (`XLSX_NOT_IMPLEMENTED` stub).
 - Production identity (JWT/OIDC) — single-function swap ready, not implemented.
-- Entity resolution, relations, hypotheses, graph projection, corroboration — contracts only / not founded.
-- ML/LLM candidate extraction — future research direction.
-- Semantic corroboration tooling (embeddings, claim grouping) — future, must not replace evidence identity.
+- Corroboration / claim grouping — future, must not replace evidence identity.
+- Cross-observation semantic intelligence, targeted reblocking, graph-hole intelligence — post-M-A12 (Phase 4/5).
+- Temporal runtime (M-A12-PR1 + PR2 implemented, unit-verified; PR3 planned) — PR1 history/intervals done; PR2 graph versions + internal historical projection done (real-Postgres integration BLOCKED on TEST_DATABASE_URL); PR3 APIs + checkpoint coupling planned.
 - Frontend graph/timeline/leads/gaps/review renderers — deferred tracker phases.
 
 ## Unknown / Needs Decision
 
-1. M-A07 candidate contract: is the typed pre-resolution candidate a new schema, or an evolution of `EntityCandidateSchema`? (Note: two near-duplicate contracts exist today — `EntityCandidateSchema` and `EntityResolutionCandidateSchema`.) `Architecture decision required`.
-2. Should `Observation.entityIds` / `candidateEntityHypothesisIds` be populated by M-A07? `Architecture decision required`.
+1. ~~M-A07 candidate contract~~ **Resolved:** `EntityMentionCandidate` store implemented; pre-resolution candidates are distinct from canonical entities (`candidateId` never becomes `EntityId`).
+2. ~~Should `Observation.entityIds` / `candidateEntityHypothesisIds` be populated by M-A07?~~ **Resolved:** `Observation.entityIds` is always `[]` at M-A06 (no entity linking there); candidate linkage handled by M-A07/M-A08.
 3. **Realtime replay**: build an event-history endpoint (`GET /investigations/:id/events`) and hydrate on reconnect, or leave SSE as fire-and-forget notification? (Pending decision from the M-A06 wrap-up.)
 4. Entity-type taxonomy owner and scope (analyze, then decide). `Architecture decision required`.
-5. Entity identity model: digest-based (like SourceId/EvidenceId/ObservationId) vs. sequence-based. `Architecture decision required`.
+5. ~~Entity identity model: digest-based vs. sequence-based~~ **Resolved:** deterministic SHA-256→UUID identity keys (`identityKey @unique`) for canonical rows.
 6. Migration strategy: Prisma `db push` vs. versioned migration files.
 7. Storage backend for production artifacts (local FS vs S3).
-8. Whether M-A08–A10 (blocking, resolution) belong in the same milestone as M-A07 or are strictly downstream.
+8. ~~Whether M-A08–A10 belong in the same milestone as M-A07~~ **Resolved:** implemented as sequential milestones M-A07 → M-A08 → M-A09 → M-A10.
 
 ## Companion documents
 
@@ -308,7 +312,8 @@ Only nodes supported by repository roadmap or current architecture are included.
 - `docs/roadmap/entity-resolution.md` — entity resolution roadmap.
 - `docs/roadmap/observation-corroboration.md` — corroboration vs. deduplication.
 - `docs/roadmap/phase-tracker.md` — phase-by-phase progress (source of truth for milestones).
-- `docs/roadmap/development-plan.md` — original architecture plan.
+- `docs/roadmap/development-plan.md` — original architecture plan (M-A12 PR0: §23.11).
+- `docs/platform/m-a12-temporal-architecture.md` — M-A12 temporal architecture & design lock (authoritative).
 
 "Future-scope consolidation complete. The roadmap distinguishes current
 implementation from planned and exploratory capabilities without changing
