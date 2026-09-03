@@ -145,7 +145,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# M-A07 model/runtime assets (never commit)
+# M-A07 model/runtime assets 
 *.traineddata
 packages/platform/.data/
 
