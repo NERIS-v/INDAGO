@@ -682,3 +682,82 @@ model Case {
   updatedAt    DateTime  @updatedAt
   closedAt     DateTime?
 }
+
+// ============================================================================
+// M-A12 D4: Durable GraphVersion (PR2 — graph versioning foundation)
+//
+// A GraphVersion is the logical-revision record for a case's canonical graph.
+// It is PERSISTED in PostgreSQL (authoritative) and drives the historical
+// graph projection; Graphology remains a DERIVED, disposable in-memory
+// projection rebuilt from this + the canonical domain records (§12).
+//
+// Identity semantics (D4, locked):
+//   id = RANDOM UUID (repository row-ID convention — the contract's
+//        GraphVersionIdSchema: z.string().uuid()). It is deliberately NOT a
+//        content hash. Deterministic logical identity is the natural key
+//        (caseId, versionNumber); "same history + same boundary ⇒ same
+//        versionNumber sequence ⇒ same projected graph" comes from replay
+//        determinism, never from hashing canonical content into the id.
+//
+// Version numbering (§ version-numbering):
+//   versionNumber is case-scoped, monotonically increasing, never reused,
+//   persisted, and allocated as MAX(versionNumber)+1 INSIDE an interactive
+//   transaction, SERIALIZED PER CASE by a transaction-scoped PostgreSQL
+//   advisory lock (pg_advisory_xact_lock(hashtextextended(caseId,0))). Two
+//   simultaneous canonical changes for the same case therefore BLOCK until the
+//   in-flight allocation commits and can never compute the same — or silently
+//   share a — versionNumber. @@unique([caseId, versionNumber]) is retained as a
+//   hard safety invariant, not the primary concurrency mechanism (STOP #4
+//   satisfied).
+
+//
+// Lifecycle (D4, § graph version lifecycle):
+//   status ∈ DRAFT | ACTIVE | SUPERSEDED | ARCHIVED with the locked legal
+//   transitions DRAFT→ACTIVE, ACTIVE→SUPERSEDED, SUPERSEDED→ARCHIVED enforced
+//   by GraphVersionStore (no arbitrary transitions; append-only — a version is
+//   never mutated except a permitted lifecycle transition + projection-status /
+//   node/edge-count updates).
+//
+// Lineage (parentGraphVersionId):
+//   immediate parent in the same case, versionNumber < child, no cycles,
+//   linear (non-branching) — validated by the store (§ parent versioning).
+//
+// projectionStatus:
+//   runtime status of the authoritative materialization step. `PENDING` means
+//   the version exists but has not been projected; the subset of the contract
+//   enum { COMPLETE, PARTIAL, STALE, ERROR } applies once projection has run.
+//   A failed projection is recoverable (retry is idempotent) and never silently
+//   marked COMPLETE.
+//
+// NO-FK DECOUPLING (intentional, consistent with the rest of the schema):
+//   caseId / investigationId / parentGraphVersionId / checkpointId are plain
+//   indexed columns with NO Prisma @relation FK — mirroring Artifact, Case,
+//   Relation, RelationHypothesis. A GraphVersion must outlive run rotations,
+//   hypothesis replacements and checkpoint lifecycle; checkpoint ↔ version
+//   reverse coupling is explicitly PR3 (D7) and must not force an FK here.
+//
+// createdAt / updatedAt are SYSTEM timestamps — never the graph's effective
+// temporal boundary (§4 rule I/J).
+// ============================================================================
+model GraphVersion {
+  id                 String   @id @default(uuid()) // random UUID (D4)
+  caseId             String // explicit case scope
+  investigationId    String?
+  versionNumber      Int // monotonic, case-scoped, never reused
+  status             String   @default("DRAFT") // DRAFT | ACTIVE | SUPERSEDED | ARCHIVED
+  parentGraphVersionId String? // immediate parent in the same case
+  projectionStatus   String   @default("PENDING") // PENDING | COMPLETE | PARTIAL | STALE | ERROR
+  nodeCount          Int      @default(0)
+  edgeCount          Int      @default(0)
+  checkpointId       String? // preserved contract field — reverse coupling is PR3 (D7)
+  reason             String? // human/audit reason for this version (canonical change that created it)
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([caseId, versionNumber]) // natural key — D4 determinism + concurrent-allocation guard
+  @@index([caseId, versionNumber]) // case-scoped listing + natural-key lookup
+  @@index([caseId, status]) // lifecycle/active-version lookups
+  @@index([caseId, projectionStatus]) // projection-status recovery queries
+  @@index([parentGraphVersionId]) // lineage traversal
+}
