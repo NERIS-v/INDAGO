@@ -72,6 +72,7 @@ export interface DurableRelationHypothesis {
   readonly directed: boolean;
   readonly provenance: unknown;
   readonly metadata: unknown;
+  readonly validityInterval: unknown | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -98,6 +99,7 @@ function rowToRelationHypothesis(row: RelationHypothesisRow): DurableRelationHyp
     directed: row.directed,
     provenance: row.provenance,
     metadata: row.metadata,
+    validityInterval: row.validityInterval,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -140,6 +142,7 @@ export interface RelationHypothesisInput {
   readonly directed: boolean;
   readonly provenance: unknown;
   readonly metadata?: unknown;
+  readonly validityInterval?: unknown;
 }
 
 /**
@@ -231,6 +234,10 @@ export class RelationHypothesisStore {
               directed: input.directed,
               provenance: toJson(input.provenance),
               metadata: input.metadata !== undefined ? toJson(input.metadata) : Prisma.JsonNull,
+              validityInterval:
+                input.validityInterval !== undefined
+                  ? toJson(input.validityInterval)
+                  : Prisma.JsonNull,
               createdAt: now,
               updatedAt: now,
             },
@@ -279,6 +286,9 @@ export class RelationHypothesisStore {
                 provenance: toJson(input.provenance),
                 ...(input.metadata !== undefined
                   ? { metadata: toJson(input.metadata) }
+                  : {}),
+                ...(input.validityInterval !== undefined
+                  ? { validityInterval: toJson(input.validityInterval) }
                   : {}),
                 updatedAt: now,
               }),
