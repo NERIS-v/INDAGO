@@ -34,6 +34,10 @@ import {
   deterministicRelationId,
   relationStore,
 } from "../persistence/relation-store.js";
+import {
+  graphVersionStore,
+  type GraphVersionStore,
+} from "../persistence/graph-version-store.js";
 
 /**
  * Injectable store boundaries (same seam used by entity-materialization) so the
@@ -48,11 +52,22 @@ export interface RelationMaterializationStores {
     typeof relationStore,
     "transaction" | "materializeRelation" | "markReversed" | "findById"
   >;
+  /**
+   * Optional — when supplied, a graph version is created (atomically, in the
+   * same transaction) whenever a genuinely graph-affecting canonical change
+   * occurs (new ACTIVE relation accepted, ACTIVE relation reversed). The
+   * production default (DEFAULT_STORES) always supplies it, so production
+   * coupling is authoritative. Tests that target the M-A10 authority in
+   * isolation (asserting relation materialization, not versioning) may omit it
+   * to keep the seam version-agnostic.
+   */
+  readonly graphVersionStore?: GraphVersionStore;
 }
 
 const DEFAULT_STORES: RelationMaterializationStores = {
   relationHypothesisStore,
   relationStore,
+  graphVersionStore,
 };
 
 export interface AcceptRelationResult {
@@ -179,6 +194,33 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
       tx,
     );
 
+    // M-A12-PR2 (D6): a genuinely NEW canonical ACTIVE relation is a
+    // graph-affecting canonical change ⇒ create a graph version in the SAME
+    // transaction (atomicity: "canonical changed but no version" is
+    // impossible, and a rolled-back mutation cannot leave a version behind —
+    // the version commits only with the mutation). An idempotent reuse of an
+    // already-materialized relation (reusedExisting=true) changes no canonical
+    // state ⇒ no duplicate version (L. retry idempotency).
+    if (!result.reusedExisting && stores.graphVersionStore) {
+      await stores.graphVersionStore.createVersion(
+        {
+          caseId,
+          investigationId: hypothesis.investigationId ?? undefined,
+          status: "DRAFT",
+          reason: `RELATION_ACCEPTED:${relationId}`,
+          metadata: {
+            change: "RELATION_ACCEPTED",
+            relationId,
+            hypothesisId,
+            relationType: hypothesis.relationType,
+            sourceEntityId: hypothesis.sourceEntityId,
+            targetEntityId: hypothesis.targetEntityId,
+          },
+        },
+        tx,
+      );
+    }
+
     return {
       hypothesis: updatedHypothesis,
       relationId,
@@ -268,6 +310,28 @@ export async function reverseRelationHypothesis(
       { caseId },
       tx,
     );
+
+    // M-A12-PR2 (D6): only when an ACTIVE canonical relation actually flipped
+    // to REVERSED is there a graph-affecting canonical change ⇒ create a graph
+    // version in the SAME transaction. If the canonical was already REVERSED
+    // (or no canonical existed), no canonical change occurred ⇒ no new version
+    // (retry/idempotency / non-duplication).
+    if (canonical !== null && stores.graphVersionStore) {
+      await stores.graphVersionStore.createVersion(
+        {
+          caseId,
+          investigationId: hypothesis.investigationId ?? undefined,
+          status: "DRAFT",
+          reason: `RELATION_REVERSED:${canonicalRelationId}`,
+          metadata: {
+            change: "RELATION_REVERSED",
+            relationId: canonicalRelationId,
+            hypothesisId,
+          },
+        },
+        tx,
+      );
+    }
 
     return {
       hypothesis: updated,
