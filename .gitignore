@@ -149,6 +149,5 @@ vite.config.ts.timestamp-*
 *.traineddata
 packages/platform/.data/
 
-# Local opencode / root lockfile (never commit)
-opencode.json
+# Root lockfile (never commit)
 package-lock.json

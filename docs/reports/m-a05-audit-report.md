@@ -426,5 +426,4 @@ packages/platform/vitest.config.ts                         60s test/hook timeout
 ```
 
 Plus supporting docs: `docs/platform/m-a05-normalization.md`,
-`docs/reports/m-a05-final-implementation-report.md`. The untracked `opencode.json` at repo
-root is unrelated to MA05.
+`docs/reports/m-a05-final-implementation-report.md`.
