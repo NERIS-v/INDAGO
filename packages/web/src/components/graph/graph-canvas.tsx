@@ -3,12 +3,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { drag as d3Drag } from "d3-drag";
 import { select as d3Select, pointer as d3Pointer } from "d3-selection";
-import {
-  useGraphLayout,
-  nodeVisualRadius,
-  screenToWorld,
-  type LayoutNode,
-} from "./use-graph-layout";
+import { useGraphLayout, nodeVisualRadius, screenToWorld, type LayoutNode } from "./use-graph-layout";
 import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
 import { GraphHoleBurstLayer } from "./graph-hole-burst-layer";
 
@@ -18,56 +13,50 @@ interface GraphCanvasProps {
   holes: GraphHole[];
   onNodeClick: (nodeId: string) => void;
   activeTimeRange: [number, number] | null;
-  controlsRef?: React.MutableRefObject<{
-    zoomIn: () => void;
-    zoomOut: () => void;
-    fit: () => void;
-    focusNode: (id: string) => void;
-  } | null>;
+  selectedNodeId?: string | null;
+  controlsRef?: React.MutableRefObject<{ zoomIn: () => void; zoomOut: () => void; fit: () => void; focusNode: (id: string) => void; } | null>;
 }
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
 const FIT_PADDING = 0.85;
-
-// Time-window entrance: how long a node takes to fly in from outside the canvas
-// (ease-in → ease-out), and how far past the edge it starts.
 const ENTER_MS = 700;
 const OFF_CANVAS_GAP = 60;
 
-/** Symmetric ease-in-out cubic: 0 → 0.5 → 1 with no speed jumps at the ends. */
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const ICON_PATHS = {
+  PERSON: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  PHONE: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
+  LOCATION: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  ACCOUNT: "M3 21h18 M3 10h18 M5 6l7-3 7 3 M4 10v11 M20 10v11 M8 14v3 M12 14v3 M16 14v3",
+  COMPANY: "M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16",
+  DOCUMENT: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
+  DEFAULT: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z",
+};
+
+export function getNodeIconPath(node: LayoutNode): string {
+  const typeStr = (node.label || "").toUpperCase();
+  if (typeStr.includes("PERSON") || typeStr.includes("VICTOR") || typeStr.includes("WITNESS") || typeStr.includes("CASTELLAN") || typeStr.includes("ALDRIDGE")) return ICON_PATHS.PERSON;
+  if (typeStr.includes("PHONE") || typeStr.includes("SIM") || typeStr.includes("+91")) return ICON_PATHS.PHONE;
+  if (typeStr.includes("ACCOUNT") || typeStr.includes("BANK")) return ICON_PATHS.ACCOUNT;
+  if (typeStr.includes("LOCATION") || typeStr.includes("ADDRESS")) return ICON_PATHS.LOCATION;
+  if (typeStr.includes("COMPANY") || typeStr.includes("LTD") || typeStr.includes("TRANSIT") || typeStr.includes("HOLDINGS")) return ICON_PATHS.COMPANY;
+  if (typeStr.includes("DOCUMENT") || typeStr.includes("FIR") || typeStr.includes("RECORD") || typeStr.includes("FILING")) return ICON_PATHS.DOCUMENT;
+  return ICON_PATHS.DEFAULT;
 }
 
-/** Spawn point just outside the canvas, along the ray from the viewport center
- *  through the node's landing (home) position — so it appears to fly in from
- *  off-screen and sweep to where it connects. */
+function easeInOutCubic(t: number): number { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
 function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x: number; y: number } {
-  let dirX = nodeX - w / 2;
-  let dirY = nodeY - h / 2;
-  const rayLen = Math.hypot(dirX, dirY);
-  if (rayLen < 1) {
-    dirX = 0;
-    dirY = -1;
-  } else {
-    dirX /= rayLen;
-    dirY /= rayLen;
-  }
+  let dirX = nodeX - w / 2; let dirY = nodeY - h / 2;
+  const rayLen = Math.hypot(dirX, dirY) || 1;
+  if (rayLen < 1) { dirX = 0; dirY = -1; } else { dirX /= rayLen; dirY /= rayLen; }
   const exitX = Math.abs(dirX) > 1e-6 ? w / 2 / Math.abs(dirX) : Infinity;
   const exitY = Math.abs(dirY) > 1e-6 ? h / 2 / Math.abs(dirY) : Infinity;
   const exitDist = Math.min(exitX, exitY);
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({
-  nodes,
-  edges,
-  holes,
-  onNodeClick,
-  activeTimeRange,
-  controlsRef,
-}: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const interactionLayerRef = useRef<SVGGElement>(null);
@@ -75,6 +64,8 @@ export function GraphCanvas({
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [focusedNode, setFocusedNode] = useState<string | null>(null);
+  const [internalSelectedNode, setInternalSelectedNode] = useState<string | null>(null);
+  
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -82,20 +73,20 @@ export function GraphCanvas({
   const panOrigin = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const [reducedMotion, setReducedMotion] = useState(false);
 
-  // Live mutable copies used by the d3-drag handler (a stable closure).
-  const zoomRef = useRef(zoom);
-  zoomRef.current = zoom;
-  const panRef = useRef(pan);
-  panRef.current = pan;
-  const dimensionsRef = useRef(dimensions);
-  dimensionsRef.current = dimensions;
+  const zoomRef = useRef(zoom); zoomRef.current = zoom;
+  const panRef = useRef(pan); panRef.current = pan;
+  const dimensionsRef = useRef(dimensions); dimensionsRef.current = dimensions;
   const draggingNodeId = useRef<string | null>(null);
 
   const [bloom, setBloom] = useState(false);
   const hasBloomedRef = useRef(false);
-
-  // Imperative per-tick re-render driver — see note below.
   const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (selectedNodeId !== undefined) {
+      setInternalSelectedNode(selectedNodeId);
+    }
+  }, [selectedNodeId]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -107,120 +98,68 @@ export function GraphCanvas({
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let resizeTimer: NodeJS.Timeout;
     const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        setDimensions({ width: entry.contentRect.width, height: entry.contentRect.height });
+      if (entries[0]) {
+        const { width, height } = entries[0].contentRect;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          setDimensions({ width, height });
+        }, 400);
       }
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      clearTimeout(resizeTimer);
+    };
   }, []);
 
   const cx = dimensions.width / 2;
   const cy = dimensions.height / 2;
 
-  const { layoutRef, apiRef, settled } = useGraphLayout(
-    nodes,
-    edges,
-    dimensions.width,
-    dimensions.height,
-    { hoveredNodeId: hoveredNode, focusedNodeId: focusedNode, reducedMotion }
-  );
+  const { layoutRef, apiRef, settled } = useGraphLayout(nodes, edges, dimensions.width, dimensions.height, { hoveredNodeId: hoveredNode, focusedNodeId: focusedNode, reducedMotion });
 
-  // Physics sends a *fresh* set of positions per tick; we re-render only while
-  // the simulation is actively moving (settling or dragging). d3-force stops
-  // its timer when alpha decays below the threshold, so there is no continuous
-  // background re-render loop — when idle the graph holds still.
-  useEffect(() => {
-    apiRef.current.onTick(() => setTick((t) => t + 1));
-    return () => {
-      apiRef.current.onTick(() => undefined);
-    };
-  }, [apiRef]);
-
-  const layoutNodes = layoutRef.current.layoutNodes;
-  const layoutEdges = layoutRef.current.layoutEdges;
-  const communities = layoutRef.current.communities;
+  useEffect(() => { apiRef.current.onTick(() => setTick((t) => t + 1)); return () => { apiRef.current.onTick(() => undefined); }; }, [apiRef]);
 
   useEffect(() => {
     if (!settled) return;
-    if (hasBloomedRef.current) {
-      setBloom(true);
-      return;
-    }
+    if (hasBloomedRef.current) { setBloom(true); return; }
     const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => {
-        setBloom(true);
-        hasBloomedRef.current = true;
-      });
+      const raf2 = requestAnimationFrame(() => { setBloom(true); hasBloomedRef.current = true; });
       return () => cancelAnimationFrame(raf2);
     });
     return () => cancelAnimationFrame(raf1);
   }, [settled]);
 
-  const isNodeInTimeRange = useCallback(
-    (nodeId: string) => {
-      if (!activeTimeRange) return true;
-      const originalNode = nodes.find((n) => n.id === nodeId);
-      if (!originalNode || !originalNode.createdAt?.value) return true;
-      const nodeTime = new Date(originalNode.createdAt.value).getTime();
-      return nodeTime >= activeTimeRange[0] && nodeTime <= activeTimeRange[1];
-    },
-    [nodes, activeTimeRange]
-  );
+  const isNodeInTimeRange = useCallback((nodeId: string) => {
+    if (!activeTimeRange) return true;
+    const originalNode = nodes.find((n) => n.id === nodeId);
+    if (!originalNode || !originalNode.createdAt?.value) return true;
+    const nodeTime = new Date(originalNode.createdAt.value).getTime();
+    return nodeTime >= activeTimeRange[0] && nodeTime <= activeTimeRange[1];
+  }, [nodes, activeTimeRange]);
 
-  // ─── Time-window entrances ─────────────────────────────────────────────
-  // Nodes are never removed from the simulation when they leave the time
-  // range (they just fade out at their resting position). When a node ENTERS
-  // the range we animate it flying in from just outside the canvas to its
-  // home with an ease-in / ease-out curve, driven per-frame in render (the
-  // physics is untouched, so nothing else churns).
   const enterRef = useRef<Map<string, { t0: number; fromX: number; fromY: number }>>(new Map());
   const enterAnimRef = useRef<number | null>(null);
   const prevInRangeRef = useRef<Set<string> | null>(null);
-  // Nodes that have already entered the time window at least once. A node only
-  // flies in on its FIRST entry (e.g. while Play is building the graph). Moving
-  // the scrubber back and forth must NOT re-trigger the fly-in — that reads as
-  // "the graph rendering again unnecessarily" while dragging.
   const enteredOnceRef = useRef<Set<string>>(new Set());
 
   const stepEntrances = useCallback(() => {
-    const now = performance.now();
-    let done = true;
+    const now = performance.now(); let done = true;
     for (const [id, e] of enterRef.current) {
       const t = (now - e.t0) / ENTER_MS;
-      if (t >= 1) {
-        enterRef.current.delete(id);
-      } else {
-        done = false;
-      }
+      if (t >= 1) enterRef.current.delete(id); else done = false;
     }
     setTick((t) => t + 1);
-    if (done) {
-      enterAnimRef.current = null;
-      return;
-    }
+    if (done) { enterAnimRef.current = null; return; }
     enterAnimRef.current = requestAnimationFrame(stepEntrances);
   }, []);
 
   useEffect(() => {
-    if (!activeTimeRange) {
-      prevInRangeRef.current = null;
-      return;
-    }
-    // Only establish the baseline / diff fly-ins once the physics layout is
-    // fully settled. Before that, layoutNodes may be populated asynchronously
-    // (a node at a time), so a "first" diff against a partial prev set would
-    // spuriously fly in the remaining nodes and read as a re-render — exactly
-    // the bug observed on the first slider move.
-    if (!settled) {
-      prevInRangeRef.current = null;
-      return;
-    }
-    const inSet = new Set<string>();
-    const prev = prevInRangeRef.current;
-    layoutNodes.forEach((n) => {
+    if (!activeTimeRange || !settled) { prevInRangeRef.current = null; return; }
+    const inSet = new Set<string>(); const prev = prevInRangeRef.current;
+    layoutRef.current.layoutNodes.forEach((n) => {
       if (isNodeInTimeRange(n.id)) {
         inSet.add(n.id);
         if (prev && !prev.has(n.id) && !enteredOnceRef.current.has(n.id)) {
@@ -230,87 +169,47 @@ export function GraphCanvas({
         enteredOnceRef.current.add(n.id);
       }
     });
-    if (enterRef.current.size > 0 && enterAnimRef.current === null) {
-      enterAnimRef.current = requestAnimationFrame(stepEntrances);
-    }
+    if (enterRef.current.size > 0 && enterAnimRef.current === null) enterAnimRef.current = requestAnimationFrame(stepEntrances);
     prevInRangeRef.current = inSet;
-  }, [layoutNodes, activeTimeRange, isNodeInTimeRange, reducedMotion, dimensions, settled, stepEntrances]);
+  }, [layoutRef, activeTimeRange, isNodeInTimeRange, reducedMotion, dimensions, settled, stepEntrances]);
 
-  useEffect(() => () => {
-    if (enterAnimRef.current !== null) cancelAnimationFrame(enterAnimRef.current);
-  }, []);
+  useEffect(() => () => { if (enterAnimRef.current !== null) cancelAnimationFrame(enterAnimRef.current); }, []);
 
   const computeFit = useCallback((): { zoom: number; pan: { x: number; y: number } } | null => {
+    const layoutNodes = layoutRef.current.layoutNodes;
     if (!layoutNodes.length || !dimensions.width || !dimensions.height) return null;
-
-    const LABEL_PAD_X = 150;
-    const LABEL_PAD_Y = 90;
-
-    const xs = layoutNodes.map((n) => n.x);
-    const ys = layoutNodes.map((n) => n.y);
-    const minX = Math.min(...xs) - LABEL_PAD_X;
-    const maxX = Math.max(...xs) + LABEL_PAD_X;
-    const minY = Math.min(...ys) - LABEL_PAD_Y;
-    const maxY = Math.max(...ys) + LABEL_PAD_Y;
-    const boxWidth = Math.max(maxX - minX, 1);
-    const boxHeight = Math.max(maxY - minY, 1);
-    const bboxCx = (minX + maxX) / 2;
-    const bboxCy = (minY + maxY) / 2;
-
-    const scale = Math.min(
-      1,
-      MAX_ZOOM,
-      Math.max(
-        MIN_ZOOM,
-        Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING)
-      )
-    );
-
-    const panX = -(bboxCx - cx) * scale;
-    const panY = -(bboxCy - cy) * scale;
-
-    return { zoom: scale, pan: { x: panX, y: panY } };
-  }, [layoutNodes, dimensions, cx, cy]);
+    const LABEL_PAD_X = 150; const LABEL_PAD_Y = 90;
+    const xs = layoutNodes.map((n) => n.x || 0); const ys = layoutNodes.map((n) => n.y || 0);
+    const minX = Math.min(...xs) - LABEL_PAD_X; const maxX = Math.max(...xs) + LABEL_PAD_X;
+    const minY = Math.min(...ys) - LABEL_PAD_Y; const maxY = Math.max(...ys) + LABEL_PAD_Y;
+    const boxWidth = Math.max(maxX - minX, 1); const boxHeight = Math.max(maxY - minY, 1);
+    const bboxCx = (minX + maxX) / 2; const bboxCy = (minY + maxY) / 2;
+    const scale = Math.min(1, MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING)));
+    return { zoom: scale, pan: { x: -(bboxCx - cx) * scale, y: -(bboxCy - cy) * scale } };
+  }, [layoutRef, dimensions, cx, cy]);
 
   const fit = useCallback(() => {
     const result = computeFit();
-    if (result) {
-      setZoom(result.zoom);
-      setPan(result.pan);
-    } else {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-    }
+    if (result) { setZoom(result.zoom); setPan(result.pan); } else { setZoom(1); setPan({ x: 0, y: 0 }); }
   }, [computeFit]);
 
-  useEffect(() => {
-    if (settled && !hasAutoFit) {
-      fit();
-      setHasAutoFit(true);
-    }
-  }, [settled, hasAutoFit, fit]);
+  useEffect(() => { if (settled && !hasAutoFit) { fit(); setHasAutoFit(true); } }, [settled, hasAutoFit, fit]);
 
   const zoomIn = useCallback(() => setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.15).toFixed(2))), []);
   const zoomOut = useCallback(() => setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.15).toFixed(2))), []);
 
-  // Focus a specific node by id: center it and zoom in. Used by Discovery Mode
-  // deep links (?focus=) and intelligence navigation.
-  const focusNode = useCallback(
-    (id: string) => {
-      const node = layoutNodes.find((n) => n.id === id);
-      if (!node || !dimensions.width || !dimensions.height) return;
-      const d = Math.max(0, node.structuralImportance);
-      const targetZoom = Math.min(MAX_ZOOM, Math.max(1.2, 0.9 + d * 2.5));
-      setPan({ x: -(node.x - cx) * targetZoom, y: -(node.y - cy) * targetZoom });
-      setZoom(targetZoom);
-      setFocusedNode(id);
-    },
-    [layoutNodes, dimensions, cx, cy]
-  );
+  const focusNode = useCallback((id: string) => {
+    const node = layoutRef.current.layoutNodes.find((n) => n.id === id);
+    if (!node || !dimensions.width || !dimensions.height) return;
+    const d = Math.max(0, node.structuralImportance);
+    const targetZoom = Math.min(MAX_ZOOM, Math.max(1.2, 0.9 + d * 2.5));
+    setPan({ x: -((node.x || cx) - cx) * targetZoom, y: -((node.y || cy) - cy) * targetZoom });
+    setZoom(targetZoom);
+    setFocusedNode(id);
+    setInternalSelectedNode(id);
+  }, [layoutRef, dimensions, cx, cy]);
 
-  useEffect(() => {
-    if (controlsRef) controlsRef.current = { zoomIn, zoomOut, fit, focusNode };
-  }, [controlsRef, zoomIn, zoomOut, fit, focusNode]);
+  useEffect(() => { if (controlsRef) controlsRef.current = { zoomIn, zoomOut, fit, focusNode }; }, [controlsRef, zoomIn, zoomOut, fit, focusNode]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -323,73 +222,37 @@ export function GraphCanvas({
     return () => el.removeEventListener("wheel", handleWheel);
   }, []);
 
-  // ------------------------------------------------------------------
-  // Node dragging via d3-drag, attached to each interaction circle.
-  //
-  // IMPORTANT (lifecycle fix): the drag behavior is built ONCE and is never
-  // torn down/recreated on re-render. It is attached per-circle through a React
-  // callback ref, so drag is always bound to whatever circle element currently
-  // exists — the binding survives physics re-renders, hover, bloom, data
-  // updates, and viewport resizes. It does NOT depend on this effect re-running
-  // (which previously caused attach→detach cycling that left nodes rigid).
-  //
-  // event coordinates are resolved against the SVG root (container) and
-  // converted to world space with the pure pan/zoom inverse transform, so
-  // dragging stays glued to the cursor at any zoom level.
-  // ------------------------------------------------------------------
   const dragBehavior = useMemo(() => {
     const drag = d3Drag<SVGCircleElement, LayoutNode>()
-      // Small click-distance threshold separates a click (which opens the
-      // drawer) from a drag (which pins and moves the node). Below this many
-      // screen pixels of movement d3-drag does not start -> no pin, and the
-      // click event still fires on the interaction circle.
       .clickDistance(3)
-      .on("start", (_event, d) => {
-        draggingNodeId.current = d.id;
-        apiRef.current.beginDrag(d.id);
-      })
+      .on("start", (_event, d) => { draggingNodeId.current = d.id; apiRef.current.beginDrag(d.id); })
       .on("drag", (event) => {
-        const id = draggingNodeId.current;
-        if (!id) return;
-        const svg = svgRef.current;
-        if (!svg) return;
+        const id = draggingNodeId.current; if (!id) return;
+        const svg = svgRef.current; if (!svg) return;
         const dims = dimensionsRef.current;
         const [sx, sy] = d3Pointer(event.sourceEvent ?? event, svg);
         const w = screenToWorld(sx, sy, panRef.current, zoomRef.current, dims.width / 2, dims.height / 2);
         apiRef.current.moveNode(id, w.x, w.y);
       })
-      .on("end", (_event, d) => {
-        draggingNodeId.current = null;
-        apiRef.current.endDrag(d.id);
-      });
-    // The drag container is resolved lazily at gesture time so it always points
-    // at the current svg element. Dragging only ever begins on a circle that
-    // lives inside the svg, so the ref is guaranteed present here.
+      .on("end", (_event, d) => { draggingNodeId.current = null; apiRef.current.endDrag(d.id); });
     drag.container(() => (svgRef.current ?? document.body) as SVGSVGElement);
     return drag;
-  }, []);
+  }, [apiRef]);
 
-  // Attach d3-drag to a single interaction circle. This single callback is
-  // assigned to every circle, so React calls it once per element on mount (and
-  // with null on unmount) — a stable identity means no per-render rebinding.
-  // Rebinding is idempotent (detach then attach), so it is always safe. It is
-  // intentionally decoupled from layout timing: it binds purely from the
-  // circle's own data-nodeid attribute, and the drag handlers only read `d.id`.
   const bindNodeDrag = useCallback((el: SVGCircleElement | null) => {
     if (!el) return;
-    const id = el.dataset.nodeid;
-    if (!id) return;
+    const id = el.dataset.nodeid; if (!id) return;
     d3Select(el).datum({ id } as LayoutNode).on(".drag", null).call(dragBehavior);
   }, [dragBehavior]);
 
-  // Canvas pan via pointer-drag on the background. Guarded so a node drag
-  // (handled by d3-drag on the circles) does not also pan the canvas.
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest("[data-nodeid]")) return;
     setIsPanning(true);
+    setInternalSelectedNode(null); 
     panOrigin.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
   };
+  
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isPanning) return;
     const dx = e.clientX - panOrigin.current.x;
@@ -398,54 +261,38 @@ export function GraphCanvas({
   };
   const stopPanning = () => setIsPanning(false);
 
+  const layoutNodes = layoutRef.current.layoutNodes;
+  const layoutEdges = layoutRef.current.layoutEdges;
+  const communities = layoutRef.current.communities;
+
   const edgeGeometry = useMemo(() => {
     const map = new Map<string, number>();
     layoutEdges.forEach((edge) => {
       const source = layoutNodes.find((n) => n.id === edge.sourceNodeId);
       const target = layoutNodes.find((n) => n.id === edge.targetNodeId);
-      if (source && target) {
-        map.set(edge.id, Math.hypot(target.x - source.x, target.y - source.y));
-      }
+      if (source && target) map.set(edge.id, Math.max(1, Math.hypot((target.x||0) - (source.x||0), (target.y||0) - (source.y||0))));
     });
     return map;
   }, [layoutEdges, layoutNodes]);
 
-  // While a node is entering the time window, its rendered position is
-  // interpolated from just outside the canvas to its resting home with an
-  // ease-in / ease-out curve. Returns null once the animation is finished
-  // (the entry is deleted from enterRef), so rendering falls back to the node's
-  // live physics position.
-  const enterPos = useCallback(
-    (id: string): { x: number; y: number; alpha: number; active: boolean } | null => {
-      const e = enterRef.current.get(id);
-      if (!e) return null;
-      const node = layoutNodes.find((n) => n.id === id);
-      if (!node) return null;
-      const t = Math.min(1, (performance.now() - e.t0) / ENTER_MS);
-      const k = easeInOutCubic(t);
-      return {
-        x: e.fromX + (node.x - e.fromX) * k,
-        y: e.fromY + (node.y - e.fromY) * k,
-        alpha: k,
-        active: t < 1,
-      };
-    },
-    [layoutNodes]
-  );
+  const enterPos = useCallback((id: string): { x: number; y: number; alpha: number; active: boolean } | null => {
+    const e = enterRef.current.get(id); if (!e) return null;
+    const node = layoutNodes.find((n) => n.id === id); if (!node) return null;
+    const t = Math.min(1, (performance.now() - e.t0) / ENTER_MS);
+    const k = easeInOutCubic(t);
+    return { x: e.fromX + ((node.x||cx) - e.fromX) * k, y: e.fromY + ((node.y||cy) - e.fromY) * k, alpha: k, active: t < 1 };
+  }, [layoutNodes, cx, cy]);
 
   if (!dimensions.width) return <div ref={containerRef} className="w-full h-full" />;
 
-  const DUR_SLOW = "var(--transition-duration-slow, 1200ms)";
-  const DUR_NORMAL = "var(--transition-duration-normal, 400ms)";
-  const DUR_FAST = "var(--transition-duration-fast, 200ms)";
-  const EASE = "var(--ease-restrained, cubic-bezier(0.22, 1, 0.36, 1))";
-
-  const SPRING_EASE = "cubic-bezier(0.175, 0.885, 0.32, 1.15)";
+  const EASE_NORMAL = "400ms cubic-bezier(0.22, 1, 0.36, 1)";
+  const EASE_SLOW = "1200ms cubic-bezier(0.22, 1, 0.36, 1)";
+  const EASE_SPRING = "500ms cubic-bezier(0.175, 0.885, 0.32, 1.15)";
 
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden rounded-lg bg-surface-0 animate-fade-in"
+      className="w-full h-full relative overflow-hidden bg-surface-0/0 animate-fade-in"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={stopPanning}
@@ -453,58 +300,76 @@ export function GraphCanvas({
       onDoubleClick={fit}
       style={{ cursor: isPanning ? "grabbing" : "grab" }}
     >
-      <svg
-        ref={svgRef}
-        className="w-full h-full relative z-10 overflow-hidden"
-        viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-      >
+      <svg ref={svgRef} className="w-full h-full relative z-10 overflow-hidden" viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}>
         <defs>
           <filter id="ambient-shadow" x="-40%" y="-40%" width="180%" height="180%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodOpacity="0.45" floodColor="#000" />
+            <feDropShadow dx="0" dy="8" stdDeviation="6" floodOpacity="0.8" floodColor="#000" />
+            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.4" floodColor="#000" />
           </filter>
-          <filter id="node-glow" x="-60%" y="-60%" width="220%" height="220%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.5" floodColor="#000" />
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          <filter id="node-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity="0.9" floodColor="#000" />
+            <feGaussianBlur stdDeviation="6" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
           <radialGradient id="fog-gradient">
-            <stop offset="0%" stopColor="var(--color-surface-400)" stopOpacity="0.06" />
+            <stop offset="0%" stopColor="var(--color-surface-300)" stopOpacity="0.08" />
             <stop offset="100%" stopColor="var(--color-surface-400)" stopOpacity="0" />
           </radialGradient>
           <radialGradient id="bridge-halo-gradient">
-            <stop offset="0%" stopColor="var(--color-accent-rose)" stopOpacity="0.25" />
+            <stop offset="0%" stopColor="var(--color-accent-rose)" stopOpacity="0.3" />
             <stop offset="100%" stopColor="var(--color-accent-rose)" stopOpacity="0" />
           </radialGradient>
-          <pattern id="canvas-grid" width="48" height="48" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.5" fill="var(--color-surface-500)" opacity="0.15" />
+          
+          <radialGradient id="foreign-halo-gradient">
+            <stop offset="0%" stopColor="var(--color-accent-blue)" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="var(--color-accent-blue)" stopOpacity="0" />
+          </radialGradient>
+
+          <pattern id="canvas-grid" width="64" height="64" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" fill="var(--color-surface-400)" opacity="0.3" />
+            <path d="M 32 30 L 32 34 M 30 32 L 34 32" stroke="var(--color-surface-400)" strokeWidth="0.5" opacity="0.15" />
           </pattern>
           <marker id="edge-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M0 0.5 L10 5 L0 9.5 z" fill="context-stroke" />
+          </marker>
+          <marker id="edge-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0.5 L10 5 L0 9.5 z" fill="var(--color-accent-blue)" />
           </marker>
         </defs>
 
         <rect x={0} y={0} width={dimensions.width} height={dimensions.height} fill="url(#canvas-grid)" />
 
-        <g
-          transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`}
-          style={{ transition: isPanning ? "none" : `transform ${DUR_NORMAL} ${EASE}` }}
-        >
+        <g opacity={0.05} transform={`translate(${cx}, ${cy})`}>
+          <line x1="-40" y1="0" x2="40" y2="0" stroke="var(--color-surface-600)" strokeWidth="1" />
+          <line x1="0" y1="-40" x2="0" y2="40" stroke="var(--color-surface-600)" strokeWidth="1" />
+          <circle cx="0" cy="0" r="16" fill="none" stroke="var(--color-surface-600)" strokeWidth="1" />
+        </g>
+
+        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${EASE_NORMAL}` }}>
+          
           <g id="community-layer">
             {communities.map((c) => {
-              const distFromCenter = Math.hypot(c.cx - cx, c.cy - cy);
+              const distFromCenter = Math.hypot(c.cx - cx, c.cy - cy) || 0;
               const rippleDelay = Math.max(0, distFromCenter * 1.5);
-
               return (
                 <circle
-                  key={`fog-${c.id}`}
-                  cx={c.cx}
-                  cy={c.cy}
-                  r={c.r}
-                  fill="url(#fog-gradient)"
-                  style={{
-                    opacity: bloom ? 1 : 0,
-                    transition: reducedMotion ? "none" : `opacity ${DUR_SLOW} ${EASE} ${rippleDelay + 200}ms`,
-                  }}
+                  key={`fog-${c.id}`} cx={c.cx} cy={c.cy} r={c.r} fill="url(#fog-gradient)"
+                  style={{ opacity: bloom ? 1 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} ${rippleDelay + 200}ms` }}
+                />
+              );
+            })}
+          </g>
+
+          <g id="foreign-halo-layer">
+            {layoutNodes.filter((n) => (n as any).isForeign).map((node) => {
+              const pos = enterPos(node.id);
+              const bx = pos ? pos.x : (node.x || cx); 
+              const by = pos ? pos.y : (node.y || cy);
+              return (
+                <circle
+                  key={`foreign-halo-${node.id}`} cx={bx} cy={by} r={120}
+                  fill="url(#foreign-halo-gradient)" className={reducedMotion ? "" : "animate-slow-pulse"}
+                  style={{ opacity: bloom ? (pos ? pos.alpha : 1) : 0, transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${bx}px ${by}px`, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 400ms, transform ${EASE_SPRING} 400ms` }}
                 />
               );
             })}
@@ -520,231 +385,117 @@ export function GraphCanvas({
                 const support = edge.support ?? 1;
                 const isLowConfidence = support < 0.5;
                 const isContradicted = edge.status === "CONTRADICTED";
-                const isDragged =
-                  draggingNodeId.current === source.id || draggingNodeId.current === target.id;
-                const isConnected =
-                  hoveredNode === source.id ||
-                  hoveredNode === target.id ||
-                  focusedNode === source.id ||
-                  focusedNode === target.id ||
-                  isDragged;
+                const isDragged = draggingNodeId.current === source.id || draggingNodeId.current === target.id;
+                
+                const isForeignBridge = (edge as any).isForeignBridge;
+                const isForeignEdge = (edge as any).isForeignEdge;
+                  
+                const isConnected = hoveredNode === source.id || hoveredNode === target.id || focusedNode === source.id || focusedNode === target.id || internalSelectedNode === source.id || internalSelectedNode === target.id || isDragged;
                 const isOutOfBounds = !isNodeInTimeRange(source.id) || !isNodeInTimeRange(target.id);
-                const length = edgeGeometry.get(edge.id) ?? 0;
+                const length = Math.max(1, edgeGeometry.get(edge.id) ?? 1);
 
-                // Entering nodes stretch their edges: draw endpoints at the
-                // eased fly-in position until the entrance completes.
                 const sPos = enterPos(source.id);
                 const tPos = enterPos(target.id);
                 const sEntering = sPos ? sPos.active : false;
                 const tEntering = tPos ? tPos.active : false;
                 const entranceAlpha = Math.min(sPos ? sPos.alpha : 1, tPos ? tPos.alpha : 1);
-                const x1 = sPos ? sPos.x : source.x;
-                const y1 = sPos ? sPos.y : source.y;
+                const x1 = sPos ? sPos.x : (source.x || cx); const y1 = sPos ? sPos.y : (source.y || cy);
+                let ex = tPos ? tPos.x : (target.x || cx); let ey = tPos ? tPos.y : (target.y || cy);
 
-                // Straight edge: a simple line segment between the two nodes.
-                // No bow, no curvature — the edge stays straight at any zoom
-                // and separation.
-                const midX = (x1 + (tPos ? tPos.x : target.x)) / 2;
-                const midY = (y1 + (tPos ? tPos.y : target.y)) / 2;
-
-                let ex = tPos ? tPos.x : target.x;
-                let ey = tPos ? tPos.y : target.y;
                 if (edge.directed) {
                   const targetRadius = nodeVisualRadius(target.structuralImportance);
-                  const tdx = ex - x1;
-                  const tdy = ey - y1;
-                  const tdist = Math.hypot(tdx, tdy) || 1;
-                  ex = ex - (tdx / tdist) * (targetRadius + 4);
-                  ey = ey - (tdy / tdist) * (targetRadius + 4);
+                  const tdx = ex - x1; const tdy = ey - y1; const tdist = Math.hypot(tdx, tdy) || 1;
+                  ex = ex - (tdx / tdist) * (targetRadius + 4); ey = ey - (tdy / tdist) * (targetRadius + 4);
                 }
 
-                const distFromCenter = Math.hypot(midX - cx, midY - cy);
-                const edgeDelay = Math.max(0, distFromCenter * 1.5) + 100;
+                const edgeDelay = Math.max(0, Math.hypot((x1+ex)/2 - cx, (y1+ey)/2 - cy) * 1.5) + 100;
+                const initialOffset = Math.hypot((source.x||cx) - cx, (source.y||cy) - cy) > Math.hypot((target.x||cx) - cx, (target.y||cy) - cy) ? -length : length;
 
-                const sourceDist = Math.hypot(source.x - cx, source.y - cy);
-                const targetDist = Math.hypot(target.x - cx, target.y - cy);
-                const drawsBackward = sourceDist > targetDist;
-                const initialOffset = drawsBackward ? -length : length;
+                let colorClass = "stroke-surface-500/60";
+                if (isForeignBridge) colorClass = "stroke-accent-blue drop-shadow-[0_0_8px_var(--color-accent-blue)]";
+                else if (isForeignEdge) colorClass = "stroke-accent-blue/40";
+                else if (isContradicted) colorClass = "stroke-danger";
+                else if (isConnected && !isOutOfBounds) colorClass = "stroke-accent-rose";
+                
+                const dashArray = isForeignBridge ? "8 6" : isContradicted ? "4 4" : isLowConfidence ? "6 6" : reducedMotion ? undefined : `${length} ${length}`;
+                const dashOffset = isForeignBridge || isLowConfidence || isContradicted || reducedMotion ? 0 : bloom ? 0 : initialOffset;
 
-                const colorClass = isContradicted
-                  ? "stroke-danger"
-                  : isConnected && !isOutOfBounds
-                  ? "stroke-accent-rose"
-                  : "stroke-surface-600";
-
-                const dashArray = isContradicted ? "4 4" : isLowConfidence ? "6 6" : reducedMotion ? undefined : `${length} ${length}`;
-                const dashOffset = isLowConfidence || isContradicted || reducedMotion ? 0 : bloom ? 0 : initialOffset;
-
-                // ── Edge draw-on while a node enters ─────────────────────────
-                // When exactly one endpoint is flying in, the edge is drawn-on
-                // from the settled (existing) node toward the arriving node: the
-                // line starts collapsed at the existing node and visibly extends
-                // to the moving node as it lands — a "connection being made"
-                // rather than the finished edge suddenly appearing.
-                const entering = sEntering || tEntering;
-                const drawOn =
-                  entering &&
-                  sEntering !== tEntering &&
-                  !isLowConfidence &&
-                  !isContradicted &&
-                  !reducedMotion;
+                const drawOn = (sEntering || tEntering) && sEntering !== tEntering && !isLowConfidence && !isContradicted && !reducedMotion;
                 let edgePath = `M ${x1} ${y1} L ${ex} ${ey}`;
                 let edgeDashArray: string | undefined = dashArray;
                 let edgeDashOffset = dashOffset;
-                let edgeMarkerEnd = edge.directed && !isOutOfBounds ? "url(#edge-arrow)" : undefined;
+                let edgeMarkerEnd = edge.directed && !isOutOfBounds ? (isForeignEdge || isForeignBridge ? "url(#edge-arrow-blue)" : "url(#edge-arrow)") : undefined;
+                
                 if (drawOn) {
-                  // drawOn guarantees exactly one endpoint is entering, so the
-                  // other is anchored at its settled home. Narrow explicitly:
-                  const anchor = sEntering ? { x: target.x, y: target.y } : { x: source.x, y: source.y };
-                  const moving = sEntering
-                    ? sPos
-                      ? { x: sPos.x, y: sPos.y }
-                      : { x: source.x, y: source.y }
-                    : tPos
-                    ? { x: tPos.x, y: tPos.y }
-                    : { x: target.x, y: target.y };
+                  const anchor = sEntering ? { x: target.x||cx, y: target.y||cy } : { x: source.x||cx, y: source.y||cy };
+                  const moving = sEntering ? sPos ? { x: sPos.x, y: sPos.y } : { x: source.x||cx, y: source.y||cy } : tPos ? { x: tPos.x, y: tPos.y } : { x: target.x||cx, y: target.y||cy };
                   const progress = sEntering ? (sPos ? sPos.alpha : 1) : tPos ? tPos.alpha : 1;
-                  const drawLen = Math.hypot(moving.x - anchor.x, moving.y - anchor.y) || 1;
+                  const drawLen = Math.max(1, Math.hypot(moving.x - anchor.x, moving.y - anchor.y));
                   edgePath = `M ${anchor.x} ${anchor.y} L ${moving.x} ${moving.y}`;
-                  edgeDashArray = `${drawLen} ${drawLen}`;
-                  edgeDashOffset = drawLen * (1 - progress);
-                  edgeMarkerEnd = undefined;
+                  edgeDashArray = `${drawLen} ${drawLen}`; edgeDashOffset = drawLen * (1 - progress); edgeMarkerEnd = undefined;
                 }
 
-                const baseOpacity = isOutOfBounds
-                  ? 0
-                  : isContradicted
-                  ? 0.6
-                  : isConnected
-                  ? 1
-                  : isLowConfidence
-                  ? 0.3
-                  : support * 0.4 + 0.2;
-
-                const showTrace = isConnected && !isContradicted && !isLowConfidence && !reducedMotion;
+                const baseOpacity = isOutOfBounds ? 0 : isForeignBridge ? 1 : isContradicted ? 0.6 : isConnected ? 1 : isLowConfidence ? 0.3 : support * 0.4 + 0.2;
+                const showTrace = (isConnected || isForeignBridge) && !isContradicted && !isLowConfidence && !reducedMotion;
 
                 return (
                   <path
-                    key={edge.id}
-                    d={edgePath}
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={entering ? edgeDashArray : showTrace ? "6 4" : dashArray}
-                    strokeDashoffset={entering ? edgeDashOffset : dashOffset}
-                    markerEnd={edgeMarkerEnd}
-                    className={colorClass}
-                    strokeWidth={isConnected ? 2.25 : Math.max(1, (edge.structuralImportance ?? support ?? 0.5) * 2)}
+                    key={edge.id} d={edgePath} fill="none" strokeLinecap="round"
+                    strokeDasharray={sEntering || tEntering ? edgeDashArray : showTrace ? "6 4" : dashArray}
+                    strokeDashoffset={sEntering || tEntering ? edgeDashOffset : dashOffset}
+                    markerEnd={edgeMarkerEnd} className={`${colorClass} ${isConnected ? "focus-target" : ""}`}
+                    strokeWidth={isConnected || isForeignBridge ? 2.25 : Math.max(1, (edge.structuralImportance ?? support ?? 0.5) * 2)}
                     strokeOpacity={baseOpacity * entranceAlpha}
-                    style={{
-                      transition: reducedMotion || entering
-                        ? "none"
-                        : `stroke-dashoffset 800ms ${EASE} ${edgeDelay}ms, stroke-opacity ${DUR_NORMAL} ${EASE} ${edgeDelay}ms, stroke ${DUR_FAST} ${EASE}`,
-                    }}
+                    style={{ transition: reducedMotion || (sEntering || tEntering) ? "none" : `stroke-dashoffset 800ms cubic-bezier(0.22, 1, 0.36, 1) ${edgeDelay}ms, stroke-opacity ${EASE_NORMAL} ${edgeDelay}ms, stroke 200ms cubic-bezier(0.22, 1, 0.36, 1)` }}
                   >
-                    {showTrace && (
-                      <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.6s" repeatCount="indefinite" />
-                    )}
+                    {showTrace && <animate attributeName="stroke-dashoffset" from="20" to="0" dur={isForeignBridge ? "0.4s" : "0.6s"} repeatCount="indefinite" />}
                   </path>
                 );
               })}
           </g>
 
-          <GraphHoleBurstLayer
-            layoutNodes={layoutNodes}
-            holes={holes}
-            reducedMotion={reducedMotion}
-            zoom={zoom}
-            bloom={bloom}
-          />
-
-          <g id="bridge-layer">
-            {layoutNodes
-              .filter((n) => n.isBridge && isNodeInTimeRange(n.id))
-              .map((node) => {
-                const pos = enterPos(node.id);
-                const bx = pos ? pos.x : node.x;
-                const by = pos ? pos.y : node.y;
-                const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
-                const nodeDelay = Math.max(0, distFromCenter * 1.5);
-
-                return (
-                  <circle
-                    key={`bridge-${node.id}`}
-                    cx={bx}
-                    cy={by}
-                    r={nodeVisualRadius(node.structuralImportance) + 14}
-                    fill="url(#bridge-halo-gradient)"
-                    className={reducedMotion ? "" : "animate-slow-pulse"}
-                    style={{
-                      opacity: bloom ? (pos ? pos.alpha : 1) : 0,
-                      transform: bloom ? "scale(1)" : "scale(0.01)",
-                      transformOrigin: `${bx}px ${by}px`,
-                      transition: reducedMotion ? "none" : `opacity ${DUR_SLOW} ${EASE} ${nodeDelay + 200}ms, transform 500ms ${SPRING_EASE} ${nodeDelay + 200}ms`,
-                    }}
-                  />
-                );
-              })}
-          </g>
+          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} /></g>
 
           <g id="node-layer">
             {layoutNodes.map((node) => {
+              const isForeign = (node as any).isForeign;
               const inTimeRange = isNodeInTimeRange(node.id);
-              const isActive = hoveredNode === node.id || focusedNode === node.id;
-              const outOfRange = !inTimeRange;
-              const hoverDimmed =
-                hoveredNode !== null &&
-                !isActive &&
-                !edges.some(
-                  (e) =>
-                    (e.sourceNodeId === node.id && e.targetNodeId === hoveredNode) ||
-                    (e.targetNodeId === node.id && e.sourceNodeId === hoveredNode)
-                );
+              const isActive = hoveredNode === node.id || focusedNode === node.id || internalSelectedNode === node.id;
+              const hoverDimmed = hoveredNode !== null && !isActive && !edges.some((e) => (e.sourceNodeId === node.id && e.targetNodeId === hoveredNode) || (e.targetNodeId === node.id && e.sourceNodeId === hoveredNode));
 
               const pos = enterPos(node.id);
-              const entering = pos ? pos.active : false;
-              const nx = pos ? pos.x : node.x;
-              const ny = pos ? pos.y : node.y;
-              const entranceAlpha = pos ? pos.alpha : 1;
-
+              const nx = pos ? pos.x : (node.x || cx); 
+              const ny = pos ? pos.y : (node.y || cy);
               const radius = nodeVisualRadius(node.structuralImportance);
-              const isEntity = node.type === "ENTITY";
 
-              const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
-              const nodeDelay = Math.max(0, distFromCenter * 1.5);
+              let fillColor = "fill-surface-0";
+              let strokeColor = "stroke-accent-amber";
+              
+              if (isActive && inTimeRange) { fillColor = "fill-surface-200"; strokeColor = "stroke-accent-rose shadow-[0_0_15px_var(--color-accent-rose)]"; }
+              else if (isForeign) { fillColor = "fill-surface-50"; strokeColor = "stroke-accent-blue/80"; }
+              else if (node.isBridge) { fillColor = "fill-surface-100"; strokeColor = "stroke-accent-rose"; }
+              else if (node.type === "ENTITY") { fillColor = "fill-surface-100"; strokeColor = "stroke-surface-400"; }
 
-              const nodeOpacity = outOfRange ? 0 : hoverDimmed ? 0.1 : bloom ? 1 : 0;
+              const nodeDelay = Math.max(0, Math.hypot(nx - cx, ny - cy) * 1.5) || 0;
 
               return (
-                <circle
+                <g
                   key={node.id}
-                  cx={nx}
-                  cy={ny}
-                  r={radius}
-                  filter={isActive ? "url(#node-glow)" : "url(#ambient-shadow)"}
-                  className={`outline-none ${node.isNewArrival && !reducedMotion ? "animate-fade-in" : ""} ${
-                    isActive && inTimeRange
-                      ? "fill-surface-200 stroke-accent-rose"
-                      : node.isBridge
-                      ? "fill-surface-100 stroke-accent-rose"
-                      : isEntity
-                      ? "fill-surface-100 stroke-surface-400"
-                      : "fill-surface-0 stroke-accent-amber"
-                  }`}
-                  strokeWidth={isActive && inTimeRange ? 2 : 1.5}
-                  style={{
-                    opacity: nodeOpacity * entranceAlpha,
-                    transform: bloom ? "scale(1)" : "scale(0.01)",
-                    transformOrigin: `${nx}px ${ny}px`,
-                    transition: reducedMotion || entering
-                      ? "none"
-                      : `opacity ${DUR_NORMAL} ${EASE} ${nodeDelay}ms, transform 500ms ${SPRING_EASE} ${nodeDelay}ms, fill ${DUR_FAST} ${EASE}, stroke ${DUR_FAST} ${EASE}`,
-                  }}
+                  className={isActive ? "focus-target" : ""}
+                  style={{ opacity: (!inTimeRange ? 0 : hoverDimmed ? 0.1 : bloom ? 1 : 0) * (pos ? pos.alpha : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
                 >
-                  <title>
-                    {node.label} · {node.type.toLowerCase()}
-                    {node.isBridge ? " · bridge candidate" : ""}
-                  </title>
-                </circle>
+                  <circle
+                    cx={nx} cy={ny} r={radius} filter={isActive || isForeign ? "url(#node-glow)" : "url(#ambient-shadow)"}
+                    className={`outline-none transition-colors duration-fast ${fillColor} ${strokeColor}`}
+                    strokeWidth={isActive || isForeign ? 2.5 : 1.5}
+                  />
+                  <svg
+                    x={nx - (radius * 1.15) / 2} y={ny - (radius * 1.15) / 2} width={radius * 1.15} height={radius * 1.15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
+                    className={`pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "text-accent-rose" : isForeign ? "text-accent-blue" : "text-surface-500"}`}
+                  >
+                    <path d={getNodeIconPath(node)} />
+                  </svg>
+                </g>
               );
             })}
           </g>
@@ -754,24 +505,12 @@ export function GraphCanvas({
               const inTimeRange = isNodeInTimeRange(node.id);
               return (
                 <circle
-                  key={`interact-${node.id}`}
-                  ref={bindNodeDrag}
-                  data-nodeid={node.id}
-                  cx={node.x}
-                  cy={node.y}
-                  r={32}
-                  tabIndex={inTimeRange ? 0 : -1}
-                  role="button"
-                  aria-label={`${node.label ?? "Entity"}${node.isBridge ? ", bridge candidate" : ""}`}
+                  key={`interact-${node.id}`} ref={bindNodeDrag} data-nodeid={node.id} cx={node.x || cx} cy={node.y || cy} r={32} tabIndex={inTimeRange ? 0 : -1} role="button" aria-label={`${node.label ?? "Entity"}${node.isBridge ? ", bridge candidate" : ""}`}
                   className={`fill-transparent outline-none ${inTimeRange ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
-                  onMouseEnter={() => setHoveredNode(node.id)}
-                  onMouseLeave={() => setHoveredNode(null)}
-                  onFocus={() => setFocusedNode(node.id)}
-                  onBlur={() => setFocusedNode(null)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") onNodeClick(node.id);
-                  }}
-                  onClick={() => onNodeClick(node.id)}
+                  onMouseEnter={() => setHoveredNode(node.id)} onMouseLeave={() => setHoveredNode(null)}
+                  onFocus={() => setFocusedNode(node.id)} onBlur={() => setFocusedNode(null)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
+                  onClick={() => { setInternalSelectedNode(node.id); onNodeClick(node.id); }}
                 />
               );
             })}
@@ -780,50 +519,26 @@ export function GraphCanvas({
           <g id="annotation-layer">
             {layoutNodes.map((node) => {
               const inTimeRange = isNodeInTimeRange(node.id);
-              const isActive = hoveredNode === node.id || focusedNode === node.id;
-              const outOfRange = !inTimeRange;
-              const hoverDimmed = hoveredNode !== null && !isActive;
-              const radius = nodeVisualRadius(node.structuralImportance);
-
+              const isActive = hoveredNode === node.id || focusedNode === node.id || internalSelectedNode === node.id;
+              const isForeign = (node as any).isForeign;
               const pos = enterPos(node.id);
-              const entering = pos ? pos.active : false;
-              const entranceAlpha = pos ? pos.alpha : 1;
-              const baseX = pos ? pos.x : node.x;
-              const baseY = pos ? pos.y : node.y;
-
-              const distFromCenter = Math.hypot(node.x - cx, node.y - cy);
-              const labelDelay = Math.max(0, distFromCenter * 1.5) + 150;
-
-              const dx = baseX - cx;
-              const dy = baseY - cy;
-              const angle = Math.atan2(dy, dx);
-              const cosA = Math.cos(angle);
-              const sinA = Math.sin(angle);
-              const labelOffset = radius + 16;
-              const lx = baseX + cosA * labelOffset;
-              const ly = baseY + sinA * labelOffset + 3;
+              
+              const dx = (pos ? pos.x : (node.x || cx)) - cx; 
+              const dy = (pos ? pos.y : (node.y || cy)) - cy;
+              const angle = Math.atan2(dy, dx); const cosA = Math.cos(angle); const sinA = Math.sin(angle);
+              const labelOffset = nodeVisualRadius(node.structuralImportance) + 16;
+              const lx = (pos ? pos.x : (node.x || cx)) + cosA * labelOffset; 
+              const ly = (pos ? pos.y : (node.y || cy)) + sinA * labelOffset + 3;
               const textAnchor = cosA > 0.35 ? "start" : cosA < -0.35 ? "end" : "middle";
-              const labelOpacity = (outOfRange ? 0 : hoverDimmed ? 0.05 : bloom ? (isActive ? 1 : 0.9) : 0) * entranceAlpha;
+
+              const labelDelay = Math.max(0, Math.hypot((node.x || cx) - cx, (node.y || cy) - cy) * 1.5) + 150;
 
               return (
-                <g
-                  key={`label-${node.id}`}
-                  transform={`translate(${lx}, ${ly}) scale(${1 / zoom}) translate(${-lx}, ${-ly})`}
-                >
+                <g key={`label-${node.id}`} transform={`translate(${lx}, ${ly}) scale(${1 / zoom}) translate(${-lx}, ${-ly})`}>
                   <text
-                    x={lx}
-                    y={ly}
-                    textAnchor={textAnchor}
-                    paintOrder="stroke fill"
-                    className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${
-                      isActive && inTimeRange ? "fill-surface-900 font-bold" : "fill-surface-600 font-medium"
-                    }`}
-                    style={{
-                      opacity: labelOpacity,
-                      stroke: "var(--color-surface-0)",
-                      strokeWidth: 2,
-                      transition: reducedMotion || entering ? "none" : `opacity ${DUR_NORMAL} ${EASE} ${labelDelay}ms`,
-                    }}
+                    x={lx} y={ly} textAnchor={textAnchor} paintOrder="stroke fill"
+                    className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "fill-surface-900 font-bold" : isForeign ? "fill-accent-blue font-bold drop-shadow-[0_0_4px_var(--color-accent-blue)]" : "fill-surface-600 font-medium"}`}
+                    style={{ opacity: (!inTimeRange ? 0 : hoveredNode !== null && !isActive ? 0.05 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
                   >
                     {node.label}
                   </text>
@@ -833,20 +548,9 @@ export function GraphCanvas({
           </g>
         </g>
       </svg>
-
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,0.32) 100%)" }}
-      />
-
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_50%_50%,transparent_50%,rgba(0,0,0,0.6)_100%)] mix-blend-multiply" />
       <ul className="sr-only" aria-label="Graph entities">
-        {layoutNodes.map((node) => (
-          <li key={`a11y-${node.id}`}>
-            <button type="button" onClick={() => onNodeClick(node.id)}>
-              {node.label} {node.isBridge ? "(bridge candidate)" : ""}
-            </button>
-          </li>
-        ))}
+        {layoutNodes.map((node) => (<li key={`a11y-${node.id}`}><button type="button" onClick={() => { setInternalSelectedNode(node.id); onNodeClick(node.id); }}>{node.label}</button></li>))}
       </ul>
     </div>
   );
