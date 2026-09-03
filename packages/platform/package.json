@@ -18,7 +18,9 @@
   "dependencies": {
     "@indago/contracts": "workspace:*",
     "@indago/entity-resolution": "workspace:*",
+    "@indago/graphology-projection": "workspace:*",
     "@indago/ingestion": "workspace:*",
+    "@indago/relation-resolution": "workspace:*",
     "@prisma/client": "^5.10.0",
     "bullmq": "^5.0.0",
     "cors": "^2.8.6",

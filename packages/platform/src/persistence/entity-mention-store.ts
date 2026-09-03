@@ -117,6 +117,30 @@ export class EntityMentionStore {
   }
 
   /**
+   * Read seam — fetch a bounded set of candidates by their deterministic ids,
+   * case-scoped. Used by the canonical-entity materialization authority
+   * (M-A09.5) to derive a canonical name/entityType from the SUPPORTING
+   * candidates of an accepted hypothesis. Case-scoping is enforced so a
+   * cross-case candidate id can never be loaded here.
+   */
+  async findByIds(
+    ids: readonly string[],
+    filter: { investigationId: string; caseId: string },
+  ): Promise<EntityMentionCandidate[]> {
+    if (ids.length === 0) return [];
+    const bounded = [...ids].slice(0, 200);
+    const rows = await this.prisma.entityMentionCandidate.findMany({
+      where: {
+        id: { in: bounded },
+        caseId: filter.caseId,
+        investigationId: filter.investigationId,
+      },
+      orderBy: [{ id: "asc" }],
+    });
+    return rows.map((row) => this.rowToCandidate(row));
+  }
+
+  /**
    * Read seam — list ALL durable candidates across a case (the M-A08
    * comparison universe). Blocking is case-scoped, so the engine reads the
    * whole case rather than a single evidence batch. Rows are reassembled and

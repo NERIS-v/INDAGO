@@ -8,6 +8,19 @@ import { streamEventsHandler } from "../realtime/sse.js";
 import { realtimeEvents } from "../realtime/sse.js";
 import { observationStore } from "../persistence/observation-store.js";
 import { caseStore } from "../persistence/case-store.js";
+import { entityMentionStore } from "../persistence/entity-mention-store.js";
+import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
+import { entityStore } from "../persistence/entity-store.js";
+import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
+import { relationStore } from "../persistence/relation-store.js";
+import { graphRuntime } from "../relations/graph-runtime.js";
+import { materializeCanonicalEntityFromAcceptedHypothesis, EntityMaterializationError } from "../entities/entity-materialization.js";
+import {
+  materializeCanonicalRelationFromAcceptedHypothesis,
+  rejectRelationHypothesis,
+  reverseRelationHypothesis,
+  RelationMaterializationError,
+} from "../relations/relation-materialization.js";
 import { requireAuth, requireRole, requireCaseAccess, verifyCaseAccess } from "./auth.js";
 import {
   EvidenceSubmissionRequestSchema,
@@ -285,6 +298,646 @@ apiRouter.get(
       });
     } catch (error: unknown) {
       console.error("Failed to list evidence:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1e. List Entity Hypotheses (M-A09) — the reviewable candidate-identity
+// universe before any canonical-entity decision is made.
+apiRouter.get(
+  "/investigations/:investigationId/entity-hypotheses",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const hypotheses = await entityHypothesisStore.listByCase(caseId, {
+        investigationId,
+      });
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        count: hypotheses.length,
+        hypotheses,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list entity hypotheses:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1f. Accept an Entity Hypothesis → materialize a canonical Entity (M-A09.5).
+//
+// This is the SMALLEST explicit authority/identity-decision boundary that
+// turns a PROPOSED hypothesis into a durable canonical Entity — the
+// prerequisite M-A10 relation resolution consumes. Deterministic identity,
+// case-scoped, refuse-repeatable:
+//   - Only a PROPOSED hypothesis in this case may be accepted.
+//   - A retry that already ACCEPTED/rejected/reversed is refused (never
+//     clobbered) — the caller sees the current durable status.
+apiRouter.post(
+  "/investigations/:investigationId/entity-hypotheses/:hypothesisId/accept",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const hypothesisId = String(req.params.hypothesisId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      let result: {
+        entityId: string;
+        hypothesis: import("@indago/contracts").EntityHypothesis;
+        materialized: boolean;
+        reused: boolean;
+      };
+      try {
+        result = await materializeCanonicalEntityFromAcceptedHypothesis({
+          caseId,
+          investigationId,
+          hypothesisId,
+          actor: req.user!.id,
+        });
+      } catch (cause) {
+        if (cause instanceof EntityMaterializationError) {
+          if (cause.code === "HYPOTHESIS_NOT_FOUND") {
+            return res.status(404).json({ error: "Entity hypothesis not found" });
+          }
+          return res.status(409).json({
+            error: "Entity hypothesis cannot be accepted",
+            code: cause.code,
+            detail: cause.message,
+          });
+        }
+        throw cause;
+      }
+
+      await logAuditEvent({
+        investigationId,
+        action: "ENTITY_HYPOTHESIS_ACCEPTED",
+        actor: req.user!.id,
+        targetType: "ENTITY_HYPOTHESIS",
+        targetId: hypothesisId,
+        description: `Accepted entity hypothesis ${hypothesisId}; materialized canonical entity ${result.entityId} (case ${caseId})`,
+      });
+      if (result.materialized && !result.reused) {
+        await logAuditEvent({
+          investigationId,
+          action: "ENTITY_CREATED",
+          actor: req.user!.id,
+          targetType: "ENTITY",
+          targetId: result.entityId,
+          description: `Created canonical entity ${result.entityId} (case ${caseId}) from accepted hypothesis ${hypothesisId}`,
+        });
+      }
+
+      return res.status(200).json({
+        entityId: result.entityId,
+        hypothesisId,
+        status: result.hypothesis.status,
+        materialized: result.materialized,
+        reusedExisting: result.reused,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to accept entity hypothesis:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g. List Relation Hypotheses (M-A10) — the reversible relationship
+// propositions over canonical entities, source-grounded and PostgreSQL-backed.
+apiRouter.get(
+  "/investigations/:investigationId/relations",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const relations = await relationHypothesisStore.listByCase(caseId, {
+        investigationId,
+      });
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        count: relations.length,
+        relations,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list relations:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2. List Canonical Relations (M-A10 relation authority output) — the
+// ACCEPTED, materialized relations that the Graphology projection consumes.
+apiRouter.get(
+  "/investigations/:investigationId/canonical-relations",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+      const relations = await relationStore.listActiveByCase(caseId, {
+        investigationId,
+      });
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        count: relations.length,
+        relations,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list canonical relations:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2b. Graph Projection (M-A10) — the DERIVED Graphology graph for the case,
+// rebuilt on demand from canonical entities + ACTIVE canonical relations.
+// Case-isolated (server-side caseId) and bounded by graphology-projection caps.
+apiRouter.get(
+  "/investigations/:investigationId/graph",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const view = await graphRuntime.graph({ investigationId, caseId });
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        nodeCount: view.nodeCount,
+        edgeCount: view.edgeCount,
+        graph: {
+          caseId: view.caseId,
+          nodes: view.graph.nodes(),
+          edges: view.edges,
+        },
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve case graph:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2c. Bounded N-hop Traversal (M-A10) from a canonical entity, case-isolated.
+apiRouter.get(
+  "/investigations/:investigationId/graph/traversal",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const startEntityId = String(req.query.startEntityId || "");
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      if (!startEntityId) {
+        return res.status(400).json({ error: "startEntityId query parameter is required" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const hopsParam = req.query.hops;
+      const maxPathsParam = req.query.maxPaths;
+      const hops = hopsParam === undefined ? undefined : Number(hopsParam);
+      const maxPaths = maxPathsParam === undefined ? undefined : Number(maxPathsParam);
+
+      const paths = await graphRuntime.traversal(
+        { investigationId, caseId },
+        startEntityId,
+        hops,
+        maxPaths,
+      );
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        startEntityId,
+        pathCount: paths.length,
+        paths,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve case traversal:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2d. Degree Centrality (M-A10) over the case's ACTIVE canonical relations.
+apiRouter.get(
+  "/investigations/:investigationId/graph/centrality",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const maxResultsParam = req.query.maxResults;
+      const maxResults =
+        maxResultsParam === undefined ? undefined : Number(maxResultsParam);
+      const centrality = await graphRuntime.centrality(
+        { investigationId, caseId },
+        maxResults,
+      );
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        centrality,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve case centrality:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2e. Community Detection (M-A10) — deterministic Louvain on the case's
+// undirected accepted-relation derivative.
+apiRouter.get(
+  "/investigations/:investigationId/graph/communities",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const communities = await graphRuntime.communities({ investigationId, caseId });
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        communityCount: communities.length,
+        communities,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve case communities:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-3. Accept a Relation Hypothesis → materialize a canonical Relation (M-A10).
+//
+// The explicit relation-authority boundary. Only a PROPOSED hypothesis in this
+// case may be accepted; a retry that already resolved the hypothesis is refused
+// (never clobbered) and the durable status is surfaced. The canonical Relation
+// is materialized durably only AFTER the hypothesis is transitioned ACCEPTED
+// (durable-state-first), then the authority audit event is emitted with the
+// ACTUAL canonical RelationId.
+apiRouter.post(
+  "/investigations/:investigationId/relation-hypotheses/:hypothesisId/accept",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const hypothesisId = String(req.params.hypothesisId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      let result: {
+        hypothesis: import("../persistence/relation-hypothesis-store.js").DurableRelationHypothesis;
+        relationId: string;
+        materialized: boolean;
+        reused: boolean;
+      };
+      try {
+        result = await materializeCanonicalRelationFromAcceptedHypothesis({
+          caseId,
+          hypothesisId,
+          actor: req.user!.id,
+        });
+      } catch (cause) {
+        if (cause instanceof RelationMaterializationError) {
+          if (cause.code === "HYPOTHESIS_NOT_FOUND") {
+            return res.status(404).json({ error: "Relation hypothesis not found" });
+          }
+          return res.status(409).json({
+            error: "Relation hypothesis cannot be accepted",
+            code: cause.code,
+            detail: cause.message,
+          });
+        }
+        throw cause;
+      }
+
+      await logAuditEvent({
+        investigationId,
+        action: "RELATION_CREATED",
+        actor: req.user!.id,
+        targetType: "RELATION",
+        targetId: result.relationId,
+        description: `Accepted relation hypothesis ${hypothesisId}; materialized canonical relation ${result.relationId} (case ${caseId}, ${result.hypothesis.sourceEntityId} → ${result.hypothesis.targetEntityId}, type ${result.hypothesis.relationType})`,
+      });
+
+      return res.status(200).json({
+        relationId: result.relationId,
+        hypothesisId,
+        status: result.hypothesis.status,
+        materialized: result.materialized,
+        reusedExisting: result.reused,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to accept relation hypothesis:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-4. Reject a Relation Hypothesis (M-A10). No canonical relation is created.
+apiRouter.post(
+  "/investigations/:investigationId/relation-hypotheses/:hypothesisId/reject",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const hypothesisId = String(req.params.hypothesisId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+      let updated!: import("../persistence/relation-hypothesis-store.js").DurableRelationHypothesis;
+      try {
+        updated = await rejectRelationHypothesis({ caseId, hypothesisId });
+      } catch (cause) {
+        if (cause instanceof RelationMaterializationError) {
+          if (cause.code === "HYPOTHESIS_NOT_FOUND") {
+            return res.status(404).json({ error: "Relation hypothesis not found" });
+          }
+          return res.status(409).json({
+            error: "Relation hypothesis cannot be rejected",
+            code: cause.code,
+            detail: cause.message,
+          });
+        }
+        throw cause;
+      }
+      await logAuditEvent({
+        investigationId,
+        action: "RELATION_RESOLUTION_PROPOSED",
+        actor: req.user!.id,
+        targetType: "RELATION_HYPOTHESIS",
+        targetId: hypothesisId,
+        description: `Rejected relation hypothesis ${hypothesisId} (case ${caseId}); no canonical relation created`,
+      });
+      return res.status(200).json({ status: updated.status, hypothesisId });
+    } catch (error: unknown) {
+      console.error("Failed to reject relation hypothesis:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-5. Reverse a Relation Hypothesis (M-A10). ACCEPTED/REJECTED → REVERSED;
+// any ACTIVE canonical relation is also flipped to REVERSED (REVERSED != MERGED).
+apiRouter.post(
+  "/investigations/:investigationId/relation-hypotheses/:hypothesisId/reverse",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const hypothesisId = String(req.params.hypothesisId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+      let updated!: import("../persistence/relation-hypothesis-store.js").DurableRelationHypothesis;
+      try {
+        updated = await reverseRelationHypothesis({ caseId, hypothesisId });
+      } catch (cause) {
+        if (cause instanceof RelationMaterializationError) {
+          if (cause.code === "HYPOTHESIS_NOT_FOUND") {
+            return res.status(404).json({ error: "Relation hypothesis not found" });
+          }
+          return res.status(409).json({
+            error: "Relation hypothesis cannot be reversed",
+            code: cause.code,
+            detail: cause.message,
+          });
+        }
+        throw cause;
+      }
+      await logAuditEvent({
+        investigationId,
+        action: "RELATION_REVERSED",
+        actor: req.user!.id,
+        targetType: "RELATION_HYPOTHESIS",
+        targetId: hypothesisId,
+        description: `Reversed relation hypothesis ${hypothesisId} (case ${caseId})`,
+      });
+      return res.status(200).json({ status: updated.status, hypothesisId });
+    } catch (error: unknown) {
+      console.error("Failed to reverse relation hypothesis:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+apiRouter.get(
+  "/investigations/:investigationId/entities",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const entities = await entityStore.listByCase(caseId, { investigationId });
+      // Entity mention candidates for the case (M-A07) — informational, so the
+      // review surface can distinguish materialized entities from raw mentions.
+      const mentions = await entityMentionStore.listByCase(caseId, {
+        investigationId,
+      });
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        entityCount: entities.length,
+        mentionCount: mentions.length,
+        entities,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list entities:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }
