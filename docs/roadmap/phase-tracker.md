@@ -10,6 +10,20 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ---
 
+## Status Legend
+
+| Mark | Meaning |
+|---|---|
+| ✅ | **IMPLEMENTED AND VERIFIED** — code exists and is exercised by tests/evidence in-repo |
+| 🟡 | **IMPLEMENTED BUT ONLY PARTIALLY VERIFIED** — a real subset exists; verification or full surfacing is missing |
+| 🔵 | **PLANNED** — documented intent; not implemented |
+| ⚠️ | **KNOWN LIMITATION** — an accepted technical debt / documented limitation, not an implementation gap |
+| ❌ | **NOT IMPLEMENTED** |
+
+Advanced items are tagged with their status symbol in front of the checkbox. Backend-correctness and frontend-surfacing are evaluated separately: a backend route existing is **not** treated as the roadmap item "complete" unless the capability is genuinely surfaced end-to-end.
+
+---
+
 ## Phase 0 — Architecture & Scope Lock
 
 **Date:** 25 Aug | **Owner:** Both | **Gate:** Scope + ownership locked
@@ -102,13 +116,36 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [x] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
 - [x] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
   - [x] Evidence read seam: durable `GET /investigations/:id/evidence` (`EvidenceProjection` — documented local shape, no fabricated strength/posture), live `listEvidence` server action + `LiveEvidenceProvider.listByInvestigation`, Evidence tab renders persisted artifacts in live mode `[Mayur]`
-- [x] M-A07: Entity candidate generator (candidate entities) `[Mayur]` — `completeMA07` mention-candidate extraction wired into worker
-- [x] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]` — `completeMA08` CandidatePair + per-pair idempotent blocking pipeline
-- [x] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]` — canonical-entity authority boundary, identity key, worker, audit
-- [x] M-A10: Relation resolver (RelationHypothesis) `[Mayur]` — source-grounded scoring v1, canonical Relation decision authority, directionality-aware identity, completeMA10 wiring, Graphology runtime + HTTP routes; audited 9.0/10 (2 P2 audit-log/@relation-FK findings + non-transactional accept tracked as documented limitations)
+- [x] M-A07: Entity candidate generator (candidate entities) `[Mayur]` — `completeMA07` mention-candidate extraction wired into worker; **backend-verified; candidate-provenance recheck is part of the M-A12 entry audit** 🟡
+- [x] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]` — `completeMA08` CandidatePair + per-pair idempotent blocking pipeline; **backend-verified; blocking-semantics recheck is part of the M-A12 entry audit** 🟡
+- [x] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]` — canonical-entity authority boundary, identity key, worker, audit; **backend-verified (`entity-hypothesis-store` + accept/reject/reverse HTTP); NOT yet surfaced in a full frontend resolution-review surface** 🟡
+- [x] M-A10: Relation resolver (RelationHypothesis) `[Mayur]` — source-grounded scoring v1, canonical Relation decision authority, directionality-aware identity, completeMA10 wiring, Graphology runtime + HTTP routes; **hardened (`caa74cd`, merged via PR #49) — prior 2 P2 findings (audit-log + @relation FK, non-transactional accept) requested and resolved as documented hardening follow-ups**; verified 43/43 platform integration across 5 suites (relation 18, graph 6, graph-http 9, contradiction 2, ingest-http 8)
 - [x] M-A11: Graph projection (GraphNode/GraphEdge) `[Mayur]` — delivered via Graphology (`@indago/graphology-projection`: build-graph/centrality/communities), NOT Neo4j; Neo4j deferred to a reversible §13 seam
-- [ ] M-A12: Temporal projection (intervals + graph versioning) `[Mayur]`
-- [x] M-A13: Graph query layer (typed graph service APIs) `[Mayur]` — GraphRuntime bounded traversal/centrality/communities + express routes (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`)
+- [ ] M-A12: Temporal projection (intervals + graph versioning) `[Mayur]` — **next major foundation milestone** (see ENTRY GATE below)
+- [x] M-A13: Graph query layer (typed graph service APIs) `[Mayur]` — GraphRuntime bounded traversal/centrality/communities + express routes (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`); **backend-verified 9 graph-http integration tests; broad live-mode UI surfacing (entities/graph/relations providers) still stub (`UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider`) — frontend-phase work** 🟡
+
+### Pre-M-A12 Foundation Audit (gate for M-A12)
+
+Before M-A12 starts, the following audit items gate it (see `development-plan.md` "M-A12 Entry Gate" and "Known Limitations"). Future semantic retrieval is **NOT** required to enter M-A12.
+
+- [ ] M-A12-G1: M-A06 observation representation audited for silent source-context loss (fragmentation concern) — remediation planned if loss found `[Both]`
+- [ ] M-A12-G2: M-A07 candidate provenance verified (candidate ≠ entity; candidateId never becomes EntityId) `[Both]`
+- [ ] M-A12-G3: M-A08 blocking semantics verified (cheap deterministic recall-control layer; bounded; pair ≠ identity) `[Both]`
+- [ ] M-A12-G4: M-A09 authority boundary verified (candidate → pair → hypothesis → explicit authority → canonical Entity) `[Both]`
+- [ ] M-A12-G5: M-A10 relation authority verified (canonical Entity + evidence → relation candidate → scoring → hypothesis → explicit authority → canonical Relation → Graphology) `[Both]`
+- [ ] M-A12-G6: M-A11 graph projection verified (Graphology derived/disposable; Postgres authoritative) `[Both]`
+- [ ] M-A12-G7: M-A13 current graph APIs verified (graph, traversal, centrality, communities) `[Both]`
+- [ ] M-A12-G8: DEMO / LIVE / AUTO regression status documented (frontend provider seam intact; demo untouched) `[Both]`
+
+> **Entry criterion:** G1–G8 satisfied (documented), plus DEMO/LIVE/AUTO regression status recorded. Semantic retrieval may remain unimplemented at M-A12 entry, by design.
+
+### M-A12 — Temporal Projection
+
+- [ ] M-A12-T1: Temporal model (event/ingestion time vs observation time vs validity interval vs materialization/reversal time — **never `updatedAt` as domain-valid time**) `[Mayur]`
+- [ ] M-A12-T2: Interval semantics, open-ended intervals, boundary semantics, late / out-of-order evidence (event order ≠ domain time) `[Mayur]`
+- [ ] M-A12-T3: Graph version boundary + deterministic graph version IDs + checkpoint relationship `[Mayur]`
+- [ ] M-A12-T4: Temporal reconstruction: Postgres authoritative history → temporal selection → Graphology projection → analytics (Graphology stays disposable) `[Mayur]`
+- [ ] M-A12-T5: Reversal-over-time + interaction with checkpoints (immutable audit history; do not reorder) `[Mayur]`
 
 ---
 
@@ -139,8 +176,8 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 - [x] Expose ingestion API `[Mayur]` — `POST /investigations/:id/evidence`: submission body → artifact fetch/sha256-verify/mime-detect → BullMQ job → worker; verified in the REAL-STACK E2E and the live case-deletion gate
 - [x] Expose observation API `[Mayur]` — `GET /investigations/:id/observations` (full ObservationSchema records, case-scoped via auth → latest run → run.caseId; routes.ts)
-- [ ] Expose entity resolution API `[Mayur]` — decision authority exists (accept route + canonical materialization); full resolution UX/review surface is frontend-phase work, not yet exposed end-to-end
-- [ ] Expose graph projection/query API `[Mayur]` — projection/query routes exist (graph, traversal, centrality, communities, 404/401 integration-tested); broad UI surfacing is frontend-phase work
+- 🟡 [x] Expose entity resolution API `[Mayur]` — decision authority exists (accept/reject/reverse route + canonical materialization, integra-verified); full resolution UX/review surface is frontend-phase work, not yet exposed end-to-end
+- 🟡 [x] Expose graph projection/query API `[Mayur]` — projection/query routes exist (graph, traversal, centrality, communities, 404/401/403 integration-tested); broad live-mode UI surfacing is frontend-phase work `[graph-http 9 tests]`
 - [ ] Seed one deliberately messy synthetic case `[Mayur]` — no seed script exists (only test fixtures + legacy mock-ingestion toggle)
 
 ### Gurashish
@@ -154,8 +191,8 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 ### Joint Integration Test
 
-- [ ] FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI `[Both]`
-  - Partial: the `INGEST > OBSERVATIONS > INVESTIGATION STATE > SSE > UI(live)` leg is proven by the REAL-STACK E2E (HTTP → BullMQ → worker → Postgres → SSE) plus the M-A06 Option A live re-ingest test. The `ENTITY HYPOTHESES > RELATIONS > GRAPH` leg is now built (M-A07–A10, A13: canonical entity/relation authority + Graphology projection), with the backend proven end-to-end (real Postgres 28/28 integration incl. graph/traversal/centrality/communities over real HTTP); a single full `HTTP → BullMQ → worker → resolution → graph` demo pass and the temporal projection are the remaining gaps.
+- 🟡 [ ] FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI `[Both]`
+  - Partial: the `INGEST > OBSERVATIONS > INVESTIGATION STATE > SSE > UI(live)` leg is proven by the REAL-STACK E2E (HTTP → BullMQ → worker → Postgres → SSE) plus the M-A06 Option A live re-ingest test. The `ENTITY HYPOTHESES > RELATIONS > GRAPH` leg is now built (M-A07–A10, A13: canonical entity/relation authority + Graphology projection), with the backend proven end-to-end (real Postgres 43/43 integration across 5 suites incl. graph/traversal/centrality/communities over real HTTP via `m-a10-ingest-http.e2e` + `m-a10-graph-http`); remaining gaps: a single full `HTTP → BullMQ → worker → resolution → graph` demo pass, the temporal projection (M-A12), and live-mode frontend surfacing of entities/graph/relations (providers are still `Unsupported*` stubs).
 
 ---
 
@@ -170,6 +207,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] Implement bridge/connector candidates `[Mayur]`
 - [ ] Implement bounded path queries `[Mayur]`
 - [ ] Implement cross-case shared-entity/infrastructure discovery `[Mayur]`
+- 🔵 [ ] Cross-observation relation retrieval `[Mayur]` — recover relation candidates that span different observations (shared infrastructure / temporal / explicit relation claims / graph-gap-driven / semantic retrieval); must preserve "candidate relationship ≠ canonical relationship" and distinguish DIRECT RELATION EVIDENCE vs INDIRECT STRUCTURAL LINKAGE vs SEMANTIC ASSOCIATION
 - [ ] Create InvestigativeLead structure `[Mayur]`
 - [ ] Attach evidence FOR / AGAINST `[Mayur]`
 - [ ] Generate alternative explanations `[Mayur]`
@@ -200,7 +238,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] Classify gap (missing investigation / missing data / missing comparison / infrastructure gap / concealment-consistent pattern) `[Mayur]`
 - [ ] Generate competing explanations `[Mayur]`
 - [ ] Detect when an ER split could explain a graph hole `[Mayur]`
-- [ ] Trigger targeted reblocking `[Mayur]`
+- 🔵 [ ] Targeted reblocking `[Mayur]` — selectively generate candidate pairs around a suspicious candidate/entity/evidence region after downstream analysis suggests a missed match; **NOT** an O(N²) all-candidate sweep; preserve case isolation, deterministic identity, pair-level idempotency, bounded computation, auditability
 - [ ] Generate candidate evidence requests `[Mayur]`
 - [ ] Calculate normalized evidence utility `[Mayur]`
 - [ ] Implement Evidence Resolution Rate@K evaluation `[Mayur]`
@@ -237,6 +275,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] Evaluate ER pair completeness / false split / false merge `[Mayur]`
 - [ ] Run missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification) `[Mayur]`
 - [ ] Separate structural signal from robustness from evidence posture `[Mayur]`
+- 🔵 [ ] Semantic retrieval architecture (future) `[Mayur]` — high-recall embedding/LLM retrieval feeding structured analytical signals into the existing deterministic scoring; semantic similarity is **NOT** evidence and embeddings/LLMs **never** create canonical entities/relations; recall-optimizing retrieval layer, precision/explainability stays in the deterministic policy + explicit authority
 
 ### 6B. Gurashish
 
@@ -285,6 +324,8 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] Define alternative-explanation presentation `[Mayur]`
 - [ ] Define what evidence must be clickable/source-traceable `[Mayur]`
 - [ ] Review graph semantics for misleading visual interpretations `[Mayur]`
+- 🔵 [ ] Source / context visualization `[Mayur]` — surface contextual source-grounded spans (artifact → section → context span → observation → mention) alongside atomic observations; preserve "atomicity for computation + contextuality for investigation"
+- 🔵 [ ] Provenance / uncertainty / absence UX `[Mayur]` — show supporting vs contradicting evidence, spanning, uncertainty, absence vs concealment distinction, score vs probability, confidence vs legal admissibility
 
 ---
 
@@ -301,6 +342,8 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 - [ ] Generate entity collisions and splits `[Mayur]`
 - [ ] Create expected graph-hole/evidence mappings `[Mayur]`
 - [ ] Define intelligence metrics `[Mayur]`
+- 🔵 [ ] Semantic intelligence benchmark (future, must precede major adoption of semantic scoring) `[Mayur]` — compare V1 deterministic-only vs V2 +embeddings vs V3 +embeddings +LLM judge; measure candidate recall, entity precision/recall, false merges/splits, relation precision/recall, graph-hole precision, evidence-retrieval utility, robustness stability, latency, cost
+- 🔵 [ ] Model versioning for future semantic features `[Mayur]` — embeddings/LLM-feature schema and weights determined by benchmark evidence, versioned separately; do not treat "embedding = better" as an assumption
 
 ### 8B. Gurashish
 
@@ -453,16 +496,18 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 |---|---|---|---|---|---|
 | 0 | 10 | 10 | 0 | 0 | 10 |
 | 1 | 40 | 40 | 20 | 6 | 14 |
-| 2A | 17 | 13 | 13 | 0 | 0 |
+| 2A | 30 | 13 | 22 | 0 | 8 |
 | 2B | 12 | 12 | 0 | 12 | 0 |
-| 3 | 12 | 8 | 2 | 6 | 1 |
-| 4 | 16 | 0 | 0 | 6 | 1 |
-| 5 | 18 | 0 | 0 | 8 | 1 |
-| 6 | 20 | 0 | 0 | 8 | 4 |
-| 7 | 18 | 0 | 0 | 11 | 0 |
-| 8 | 22 | 0 | 0 | 6 | 9 |
-| 9 | 17 | 0 | 0 | 10 | 0 |
-| 10 | 10 | 0 | 0 | 5 | 0 |
-| 11 | 30 | 0 | 0 | 10 | 10 |
-| 12 | 16 | 0 | 0 | 8 | 1 |
-| **Total** | **258** | **83** | **35** | **96** | **51** |
+| 3 | 12 | 10 | 5 | 6 | 1 |
+| 4 | 17 | 0 | 10 | 6 | 1 |
+| 5 | 18 | 0 | 9 | 8 | 1 |
+| 6 | 21 | 8 | 9 | 8 | 4 |
+| 7 | 20 | 0 | 9 | 11 | 0 |
+| 8 | 24 | 0 | 9 | 6 | 9 |
+| 9 | 17 | 4 | 7 | 10 | 0 |
+| 10 | 10 | 0 | 5 | 5 | 0 |
+| 11 | 30 | 0 | 10 | 10 | 10 |
+| 12 | 16 | 0 | 7 | 8 | 1 |
+| **Total** | **277** | **97** | **122** | **96** | **59** |
+
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). Phase 2A total includes the 13 un-done M-A12 entry-gate (G1–G8, `[Both]`) and temporal (T1–T5, `[Mayur]`) sub-task rows added by the V7 tracker reconciliation.

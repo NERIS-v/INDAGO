@@ -210,9 +210,11 @@ Owner model: Mayur and Gurashish work independently after Phase 1, using contrac
 | M-A08 | Multi-pass blocking | Candidate pairs | M-A07 |
 | M-A09 | Entity resolver | Reversible EntityHypothesis | M-A08 |
 | M-A10 | Relation resolver | RelationHypothesis | M-A06/M-A09 |
-| M-A11 | Neo4j graph projection | GraphNode/GraphEdge | M-A09/10 |
+| M-A11 | Graph projection | GraphNode/GraphEdge | M-A09/10 |
 | M-A12 | Temporal projection | Intervals + graph versioning | M-A11 |
 | M-A13 | Graph query layer | Typed graph service APIs | M-A11/12 |
+
+> **Note (post-integration reconciliation):** M-A11 was **delivered via Graphology** (`@indago/graphology-projection`: build-graph / traversal / centrality / communities) integrated through M-A10, **not** Neo4j. Neo4j is deferred to a reversible seam. M-A13 (graph query layer) is the GraphRuntime + express routes (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`), backend-verified (9 graph-http integration tests). M-A12 (temporal projection) remains the **next major foundation milestone** — see §23 "M-A12 Entry Gate" and the reconciled phase tracker.
 
 ### 6B. GURASHISH — Execution / Platform Foundation
 
@@ -693,3 +695,201 @@ Build the execution platform: API > Redis/BullMQ > state machine > workers > age
 ### BOTH
 
 Phase 1 contracts > continuous integration > vertical checkpoints > benchmark interpretation > final stress test > final demo.
+
+---
+
+## 23. Pre-M-A12 Tracker Reconciliation & Architecture Update (V7)
+
+> **Nature of this section:** documentation / planning only. It reconciles the roadmap
+> tracker with what is **actually implemented**, documents the architectural direction agreed
+> in the pre-M-A12 review, and makes the future improvements explicit **planned work**. It does
+> **not** change any implementation, contract, schema, route, worker, scoring, or Graphology code.
+> See the reconciled `docs/roadmap/phase-tracker.md` for per-item status.
+
+### 23.1 Current Verified State (at hardening HEAD)
+
+| Component | Milestone | Verified status | Evidence |
+|---|---|---|---|
+| Ingestion skeleton / acquisition / classification / raw extraction | M-A01 (M-PR1/2/3) | ✅ implemented | `packages/platform/src/ingest/*`, `packages/intelligence/ingestion/src/{classify,parser}/*` |
+| Normalization engine | M-A05 | ✅ implemented / frozen | `normalize/`, `docs/platform/m-a05-normalization.md`; "no LLM/OCR reruns" rule |
+| Observation extraction (with provenance) | M-A06 | ✅ implemented (deterministic) | `observation/`, durable `GET /evidence` seam, live `listEvidence` provider |
+| Entity mention candidates | M-A07 | ✅ implemented (backend) — 🟡 not UV-surfaced | `completeMA07` in `packages/platform/src/queue/ingest-evidence.ts` |
+| Multi-pass blocking | M-A08 | ✅ implemented (backend) — 🟡 not UV-surfaced | `completeMA08`, CandidatePair persistence |
+| Entity resolver (reversible EntityHypothesis) | M-A09 | ✅ implemented (backend) — 🟡 UX surface pending | `entity-hypothesis-store.ts`, accept/reject/reverse routes |
+| Relation resolver (RelationHypothesis) | M-A10 | ✅ implemented + **hardened** (`caa74cd`, merged PR #49) | 43/43 platform integration across 5 suites |
+| Graph projection | M-A11 | ✅ implemented **via Graphology** (not Neo4j) | `@indago/graphology-projection` |
+| Graph query layer | M-A13 | ✅ implemented (backend) — 🟡 live-mode UI surfacing pending | GraphRuntime + express routes; 9 graph-http integration tests |
+| Temporal projection | M-A12 | ❌ not implemented — **next major foundation milestone** | — |
+| FIR / CDR / Financial ingestion | M-A02/M-A03/M-A04 | ❌ not implemented | — |
+
+**Owner / boundary note (unchanged):** Mayur owns WHAT INDAGO KNOWS (deterministic intelligence
+services). Gurashish owns HOW INDAGO RUNS. Neither silently changes a shared contract.
+
+### 23.2 Known Limitations & Follow-Ups
+
+**A. Non-blocking technical debt**
+- No full live Redis/BullMQ+Postgres harness in CI (Redis-gated `real-stack.e2e` tests) — infra/test limitation, not a bug.
+- NO-FK `@relation`-less relation/hypothesis endpoints — retained **by design** (case-scoped integrity enforced transactionally in code; schema review is a documented, non-blocking follow-up).
+- Real production authentication (JWT/OIDC) is a **separate dependency / future migration**, behind the `verifyToken` seam (currently dev-grade `demo-token` bypass).
+- `schema.prisma` comment typo ("harded-as-audited") — cosmetic; prisma not modified in this planning pass.
+- Pre-existing environmental failures not caused by M-A10: `entity-hypothesis-store.test.ts` (Neon pooled-connection) and `real-stack.e2e.test.ts` (Redis-gated) — zero diff from the PR.
+
+**B. Future intelligence improvements (explicit planned work)**
+- ✅ Deterministic recall-control layer exists (M-A08). **Targeted reblocking** (bounded, selective, NOT O(N²)) is future.
+- ✅ Deterministic explainable scoring exists (M-A09/M-A10). **Semantic retrieval** (embeddings / LLM-assisted relevance) is future and must feed *signals* into the existing deterministic policy — never become canonical truth.
+- ✅ Same-observation co-occurrence relation candidate generation exists. **Cross-observation relation retrieval** (shared infrastructure / temporal / explicit claims / graph-gap / semantic) is future.
+- **Temporal projection (M-A12)** is unbuilt: event/observation-time separation, intervals, graph versioning, reconstruction from authoritative history — see §23.5.
+
+**C. Infrastructure / test limitations**
+- No full live harness for a single end-to-end `HTTP → BullMQ → worker → resolution → graph` **demo pass** (backend legs individually proven; the combined demo pass + temporal projection are the remaining gaps).
+- Graphology does not retain history — it is a **derived, disposable projection** of current canonical state.
+
+**D. Architecture decisions intentionally deferred**
+- Neo4j (deferred to a reversible seam in favor of Graphology).
+- Semantic embedding / LLM scoring (gated by a future benchmark — §23.8).
+- Production deployment model (object storage S3, migrations dir, secrets mgmt).
+
+### 23.3 Observation-Context Preservation (M-A06 upstream concern)
+
+The main upstream architectural concern: rich narratives may be over-fragmented into atomic
+observations (e.g. "Rakesh met Suresh at Warehouse 17" → disconnected fragments) **without
+retaining the contextual relationship between them**. Future architecture preserves **both**:
+
+```
+ATOMICITY FOR COMPUTATION   +   CONTEXTUALITY FOR INVESTIGATION
+```
+
+Source artifact stays authoritative; observations stay traceable to artifact / section /
+context span / location / source / evidence. Intended future representation (schema to be
+determined by auditing existing M-A06 contracts first, **not** by adding arbitrary fields):
+
+```
+Artifact → document/section → context span → observation → mention        (narrative)
+Artifact → sheet/table → row → observation → field/cell                     (structured)
+```
+
+This is a **pre-M-A12 foundation audit** item (tracker G1) — not a schema change made now.
+
+### 23.4 Future Intelligence Pipeline (target architectural direction)
+
+```
+SOURCE
+ → EVIDENCE                                            (authoritative, traceable)
+ → CONTEXTUAL OBSERVATION                              (fragment + parent context — §23.3)
+ → ATOMIC OBSERVATION
+ → DETERMINISTIC RETRIEVAL (blocking)                  (cheap recall-control — M-A08)
+ → SEMANTIC RETRIEVAL  (future, high-recall)            (+ embeddings)
+ → RELEVANCE / EVIDENCE JUDGE (future)                  (+ LLM → structured signals only)
+ → DETERMINISTIC RESOLUTION                             (explainable scoring — M-A09/M-A10)
+ → EXPLICIT AUTHORITY                                   (canonical decision boundary)
+ → CANONICAL STATE                                      (Postgres = authority)
+ → TEMPORAL PROJECTION (M-A12)                          (disposable Graphology)
+ → GRAPH
+ → INVESTIGATIVE SIGNAL                                 (structural signal ≠ conviction)
+ → LEAD
+ → EVIDENCE REQUEST
+ → REASSESSMENT
+```
+
+Key invariants: **semantic similarity ≠ evidence**; **retrieval optimizes recall**,
+**deterministic policy optimizes precision/explainability**; **authority creates canonical
+state**; **embeddings/LLM never directly create canonical entities or relations**.
+
+### 23.5 M-A12 Entry Gate
+
+Before M-A12 is started, the following **audits** must be completed and documented. Semantic
+retrieval is **NOT** required to enter M-A12.
+
+| ID | Entry-gate audit | Required evidence |
+|---|---|---|
+| G1 | M-A06 observation representation audited for silent source-context loss | remediation planned **if** loss found |
+| G2 | M-A07 candidate provenance verified | candidate ≠ entity; candidateId never becomes EntityId |
+| G3 | M-A08 blocking semantics verified | cheap deterministic recall layer; bounded; pair ≠ identity |
+| G4 | M-A09 authority boundary verified | candidate → pair → hypothesis → authority → canonical Entity |
+| G5 | M-A10 relation authority verified | canonical Entity + evidence → candidate → scoring → hypothesis → authority → canonical Relation → Graphology |
+| G6 | M-A11 graph projection verified | Graphology derived/disposable; Postgres authoritative |
+| G7 | M-A13 current graph APIs verified | graph, traversal, centrality, communities |
+| G8 | DEMO / LIVE / AUTO regression status documented | frontend provider seam intact; demo untouched |
+
+**Entry criterion:** G1–G8 satisfied (documented) + DEMO/LIVE/AUTO regression status recorded.
+
+### 23.6 Intelligence Architecture Principles
+
+1. Source evidence is authoritative.
+2. Observation extraction must not destroy context.
+3. Candidate ≠ Entity.
+4. CandidatePair ≠ identity.
+5. Hypothesis ≠ canonical truth.
+6. Semantic similarity ≠ evidence.
+7. Retrieval optimizes recall.
+8. Deterministic policy optimizes precision/explainability.
+9. Authority creates canonical state.
+10. Graph analytics do not manufacture evidence.
+11. Graphology is derived, not authoritative.
+12. Temporal history must be reconstructable.
+13. Cross-observation reasoning must preserve provenance.
+14. Absence of evidence ≠ evidence of absence unless explicitly justified.
+15. Structural connectivity ≠ criminal relevance.
+
+### 23.7 Explicit Non-Goals (this plan does not authorize)
+
+- No rewrite of M-A06/M-A07/M-A08/M-A09/M-A10 to satisfy this document.
+- No LLM/embedding that directly returns "this is definitely the same entity" as an authority action.
+- No "embedding = better" assumption; no semantic scoring adopted ahead of a benchmark (§23.8).
+- No Graphology-based temporal history (Graphology is disposable; history lives in authoritative Postgres temporal/event data).
+- No `updatedAt` used as a domain-valid time.
+- No new APIs / schema / workers introduced by this planning pass (implementation frozen).
+
+### 23.8 Future Work Placement (no cramming into M-A12)
+
+| Where | Work |
+|---|---|
+| **Pre-M-A12 / foundation audit** | G1: M-A05/M-A06 information-preservation + observation-fragmentation audit; establish contextual-evidence representation if needed (§23.3) |
+| **M-A12** | Temporal projection: event/ingestion vs observation vs validity times; interval & boundary semantics; open/late/out-of-order evidence; deterministic graph-version IDs + checkpoint relationship; temporal reconstruction from authoritative history (Graphology disposable); reversal-over-time |
+| **Phase 4/5** | Cross-observation relation retrieval; targeted reblocking (bounded); graph-hole / graph-gap-driven retrieval; richer relation-candidate generation (DIRECT relation evidence vs INDIRECT structural linkage vs SEMANTIC association — kept distinct) |
+| **Phase 6/8** | Semantic retrieval (embeddings); LLM relevance/evidence judge (→ structured signals); benchmark: V1 deterministic vs V2 +embeddings vs V3 +embeddings +LLM judge; measures: candidate recall, entity/relation precision/recall, false merges/splits, graph-hole precision, evidence-retrieval utility, robustness stability, latency, cost; versioned model-feature schemas |
+| **Phase 7** | Source / context visualization; provenance UX; uncertainty / evidence presentation (supporting vs contradicting, score vs probability, confidence vs admissibility, absence vs concealment, role vs culpability) |
+
+### 23.9 Dependency Graph (ordering)
+
+```
+M-A06 obs representation (G1 gate)
+        │
+        ▼
+M-A07 proof → M-A08 blocking (G2/G3) ──────────────┐
+        └──────────┐                               │
+M-A09 entity authority (G4) ───────────────────────┼──► M-A12 temporal projection
+        ▼                                          │
+M-A10 relation authority (G5) ──────────────────────┤
+        ▼                                          │
+M-A11 graphology + M-A13 graph APIs (G6/G7) ────────┤
+        └──────────────── G8: DEMO/LIVE/AUTO reg ───┘
+   (deterministic lane complete + entry gate documented)
+
+M-A12 ─► Phase 4 cross-observation / Phase 5 targeted reblocking + graph holes + leads
+        │
+        ▼
+Phase 6/8 semantic retrieval + LLM judge  (benchmark-gated)
+        │
+        └► Phase 7 source/context + provenance/uncertainty UX
+```
+
+Direction of travel: deterministic foundation first (complete), then temporal (M-A12), then
+cross-observation / targeted reblocking / graph-hole retrieval (Phase 4/5), then semantic
+retrieval + benchmark (Phase 6/8), with provenance/uncertainty UX (Phase 7) parallel to the
+semantic work. Semantic-retrieval signals only **additive** features over deterministic policy.
+
+### 23.10 Status Vocabulary (consistent with the tracker)
+
+| Mark | Meaning |
+|---|---|
+| ✅ | IMPLEMENTED AND VERIFIED |
+| 🟡 | IMPLEMENTED BUT ONLY PARTIALLY VERIFIED (e.g. backend done, UX surfacing pending) |
+| 🔵 | PLANNED |
+| ⚠️ | KNOWN LIMITATION |
+| ❌ | NOT IMPLEMENTED |
+
+Final recommendation: **READY TO START M-A12**, conditioned on completing + documenting the
+G1–G8 entry-gate audits (§23.5), chiefly the M-A06 observation-context audit (G1) and the
+DEMO/LIVE/AUTO regression status (G8). Semantic retrieval is intentionally non-blocking for
+M-A12 and lands in Phase 6/8.
