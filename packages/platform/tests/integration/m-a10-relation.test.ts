@@ -906,7 +906,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
         { caseId, hypothesisId: relationId },
         { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
       );
-      expect(reversed.status).toBe("REVERSED");
+      expect(reversed.hypothesis.status).toBe("REVERSED");
 
       const canonicalId = await deterministicRelationId({
         sourceEntityId: entityA.entityId,
@@ -1033,6 +1033,333 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const otherCase = await canonRelationStore.findById(canonicalId, { caseId: otherCaseId });
       expect(otherCase).toBeNull();
       expect(active.some((r) => r.id === canonicalId)).toBe(true);
+    });
+
+    it("relation hypothesis lifecycle matrix is locked (valid + invalid transitions)", async () => {
+      // REJECTED → REVERSED: explicitly KEPT (documented intentional behavior —
+      // an explicit reverse of a rejection, preserving history; REVERSED != MERGED).
+      const entityA = await prepareAcceptedEntity("rel-life-a@example.org", 5301, 5302, obsA, obsB);
+      const entityB = await prepareAcceptedEntity("rel-life-b@example.org", 5303, 5304, obsB, obsC);
+      const probe = async (id: string) => relationStore.findById(id, { caseId });
+
+      // --- Valid transitions ---
+      // PROPOSED → REJECTED (then REJECTED → REVERSED, kept intentionally).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "association", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "association", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "association", support: 0.6, evidenceBasis: [obsA, obsB], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 2,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: false,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.updateStatus(id, { caseId }, "REJECTED");
+        expect((await probe(id))!.status).toBe("REJECTED");
+        // REJECTED → REVERSED is the documented intentional reverse-of-rejection.
+        await relationStore.updateStatus(id, { caseId }, "REVERSED");
+        expect((await probe(id))!.status).toBe("REVERSED");
+      }
+
+      // PROPOSED → ACCEPTED → REVERSED (full canonical path).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "family", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "family", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "family", support: 0.7, evidenceBasis: [obsA], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 1,
+          evidenceStrength: 0.7, sourceCoverage: 1, temporalCoverage: 1, directed: true,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.updateStatus(id, { caseId }, "ACCEPTED");
+        expect((await probe(id))!.status).toBe("ACCEPTED");
+        await relationStore.updateStatus(id, { caseId }, "REVERSED");
+        expect((await probe(id))!.status).toBe("REVERSED");
+      }
+
+      // --- Invalid transitions: every terminal/illegal move is refused. ---
+      const expectRefused = async (promise: Promise<unknown>) =>
+        expect(promise).rejects.toBeInstanceOf(RelationHypothesisTransitionError);
+
+      // PROPOSED → REVERSED is illegal (no direct jump).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "ownership", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "ownership", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "ownership", support: 0.5, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.5, sourceCoverage: 1, temporalCoverage: 1, directed: false,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await expectRefused(relationStore.updateStatus(id, { caseId }, "REVERSED"));
+        expect((await probe(id))!.status).toBe("PROPOSED");
+      }
+
+      // REJECTED → ACCEPTED is illegal (rejection is irreversible except to REVERSED).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "communication", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "communication", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "communication", support: 0.6, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: true,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.updateStatus(id, { caseId }, "REJECTED");
+        await expectRefused(relationStore.updateStatus(id, { caseId }, "ACCEPTED"));
+        expect((await probe(id))!.status).toBe("REJECTED");
+      }
+
+      // ACCEPTED → ACCEPTED (re-accept a resolved hypothesis) is illegal.
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "transport", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "transport", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "transport", support: 0.6, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: false,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.updateStatus(id, { caseId }, "ACCEPTED");
+        await expectRefused(relationStore.updateStatus(id, { caseId }, "ACCEPTED"));
+        expect((await probe(id))!.status).toBe("ACCEPTED");
+      }
+
+      // REVERSED → anything is illegal (REVERSED is terminal).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "financial", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "financial", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "financial", support: 0.6, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: true,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.updateStatus(id, { caseId }, "ACCEPTED");
+        await relationStore.updateStatus(id, { caseId }, "REVERSED");
+        await expectRefused(relationStore.updateStatus(id, { caseId }, "ACCEPTED"));
+        await expectRefused(relationStore.updateStatus(id, { caseId }, "REJECTED"));
+        expect((await probe(id))!.status).toBe("REVERSED");
+      }
+    });
+
+    it("relation authority is concurrency-safe: simultaneous accepts yield ONE canonical relation", async () => {
+      const entityA = await prepareAcceptedEntity("rel-cc-a@example.org", 5401, 5402, obsA, obsB);
+      const entityB = await prepareAcceptedEntity("rel-cc-b@example.org", 5403, 5404, obsB, obsC);
+
+      const relationId = await deterministicRelationHypothesisId({
+        sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+        relationType: "financial", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+      });
+      await relationStore.upsertHypothesis({
+        id: relationId, identityKey: buildRelationHypothesisIdentityKey({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "financial", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        }),
+        caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+        relationType: "financial", support: 0.7, evidenceBasis: [obsA], contradictions: [],
+        status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 1,
+        evidenceStrength: 0.7, sourceCoverage: 1, temporalCoverage: 1, directed: false,
+        provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+      });
+
+      // Fire BOTH accepts concurrently over the same transactional authority.
+      const [r1, r2] = await Promise.allSettled([
+        materializeCanonicalRelationFromAcceptedHypothesis(
+          { caseId, hypothesisId: relationId, actor: "test@indago" },
+          { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
+        ),
+        materializeCanonicalRelationFromAcceptedHypothesis(
+          { caseId, hypothesisId: relationId, actor: "test@indago" },
+          { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
+        ),
+      ]);
+
+      // Exactly ONE accept may win; the other must be refused (no double-commit,
+      // no duplicate canonical relation, no resurrection to a second ACCEPTED).
+      const wins = [r1, r2].filter((r) => r.status === "fulfilled");
+      const refusals = [r1, r2].filter((r) => r.status === "rejected");
+      expect(wins.length).toBe(1);
+
+      const canonicalId = await deterministicRelationId({
+        sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+        relationType: "financial", directed: false, scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+      });
+
+      const final0 = await relationStore.findById(relationId, { caseId });
+      expect(final0!.status).toBe("ACCEPTED");
+      const canonical = await canonRelationStore.findById(canonicalId, { caseId });
+      expect(canonical).not.toBeNull();
+      expect(canonical!.status).toBe("ACTIVE");
+
+      // Exactly ONE ACTIVE canonical relation exists for this (source,target,
+      // type,directed,model) — the deterministic canonical id is unique, so a
+      // double-commit can never produce two rows for the same relation.
+      const activeMatching = (await canonRelationStore.listActiveByCase(caseId, { investigationId }))
+        .filter((r) => r.id === canonical!.id);
+      expect(activeMatching.length).toBe(1);
+
+      // The losing accept (if refused for "not PROPOSED") reports a clean refusal.
+      expect(refusals.length).toBe(1);
+    });
+
+    it("relation authority idempotency: accept→accept, accept→reject, reject→accept are refused", async () => {
+      const entityA = await prepareAcceptedEntity("rel-idm-a@example.org", 5501, 5502, obsA, obsB);
+      const entityB = await prepareAcceptedEntity("rel-idm-b@example.org", 5503, 5504, obsB, obsC);
+      const expectRefused = async (p: Promise<unknown>) =>
+        expect(p).rejects.toBeInstanceOf(RelationHypothesisTransitionError);
+
+      // accept then re-accept → refused (terminal, no resurrection).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "communication", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "communication", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "communication", support: 0.6, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: true,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.acceptHypothesis(id, { caseId });
+        await expectRefused(relationStore.acceptHypothesis(id, { caseId }));
+        expect((await relationStore.findById(id, { caseId }))!.status).toBe("ACCEPTED");
+      }
+
+      // ACCEPTED → REJECTED is refused (authority decisions on resolved rows are terminal).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "transport", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "transport", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "transport", support: 0.6, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: false,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.acceptHypothesis(id, { caseId });
+        await expectRefused(relationStore.rejectHypothesis(id, { caseId }));
+        expect((await relationStore.findById(id, { caseId }))!.status).toBe("ACCEPTED");
+      }
+
+      // REJECTED → ACCEPTED is refused (rejection is seeded; only REJECTED→REVERSED is allowed).
+      {
+        const id = await deterministicRelationHypothesisId({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "ownership", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        });
+        await relationStore.upsertHypothesis({
+          id, identityKey: buildRelationHypothesisIdentityKey({
+            sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+            relationType: "ownership", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+          }),
+          caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "ownership", support: 0.6, evidenceBasis: [], contradictions: [],
+          status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+          evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: true,
+          provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+        });
+        await relationStore.rejectHypothesis(id, { caseId });
+        await expectRefused(relationStore.acceptHypothesis(id, { caseId }));
+        expect((await relationStore.findById(id, { caseId }))!.status).toBe("REJECTED");
+      }
+    });
+
+    it("relation authority reverse races are refused (reverse→reverse, reverse→accept)", async () => {
+      const entityA = await prepareAcceptedEntity("rel-rv-a@example.org", 5601, 5602, obsA, obsB);
+      const entityB = await prepareAcceptedEntity("rel-rv-b@example.org", 5603, 5604, obsB, obsC);
+      const expectRefused = async (p: Promise<unknown>) =>
+        expect(p).rejects.toBeInstanceOf(RelationHypothesisTransitionError);
+
+      const id = await deterministicRelationHypothesisId({
+        sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+        relationType: "case-link", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+      });
+      await relationStore.upsertHypothesis({
+        id, identityKey: buildRelationHypothesisIdentityKey({
+          sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+          relationType: "case-link", scoreModelVersion: RELATION_SCORE_MODEL_VERSION,
+        }),
+        caseId, investigationId, sourceEntityId: entityA.entityId, targetEntityId: entityB.entityId,
+        relationType: "case-link", support: 0.6, evidenceBasis: [], contradictions: [],
+        status: "PROPOSED", scoreModelVersion: RELATION_SCORE_MODEL_VERSION, evidenceCount: 0,
+        evidenceStrength: 0.6, sourceCoverage: 1, temporalCoverage: 1, directed: false,
+        provenance: { sourceId, artifactId, extractor: "indago:relation-resolution:engine" },
+      });
+      await relationStore.acceptHypothesis(id, { caseId });
+
+      // reverse→reverse (REVERSED is terminal → second refused).
+      await reverseRelationHypothesis(
+        { caseId, hypothesisId: id },
+        { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
+      );
+      await expectRefused(
+        reverseRelationHypothesis(
+          { caseId, hypothesisId: id },
+          { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
+        ),
+      );
+      // reverse→accept refused (REVERSED cannot be re-accepted) — the
+      // materializer's own guard rejects a non-PROPOSED hypothesis.
+      await expect(
+        materializeCanonicalRelationFromAcceptedHypothesis(
+          { caseId, hypothesisId: id, actor: "test@indago" },
+          { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
+        ),
+      ).rejects.toBeInstanceOf(RelationMaterializationError);
+      expect((await relationStore.findById(id, { caseId }))!.status).toBe("REVERSED");
     });
   },
 );

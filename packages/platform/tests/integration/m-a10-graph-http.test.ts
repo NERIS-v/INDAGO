@@ -42,6 +42,11 @@ describe.skipIf(!TEST_DATABASE_URL)(
       // Override the app datasource BEFORE importing routes or constructing
       // Prisma so the Graphology runtime reads the authoritative test DB.
       process.env.DATABASE_URL = TEST_DATABASE_URL!;
+      // Fail-closed auth: grant the demo principal access to the case this
+      // suite itself created (explicit INDAGO_DEV_ALLOWED_CASES grant), so the
+      // strict allow-list (verifyCaseAccess is now enforced in all modes) still
+      // lets the suite reach its own case — without loosening the boundary.
+      process.env.INDAGO_DEV_ALLOWED_CASES = caseId;
       prisma = new PrismaClient({
         datasources: { db: { url: TEST_DATABASE_URL! } },
       });
@@ -139,6 +144,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
     afterAll(async () => {
       server?.close();
+      delete process.env.INDAGO_DEV_ALLOWED_CASES;
       await prisma.relation.deleteMany({});
       await prisma.entity.deleteMany({});
       await prisma.investigationRun.deleteMany({});
@@ -173,6 +179,40 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(body.pathCount).toBeGreaterThan(0);
       expect(body.paths.every((p) => p.startNodeId === entityA)).toBe(true);
       expect(body.paths.every((p) => p.hopCount <= 1)).toBe(true);
+    });
+
+    it("GET traversal rejects malformed / out-of-range params (400)", async () => {
+      const bad = [
+        { hops: "abc" },
+        { hops: "1.5" },
+        { hops: "-1" },
+        { hops: "5" },
+        { maxPaths: "0" },
+        { maxPaths: "1001" },
+        { maxPaths: "two" },
+      ];
+      for (const q of bad) {
+        const query = new URLSearchParams({
+          startEntityId: entityA,
+          ...q,
+        }).toString();
+        const res = await fetch(
+          `${baseUrl}/api/v1/investigations/${investigationId}/graph/traversal?${query}`,
+          { headers: authHeader("demo-token") },
+        );
+        expect(res.status).toBe(400);
+      }
+    });
+
+    it("GET centrality rejects malformed / out-of-range maxResults (400)", async () => {
+      const bad = ["abc", "1.5", "-1", "0", "1001", "Infinity", "NaN"];
+      for (const v of bad) {
+        const res = await fetch(
+          `${baseUrl}/api/v1/investigations/${investigationId}/graph/centrality?maxResults=${encodeURIComponent(v)}`,
+          { headers: authHeader("demo-token") },
+        );
+        expect(res.status).toBe(400);
+      }
     });
 
     it("GET centrality returns degree rank", async () => {
@@ -215,6 +255,47 @@ describe.skipIf(!TEST_DATABASE_URL)(
         // No authorization header → requireAuth returns 401.
       );
       expect(res.status).toBe(401);
+    });
+
+    it("denies a case the demo principal was not granted (403, fail-closed boundary)", async () => {
+      // A second, EXISTING investigation run in a DIFFERENT (foreign) case that
+      // the demo principal was NOT granted via INDAGO_DEV_ALLOWED_CASES.
+      const foreignRun = randomUUID();
+      const foreignCase = randomUUID();
+      const foreignEntity = randomUUID();
+      await prisma.investigationRun.create({
+        data: {
+          investigationId: foreignRun,
+          caseId: foreignCase,
+          status: "COMPLETED",
+          state: "RESOLVED",
+          contextData: { caseId: foreignCase },
+        },
+      });
+      await prisma.entity.create({
+        data: {
+          id: foreignEntity,
+          identityKey: `http:${foreignCase}:${foreignEntity}`,
+          caseId: foreignCase,
+          investigationId: foreignRun,
+          canonicalName: "foreign@example.org",
+          entityType: "EMAIL",
+          status: "ACTIVE",
+          observationIds: [],
+          hypothesisIds: [],
+          provenance: { sourceId, extractor: "http-test" },
+        },
+      });
+
+      const res = await fetch(
+        `${baseUrl}/api/v1/investigations/${foreignRun}/graph`,
+        { headers: authHeader("demo-token") },
+      );
+      // The run EXISTS but the principal is not scoped to its case → 403, not 200.
+      expect(res.status).toBe(403);
+
+      await prisma.entity.deleteMany({ where: { caseId: foreignCase } });
+      await prisma.investigationRun.deleteMany({ where: { caseId: foreignCase } });
     });
   },
 );

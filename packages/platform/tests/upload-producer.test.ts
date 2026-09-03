@@ -38,7 +38,7 @@ const mockFile = {
 // ============================================================================
 describe("Auth Helpers", () => {
   describe("verifyToken", () => {
-    it("returns AuthenticatedUser for valid demo-token", () => {
+    it("returns an AuthenticatedUser for a valid demo-token", () => {
       const user = verifyToken("demo-token");
       expect(user).not.toBeNull();
       expect(user!.id).toBe("usr_demo_123");
@@ -53,6 +53,25 @@ describe("Auth Helpers", () => {
     it("returns null for empty string", () => {
       expect(verifyToken("")).toBeNull();
     });
+
+    it("augments demo allowedCases from INDAGO_DEV_ALLOWED_CASES (explicit grant, not blanket)", () => {
+      const original = process.env.INDAGO_DEV_ALLOWED_CASES;
+      try {
+        process.env.INDAGO_DEV_ALLOWED_CASES = "case-abc ,case-def, case-abc";
+        const user = verifyToken("demo-token")!;
+        expect(user.allowedCases).toEqual([
+          VALID_CASE_ID,
+          VALID_CASE_ID_2,
+          "case-abc",
+          "case-def",
+        ]);
+        expect(verifyCaseAccess(user, "case-abc")).toBe(true);
+        expect(verifyCaseAccess(user, "case-untouched")).toBe(false);
+      } finally {
+        if (original === undefined) delete process.env.INDAGO_DEV_ALLOWED_CASES;
+        else process.env.INDAGO_DEV_ALLOWED_CASES = original;
+      }
+    });
   });
 
   describe("verifyCaseAccess", () => {
@@ -62,10 +81,11 @@ describe("Auth Helpers", () => {
       expect(verifyCaseAccess(user, VALID_CASE_ID)).toBe(true);
     });
 
-    it("denies access to unallowed case in production", () => {
+    it("denies access to an unallowed case in EVERY environment (fail-closed)", () => {
       const original = process.env.NODE_ENV;
       try {
-        process.env.NODE_ENV = "production";
+        // Outside production the allow-list is still enforced — no fail-open.
+        process.env.NODE_ENV = "development";
         expect(verifyCaseAccess(user, "case-999")).toBe(false);
       } finally {
         process.env.NODE_ENV = original;

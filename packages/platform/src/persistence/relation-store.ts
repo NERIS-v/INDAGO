@@ -170,19 +170,33 @@ export class RelationStore {
    * its status — an existing ACTIVE row stays ACTIVE, an existing REVERSED row
    * stays REVERSED (REVERSED != MERGED; history is preserved).
    */
+  /**
+   * Interactive transaction runner bound to THIS store's Prisma client (so an
+   * injected test-DB store opens its transaction against the test database,
+   * not the global `db`). The authority layer uses this to co-locate the
+   * hypothesis decision + canonical-relation write in one atomic boundary.
+   */
+  async transaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(fn);
+  }
+
   async materializeRelation(
     input: MaterializeRelationInput,
+    tx?: Prisma.TransactionClient,
   ): Promise<MaterializeRelationResult> {
-    const { id, relationKey } = input;
-    const now = new Date();
-
-    return await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.relation.findUnique({
+    const run = async (
+      client: Pick<Prisma.TransactionClient, "relation">,
+    ): Promise<MaterializeRelationResult> => {
+      const { id, relationKey } = input;
+      const now = new Date();
+      const existing = await client.relation.findUnique({
         where: { relationKey },
       });
       if (!existing) {
         try {
-          const created = await tx.relation.create({
+          const created = await client.relation.create({
             data: {
               id,
               relationKey,
@@ -215,7 +229,7 @@ export class RelationStore {
               ? cause.code
               : undefined;
           if (code !== "P2002") throw cause;
-          const raced = await tx.relation.findUnique({ where: { relationKey } });
+          const raced = await client.relation.findUnique({ where: { relationKey } });
           if (!raced) throw cause;
           return {
             wrote: true,
@@ -229,7 +243,12 @@ export class RelationStore {
         reusedExisting: true,
         relation: rowToRelation(existing),
       };
-    });
+    };
+
+    // When the caller supplied a transaction client we operate directly inside
+    // it (no nested $transaction). Otherwise we open our own interactive tx.
+    if (tx) return run(tx);
+    return this.prisma.$transaction(run);
   }
 
   /**
@@ -241,14 +260,16 @@ export class RelationStore {
   async markReversed(
     id: string,
     filter: { caseId: string },
+    tx?: Prisma.TransactionClient,
   ): Promise<DurableRelation | null> {
-    const row = await this.prisma.relation.findFirst({
+    const client = tx ?? this.prisma;
+    const row = await client.relation.findFirst({
       where: { id, caseId: filter.caseId },
     });
     if (!row || row.status !== "ACTIVE") return null;
 
     const now = new Date();
-    const updated = await this.prisma.relation.update({
+    const updated = await client.relation.update({
       where: { id },
       data: { status: "REVERSED", reversedAt: now, updatedAt: now },
     });

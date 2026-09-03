@@ -30,6 +30,62 @@ import {
 
 export const apiRouter: Router = Router();
 
+// ============================================================================
+// Graph query-parameter BOUNDS + validation (M-A10 Fix 6)
+//
+// The Graphology projection caps are enforced here at the HTTP boundary so a
+// malformed / NaN / decimal / negative / oversized value NEVER reaches the
+// runtime unchecked. Every bound mirrors the graphology-projection caps:
+//   - hops      ∈ [0, 4]          (integer; absent → false → runtime default)
+//   - maxPaths  ∈ [1, 1000]       (integer; absent → runtime default ≤ 1000)
+//   - maxResults∈ [1, 1000]       (integer; absent → runtime default ≤ 1000)
+//
+// `strictInt` rejects non-numeric strings, floats, and out-of-range values;
+// it does NOT accept "Infinity"/"NaN" because Number coercion of those yields
+// a non-finite number which fails the integer + range guards below.
+// ============================================================================
+const GRAPH_HOPS_MAX = 4;
+const GRAPH_LIMIT_MAX = 1000;
+
+type GraphLimitResult =
+  | { readonly ok: true; readonly value: number | undefined }
+  | { readonly ok: false; readonly error: string };
+
+function parseBoundedInt(
+  raw: unknown,
+  min: number,
+  max: number,
+  name: string,
+): GraphLimitResult {
+  if (raw === undefined || raw === null || String(raw).trim() === "") {
+    // Absent / empty → caller falls through to the runtime default.
+    return { ok: true, value: undefined };
+  }
+  const s = String(raw).trim();
+  const parsed = Number(s);
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    return { ok: false, error: `${name} must be an integer` };
+  }
+  if (parsed < min || parsed > max) {
+    return { ok: false, error: `${name} must be between ${min} and ${max}` };
+  }
+  return { ok: true, value: parsed };
+}
+
+export function parseGraphQueryParam(
+  raw: unknown,
+  name: "hops" | "maxPaths" | "maxResults",
+): GraphLimitResult {
+  const bounds = {
+    hops: { min: 0, max: GRAPH_HOPS_MAX },
+    maxPaths: { min: 1, max: GRAPH_LIMIT_MAX },
+    maxResults: { min: 1, max: GRAPH_LIMIT_MAX },
+  } as const;
+  const { min, max } = bounds[name];
+  return parseBoundedInt(raw, min, max, name);
+}
+
+
 // Schema for the incoming webhook/API request
 //
 // caseId MUST be a canonical CaseIdSchema UUID. The canonical case identity
@@ -95,13 +151,13 @@ apiRouter.get(
   async (req, res) => {
     try {
       let cases = await caseStore.listCases();
-      // Production scope: the authenticated principal's allowedCases drive the
-      // catalogue. (verifyCaseAccess short-circuits to true in development, so
-      // the dev catalogue is intentionally un-scoped.)
-      if (process.env.NODE_ENV === "production") {
-        const allowed = new Set(req.user?.allowedCases ?? []);
-        cases = cases.filter((c) => allowed.has(c.id));
-      }
+      // Case-scoped catalogue in EVERY environment: the authenticated
+      // principal's allowedCases drive the listing (fail-closed, consistent
+      // with verifyCaseAccess now enforcing the allow-list in all modes — the
+      // dev demo principal is scoped to DEMO_ALLOWED_CASES + explicit
+      // INDAGO_DEV_ALLOWED_CASES grants).
+      const allowed = new Set(req.user?.allowedCases ?? []);
+      cases = cases.filter((c) => allowed.has(c.id));
       return res.status(200).json({
         count: cases.length,
         cases,
@@ -597,14 +653,20 @@ apiRouter.get(
 
       const hopsParam = req.query.hops;
       const maxPathsParam = req.query.maxPaths;
-      const hops = hopsParam === undefined ? undefined : Number(hopsParam);
-      const maxPaths = maxPathsParam === undefined ? undefined : Number(maxPathsParam);
+      const hopsResult = parseGraphQueryParam(hopsParam, "hops");
+      const maxPathsResult = parseGraphQueryParam(maxPathsParam, "maxPaths");
+      if (!hopsResult.ok) {
+        return res.status(400).json({ error: hopsResult.error });
+      }
+      if (!maxPathsResult.ok) {
+        return res.status(400).json({ error: maxPathsResult.error });
+      }
 
       const paths = await graphRuntime.traversal(
         { investigationId, caseId },
         startEntityId,
-        hops,
-        maxPaths,
+        hopsResult.value,
+        maxPathsResult.value,
       );
       return res.status(200).json({
         investigationId,
@@ -645,11 +707,13 @@ apiRouter.get(
       }
 
       const maxResultsParam = req.query.maxResults;
-      const maxResults =
-        maxResultsParam === undefined ? undefined : Number(maxResultsParam);
+      const maxResultsResult = parseGraphQueryParam(maxResultsParam, "maxResults");
+      if (!maxResultsResult.ok) {
+        return res.status(400).json({ error: maxResultsResult.error });
+      }
       const centrality = await graphRuntime.centrality(
         { investigationId, caseId },
-        maxResults,
+        maxResultsResult.value,
       );
       return res.status(200).json({
         investigationId,
@@ -764,6 +828,14 @@ apiRouter.post(
 
       await logAuditEvent({
         investigationId,
+        action: "RELATION_HYPOTHESIS_ACCEPTED",
+        actor: req.user!.id,
+        targetType: "RELATION_HYPOTHESIS",
+        targetId: hypothesisId,
+        description: `Accepted relation hypothesis ${hypothesisId} (case ${caseId})`,
+      });
+      await logAuditEvent({
+        investigationId,
         action: "RELATION_CREATED",
         actor: req.user!.id,
         targetType: "RELATION",
@@ -828,7 +900,7 @@ apiRouter.post(
       }
       await logAuditEvent({
         investigationId,
-        action: "RELATION_RESOLUTION_PROPOSED",
+        action: "RELATION_HYPOTHESIS_REJECTED",
         actor: req.user!.id,
         targetType: "RELATION_HYPOTHESIS",
         targetId: hypothesisId,
@@ -869,8 +941,10 @@ apiRouter.post(
         });
       }
       let updated!: import("../persistence/relation-hypothesis-store.js").DurableRelationHypothesis;
+      let reverseResult!: import("../relations/relation-materialization.js").ReverseRelationResult;
       try {
-        updated = await reverseRelationHypothesis({ caseId, hypothesisId });
+        reverseResult = await reverseRelationHypothesis({ caseId, hypothesisId });
+        updated = reverseResult.hypothesis;
       } catch (cause) {
         if (cause instanceof RelationMaterializationError) {
           if (cause.code === "HYPOTHESIS_NOT_FOUND") {
@@ -884,14 +958,27 @@ apiRouter.post(
         }
         throw cause;
       }
+      // Hypothesis-level reversal audit (authority decision on the hypothesis).
       await logAuditEvent({
         investigationId,
-        action: "RELATION_REVERSED",
+        action: "RELATION_HYPOTHESIS_REVERSED",
         actor: req.user!.id,
         targetType: "RELATION_HYPOTHESIS",
         targetId: hypothesisId,
         description: `Reversed relation hypothesis ${hypothesisId} (case ${caseId})`,
       });
+      // Canonical-relation reversal audit — only when an ACTIVE canonical
+      // relation was actually flipped (REVERSED != MERGED; history kept).
+      if (reverseResult.canonicalReversed && reverseResult.canonicalRelationId) {
+        await logAuditEvent({
+          investigationId,
+          action: "RELATION_REVERSED",
+          actor: req.user!.id,
+          targetType: "RELATION",
+          targetId: reverseResult.canonicalRelationId,
+          description: `Marked canonical relation ${reverseResult.canonicalRelationId} REVERSED (case ${caseId}) following acceptance reversal of hypothesis ${hypothesisId}`,
+        });
+      }
       return res.status(200).json({ status: updated.status, hypothesisId });
     } catch (error: unknown) {
       console.error("Failed to reverse relation hypothesis:", error);
