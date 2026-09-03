@@ -148,3 +148,7 @@ vite.config.ts.timestamp-*
 # M-A07 model/runtime assets (never commit)
 *.traineddata
 packages/platform/.data/
+
+# Local opencode / root lockfile (never commit)
+opencode.json
+package-lock.json
