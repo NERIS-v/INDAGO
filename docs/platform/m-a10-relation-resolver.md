@@ -291,18 +291,21 @@ Location: `packages/platform/src/relations/relation-store.ts`, `packages/platfor
 
 ## 11. Audit Events
 
-The following audit actions are persisted in `AuditActionSchema`:
+The following audit actions are persisted in `AuditActionSchema` (post-hardening vocab; `RELATION_HYPOTHESIS_*` actions are the lifecycle transition vocabulary; `RELATION_CREATED` / `RELATION_REVERSED` are the domain-state audit co-emitted alongside them):
 
 | Action | When |
 |--------|------|
-| `RELATION_RESOLUTION_PROPOSED` | A fresh PROPOSED relation hypothesis row is proposed (no dedicated accept/reject payload action — transitions ARE the authority) |
-| `RELATION_CREATED` | A PROPOSED hypothesis is accepted into a durable canonical Relation |
-| `RELATION_REVERSED` | A canonical Relation is reversed (ACCEPTED/REJECTED → REVERSED, terminal) |
-| `RELATION_CONTRADICTED` | A relation is contradicted |
-| `ENTITY_HYPOTHESIS_ACCEPTED` | An entity hypothesis is accepted |
-| `ENTITY_CREATED` | A canonical Entity is created |
+| `RELATION_RESOLUTION_PROPOSED` | A fresh PROPOSED relation hypothesis row is created by the worker (`completeMA10`) |
+| `RELATION_HYPOTHESIS_ACCEPTED` | The accept authority transition fires on a PROPOSED hypothesis |
+| `RELATION_CREATED` | A canonical `Relation` row is persisted (co-emitted with `RELATION_HYPOTHESIS_ACCEPTED` on accept) |
+| `RELATION_HYPOTHESIS_REJECTED` | The reject authority transition fires on a PROPOSED hypothesis (no canonical Relation created) |
+| `RELATION_HYPOTHESIS_REVERSED` | The reverse authority transition fires on a previously ACCEPTED/REJECTED hypothesis |
+| `RELATION_REVERSED` | A canonical Relation status flips to REVERSED (co-emitted with `RELATION_HYPOTHESIS_REVERSED` on reverse) |
+| `RELATION_CONTRADICTED` | A relation receives an explicit contradiction (`explicitContradictions` array in evidence) |
+| `ENTITY_HYPOTHESIS_ACCEPTED` | An entity hypothesis is accepted (cross-ref: entity-hypothesis authority) |
+| `ENTITY_CREATED` | A canonical Entity is created as part of hypothesis accept |
 
-**Discipline:** the audit target MUST be the actual `RelationHypothesis.id` / canonical `Relation.id`; persist the row first, then emit the audit event.
+**Discipline:** the audit target MUST be the actual `RelationHypothesis.id` / canonical `Relation.id`; persist the row first, then emit the audit event. On accept: persist canonical `Relation` first, then emit both `RELATION_HYPOTHESIS_ACCEPTED` and `RELATION_CREATED`. On reverse: update the `Relation` status first, then emit both `RELATION_HYPOTHESIS_REVERSED` and `RELATION_REVERSED`.
 
 ---
 
@@ -395,11 +398,12 @@ The swap is **reversible by design**. M-A10 keeps a clean seam so that a future 
 - **graphology-projection** — 11/11 tests (node/edge projection, directed/undirected structure, bounds, traversal, centrality, Louvain determinism) + typecheck clean.
 - **platform typecheck** — exit 0.
 - **platform unit** — 100/100 (worker-stub durable ingest-evidence incl. M-A10 implication + recovery + upload + auth).
-- **platform integration (real Postgres, `TEST_DATABASE_URL`)** — 28/28 across four suites:
-  - **m-a10-relation (14)** — accept/reject/reverse authority, transition guards, repeat/terminal refusal, identity convergence, directionality-aware identity, lifecycle preservation.
+- **platform integration (real Postgres, `TEST_DATABASE_URL`)** — 43/43 across five suites:
+  - **m-a10-relation (18)** — accept/reject/reverse authority, transition guards, repeat/terminal refusal, identity convergence, directionality-aware identity, lifecycle preservation.
   - **m-a10-contradiction (2)** — hardContradiction −0.25 (0.50 → 0.25), precise persisted `contradictions` provenance, single durable idempotent row (`reusedExisting:true`).
   - **m-a10-graph (6)** — node/edge counts, REVERSED/PROPOSED exclusion, bounded cycle-safe traversal, degree centrality, deterministic Louvain coverage, case isolation (via DI-able `GraphRuntime`).
-  - **m-a10-graph-http (6)** — the four Graphology express routes over the real API (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`) + 404 nonexistent investigation + 401/403 auth guard.
+  - **m-a10-graph-http (9)** — the four Graphology express routes over the real API (`graph`, `graph/traversal`, `graph/centrality`, `graph/communities`) + 404 nonexistent investigation + 401/403 auth guard + 400 malformed-param guards (traversal hops, centrality maxResults).
+  - **m-a10-ingest-http.e2e (8)** — full HTTP→worker→resolution→canonical-relation→graph end-to-end: proposed-hypothesis invariant (no dangling endpoints), accept→ACTIVE graph, re-accept 409, reject, reverse→ACTIVE excluded, traversal/centrality/communities from accepted relation, 403 foreign-case denial.
 
 Tests gated on an explicitly-set `TEST_DATABASE_URL`; they never target production `DATABASE_URL`.
 
@@ -407,4 +411,4 @@ Tests gated on an explicitly-set `TEST_DATABASE_URL`; they never target producti
 
 ## 16. Completion
 
-M-A10 implementation complete. Canonical relation hypotheses are source-grounded, reversible, PostgreSQL-authoritative, and projected into Graphology without changing the original M-A10 feature set or output contracts. The four audit blockers — relation directionality, relation decision authority, contradiction flow through the worker, and Graphology runtime wiring — are resolved and evidenced end-to-end (real Postgres integration 28/28, contracts 181/181, unit 100/100, all typechecks clean).
+M-A10 implementation complete and hardened. Canonical relation hypotheses are source-grounded, reversible, PostgreSQL-authoritative, and projected into Graphology without changing the original M-A10 feature set or output contracts. The four original audit blockers — relation directionality, relation decision authority, contradiction flow through the worker, and Graphology runtime wiring — are resolved and evidenced end-to-end (real Postgres integration 43/43 across 5 suites, contracts 181/181, unit 100/100, all typechecks clean). The follow-up hardening (`caa74cd`, merged via PR #49) resolved the two P2 findings (audit-log aliasing + non-transactional accept) and is tracked as resolved in the reconciled phase tracker.
