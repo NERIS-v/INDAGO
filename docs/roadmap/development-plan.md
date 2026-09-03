@@ -899,9 +899,10 @@ M-A12 and lands in Phase 6/8.
 **Status:** 🔵 DESIGN / LOCK — architecture locked; runtime not implemented.
 **Authoritative design doc:** `docs/platform/m-a12-temporal-architecture.md`.
 
-M-A12 is implemented as three PRs. PR0 locks the design; PR1/PR2/PR3 remain
-**planned** (not started). The locked decisions (D1–D7) and semantics are
-recorded in the design doc and must not be re-interpreted by downstream PRs.
+M-A12 is implemented as three PRs. PR0 locks the design; **PR1 (temporal history
++ intervals) is implemented**; PR2/PR3 remain **planned** (not started). The
+locked decisions (D1–D7) and semantics are recorded in the design doc and must
+not be re-interpreted by downstream PRs.
 
 #### Locked decisions (summary — see design doc for full detail)
 
@@ -934,7 +935,7 @@ recorded in the design doc and must not be re-interpreted by downstream PRs.
 | PR | Scope | Status |
 | --- | --- | --- |
 | M-A12-PR0 | Temporal architecture + design lock (this) + dev-plan/tracker updates | 🔵 DESIGN / LOCK (complete as a design PR) |
-| M-A12-PR1 | Temporal history + intervals: persist domain event-time, validity intervals, immutable temporal history for reconstruction; event-time propagation where confident; runtime validation; indexes; deterministic reconstruction primitives; tests | 🔵 PLANNED (next) |
+| M-A12-PR1 | Temporal history + intervals: persist domain event-time, validity intervals, immutable temporal history for reconstruction; event-time propagation where confident; runtime validation; indexes; deterministic reconstruction primitives; tests | ✅ IMPLEMENTED (`Observation.eventTime/sourceContextId/validityInterval` + `Relation`/`RelationHypothesis.validityInterval`; `temporal/interval-validation.ts` D5 rules; `TemporalStateChange` append-only store; MA06 event-time/source-context propagation + D6 history wiring; PR1 unit suite green; real-Postgres PR1 integration suite written — run deferred until TEST_DATABASE_URL reachable) |
 | M-A12-PR2 | Graph versions + historical graph projection: `GraphVersion`, version creation on canonical change, historical projection via node/edge `temporalRange`, current-vs-historical semantics | 🔵 PLANNED |
 | M-A12-PR3 | APIs + checkpoints + verification: minimal API surface (`current`, `versions`, `versions/:vid`, `as-of`), checkpoint↔version coupling, full test matrix | 🔵 PLANNED |
 
