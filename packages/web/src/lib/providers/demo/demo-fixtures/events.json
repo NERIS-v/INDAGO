@@ -1,0 +1,74 @@
+[
+  {
+    "id": "narrative-01",
+    "timestamp": "2024-06-18T10:00:00Z",
+    "type": "INGESTION",
+    "action": "Messy Case Pack Uploaded",
+    "description": "Initial extraction of 4 documents, including financial records and CDRs.",
+    "status": "SYSTEM"
+  },
+  {
+    "id": "narrative-02",
+    "timestamp": "2024-06-18T10:05:30Z",
+    "type": "OBSERVATION",
+    "action": "Observations Extracted",
+    "description": "12 factual observations extracted. Unidentified Witness communication channel identified.",
+    "status": "SYSTEM"
+  },
+  {
+    "id": "narrative-03",
+    "timestamp": "2024-06-18T10:30:00Z",
+    "type": "ENTITY_RESOLUTION",
+    "action": "Entity Resolution Requested",
+    "description": "Candidate match identified via shared communications infrastructure for Unidentified Witness.",
+    "status": "PENDING"
+  },
+  {
+    "id": "narrative-04",
+    "timestamp": "2024-06-18T11:15:00Z",
+    "type": "ANALYSIS",
+    "action": "Temporal Graph Generated",
+    "description": "Base knowledge graph constructed. Community fog and Tarjan bridges applied.",
+    "status": "SYSTEM"
+  },
+  {
+    "id": "narrative-05",
+    "timestamp": "2024-06-18T11:45:00Z",
+    "type": "ANALYSIS",
+    "action": "Lead Generated: Covert Ownership",
+    "description": "Structural pattern indicates Victor Aldridge exercises covert ownership of Meridian Transit.",
+    "status": "SYSTEM"
+  },
+  {
+    "id": "narrative-06",
+    "timestamp": "2024-06-18T12:02:00Z",
+    "type": "ANALYSIS",
+    "action": "Investigative Gap Classified",
+    "description": "Graph-hole detected. Meridian Transit Pvt Ltd ownership status unresolved.",
+    "status": "SYSTEM"
+  },
+  {
+    "id": "narrative-07",
+    "timestamp": "2024-06-18T12:10:00Z",
+    "type": "EVIDENCE_REQUEST",
+    "action": "Evidence Request Drafted",
+    "description": "Request for ROC / MCA Corporate Filing targeting Meridian Transit. EIG: 0.85.",
+    "status": "PENDING"
+  },
+  {
+    "id": "narrative-08",
+    "timestamp": "2024-06-18T12:30:00Z",
+    "type": "ANALYSIS",
+    "action": "Counter-Evidence Highlighted",
+    "description": "Conflicting location observation on 12-Apr challenges timeline viability.",
+    "status": "SYSTEM"
+  },
+  {
+    "id": "narrative-09",
+    "timestamp": "2024-06-18T12:35:00Z",
+    "type": "ANALYSIS",
+    "action": "Robustness Verified",
+    "description": "Missingness Stability calculated at 87/100. Resolution precision stable at 93.4%.",
+    "status": "SYSTEM"
+  }
+]
