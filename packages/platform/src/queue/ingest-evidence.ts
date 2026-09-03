@@ -93,6 +93,7 @@ import { candidatePairStore } from "../persistence/candidate-pair-store.js";
 import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
 import { entityStore } from "../persistence/entity-store.js";
 import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
+import { temporalStateChangeStore } from "../persistence/temporal-state-change-store.js";
 import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
@@ -716,6 +717,29 @@ async function completeMA06(params: {
     caseId,
   });
   if (created === 0) return; // a concurrent pass already made this durable
+
+  // 4a. M-A12-D6: append immutable temporal history for each observation
+  //     created THIS pass. recordChange is idempotent (deterministic id), so a
+  //     retry converges to the same rows without duplicating history. Domain
+  //     event time / validity / provenance are propagated when present; never
+  //     fabricated. Graph versioning is deferred to PR2 (no snapshot here).
+  for (const entry of entries) {
+    await temporalStateChangeStore.recordChange({
+      caseId,
+      investigationId,
+      entityType: "OBSERVATION",
+      entityId: entry.observation.id,
+      stateType: "CREATED",
+      ...(entry.observation.eventTime !== undefined
+        ? { eventTime: entry.observation.eventTime }
+        : {}),
+      ...(entry.observation.validityInterval !== undefined
+        ? { validityInterval: entry.observation.validityInterval }
+        : {}),
+      provenance: entry.observation.provenance,
+      ingestedAt: new Date(nowIso),
+    });
+  }
 
   // 4. Audit exactly once, only after rows are durable.
   await logAuditEvent({
