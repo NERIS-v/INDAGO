@@ -190,6 +190,7 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
         evidenceCount: hypothesis.evidenceCount,
         provenance,
         hypothesisId,
+        validityInterval: hypothesis.validityInterval,
       },
       tx,
     );
@@ -288,6 +289,16 @@ export async function reverseRelationHypothesis(
   const hypothesis = await hypStore.findById(hypothesisId, { caseId });
   if (!hypothesis) {
     throw new RelationMaterializationError("HYPOTHESIS_NOT_FOUND", hypothesisId);
+  }
+
+  // Idempotent: a second reverse of an already-REVERSED hypothesis is a no-op
+  // (returns the existing state, no duplicate writes or versions).
+  if (hypothesis.status === "REVERSED") {
+    return {
+      hypothesis,
+      canonicalRelationId: null,
+      canonicalReversed: false,
+    };
   }
 
   const canonicalRelationId = await deterministicRelationId({

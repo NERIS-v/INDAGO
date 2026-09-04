@@ -68,7 +68,7 @@ export function buildGraph(input: GraphProjectionInputLike): BuiltGraph {
   const nodes = input.nodes.slice(0, GRAPH_PROJECTION_BOUNDS.maxNodes);
   const edges = input.edges.slice(0, GRAPH_PROJECTION_BOUNDS.maxEdges);
 
-  const graph = new Graph();
+  const graph = new Graph({ multi: true });
   graph.setAttribute('caseId', input.caseId);
 
   const nodeMap = new Map<string, GraphProjectionInputLike['nodes'][number]>();

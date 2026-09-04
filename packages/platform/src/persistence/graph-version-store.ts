@@ -172,7 +172,7 @@ export class GraphVersionStore {
    * canonical mutation + version creation in one atomic boundary.
    */
   async transaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, { timeout: 15_000 });
   }
 
   /**
@@ -237,7 +237,7 @@ export class GraphVersionStore {
       // advisory lock. Concurrent same-case allocations block here until the
       // in-flight transaction commits, guaranteeing a globally unique,
       // gap-free-per-commit versionNumber without a silent collision.
-      await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${caseId}, 0))`;
+      await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${caseId}, 0))`;
 
       const versionNumber = await this.nextVersionNumber(caseId, client);
 

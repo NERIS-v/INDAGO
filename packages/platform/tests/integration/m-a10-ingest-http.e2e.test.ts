@@ -155,6 +155,12 @@ describe.skipIf(!TEST_DATABASE_URL)(
       // hypotheses over the REAL canonical EntityIds above. This is the same
       // relationHypothesisStore.upsertHypothesis that completeMA10 calls; the
       // rows are the durable PROPOSED state a worker pass would have produced.
+      //
+      // IMPORTANT: use the app's `db` singleton (same PrismaClient the routes
+      // use via DEFAULT_STORES) so the interactive $transaction in the accept
+      // handler sees the rows. Neon's pooler transaction mode can cause
+      // visibility issues when different PrismaClient instances share a pool.
+      const { db } = await import("../../src/db/prisma.js");
       const { RelationHypothesisStore } = await import(
         "../../src/persistence/relation-hypothesis-store.js"
       );
@@ -164,7 +170,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
         RELATION_SCORE_MODEL_VERSION,
       } = await import("@indago/relation-resolution");
 
-      const relationStore = new RelationHypothesisStore(prisma);
+      const relationStore = new RelationHypothesisStore(db);
 
       const pairs: Array<{
         sourceEntityId: string;
