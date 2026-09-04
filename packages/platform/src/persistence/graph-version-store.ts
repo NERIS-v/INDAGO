@@ -469,10 +469,86 @@ export class GraphVersionStore {
   }
 
   /**
+   * Paginated version listing for a case. Returns total count alongside the
+   * page so callers can compute next-page cursors. Ordered by versionNumber
+   * ascending (the deterministic replay seam).
+   */
+  async listByCasePaginated(
+    caseId: string,
+    params: { limit: number; offset: number; investigationId?: string },
+  ): Promise<{ versions: DurableGraphVersion[]; total: number }> {
+    const where = {
+      caseId,
+      ...(params.investigationId ? { investigationId: params.investigationId } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.graphVersion.findMany({
+        where,
+        orderBy: [{ versionNumber: "asc" }, { id: "asc" }],
+        take: params.limit,
+        skip: params.offset,
+      }),
+      this.prisma.graphVersion.count({ where }),
+    ]);
+    return { versions: rows.map(rowToGraphVersion), total };
+  }
+
+  /**
    * Count versions for a case.
    */
   async countByCase(caseId: string): Promise<number> {
     return this.prisma.graphVersion.count({ where: { caseId } });
+  }
+
+  // -----------------------------------------------------------------------
+  // D7 Checkpoint ↔ GraphVersion mapping (PR3)
+  //
+  // The forward mapping (version → checkpoint) already exists as
+  // `GraphVersion.checkpointId`. These methods add the reverse mapping
+  // (checkpoint → version) and the explicit association write.
+  //
+  // Design rationale (D7, §11):
+  //   - The association is EXPLICIT: someone writes `checkpointId` on a version.
+  //   - The reverse resolution is a deterministic query by (checkpointId, caseId).
+  //   - No timestamp heuristics, no step↔version inference, no schema change.
+  // -----------------------------------------------------------------------
+
+  /**
+   * Explicitly associate a checkpoint with a graph version (D7). Sets
+   * `checkpointId` on the version — the existing nullable forward-link field.
+   * Case-scoped: the version must belong to the given case.
+   */
+  async associateCheckpoint(
+    versionId: string,
+    checkpointId: string,
+    filter: { caseId: string },
+  ): Promise<DurableGraphVersion | null> {
+    const row = await this.prisma.graphVersion.findFirst({
+      where: { id: versionId, caseId: filter.caseId },
+    });
+    if (!row) return null;
+    const now = new Date();
+    const updated = await this.prisma.graphVersion.update({
+      where: { id: versionId },
+      data: { checkpointId, updatedAt: now },
+    });
+    return rowToGraphVersion(updated);
+  }
+
+  /**
+   * Reverse mapping (D7): resolve a graph version by its associated
+   * checkpointId. Case-scoped — only returns versions belonging to the
+   * given case. Deterministic: the explicit association set via
+   * `associateCheckpoint` is the single source of truth.
+   */
+  async resolveVersionByCheckpoint(
+    checkpointId: string,
+    filter: { caseId: string },
+  ): Promise<DurableGraphVersion | null> {
+    const row = await this.prisma.graphVersion.findFirst({
+      where: { checkpointId, caseId: filter.caseId },
+    });
+    return row ? rowToGraphVersion(row) : null;
   }
 }
 

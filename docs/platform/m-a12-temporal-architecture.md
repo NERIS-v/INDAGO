@@ -654,6 +654,13 @@ auditable, and compatible with future semantic intelligence.
 - **Dependencies:** PR1 + PR2.
 - **Non-goals:** semantic retrieval / embeddings / LLM / reblocking.
 - **Acceptance:** §17 + §19 matrix green end-to-end.
+- **Status:** ✅ IMPLEMENTED (unit-verified; real-Postgres integration BLOCKED).
+- **Deliverables:** case-scoped `GET /cases/:caseId/graph/current`,
+  `GET /cases/:caseId/graph/versions`, `GET /cases/:caseId/graph/versions/:vid`,
+  `GET /cases/:caseId/graph/as-of` (501 deferred); D7 checkpoint↔version
+  mapping via `associateCheckpoint`/`resolveVersionByCheckpoint` on existing
+  `GraphVersion.checkpointId` field; non-DB unit suite (16 green); gated
+  integration suite (7, BLOCKED).
 
 ---
 
@@ -684,7 +691,8 @@ auditable, and compatible with future semantic intelligence.
 - Fields: `caseId`, `investigationId?`, `versionNumber`, `status` (default `DRAFT`),
   `parentGraphVersionId?` (auto-linear to immediate predecessor when not explicit),
   `projectionStatus` (default `PENDING`), `nodeCount`/`edgeCount` (default 0), `checkpointId?`
-  (field preserved; reverse-link is PR3/D7), `reason?`, `metadata?`, `createdAt`/`updatedAt`.
+  (PR3/D7: `associateCheckpoint`/`resolveVersionByCheckpoint` wired, no schema migration),
+  `reason?`, `metadata?`, `createdAt`/`updatedAt`.
 
 ### B.1.2 Version numbering + allocation
 - `GraphVersionStore.nextVersionNumber(caseId, client)` reads `MAX(versionNumber)` for the case
@@ -782,22 +790,80 @@ auditable, and compatible with future semantic intelligence.
 
 ### B.1.14 Files
 - `packages/platform/prisma/schema.prisma` (GraphVersion model; no migration created — schema push BLOCKED).
-- `packages/platform/src/persistence/graph-version-store.ts` (advisory-lock allocation, lifecycle, parent, projection status).
+- `packages/platform/src/persistence/graph-version-store.ts` (advisory-lock allocation, lifecycle, parent, projection status; PR3 adds `associateCheckpoint`, `resolveVersionByCheckpoint`, `listByCasePaginated`).
 - `packages/platform/src/relations/relation-materialization.ts` (accept/reverse → version in same tx; reject → none).
 - `packages/platform/src/relations/graph-version-service.ts` (current + historical projection, replay, normalize).
+- `packages/platform/src/api/routes.ts` (PR3 adds case-scoped `/cases/:caseId/graph/*` endpoints).
 - `packages/intelligence/graphology-projection/src/types.ts` + `build-graph.ts` (optional `temporalRange` threading).
 - Tests: `tests/m-a12-pr2-graph-projection.test.ts` (pure, 16 green),
-  `tests/integration/m-a12-pr2-versioning.integration.test.ts` (real Postgres, gated, **BLOCKED**).
+  `tests/m-a12-pr3-temporal-apis.test.ts` (pure, 16 green),
+  `tests/integration/m-a12-pr2-versioning.integration.test.ts` (real Postgres, gated, **BLOCKED**),
+  `tests/integration/m-a12-pr3-apis.integration.test.ts` (real Postgres, gated, **BLOCKED**).
 
 ### B.1.15 Known limitations / deferred (documented, not COMPLETE green)
 - **Real Postgres verification BLOCKED** — TEST_DATABASE_URL unreachable; schema push + all DB suites cannot execute.
 - **GraphVersion table not live on prod** — schema absent on prod and unreachable on test DB ⇒ coupling is
   "implemented but not yet activated" (authority tolerates absent `graphVersionStore` in isolated M-A10 tests;
   production `DEFAULT_STORES` always supplies it).
-- Checkpoint↔version reverse-link is PR3/D7 (field `checkpointId` present only).
-- Public version/as-of query APIs are PR3.
+- **`as-of` temporal query deferred** — PR0 §17 lists as-of as a candidate endpoint but does not define
+  sufficient temporal-boundary semantics. The endpoint returns 501 with a clear message. Version-based
+  retrieval via `/versions/:vid` is the authoritative historical surface.
 - Historical entity-node selection uses the canonical non-ARCHIVED universe (entity-mutation version triggers
   are not wired in PR2; only relation accept/reverse trigger versions).
+
+### B.1.16 PR3 — Public Temporal APIs + D7 Checkpoint Mapping (implemented)
+
+> PR3 delivers the minimal public API surface (§17) and the D7 checkpoint↔version reverse mapping.
+> All endpoints are case-scoped, fail-closed, bounded/paginated. Historical graph delegates to
+> `graphProjectionService.projectGraphVersion()` — no SQL in routes, no Graphology-as-truth.
+
+**API endpoints** (in `packages/platform/src/api/routes.ts`):
+- `GET /api/v1/cases/:caseId/graph/current` — current canonical graph for a case. Resolves the
+  latest `InvestigationRun.investigationId` for the case, delegates to `projectCurrentGraph()`.
+  Returns normalized `NormalizedGraphSnapshot` (deterministic, sorted).
+- `GET /api/v1/cases/:caseId/graph/versions?limit=&offset=` — paginated version listing.
+  `limit` ∈ [1, 100] (default 20), `offset` ∈ [0, 1M] (default 0). Ordered by `versionNumber`
+  ascending. Returns `versions[]` with id, versionNumber, status, projectionStatus, checkpointId,
+  nodeCount, edgeCount, reason, timestamps, plus `total` count.
+- `GET /api/v1/cases/:caseId/graph/versions/:vid` — historical graph for a specific version.
+  `:vid` accepts a positive integer (versionNumber) or a UUID (version id). Delegates to
+  `projectGraphVersion()`. 404 on unresolvable target (no silent fallback to current graph).
+  Returns version metadata + normalized graph snapshot.
+- `GET /api/v1/cases/:caseId/graph/as-of` — **DEFERRED** (501). PR0 lacks sufficient
+  temporal-boundary semantics (STOP condition #6).
+
+**Auth pattern:** `requireAuth` + `requireRole(["INVESTIGATOR", "ADMIN"])` + `verifyCaseAccess`
+(fail-closed). Case boundary derived from URL path param, never client-supplied. Follows existing
+`DELETE /cases/:caseId` pattern. Backward-compat: existing `/investigations/:id/graph` endpoint
+is untouched.
+
+**D7 Checkpoint↔Version mapping** (in `graph-version-store.ts`):
+- `associateCheckpoint(versionId, checkpointId, {caseId})` — explicit write setting the existing
+  `GraphVersion.checkpointId` field. Case-scoped: version must belong to the given case. Returns
+  the updated version or null if version not found.
+- `resolveVersionByCheckpoint(checkpointId, {caseId})` — deterministic reverse resolution query.
+  Returns the version associated with the given checkpoint, case-scoped.
+- `listByCasePaginated(caseId, {limit, offset, investigationId?})` — paginated version listing
+  with total count. Used by the version listing endpoint.
+- No schema migration needed. Uses the existing `GraphVersion.checkpointId` nullable field.
+- The association is EXPLICIT: someone writes checkpointId on a version. No timestamp heuristics,
+  no step↔version inference, no AgentCheckpoint redesign.
+
+**Test coverage:**
+- `tests/m-a12-pr3-temporal-apis.test.ts` — 16 pure unit tests (green):
+  - `replayLifecycle` multi-relation + checkpoint-relevant scenarios (4 tests)
+  - `GraphProjectionService` mock-store historical projection (5 tests)
+  - D7 checkpoint↔version semantic rules (4 tests)
+  - `normalizeBuiltGraph` determinism (1 test)
+  - Lifecycle transition matrix (1 test)
+  - as-of deferral documentation (1 test)
+- `tests/integration/m-a12-pr3-apis.integration.test.ts` — 7 gated integration tests (BLOCKED):
+  - Version listing + pagination
+  - Historical graph projection via versionNumber and UUID
+  - Checkpoint association + resolution
+  - Cross-case isolation for checkpoint mapping
+  - Deterministic replay after checkpoint association
+  - Jan10→Mar10 worked example with version listing
 
 ---
 

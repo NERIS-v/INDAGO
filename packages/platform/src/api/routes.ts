@@ -14,6 +14,8 @@ import { entityStore } from "../persistence/entity-store.js";
 import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
 import { relationStore } from "../persistence/relation-store.js";
 import { graphRuntime } from "../relations/graph-runtime.js";
+import { graphProjectionService } from "../relations/graph-version-service.js";
+import { graphVersionStore } from "../persistence/graph-version-store.js";
 import { materializeCanonicalEntityFromAcceptedHypothesis, EntityMaterializationError } from "../entities/entity-materialization.js";
 import {
   materializeCanonicalRelationFromAcceptedHypothesis,
@@ -1218,4 +1220,251 @@ apiRouter.post(
       return res.status(500).json({ error: "Internal server error" });
     }
   }
+);
+
+// ============================================================================
+// M-A12-PR3 — Case-scoped graph temporal endpoints (§17 API Plan)
+//
+// These are the case-scoped public endpoints the PR0 design specifies.
+// Backward-compat: the existing /investigations/:id/graph endpoint is
+// untouched; the new endpoints use /cases/:caseId/graph/*.
+//
+// Auth: every endpoint derives the case boundary from the URL path param,
+// NOT from a client-supplied query/body field. verifyCaseAccess enforces
+// the allow-list (fail-closed). cross-case data never leaks.
+//
+// Historical graph delegates to graphProjectionService (never raw SQL,
+// never Graphology-as-truth). as-of is DEFERRED (501) because PR0 does
+// not define sufficient temporal-boundary semantics.
+// ============================================================================
+
+const GRAPH_VERSION_LIMIT_MAX = 100;
+
+/**
+ * Case-scoped auth helper — resolves caseId from the route param, verifies
+ * access, and returns the case boundary. Returns null (with 4xx sent) when
+ * the caller is unauthorized or the caseId is invalid.
+ */
+async function resolveCaseBoundary(
+  req: Express.Request,
+  res: Express.Response,
+): Promise<string | null> {
+  const caseId = String(req.params.caseId || "");
+  if (!caseId || !CaseIdSchema.safeParse(caseId).success) {
+    res.status(400).json({ error: "Invalid case ID" });
+    return null;
+  }
+  if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+    res.status(403).json({
+      error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+    });
+    return null;
+  }
+  return caseId;
+}
+
+/**
+ * Resolve the latest InvestigationRun for a case and return its
+ * investigationId. The projection service requires an investigationId;
+ * this provides it from the authoritative persisted run.
+ */
+async function resolveInvestigationIdForCase(caseId: string): Promise<string | null> {
+  const run = await db.investigationRun.findFirst({
+    where: { caseId },
+    orderBy: { createdAt: "desc" },
+  });
+  return run?.investigationId ?? null;
+}
+
+// PR3-1. GET /cases/:caseId/graph/current — current canonical graph for a case.
+apiRouter.get(
+  "/cases/:caseId/graph/current",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const caseId = await resolveCaseBoundary(req, res);
+      if (!caseId) return;
+
+      const investigationId = await resolveInvestigationIdForCase(caseId);
+      const built = await graphProjectionService.projectCurrentGraph({
+        caseId,
+        investigationId: investigationId ?? "",
+      });
+      const snap = (
+        await import("../relations/graph-version-service.js")
+      ).normalizeBuiltGraph(built.graph, caseId);
+
+      return res.status(200).json({
+        caseId,
+        nodeCount: snap.nodes.length,
+        edgeCount: snap.edges.length,
+        graph: snap,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve case current graph:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// PR3-2. GET /cases/:caseId/graph/versions — paginated version listing.
+//
+// limit ∈ [1, 100] (default 20), offset ∈ [0, ∞) (default 0).
+// Ordered by versionNumber ascending (the deterministic replay seam).
+apiRouter.get(
+  "/cases/:caseId/graph/versions",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const caseId = await resolveCaseBoundary(req, res);
+      if (!caseId) return;
+
+      const limitResult = parseBoundedInt(req.query.limit, 1, GRAPH_VERSION_LIMIT_MAX, "limit");
+      if (!limitResult.ok) {
+        return res.status(400).json({ error: limitResult.error });
+      }
+      const offsetRaw = req.query.offset;
+      let offset = 0;
+      if (offsetRaw !== undefined && offsetRaw !== null && String(offsetRaw).trim() !== "") {
+        const offResult = parseBoundedInt(offsetRaw, 0, 1_000_000, "offset");
+        if (!offResult.ok) {
+          return res.status(400).json({ error: offResult.error });
+        }
+        offset = offResult.value!;
+      }
+      const limit = limitResult.value ?? 20;
+
+      const { versions, total } = await graphVersionStore.listByCasePaginated(caseId, {
+        limit,
+        offset,
+      });
+
+      return res.status(200).json({
+        caseId,
+        total,
+        offset,
+        limit,
+        count: versions.length,
+        versions: versions.map((v) => ({
+          id: v.id,
+          caseId: v.caseId,
+          versionNumber: v.versionNumber,
+          status: v.status,
+          projectionStatus: v.projectionStatus,
+          parentGraphVersionId: v.parentGraphVersionId,
+          checkpointId: v.checkpointId,
+          nodeCount: v.nodeCount,
+          edgeCount: v.edgeCount,
+          reason: v.reason,
+          createdAt: v.createdAt.toISOString(),
+          updatedAt: v.updatedAt.toISOString(),
+        })),
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list graph versions:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// PR3-3. GET /cases/:caseId/graph/versions/:vid — historical graph for a
+// specific version. `:vid` accepts either a versionNumber (positive integer)
+// or a GraphVersion UUID id. The projection service delegates to
+// projectGraphVersion which never falls back to the current graph.
+apiRouter.get(
+  "/cases/:caseId/graph/versions/:vid",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const caseId = await resolveCaseBoundary(req, res);
+      if (!caseId) return;
+
+      const vid = String(req.params.vid || "");
+      if (!vid) {
+        return res.status(400).json({ error: "Version identifier is required" });
+      }
+
+      // Determine whether vid is a versionNumber (positive integer) or a UUID.
+      const asInt = Number(vid);
+      const target =
+        Number.isInteger(asInt) && Number.isFinite(asInt) && asInt > 0
+          ? { versionNumber: asInt }
+          : z.string().uuid().safeParse(vid).success
+            ? { graphVersionId: vid }
+            : null;
+      if (!target) {
+        return res.status(400).json({
+          error: "vid must be a positive integer versionNumber or a valid UUID",
+        });
+      }
+
+      const investigationId = await resolveInvestigationIdForCase(caseId);
+      const built = await graphProjectionService.projectGraphVersion(caseId, target);
+      const snap = (
+        await import("../relations/graph-version-service.js")
+      ).normalizeBuiltGraph(built.graph, caseId);
+
+      // Resolve the version metadata for the response.
+      const version =
+        "versionNumber" in target
+          ? await graphVersionStore.findByVersionNumber(caseId, target.versionNumber)
+          : await graphVersionStore.findById(target.graphVersionId, { caseId });
+
+      return res.status(200).json({
+        caseId,
+        version: version
+          ? {
+              id: version.id,
+              versionNumber: version.versionNumber,
+              status: version.status,
+              projectionStatus: version.projectionStatus,
+              parentGraphVersionId: version.parentGraphVersionId,
+              checkpointId: version.checkpointId,
+              nodeCount: snap.nodes.length,
+              edgeCount: snap.edges.length,
+              reason: version.reason,
+              createdAt: version.createdAt.toISOString(),
+              updatedAt: version.updatedAt.toISOString(),
+            }
+          : null,
+        graph: snap,
+      });
+    } catch (error: unknown) {
+      // projectGraphVersion throws when the version cannot be resolved —
+      // surface as 404, not 500.
+      if (
+        error instanceof Error &&
+        error.message.includes("GraphVersion not found")
+      ) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Failed to serve historical graph:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// PR3-4. GET /cases/:caseId/graph/as-of — DEFERRED (501).
+//
+// PR0 §17 lists as-of as a candidate endpoint but does not define sufficient
+// temporal-boundary semantics (STOP condition #6). Version-based retrieval
+// via /versions/:vid is the authoritative historical surface. This stub
+// documents the intent without inventing semantics.
+apiRouter.get(
+  "/cases/:caseId/graph/as-of",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    const caseId = await resolveCaseBoundary(req, res);
+    if (!caseId) return;
+    return res.status(501).json({
+      error: "as-of temporal query is deferred",
+      detail:
+        "PR0 does not define sufficient temporal-boundary semantics. Use /versions/:vid for version-based historical retrieval.",
+      caseId,
+    });
+  },
 );

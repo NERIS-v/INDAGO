@@ -68,7 +68,7 @@ this `docs/` tree):
 | Entity / candidate / hypothesis contracts | `IMPLEMENTED` | `packages/contracts/src/domain/entity.ts`, `intelligence/entity-resolution.ts`; M-A07 EntityMentionCandidate + M-A08 CandidatePair + M-A09 EntityHypothesis persisted stores |
 | Entity resolution / canonical entities | `IMPLEMENTED` | M-A09 canonical Entity authority (identity key, reversible EntityHypothesis, worker, audit); backend-verified |
 | Relations / hypotheses / graph | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring, reversal); M-A11 Graphology projection; M-A13 graph query APIs — backend-verified |
-| Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2, unit-verified) / `PLANNED` (PR3) | PR0 design locked; **PR1 implemented** (temporal fields, D5 validation, `TemporalStateChange` history store, event-time/source-context propagation); **PR2 implemented** (`GraphVersion` model+store, advisory-lock versioning, canonical-change coupling, internal current/historical projection service, deterministic replay) — real-Postgres integration verification **BLOCKED** (TEST_DATABASE_URL unreachable); PR3 (APIs + checkpoints) planned — `docs/platform/m-a12-temporal-architecture.md` |
+| Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3, unit-verified) | PR0 design locked; **PR1 implemented** (temporal fields, D5 validation, `TemporalStateChange` history store, event-time/source-context propagation); **PR2 implemented** (`GraphVersion` model+store, advisory-lock versioning, canonical-change coupling, internal current/historical projection service, deterministic replay); **PR3 implemented** (case-scoped temporal APIs: `current`, `versions`, `versions/:vid`; D7 checkpoint↔version coupling; `as-of` deferred 501) — real-Postgres integration verification **BLOCKED** (TEST_DATABASE_URL temporarily unavailable) — `docs/platform/m-a12-temporal-architecture.md` |
 | Corroboration / semantic grouping | `NOT_FOUND` | not contracted; see `observation-corroboration.md`; cross-observation semantic intelligence deferred post-M-A12 |
 | Leads / gaps / robustness | `NOT_FOUND` in backend | phases exist on the tracker; only narrative/UI scaffolds exist |
 
@@ -117,7 +117,7 @@ flowchart TD
 | 10 | Relation extraction / resolution | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring v1); backend-verified |
 | 11 | Hypothesis generation | `PARTIALLY_IMPLEMENTED` | EntityHypothesis + RelationHypothesis lifecycle stores exist; full hypothesis UI surfacing deferred |
 | 12 | Graph projection | `IMPLEMENTED` (backend) / `PARTIALLY_IMPLEMENTED` (UI) | M-A11 Graphology projection + M-A13 graph query APIs; broad live-mode UI surfacing still stub (`UnsupportedGraphProvider`) |
-| 12b | Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2, unit-verified) / `PLANNED` (PR3) | PR1 temporal history + intervals done; PR2 graph versions + internal historical projection done (real-Postgres integration BLOCKED); PR3 APIs + checkpoint coupling planned |
+| 12b | Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3, unit-verified) | PR1 temporal history + intervals done; PR2 graph versions + internal historical projection done; PR3 case-scoped temporal APIs + D7 checkpoint coupling done (real-Postgres integration BLOCKED) |
 | 13 | Leads | `NOT_FOUND` | tracker Phase 4 |
 | 14 | Claim grounding | `NOT_FOUND` | tracker Phase 6A |
 | 15 | Robustness / counter-evidence | `PARTIALLY_IMPLEMENTED` (tracker 6B complete; UI narrative) | tracker Phase 6 |
@@ -167,7 +167,7 @@ future richer workflows. No milestones are fixed for these.
 - Backend: graph projection, query, and analysis are **IMPLEMENTED** via M-A11 (Graphology projection: build-graph/centrality/communities) and M-A13 (typed graph service APIs + express routes `graph`, `graph/traversal`, `graph/centrality`, `graph/communities`). `GraphNode`/`GraphEdge`/`GraphVersion` contracts are `packages/contracts/src/graph/*`.
 - Graphology is a **derived, disposable** projection; Postgres is the authoritative domain state. No Graphology-based historical/temporal history (temporal projection is M-A12; PR1 history/intervals implemented, graph-version history is PR2/PR3).
 - Frontend: graph presentation scaffolds exist in demo fixtures; live-mode rendering is future UI phase (F-PR4+ per `docs/frontend/frontend-development-plan.md`); live providers are stub (`UnsupportedGraphProvider`).
-- Temporal graph (current vs historical versions) is M-A12; **PR2 internal current/historical projection implemented** (unit-verified; real-Postgres integration BLOCKED); public version/as-of query APIs are PR3 (planned).
+- Temporal graph (current vs historical versions) is M-A12; **PR2 internal current/historical projection implemented** (unit-verified; real-Postgres integration BLOCKED); **PR3 public version/current/as-of query APIs implemented** (unit-verified; real-Postgres integration BLOCKED; `as-of` deferred as 501).
 
 ## Frontend Capability Progression
 
@@ -242,14 +242,14 @@ Priorities are derived from the repository's own phase ordering and documented
 dependencies, not from feature preference.
 
 ### P0 — required for core next milestones / correctness
-- M-A12 Temporal projection (PR1 intervals/history **implemented**; PR2 graph versions **implemented** unit-verified, real-Postgres integration **BLOCKED**; PR3 APIs) — **next foundation milestone**; PR0 design locked.
+- M-A12 Temporal projection (PR1 intervals/history **implemented**; PR2 graph versions **implemented** unit-verified; PR3 APIs + checkpoints **implemented** unit-verified; real-Postgres integration **BLOCKED**) — **next foundation milestone**; PR0 design locked. M-A12 implementation complete; full verification BLOCKED on TEST_DATABASE_URL.
 - Realtime replay endpoint decision (activity-feed replay vs PR open) — pending decision, potentially P0 for the frontend realtime story.
 
 ### P1 — important production/product capability
 - Production auth (JWT/OIDC behind `verifyToken`).
 - Production DB migration mechanism.
 - Graph UI + entity-resolution review UI (live-mode providers are stub: `UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider`).
-- M-A12 temporal/graph version APIs (PR3).
+- M-A12 temporal/graph version APIs (PR3) — **implemented** (unit-verified; real-Postgres integration BLOCKED).
 - Production observability / queue monitoring / secrets management.
 
 ### P2 — later enhancement
@@ -292,7 +292,7 @@ Only nodes supported by repository roadmap or current architecture are included.
 - Production identity (JWT/OIDC) — single-function swap ready, not implemented.
 - Corroboration / claim grouping — future, must not replace evidence identity.
 - Cross-observation semantic intelligence, targeted reblocking, graph-hole intelligence — post-M-A12 (Phase 4/5).
-- Temporal runtime (M-A12-PR1 + PR2 implemented, unit-verified; PR3 planned) — PR1 history/intervals done; PR2 graph versions + internal historical projection done (real-Postgres integration BLOCKED on TEST_DATABASE_URL); PR3 APIs + checkpoint coupling planned.
+- Temporal runtime (M-A12-PR1 + PR2 + PR3 implemented, unit-verified) — PR1 history/intervals done; PR2 graph versions + internal historical projection done; PR3 case-scoped temporal APIs + D7 checkpoint coupling done (real-Postgres integration BLOCKED on TEST_DATABASE_URL); `as-of` deferred (501).
 - Frontend graph/timeline/leads/gaps/review renderers — deferred tracker phases.
 
 ## Unknown / Needs Decision
