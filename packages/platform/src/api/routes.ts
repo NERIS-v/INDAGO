@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { db } from "../db/prisma.js";
@@ -1246,8 +1246,8 @@ const GRAPH_VERSION_LIMIT_MAX = 100;
  * the caller is unauthorized or the caseId is invalid.
  */
 async function resolveCaseBoundary(
-  req: Express.Request,
-  res: Express.Response,
+  req: Request,
+  res: Response,
 ): Promise<string | null> {
   const caseId = String(req.params.caseId || "");
   if (!caseId || !CaseIdSchema.safeParse(caseId).success) {
@@ -1401,7 +1401,7 @@ apiRouter.get(
         });
       }
 
-      const investigationId = await resolveInvestigationIdForCase(caseId);
+      await resolveInvestigationIdForCase(caseId);
       const built = await graphProjectionService.projectGraphVersion(caseId, target);
       const snap = (
         await import("../relations/graph-version-service.js")
@@ -1410,7 +1410,7 @@ apiRouter.get(
       // Resolve the version metadata for the response.
       const version =
         "versionNumber" in target
-          ? await graphVersionStore.findByVersionNumber(caseId, target.versionNumber)
+          ? await graphVersionStore.findByVersionNumber(caseId, target.versionNumber!)
           : await graphVersionStore.findById(target.graphVersionId, { caseId });
 
       return res.status(200).json({
