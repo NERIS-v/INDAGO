@@ -34,6 +34,7 @@ const NAV: NavEntry[] = [
   { label: "Ledger", href: "ledger", scaffolded: true },
   { label: "Robustness", href: "robustness", scaffolded: true },
   { label: "Review", href: "review", scaffolded: true },
+  { label: "Hypothesis", href: "hypothesis" },
 ];
 
 export function WorkspaceShell({
