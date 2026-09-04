@@ -138,34 +138,36 @@ export function traverseBounded(
       const neighbors = graph.neighbors(currentNode).sort();
       for (const nb of neighbors) {
         if (walk.visited.has(nb)) continue; // cycle-safe
-        const edgeKey = graph.edge(currentNode, nb);
-        if (edgeKey === undefined) continue;
-        const edgeAttrs = graph.getEdgeAttributes(edgeKey) as {
-          relationType?: string;
-          relationId?: string;
-        };
-        const directed = graph.isDirected(edgeKey);
-        const attrs = graph.getNodeAttributes(nb) as NodeAttributes;
-        const nbCert: TraversalHopCert = {
-          nodeId: nb,
-          entityType: attrs.entityType ?? null,
-          canonicalName: attrs.canonicalName ?? '',
-        };
-        const nextVisited = new Set(walk.visited);
-        nextVisited.add(nb);
-        next.push({
-          nodes: [...walk.nodes, nbCert],
-          steps: [
-            ...walk.steps,
-            {
-              relationType: edgeAttrs.relationType ?? '',
-              edgeId: edgeAttrs.relationId ?? edgeKey,
-              nodeId: nb,
-              directed,
-            },
-          ],
-          visited: nextVisited,
-        });
+        const edgeKeys = graph.edges(currentNode, nb);
+        if (!edgeKeys || edgeKeys.length === 0) continue;
+        for (const edgeKey of edgeKeys) {
+          const edgeAttrs = graph.getEdgeAttributes(edgeKey) as {
+            relationType?: string;
+            relationId?: string;
+          };
+          const directed = graph.isDirected(edgeKey);
+          const attrs = graph.getNodeAttributes(nb) as NodeAttributes;
+          const nbCert: TraversalHopCert = {
+            nodeId: nb,
+            entityType: attrs.entityType ?? null,
+            canonicalName: attrs.canonicalName ?? '',
+          };
+          const nextVisited = new Set(walk.visited);
+          nextVisited.add(nb);
+          next.push({
+            nodes: [...walk.nodes, nbCert],
+            steps: [
+              ...walk.steps,
+              {
+                relationType: edgeAttrs.relationType ?? '',
+                edgeId: edgeAttrs.relationId ?? edgeKey,
+                nodeId: nb,
+                directed,
+              },
+            ],
+            visited: nextVisited,
+          });
+        }
       }
     }
     frontier = next;

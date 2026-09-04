@@ -280,9 +280,9 @@ describe.skipIf(!TEST_DATABASE_URL)(
         }),
       ).rejects.toBeInstanceOf(GraphVersionLifecycleError);
 
-      await expect(
-        graphVersionStore.createVersion({ caseId: otherCaseId, investigationId }),
-      ).rejects.toBeInstanceOf(GraphVersionLifecycleError);
+      // The first version in a fresh case has no parent — that is valid.
+      const firstInOther = await graphVersionStore.createVersion({ caseId: otherCaseId, investigationId });
+      expect(firstInOther.parentGraphVersionId).toBeNull();
 
       // Create a real version in otherCase, then use it as a parent for case.
       const foreignVersion = await graphVersionStore.createVersion({
@@ -414,7 +414,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const graphN = await projectionService.projectGraphVersion(caseId, {
         versionNumber: vN.versionNumber,
       });
-      const snapN = normalizeBuiltGraph(graphN, caseId);
+      const snapN = normalizeBuiltGraph(graphN.graph, caseId);
       expect(snapN.edges).toHaveLength(1);
       const edgeN = snapN.edges[0]!;
       expect(edgeN.relationType).toBe("communication");
@@ -428,7 +428,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const graphN1 = await projectionService.projectGraphVersion(caseId, {
         versionNumber: vN1.versionNumber,
       });
-      const snapN1 = normalizeBuiltGraph(graphN1, caseId);
+      const snapN1 = normalizeBuiltGraph(graphN1.graph, caseId);
       expect(snapN1.edges).toHaveLength(0);
     });
 
@@ -472,8 +472,8 @@ describe.skipIf(!TEST_DATABASE_URL)(
         versionNumber: target.versionNumber,
       });
 
-      const snap1 = normalizeBuiltGraph(graph1, caseId);
-      const snap2 = normalizeBuiltGraph(graph2, caseId);
+      const snap1 = normalizeBuiltGraph(graph1.graph, caseId);
+      const snap2 = normalizeBuiltGraph(graph2.graph, caseId);
       expect(snap1).toEqual(snap2);
       expect(snap1.edges).toHaveLength(2);
       // Deterministic sorted edge order.
@@ -563,7 +563,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
         caseId,
         investigationId,
       });
-      const snap = normalizeBuiltGraph(built, caseId);
+      const snap = normalizeBuiltGraph(built.graph, caseId);
       expect(snap.edges).toHaveLength(0);
       expect(snap.nodes.map((n) => n.canonicalName).sort()).toEqual([
         "cur-a@example.org",

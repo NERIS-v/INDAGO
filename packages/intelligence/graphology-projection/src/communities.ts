@@ -53,19 +53,18 @@ function deterministicRng(seed: number): () => number {
  */
 function toUndirectedHomogeneousView(graph: Graph): Graph {
   const view = new Graph({ type: 'undirected' });
-  const nodeIds = graph.nodes();
-  for (const id of nodeIds) {
-    view.addNode(id);
-  }
+  for (const id of graph.nodes()) view.addNode(id);
   const seen = new Set<string>();
-  graph.forEachEdge((_edge, _attrs, source, target) => {
-    const pair = source < target ? `${source}|${target}` : `${target}|${source}`;
-    if (seen.has(pair)) return;
-    seen.add(pair);
-    if (!view.hasEdge(source, target)) {
-      view.addEdge(source, target);
+  for (const node of graph.nodes()) {
+    for (const neighbor of graph.neighbors(node)) {
+      const pair = node < neighbor ? `${node}|${neighbor}` : `${neighbor}|${node}`;
+      if (seen.has(pair)) continue;
+      seen.add(pair);
+      if (!view.hasEdge(node, neighbor)) {
+        view.addEdge(node, neighbor);
+      }
     }
-  });
+  }
   return view;
 }
 

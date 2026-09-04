@@ -182,7 +182,7 @@ export class RelationStore {
   async transaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, { timeout: 15_000 });
   }
 
   async materializeRelation(

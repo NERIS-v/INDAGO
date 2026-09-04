@@ -41,7 +41,7 @@ export function degreeCentrality(
   const entries: Entry[] = [];
 
   graph.forEachNode((nodeId) => {
-    const degree = (graph.degree(nodeId) as number) ?? 0;
+    const degree = graph.edges(nodeId).length;
     if (degree === 0) return;
     entries.push({ nodeId, degree, maxDegree: 0 });
     if (degree > maxDegree) maxDegree = degree;

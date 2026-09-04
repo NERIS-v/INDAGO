@@ -277,6 +277,8 @@ describe.skipIf(!TEST_DATABASE_URL)(
       relationStore = new RelationHypothesisStore(prisma);
       canonRelationStore = new RelationStore(prisma);
 
+      await prisma.graphVersion.deleteMany({});
+      await prisma.temporalStateChange.deleteMany({});
       await prisma.relation.deleteMany({});
       await prisma.relationHypothesis.deleteMany({});
       await prisma.entity.deleteMany({});
@@ -315,6 +317,8 @@ describe.skipIf(!TEST_DATABASE_URL)(
     });
 
     afterAll(async () => {
+      await prisma.graphVersion.deleteMany({});
+      await prisma.temporalStateChange.deleteMany({});
       await prisma.relation.deleteMany({});
       await prisma.relationHypothesis.deleteMany({});
       await prisma.entity.deleteMany({});
@@ -1340,17 +1344,13 @@ describe.skipIf(!TEST_DATABASE_URL)(
       });
       await relationStore.acceptHypothesis(id, { caseId });
 
-      // reverse→reverse (REVERSED is terminal → second refused).
-      await reverseRelationHypothesis(
+      // reverse→reverse (idempotent — second reverse is a no-op).
+      const secondReverse = await reverseRelationHypothesis(
         { caseId, hypothesisId: id },
         { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
       );
-      await expectRefused(
-        reverseRelationHypothesis(
-          { caseId, hypothesisId: id },
-          { relationHypothesisStore: relationStore, relationStore: canonRelationStore },
-        ),
-      );
+      expect(secondReverse.canonicalReversed).toBe(false);
+      expect((await relationStore.findById(id, { caseId }))!.status).toBe("REVERSED");
       // reverse→accept refused (REVERSED cannot be re-accepted) — the
       // materializer's own guard rejects a non-PROPOSED hypothesis.
       await expect(
