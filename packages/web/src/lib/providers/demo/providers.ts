@@ -19,6 +19,7 @@ import type {
   GapProvider,
   ReviewProvider,
   RobustnessProvider,
+  HypothesisProvider,
   CrossCaseProvider,
   RelationProvider,
   IntelligenceProvider,
@@ -37,20 +38,26 @@ import type {
   UploadedFileReference,
   Source,
   Artifact,
+  Entity,
 } from "@indago/contracts";
 import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
+import { createCapabilityStatusTable } from "../capabilities";
 import { createDemoWorkspaceState, logDemoEvent } from "./state";
 import type { DemoWorkspaceState } from "./state";
 import { createDemoRealtimeProvider } from "./realtime";
 import { baseLatency, heavyLatency, deterministicSleep } from "./latency";
 import { demoFixtures } from "./demo-fixtures";
 import { uploadDemoCatalog } from "./demo-fixtures/upload-demo-sequence";
+import { MOCK_FOREIGN_CASES, FOREIGN_ENTITIES_DB } from "./demo-fixtures/cross-case";
 import { ENTITY_LINK_BY_CANDIDATE } from "./demo-fixtures/entity-resolution";
 import { createdNow } from "./demo-fixtures/times";
 import type {
   IntelligenceCandidateView,
   ObservationContradiction,
   DiscoveryCandidate,
+  ForeignCaseOverlay,
+  ForeignGraphNode,
+  ForeignGraphEdge,
 } from "../types";
 import {
   addDemoSessionEvidence,
@@ -85,6 +92,18 @@ function resolveSignal(query?: ProviderQuery): AbortSignal | undefined {
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw ProviderError.cancelled();
+}
+
+/** PR-1 T4: global ascending timeline sort (stable; unknown precision last). */
+function compareTimelineAscending(
+  a: import("../types").TimelineItem,
+  b: import("../types").TimelineItem,
+): number {
+  const ta = new Date(a.time).getTime();
+  const tb = new Date(b.time).getTime();
+  if (Number.isNaN(ta)) return 1;
+  if (Number.isNaN(tb)) return -1;
+  return ta - tb;
 }
 
 export class DemoCaseProvider implements CaseProvider {
@@ -344,8 +363,21 @@ export class DemoEntityProvider implements EntityProvider {
   async get(id: string): Promise<import("@indago/contracts").Entity> {
     await deterministicSleep(baseLatency(this.config));
     const it = this.state.entityById.get(id);
-    if (!it) throw ProviderError.notFound();
-    return it;
+    if (it) return it;
+    // Foreign-island entities (cross-case boundary) are canonical Entity-shaped
+    // records owned by the cross-case fixture. The UI resolves them through this
+    // provider seam so it never imports the foreign DB directly.
+    const foreign = FOREIGN_ENTITIES_DB[id];
+    if (foreign) {
+      return {
+        ...(foreign as Entity),
+        observationIds: foreign.observationIds ?? [],
+        evidenceIds: foreign.evidenceIds ?? [],
+        hypothesisIds: foreign.hypothesisIds ?? [],
+        roleHypothesisIds: foreign.roleHypothesisIds ?? [],
+      };
+    }
+    throw ProviderError.notFound();
   }
 }
 
@@ -411,7 +443,15 @@ export class DemoTimelineProvider implements TimelineProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    return this.state.timeline;
+    // PR-1 T4: the InvestigationTimeline contract declares a single global
+    // ascending sort. The fixture is grouped by band (ascending within each
+    // band); the provider normalizes to the documented contract so consumers
+    // never see a band-grouped order. Stable for equal timestamps; unknown
+    // precision is pushed last. Engine clients are order-independent.
+    return {
+      ...this.state.timeline,
+      items: [...this.state.timeline.items].sort(compareTimelineAscending),
+    };
   }
 }
 
@@ -507,6 +547,29 @@ export class DemoRobustnessProvider implements RobustnessProvider {
   }
 }
 
+export class DemoHypothesisProvider implements HypothesisProvider {
+  constructor(
+    private readonly state: DemoWorkspaceState,
+    private readonly config: DataModeConfig,
+  ) {}
+
+  async listByInvestigation(
+    _investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<import("@indago/contracts").Hypothesis>> {
+    await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    return paginate([...this.state.hypothesisById.values()], query);
+  }
+
+  async get(id: string): Promise<import("@indago/contracts").Hypothesis> {
+    await deterministicSleep(baseLatency(this.config));
+    const it = this.state.hypothesisById.get(id);
+    if (!it) throw ProviderError.notFound();
+    return it;
+  }
+}
+
 export class DemoCrossCaseProvider implements CrossCaseProvider {
   constructor(
     private readonly state: DemoWorkspaceState,
@@ -523,6 +586,31 @@ export class DemoCrossCaseProvider implements CrossCaseProvider {
       return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
     }
     return paginate(demoFixtures.crossCase, query);
+  }
+
+  /** PR-1 T2: the foreign-island overlays the graph UI draws. Demo serves its
+   *  deterministic cobalt/crimson islands through this seam (keyed by ref); the
+   *  UI no longer imports them from the fixture module. */
+  async listForeignOverlays(
+    caseId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<ForeignCaseOverlay>> {
+    await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    if (!this.state.case || caseId !== this.state.case.id) {
+      return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
+    }
+    const overlays: ForeignCaseOverlay[] = Object.entries(MOCK_FOREIGN_CASES).map(([ref, m]) => ({
+      ref,
+      caseId: m.id,
+      title: m.title,
+      summary: m.summary,
+      localTargetMatch: m.localTargetMatch,
+      bridgeSupport: m.bridgeSupport,
+      nodes: m.nodes as ForeignGraphNode[],
+      edges: m.edges as ForeignGraphEdge[],
+    }));
+    return paginate(overlays, query);
   }
 }
 
@@ -768,6 +856,7 @@ export function createWorkspaceDemoProviders(
   const gaps = new DemoGapProvider(state, config);
   const review = new DemoReviewProvider(state, config);
   const robustness = new DemoRobustnessProvider(state, config);
+  const hypotheses = new DemoHypothesisProvider(state, config);
   const crossCase = new DemoCrossCaseProvider(state, config);
   const relations = new DemoRelationProvider(state, config);
   const intelligence = new DemoIntelligenceProvider(state, config);
@@ -777,6 +866,7 @@ export function createWorkspaceDemoProviders(
     caseId: identity.caseId,
     investigationId: identity.investigationId,
     mode: "demo",
+    capabilities: createCapabilityStatusTable(config, "demo"),
     cases,
     investigations,
     evidence,
@@ -788,6 +878,7 @@ export function createWorkspaceDemoProviders(
     gaps,
     review,
     robustness,
+    hypotheses,
     crossCase,
     relations,
     intelligence,

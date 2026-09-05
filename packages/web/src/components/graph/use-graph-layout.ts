@@ -122,6 +122,13 @@ const HOVER_ALPHA = 0.07;
 const IDLE_ALPHA_MIN = 0.001;
 const IDLE_VELOCITY_MAX = 0.15;
 
+// The boundary clamp only applies to ENERGETIC simulations. A near-frozen
+// rebuild (resize-only carry-over) must never snap nodes into a shrunken
+// canvas in a single frame — that hard clamp is the visible "abrupt cut"
+// during a mid-move viewport change. Low-energy sims ride through at their
+// live positions and reflow on the next full-content build.
+const CLAMP_MIN_ALPHA = 0.05;
+
 // Interaction-state damping. The graph is more responsive (less damped) while
 // the user is dragging so nearby nodes yield and stretch as real springs, and
 // returns to normal damping so it settles to a calm rest afterward.
@@ -320,6 +327,22 @@ export function useGraphLayout(
   const positionCache = useRef<Map<string, { x: number; y: number }>>(new Map());
   const seenNodeIds = useRef<Set<string>>(new Set());
   const seenEdgeIds = useRef<Set<string>>(new Set());
+  // PR-3 UX fix ("double-shot"): the LAST LIVE node positions observed by the
+  // running simulation, kept in a component-level ref that SURVIVES effect
+  // rebuilds. The previous carry-over read simRef.current, which the prior
+  // effect's cleanup nulls BEFORE the next build runs — so every rebuild fell
+  // back to the stale positionCache (foreign islands still at their off-canvas
+  // spawn snapshot) and visibly teleported + re-flew the whole island again.
+  const livePositionsRef = useRef<Map<string, { x: number; y: number }> | null>(null);
+  // PR-3 UX fix: the live physics energy (simulation alpha) survives rebuilds
+  // the same way; a resize-triggered rebuild must resume gently, never blast
+  // the graph back to full alpha (that replay is the visible "double shot").
+  const lastAlphaRef = useRef(0);
+  // PR-3 UX fix: distinguish a no-op rebuild (same content AND viewport → skip
+  // entirely) from a resize-only rebuild (same nodes/edges, new viewport →
+  // resume gently without flipping `settled`).
+  const lastContentKeyRef = useRef<string | null>(null);
+  const lastViewportKeyRef = useRef<string | null>(null);
   const controlsRef = useRef(controls);
   controlsRef.current = controls;
   // Canvas registers its imperative DOM-sync callback here; the hook calls it
@@ -395,16 +418,36 @@ export function useGraphLayout(
       return;
     }
 
+    const sortedNodeKey = nodes.map((n) => n.id).sort().join(",");
+    const sortedEdgeKey = edges.map((e) => e.id).sort().join(",");
+    const contentKey = `${sortedNodeKey}|${sortedEdgeKey}`;
+    const viewportKey = `${width}x${height}`;
+    const sameContent = lastContentKeyRef.current !== null && lastContentKeyRef.current === contentKey;
+    const sameEverything = sameContent && lastViewportKeyRef.current === viewportKey;
+    // Only skip when there is a LIVE simulation to preserve. If a transient
+    // empty frame (or an early return) previously nulled simRef, a same-content
+    // rebuild MUST still run to revive the graph — otherwise interaction
+    // (drag/hover/focus) stays dead forever while nodes keep rendering.
+    if (sameEverything && simRef.current) {
+      // Keep the live simulation untouched — no teardown, no settled flip, no
+      // position teleport. A no-op rebuild would otherwise restart the physics
+      // and replay the foreign island's entrance.
+      return;
+    }
+    // A RESIZE-ONLY rebuild (same nodes/edges, new viewport) must not replay
+    // anything: it carries every node forward from its live position and resumes
+    // the simulation at its current energy instead of a full alpha(1) restart,
+    // so the graph stays perfectly still across the resize.
+    const isResizeOnly = sameContent;
+    lastContentKeyRef.current = contentKey;
+    lastViewportKeyRef.current = viewportKey;
+
     const isFirstLayout = seenNodeIds.current.size === 0;
     const cache = positionCache.current;
-    // Live positions of the *previous* simulation, if any. When data changes
-    // mid-settle (a new node arrives while the graph is still moving), existing
-    // nodes must carry over their CURRENT live position — not the stale seed
-    // cache — so they never jump back to the initial ring layout.
-    const prevPositions =
-      simRef.current && !isFirstLayout
-        ? new Map(Array.from(simRef.current.nodesById.entries()).map(([id, n]) => [id, { x: n.x, y: n.y }]))
-        : null;
+    // Live positions observed by the (possibly just-torn-down) simulation.
+    // livePositionsRef is a stable component ref, so it is valid even on
+    // rebuilds where simRef was already nulled by the previous cleanup.
+    const prevPositions = livePositionsRef.current;
     const { adjacency, communityOf, communityCount, bridgeNodeIds } = structure;
 
     // Seeding: reuse the current live position for existing nodes (so live
@@ -430,7 +473,7 @@ export function useGraphLayout(
       } else {
         const neighborIds = [...(adjacency.get(n.id) ?? [])];
         const placedNeighbor = neighborIds
-          .map((id) => cache.get(id))
+          .map((id) => prevPositions?.get(id) ?? cache.get(id))
           .find((p): p is { x: number; y: number } => Boolean(p));
         if (isFirstLayout) {
           const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI;
@@ -581,6 +624,9 @@ export function useGraphLayout(
         simRef.current.nodeArray,
         simRef.current.communityCount
       );
+      livePositionsRef.current = new Map(
+        simRef.current.nodeArray.map((n) => [n.id, { x: n.x, y: n.y }])
+      );
     };
 
     simRef.current = {
@@ -622,6 +668,8 @@ export function useGraphLayout(
       const nextCache = new Map<string, { x: number; y: number }>();
       simRef.current.nodeArray.forEach((n) => nextCache.set(n.id, { x: n.x, y: n.y }));
       positionCache.current = nextCache;
+      livePositionsRef.current = nextCache;
+      lastAlphaRef.current = 0;
       seenNodeIds.current = new Set(simRef.current.nodeArray.map((n) => n.id));
       if (!settledRef.current) {
         settledRef.current = true;
@@ -635,6 +683,9 @@ export function useGraphLayout(
       if (!simRef.current) return;
       simRef.current.active = true;
       const { nodeArray: arr, simulation: sim } = simRef.current;
+      // Persist the live energy so a resize-only rebuild can resume the
+      // simulation where it left off instead of blasting it back to alpha(1).
+      lastAlphaRef.current = sim.alpha();
 
       // During drag, lower damping so the network responds / yields like real
       // springs, and cap excessive velocity to prevent an explosion.
@@ -656,9 +707,16 @@ export function useGraphLayout(
       // Soft boundary: only pull a node back when it genuinely leaves the safe
       // canvas region. Do not anchor nodes to an interior margin — springs must
       // be able to stretch and move naturally near the edges.
-      for (const n of arr) {
-        n.x = Math.max(NODE_MARGIN_X - 40, Math.min(width - NODE_MARGIN_X + 40, n.x));
-        n.y = Math.max(NODE_MARGIN_Y - 40, Math.min(height - NODE_MARGIN_Y + 40, n.y));
+      //
+      // The clamp is gated on simulation energy: a near-frozen resize rebuild
+      // must not snap nodes back once the canvas shrank (that one-frame jump is
+      // the visible "abrupt cut" mid-reveal). It holds live positions instead
+      // and reflows on the next full-content build.
+      if (sim.alpha() > CLAMP_MIN_ALPHA) {
+        for (const n of arr) {
+          n.x = Math.max(NODE_MARGIN_X - 40, Math.min(width - NODE_MARGIN_X + 40, n.x));
+          n.y = Math.max(NODE_MARGIN_Y - 40, Math.min(height - NODE_MARGIN_Y + 40, n.y));
+        }
       }
       syncToLayoutRef();
       tickCbRef.current();
@@ -683,6 +741,9 @@ export function useGraphLayout(
     positionCache.current = new Map(
       simRef.current.nodeArray.map((n) => [n.id, { x: n.x, y: n.y }])
     );
+    livePositionsRef.current = new Map(
+      simRef.current.nodeArray.map((n) => [n.id, { x: n.x, y: n.y }])
+    );
     seenNodeIds.current = new Set(simRef.current.nodeArray.map((n) => n.id));
 
     // Start the initial layout — the simulation runs, decays, and stops.
@@ -691,21 +752,36 @@ export function useGraphLayout(
     // (auto-fit, bloom) fire promptly after the initial layout converges rather
     // than waiting for full idle decay. `settled` is a latch: once true it
     // stays true; it represents "graph is in a restful, stable state".
-    setSettled(false);
-    settledRef.current = false;
-    simulation.alpha(1).restart();
-
-    if (settledTimer.current) clearTimeout(settledTimer.current);
-    settledTimer.current = setTimeout(() => {
-      settledRef.current = true;
-      setSettled(true);
-    }, 500);
+    //
+    // PR-3 UX fix: a RESIZE-ONLY rebuild (same nodes/edges, new viewport)
+    // must not flip `settled` or re-arm the latch, and it resumes at the
+    // previous simulation energy instead of restarting at alpha(1). A fresh
+    // alpha(1) blast re-simulates the whole graph and replays the settlement
+    // motion — that mid-camera-move re-settle is the visible "double shot" in
+    // the cross-case reveal.
+    if (!isResizeOnly) {
+      setSettled(false);
+      settledRef.current = false;
+      if (settledTimer.current) clearTimeout(settledTimer.current);
+      settledTimer.current = setTimeout(() => {
+        settledRef.current = true;
+        setSettled(true);
+      }, 500);
+    }
+    // A RESIZE-ONLY rebuild must not visibly re-settle: every node is carried
+    // forward from its live position (no respawn), so the only thing left to do
+    // is re-attach forces to the new viewport — run at a near-frozen energy so
+    // the graph sits perfectly still through any mid-move camera transition.
+    // Content changes still get the full alpha(1) run (fly-in + re-settle).
+    const resumeEnergy = isResizeOnly ? Math.min(lastAlphaRef.current, 0.02) : 1;
+    simulation.alpha(resumeEnergy).restart();
 
     return () => {
       if (settledTimer.current) {
         clearTimeout(settledTimer.current);
         settledTimer.current = null;
       }
+      lastAlphaRef.current = simulation.alpha();
       simulation.on("tick", null);
       simulation.on("end", null);
       simulation.stop();

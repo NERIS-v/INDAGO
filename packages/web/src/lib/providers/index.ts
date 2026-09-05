@@ -58,3 +58,13 @@ export {
   createIntakeProviders,
   resolveCaseListMode,
 } from "./factory";
+
+export {
+  CAPABILITY_AVAILABILITY,
+  resolveCapabilityStatus,
+  createCapabilityStatusTable,
+  type CapabilityKey,
+  type CapabilityStatus,
+  type CapabilityStatusTable,
+  type CapabilityAvailability,
+} from "./capabilities";

@@ -24,6 +24,13 @@ import {
   GE_5,
 } from "@/lib/providers/demo/demo-fixtures/lookup";
 import type { WorkspaceIdentity } from "@/lib/providers/types";
+import {
+  getDataModeConfig,
+  TIMING_SCALE_ENV,
+  DATA_MODE_ENV,
+  DEMO_CASE_ID_ENV,
+} from "@/lib/providers/config";
+import type { DataModeConfig } from "@/lib/providers/types";
 
 function identity(): WorkspaceIdentity {
   return {
@@ -33,7 +40,15 @@ function identity(): WorkspaceIdentity {
   };
 }
 
-const config = { simulateLatency: false };
+// PR-1 T5: tests use the real DataModeConfig contract (fast deterministic
+// latencies), matching the pattern in the other provider suites.
+const fastEnv: NodeJS.ProcessEnv = {
+  NODE_ENV: "test",
+  [DATA_MODE_ENV]: "demo",
+  [DEMO_CASE_ID_ENV]: CASE_ID,
+  [TIMING_SCALE_ENV]: "0.001",
+};
+const config: DataModeConfig = getDataModeConfig(fastEnv);
 
 describe("F-PR4 fixture coherence", () => {
   it("the contradiction pairs OBS_8 (shared-address line) against OBS_9 (CC-882 cross-check)", () => {

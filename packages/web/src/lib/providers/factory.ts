@@ -9,6 +9,16 @@
 // There is deliberately NO global singleton: every workspace gets its own
 // immutable provider bundle, so concurrent investigations never share mutable
 // demo state.
+//
+// Mode contract:
+//  - config.mode "demo"  -> pure demo bundle (DEMO -> demo provider).
+//  - config.mode "live"  -> pure live bundle (LIVE -> live provider; a capability
+//    live cannot serve is typed "not-ready" and throws, never a demo fallback).
+//  - config.mode "auto"  -> capability-level AUTO bundle (createAutoWorkspaceProviders):
+//    each capability is served by the live implementation when one exists and by
+//    the demo implementation when only a demo exists, all inside ONE bundle. This
+//    is the F-PR5 corrective semantics: AUTO fallback is PER CAPABILITY, and a
+//    capability that HAS a live implementation is never demo-served.
 // ============================================================================
 
 import {
@@ -16,6 +26,11 @@ import {
   getDataModeConfig,
   getEffectiveEnv,
 } from "./config";
+import {
+  createCapabilityStatusTable,
+  resolveCapabilityStatus,
+  type CapabilityKey,
+} from "./capabilities";
 import type {
   AppDataMode,
   DataModeConfig,
@@ -62,7 +77,69 @@ export function createWorkspaceProviders(
   if (mode === "demo") {
     return createWorkspaceDemoProviders(identity, config);
   }
+  if (config.mode === "auto") {
+    return createAutoWorkspaceProviders(identity, config);
+  }
   return createLiveWorkspaceProviders(identity, config);
+}
+
+// ============================================================================
+// AUTO (capability-level) bundle
+//
+// AUTO is resolved PER CAPABILITY, never globally: each capability slot picks
+// the live implementation when CAPABILITY_AVAILABILITY says live exists, and the
+// demo implementation when only demo exists (reusing the SAME providers the pure
+// bundles construct — no second resolution system). Because every provider-backed
+// capability in the matrix has at least one implementation, every slot resolves
+// to live or demo.
+//
+// Runtime-failure rule: a slot served live is a REAL live provider. If its call
+// fails it surfaces a typed ProviderError — there is no catch-and-fallback to the
+// demo implementation, because the demo instance is never wired into that slot.
+// ============================================================================
+
+export function createAutoWorkspaceProviders(
+  identity: WorkspaceIdentity,
+  config: DataModeConfig,
+): WorkspaceProviders {
+  const demo = createWorkspaceDemoProviders(identity, config);
+  const live = createLiveWorkspaceProviders(identity, config);
+  const liveServes = (capability: CapabilityKey): boolean =>
+    resolveCapabilityStatus(capability, config, "live") === "live";
+
+  return {
+    workspaceId: identity.workspaceId,
+    caseId: identity.caseId,
+    investigationId: identity.investigationId,
+    mode: "live",
+    capabilities: createCapabilityStatusTable(config, "live"),
+    cases: liveServes("cases") ? live.cases : demo.cases,
+    investigations: liveServes("investigation")
+      ? live.investigations
+      : demo.investigations,
+    evidence: liveServes("evidence") ? live.evidence : demo.evidence,
+    observations: liveServes("observations")
+      ? live.observations
+      : demo.observations,
+    entities: liveServes("entities") ? live.entities : demo.entities,
+    graph: liveServes("graph") ? live.graph : demo.graph,
+    relations: liveServes("relations") ? live.relations : demo.relations,
+    intelligence: liveServes("intelligence")
+      ? live.intelligence
+      : demo.intelligence,
+    timeline: liveServes("timeline") ? live.timeline : demo.timeline,
+    leads: liveServes("leads") ? live.leads : demo.leads,
+    gaps: liveServes("gaps") ? live.gaps : demo.gaps,
+    review: liveServes("review") ? live.review : demo.review,
+    robustness: liveServes("robustness")
+      ? live.robustness
+      : demo.robustness,
+    hypotheses: liveServes("hypotheses")
+      ? live.hypotheses
+      : demo.hypotheses,
+    crossCase: liveServes("crossCase") ? live.crossCase : demo.crossCase,
+    realtime: liveServes("realtime") ? live.realtime : demo.realtime,
+  };
 }
 
 // ============================================================================

@@ -28,6 +28,7 @@ import type {
   GapProvider,
   ReviewProvider,
   RobustnessProvider,
+  HypothesisProvider,
   CrossCaseProvider,
   RelationProvider,
   IntelligenceProvider,
@@ -54,6 +55,7 @@ import type {
   ObservationsResponse,
   CasesResponse,
 } from "@/lib/api/types";
+import { createCapabilityStatusTable } from "../capabilities";
 import { createLiveRealtimeProvider } from "./realtime";
 import { providerUnsupported, providerUnsupportedPaginated } from "./unsupported";
 import { toLiveProviderError } from "./errors";
@@ -400,9 +402,21 @@ class UnsupportedRobustnessProvider implements RobustnessProvider {
   }
 }
 
+class UnsupportedHypothesisProvider implements HypothesisProvider {
+  listByInvestigation(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("hypotheses.listByInvestigation");
+  }
+  get(): Promise<never> {
+    return providerUnsupported("hypotheses.get");
+  }
+}
+
 class UnsupportedCrossCaseProvider implements CrossCaseProvider {
   listMatches(): Promise<Paginated<never>> {
     return providerUnsupportedPaginated("crossCase.listMatches");
+  }
+  listForeignOverlays(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("crossCase.listForeignOverlays");
   }
 }
 
@@ -425,6 +439,7 @@ export function createLiveWorkspaceProviders(
     caseId: identity.caseId,
     investigationId: identity.investigationId,
     mode: "live",
+    capabilities: createCapabilityStatusTable(_config, "live"),
     cases: new LiveCaseProvider(),
     investigations: new LiveInvestigationProvider(identity.caseId),
     evidence: new LiveEvidenceProvider(),
@@ -436,6 +451,7 @@ export function createLiveWorkspaceProviders(
     gaps: new UnsupportedGapProvider(),
     review: new UnsupportedReviewProvider(),
     robustness: new UnsupportedRobustnessProvider(),
+    hypotheses: new UnsupportedHypothesisProvider(),
     crossCase: new UnsupportedCrossCaseProvider(),
     relations: new UnsupportedRelationProvider(),
     intelligence: new UnsupportedIntelligenceProvider(),

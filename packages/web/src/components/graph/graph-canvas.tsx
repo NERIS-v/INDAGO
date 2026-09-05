@@ -14,7 +14,10 @@ interface GraphCanvasProps {
   onNodeClick: (nodeId: string) => void;
   activeTimeRange: [number, number] | null;
   selectedNodeId?: string | null;
-  controlsRef?: React.MutableRefObject<{ zoomIn: () => void; zoomOut: () => void; fit: () => void; focusNode: (id: string) => void; } | null>;
+  controlsRef?: React.MutableRefObject<{ zoomIn: () => void; zoomOut: () => void; fit: () => void; focusNode: (id: string) => void; focusPair: (aId: string, bId: string, durationMs?: number) => void; } | null>;
+  /** PR-3: fired when the user presses on empty canvas (not a node). Lets the
+   *  shell clear the selection — the "click away to unfocus" affordance. */
+  onCanvasBackgroundPointerDown?: () => void;
 }
 
 const MIN_ZOOM = 0.15;
@@ -56,7 +59,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const interactionLayerRef = useRef<SVGGElement>(null);
@@ -70,6 +73,9 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [hasAutoFit, setHasAutoFit] = useState(false);
+  // PR-3 UX: programmatic camera moves (focusPair) may request a slower ease
+  // so staged reveals (e.g. cross-case) don't snap. Reset after the move.
+  const [cameraEase, setCameraEase] = useState("400ms cubic-bezier(0.22, 1, 0.36, 1)");
   const panOrigin = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -85,6 +91,10 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
   useEffect(() => {
     if (selectedNodeId !== undefined) {
       setInternalSelectedNode(selectedNodeId);
+      // PR-3 UX: the focus highlight must follow the selection. When the
+      // selection is cleared or moves to another node, drop the focusedNode
+      // ring too — otherwise a previously Focused node stays lit forever.
+      setFocusedNode((prev) => (prev !== null && prev !== selectedNodeId ? null : prev));
     }
   }, [selectedNodeId]);
 
@@ -202,14 +212,59 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
     const node = layoutRef.current.layoutNodes.find((n) => n.id === id);
     if (!node || !dimensions.width || !dimensions.height) return;
     const d = Math.max(0, node.structuralImportance);
-    const targetZoom = Math.min(MAX_ZOOM, Math.max(1.2, 0.9 + d * 2.5));
+    // PR-3 UX: focus = center the object with a comfortable close-up. A
+    // bounded 1.4x-3x zoom (importance-tuned) brings the subject forward
+    // while keeping neighboring entities in view — no abrupt empty-screen dive.
+    const targetZoom = Math.max(1.4, Math.min(MAX_ZOOM, 1.2 + d * 1.3));
     setPan({ x: -((node.x || cx) - cx) * targetZoom, y: -((node.y || cy) - cy) * targetZoom });
     setZoom(targetZoom);
     setFocusedNode(id);
     setInternalSelectedNode(id);
   }, [layoutRef, dimensions, cx, cy]);
 
-  useEffect(() => { if (controlsRef) controlsRef.current = { zoomIn, zoomOut, fit, focusNode }; }, [controlsRef, zoomIn, zoomOut, fit, focusNode]);
+  // PR-3 UX: frame a PAIR of nodes (e.g. the local bridge anchor + the foreign
+  // island head) in ONE smooth, slightly slower camera move instead of the
+  // old fit-then-dive two-step. The camera settles centered on the connection.
+  const focusPair = useCallback(
+    (aId: string, bId: string, durationMs = 800) => {
+      const layoutNodes = layoutRef.current.layoutNodes;
+      if (!layoutNodes.length || !dimensions.width || !dimensions.height) return;
+      const a = layoutNodes.find((n) => n.id === aId);
+      const b = layoutNodes.find((n) => n.id === bId);
+      const xs = [a?.x, b?.x].filter((v): v is number => v != null && Number.isFinite(v));
+      const ys = [a?.y, b?.y].filter((v): v is number => v != null && Number.isFinite(v));
+      if (!xs.length || !ys.length) return;
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const targetCx = (minX + maxX) / 2;
+      const targetCy = (minY + maxY) / 2;
+      const boxW = Math.max(maxX - minX, 220);
+      const boxH = Math.max(maxY - minY, 220);
+      const scale = Math.min(
+        2.2,
+        Math.max(1, Math.min((dimensions.width / boxW) * 0.65, (dimensions.height / boxH) * 0.65)),
+      );
+      setCameraEase(`${Math.max(400, Math.round(durationMs))}ms cubic-bezier(0.22, 1, 0.36, 1)`);
+      setPan({ x: -(targetCx - cx) * scale, y: -(targetCy - cy) * scale });
+      setZoom(scale);
+      setFocusedNode(aId);
+      setInternalSelectedNode(aId);
+    },
+    [layoutRef, dimensions, cx, cy],
+  );
+
+  useEffect(() => {
+    if (cameraEase === "400ms cubic-bezier(0.22, 1, 0.36, 1)") return;
+    const t = setTimeout(
+      () => setCameraEase("400ms cubic-bezier(0.22, 1, 0.36, 1)"),
+      1600,
+    );
+    return () => clearTimeout(t);
+  }, [cameraEase]);
+
+  useEffect(() => { if (controlsRef) controlsRef.current = { zoomIn, zoomOut, fit, focusNode, focusPair }; }, [controlsRef, zoomIn, zoomOut, fit, focusNode, focusPair]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -249,7 +304,9 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
     const target = e.target as HTMLElement;
     if (target.closest("[data-nodeid]")) return;
     setIsPanning(true);
-    setInternalSelectedNode(null); 
+    setInternalSelectedNode(null);
+    setFocusedNode(null);
+    onCanvasBackgroundPointerDown?.();
     panOrigin.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
   };
   
@@ -345,7 +402,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
           <circle cx="0" cy="0" r="16" fill="none" stroke="var(--color-surface-600)" strokeWidth="1" />
         </g>
 
-        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${EASE_NORMAL}` }}>
+        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${cameraEase}` }}>
           
           <g id="community-layer">
             {communities.map((c) => {
