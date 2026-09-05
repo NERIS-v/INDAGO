@@ -20,6 +20,8 @@ import { mapInvestigativeGapToGapMock } from "@/lib/intel/gap-adapter";
 import type { InvestigativeContext } from "@/lib/context/investigative-context";
 import { applyGraphFilter } from "@/lib/graph/graph-filter";
 import type { GraphFilterState } from "@/lib/graph/graph-filter";
+import { deriveGraphVisualContext } from "@/lib/graph/graph-visual-state";
+import type { GraphFocusSeed, GraphVisualContext } from "@/lib/graph/graph-visual-state";
 import { DEFAULT_ACTIONS } from "@/lib/layout/control-center";
 import type { GraphControlCenterActions } from "@/lib/layout/control-center";
 
@@ -271,6 +273,77 @@ export function GraphPanel({
     [finalEdges, filter],
   );
 
+  // PR-6: cross-case overlay membership surfaces as a CASE-SCOPE dimension —
+  // foreign entities (incl. the cross-case bridge) must never look local. The
+  // flags are carried on the injected overlay objects; these sets are derived
+  // from the merged projection so they always match what the canvas renders.
+  const foreignNodeIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const n of finalNodes) if ((n as { isForeign?: boolean }).isForeign) set.add(n.id);
+    return set;
+  }, [finalNodes]);
+
+  const foreignEdgeIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of finalEdges) {
+      const foreign = e as { isForeign?: boolean; isForeignEdge?: boolean; isForeignBridge?: boolean };
+      if (foreign.isForeignEdge || foreign.isForeignBridge) set.add(e.id);
+    }
+    return set;
+  }, [finalEdges]);
+
+  // PR-6: the FOCUS SCOPE is resolved from provider data here (above the
+  // canvas). A hypothesis contributes its related entities; a gap contributes
+  // its related entities PLUS the graph holes resolved for that gap; an
+  // evidence selection contributes its graph-grounded scope (the provider
+  // projection does not carry evidence→entity links, so the scope is honestly
+  // derived from the grounded edges that exist — never fabricated).
+  const [focusSeed, setFocusSeed] = useState<GraphFocusSeed | null>(null);
+
+  useEffect(() => {
+    const ctx = selectedContext;
+    if (!ctx) { setFocusSeed(null); return; }
+    let cancelled = false;
+
+    if (ctx.kind === "hypothesis") {
+      workspace.hypotheses
+        .get(ctx.id)
+        .then((hypothesis) => {
+          if (cancelled) return;
+          setFocusSeed({
+            kind: "hypothesis",
+            entityIds: hypothesis.relatedEntityIds ?? [],
+            nodeIds: [],
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setFocusSeed({ kind: "hypothesis", entityIds: [], nodeIds: [] });
+        });
+    } else if (ctx.kind === "gap") {
+      const gap = investigativeGaps.find((g) => g.id === ctx.id);
+      setFocusSeed({
+        kind: "gap",
+        entityIds: gap?.relatedEntityIds ?? [],
+        nodeIds: mergedHoles
+          .filter((h) => h.investigationGapId === ctx.id)
+          .flatMap((h) => h.nodeIds),
+      });
+    } else if (ctx.kind === "evidence") {
+      workspace.evidence
+        .get(ctx.id)
+        .then(() => {
+          if (!cancelled) setFocusSeed({ kind: "evidence", entityIds: [], nodeIds: [] });
+        })
+        .catch(() => {
+          if (!cancelled) setFocusSeed({ kind: "evidence", entityIds: [], nodeIds: [] });
+        });
+    } else {
+      setFocusSeed(null);
+    }
+
+    return () => { cancelled = true; };
+  }, [selectedContext, workspace, investigativeGaps, mergedHoles]);
+
   // PR-3: the canvas highlight must target a GRAPH node id (n.id), never an
   // entity id. In shell mode it tracks the shell-owned context (so a shell
   // deselect clears the harness highlight); standalone it follows the panel's
@@ -285,6 +358,25 @@ export function GraphPanel({
     if (!source) return null;
     return finalNodes.find((n) => n.entityId === source)?.id ?? null;
   }, [selectedContext, selectedEntityId, finalNodes]);
+
+  // PR-6: the presentation model is derived ONCE per meaningful snapshot change
+  // (memoized), then hydrated with interaction state inside the canvas per
+  // render. It never runs on the physics tick.
+  const visualContext: GraphVisualContext = useMemo(
+    () =>
+      deriveGraphVisualContext({
+        nodes: finalNodes,
+        edges: canvasEdges,
+        holes: mergedHoles,
+        activeTimeRange,
+        filter,
+        selectedNodeId: selectedGraphNodeId,
+        foreignNodeIds,
+        foreignEdgeIds,
+        focusSeed,
+      }),
+    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, foreignNodeIds, foreignEdgeIds, focusSeed],
+  );
 
   // PR-3: graph selection is an INTENT. The shell owns canonical selection
   // state; the panel only reports which graph object the user picked, tagged
@@ -520,6 +612,7 @@ export function GraphPanel({
             onCanvasBackgroundPointerDown={handleBackgroundDeselect}
             activeTimeRange={activeTimeRange}
             controlsRef={controlsRef}
+            visualContext={visualContext}
           />
         </div>
 
@@ -556,6 +649,10 @@ export function GraphPanel({
               <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-danger" />} label="Contradicted link" />
               <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-accent-amber" />} label="Graph hole" />
               <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full ring-2 ring-accent-rose shadow-[0_0_8px_var(--color-accent-rose)]" />} label="Live arrival" />
+              <LegendRow swatch={<span className="relative w-4 h-4 flex items-center justify-center"><span className="w-1.5 h-1.5 rounded-full bg-accent-amber ring-1 ring-surface-0" /></span>} label="Evidence-grounded link" />
+              <LegendRow swatch={<span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-accent-amber/60 bg-accent-amber/10" />} label="Attention region" />
+              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-surface-50 ring-2 ring-accent-blue" />} label="Foreign case node" />
+              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-accent-rose" />} label="Current focus area" />
             </div>
           )}
         </div>

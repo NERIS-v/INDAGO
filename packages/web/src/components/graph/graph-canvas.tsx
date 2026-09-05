@@ -3,9 +3,11 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { drag as d3Drag } from "d3-drag";
 import { select as d3Select, pointer as d3Pointer } from "d3-selection";
-import { useGraphLayout, nodeVisualRadius, screenToWorld, type LayoutNode } from "./use-graph-layout";
+import { useGraphLayout, nodeVisualRadius, screenToWorld, type LayoutNode, type LayoutEdge } from "./use-graph-layout";
 import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
 import { GraphHoleBurstLayer } from "./graph-hole-burst-layer";
+import type { GraphVisualContext, GraphNodeVisualState, GraphEdgeVisualState, GraphAttentionRegion } from "@/lib/graph/graph-visual-state";
+import { DEFAULT_NODE_VISUAL_STATE, DEFAULT_EDGE_VISUAL_STATE } from "@/lib/graph/graph-visual-state";
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
@@ -18,6 +20,10 @@ interface GraphCanvasProps {
   /** PR-3: fired when the user presses on empty canvas (not a node). Lets the
    *  shell clear the selection — the "click away to unfocus" affordance. */
   onCanvasBackgroundPointerDown?: () => void;
+  /** PR-6: presentation-model context derived in the panel (memoized, pure).
+   *  Interaction dimensions (selected/focused/hovered) are hydrated by the
+   *  canvas from its own interaction state — never from this base map. */
+  visualContext?: GraphVisualContext | null;
 }
 
 const MIN_ZOOM = 0.15;
@@ -59,7 +65,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const interactionLayerRef = useRef<SVGGElement>(null);
@@ -321,6 +327,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
   const layoutNodes = layoutRef.current.layoutNodes;
   const layoutEdges = layoutRef.current.layoutEdges;
   const communities = layoutRef.current.communities;
+  const focusActive = visualContext?.focus != null;
 
   const edgeGeometry = useMemo(() => {
     const map = new Map<string, number>();
@@ -339,6 +346,54 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
     const k = easeInOutCubic(t);
     return { x: e.fromX + ((node.x||cx) - e.fromX) * k, y: e.fromY + ((node.y||cy) - e.fromY) * k, alpha: k, active: t < 1 };
   }, [layoutNodes, cx, cy]);
+
+  // PR-6: hydrate the presentation model with THIS canvas's interaction state.
+  // The base map is derived once in the panel; interaction is canvas-local and
+  // never mutates the base context. Attention snaps to 3 whenever the node is
+  // selected or focused (the hierarchy apex).
+  const nodeStateFor = useCallback(
+    (node: LayoutNode): GraphNodeVisualState => {
+      const raw = visualContext?.nodes.get(node.id) ?? DEFAULT_NODE_VISUAL_STATE;
+      const selected = internalSelectedNode === node.id;
+      const focused = focusedNode === node.id;
+      const hovered = hoveredNode === node.id;
+      return {
+        ...raw,
+        selected,
+        focused,
+        hovered,
+        attentionLevel: selected || focused ? 3 : raw.attentionLevel,
+      };
+    },
+    [visualContext, internalSelectedNode, focusedNode, hoveredNode],
+  );
+
+  const edgeStateFor = useCallback(
+    (edge: LayoutEdge, interaction: { selected: boolean; focused: boolean; hovered: boolean }): GraphEdgeVisualState => {
+      const raw = visualContext?.edges.get(edge.id) ?? DEFAULT_EDGE_VISUAL_STATE;
+      return {
+        ...raw,
+        incidentToSelection: raw.incidentToSelection || interaction.selected || interaction.focused || interaction.hovered,
+        attentionLevel: interaction.selected || interaction.focused ? 3 : raw.attentionLevel,
+      };
+    },
+    [visualContext],
+  );
+
+  const attentionRegions = useMemo(() => {
+    if (!visualContext?.regions.length) return [];
+    return visualContext.regions.map((region) => {
+      const members = region.memberNodeIds
+        .map((id) => layoutNodes.find((n) => n.id === id))
+        .filter((n): n is LayoutNode => Boolean(n))
+        .map((n) => ({ x: n.x ?? cx, y: n.y ?? cy }));
+      if (members.length === 0) return null;
+      const centerX = members.reduce((s, m) => s + m.x, 0) / members.length;
+      const centerY = members.reduce((s, m) => s + m.y, 0) / members.length;
+      const radius = Math.max(56, Math.max(0, ...members.map((m) => Math.hypot(m.x - centerX, m.y - centerY))) + 30);
+      return { id: region.id, signals: region.signalTypes, cx: centerX, cy: centerY, radius };
+    }).filter((r): r is { id: string; signals: GraphAttentionRegion["signalTypes"]; cx: number; cy: number; radius: number } => Boolean(r));
+  }, [visualContext, layoutNodes, cx, cy]);
 
   if (!dimensions.width) return <div ref={containerRef} className="w-full h-full" />;
 
@@ -382,6 +437,11 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
             <stop offset="100%" stopColor="var(--color-accent-blue)" stopOpacity="0" />
           </radialGradient>
 
+          <radialGradient id="attention-gradient">
+            <stop offset="0%" stopColor="var(--color-accent-amber)" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="var(--color-accent-amber)" stopOpacity="0" />
+          </radialGradient>
+
           <pattern id="canvas-grid" width="64" height="64" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="1" fill="var(--color-surface-400)" opacity="0.3" />
             <path d="M 32 30 L 32 34 M 30 32 L 34 32" stroke="var(--color-surface-400)" strokeWidth="0.5" opacity="0.15" />
@@ -415,6 +475,20 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 />
               );
             })}
+          </g>
+
+          <g id="attention-layer">
+            {attentionRegions.map((region) => (
+              <g
+                key={`attention-region-${region.id}`}
+                data-graph-attention-region={region.id}
+                data-graph-attention-signals={region.signals.join(",")}
+                data-graph-attention-members={region.id}
+              >
+                <circle cx={region.cx} cy={region.cy} r={region.radius} fill="url(#attention-gradient)" style={{ opacity: bloom ? 1 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 500ms` }} />
+                <circle cx={region.cx} cy={region.cy} r={region.radius + 6} fill="none" stroke="var(--color-accent-amber)" strokeWidth={1.5} strokeDasharray="3 6" style={{ opacity: bloom ? 0.65 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 800ms` }} />
+              </g>
+            ))}
           </g>
 
           <g id="foreign-halo-layer">
@@ -468,10 +542,26 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 const edgeDelay = Math.max(0, Math.hypot((x1+ex)/2 - cx, (y1+ey)/2 - cy) * 1.5) + 100;
                 const initialOffset = Math.hypot((source.x||cx) - cx, (source.y||cy) - cy) > Math.hypot((target.x||cx) - cx, (target.y||cy) - cy) ? -length : length;
 
+                const interaction = {
+                  selected: internalSelectedNode === source.id || internalSelectedNode === target.id,
+                  focused: focusedNode === source.id || focusedNode === target.id,
+                  hovered: hoveredNode === source.id || hoveredNode === target.id,
+                };
+                const vs = edgeStateFor(edge, interaction);
+                const focusRecede =
+                  focusActive &&
+                  !vs.hypothesisRelevance &&
+                  !vs.evidenceInScope &&
+                  !vs.gapAffected &&
+                  !isConnected &&
+                  !isForeignBridge &&
+                  !isContradicted;
+
                 let colorClass = "stroke-surface-500/60";
                 if (isForeignBridge) colorClass = "stroke-accent-blue drop-shadow-[0_0_8px_var(--color-accent-blue)]";
                 else if (isForeignEdge) colorClass = "stroke-accent-blue/40";
                 else if (isContradicted) colorClass = "stroke-danger";
+                else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) colorClass = "stroke-accent-rose";
                 else if (isConnected && !isOutOfBounds) colorClass = "stroke-accent-rose";
                 
                 const dashArray = isForeignBridge ? "8 6" : isContradicted ? "4 4" : isLowConfidence ? "6 6" : reducedMotion ? undefined : `${length} ${length}`;
@@ -495,18 +585,47 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 const baseOpacity = isOutOfBounds ? 0 : isForeignBridge ? 1 : isContradicted ? 0.6 : isConnected ? 1 : isLowConfidence ? 0.3 : support * 0.4 + 0.2;
                 const showTrace = (isConnected || isForeignBridge) && !isContradicted && !isLowConfidence && !reducedMotion;
 
+                const edgeOpacity = baseOpacity * entranceAlpha * (focusRecede ? 0.4 : 1);
+
                 return (
-                  <path
-                    key={edge.id} d={edgePath} fill="none" strokeLinecap="round"
-                    strokeDasharray={sEntering || tEntering ? edgeDashArray : showTrace ? "6 4" : dashArray}
-                    strokeDashoffset={sEntering || tEntering ? edgeDashOffset : dashOffset}
-                    markerEnd={edgeMarkerEnd} className={`${colorClass} ${isConnected ? "focus-target" : ""}`}
-                    strokeWidth={isConnected || isForeignBridge ? 2.25 : Math.max(1, (edge.structuralImportance ?? support ?? 0.5) * 2)}
-                    strokeOpacity={baseOpacity * entranceAlpha}
-                    style={{ transition: reducedMotion || (sEntering || tEntering) ? "none" : `stroke-dashoffset 800ms cubic-bezier(0.22, 1, 0.36, 1) ${edgeDelay}ms, stroke-opacity ${EASE_NORMAL} ${edgeDelay}ms, stroke 200ms cubic-bezier(0.22, 1, 0.36, 1)` }}
+                  <g
+                    key={edge.id}
+                    data-graph-edge-state={JSON.stringify({
+                      band: vs.supportBand,
+                      posture: vs.posture,
+                      grounded: vs.grounded,
+                      scope: vs.caseScope,
+                      temporal: vs.temporal,
+                      hypRel: vs.hypothesisRelevance,
+                      evidenceInScope: vs.evidenceInScope,
+                      gapAffected: vs.gapAffected,
+                      selected: interaction.selected,
+                      attentionLevel: vs.attentionLevel,
+                    })}
+                    data-graph-case-scope={vs.caseScope}
+                    data-graph-attention-level={String(vs.attentionLevel)}
+                    data-graph-edge-grounded={vs.grounded && !isForeignBridge && !isContradicted ? "true" : undefined}
                   >
-                    {showTrace && <animate attributeName="stroke-dashoffset" from="20" to="0" dur={isForeignBridge ? "0.4s" : "0.6s"} repeatCount="indefinite" />}
-                  </path>
+                    {vs.grounded && !isForeignBridge && !isContradicted && !isOutOfBounds && (
+                      <circle
+                        cx={(x1 + ex) / 2} cy={(y1 + ey) / 2} r={2.5}
+                        fill="var(--color-accent-amber)" stroke="var(--color-surface-0)" strokeWidth={1}
+                        data-graph-edge-grounded="true"
+                        style={{ opacity: bloom ? (isConnected ? 1 : 0.7) : 0, transition: reducedMotion ? "none" : `opacity ${EASE_NORMAL} ${edgeDelay}ms` }}
+                      />
+                    )}
+                    <path
+                      d={edgePath} fill="none" strokeLinecap="round"
+                      strokeDasharray={sEntering || tEntering ? edgeDashArray : showTrace ? "6 4" : dashArray}
+                      strokeDashoffset={sEntering || tEntering ? edgeDashOffset : dashOffset}
+                      markerEnd={edgeMarkerEnd} className={`${colorClass} ${isConnected ? "focus-target" : ""}`}
+                      strokeWidth={isConnected || isForeignBridge ? 2.25 : Math.max(1, (edge.structuralImportance ?? support ?? 0.5) * 2)}
+                      strokeOpacity={edgeOpacity}
+                      style={{ transition: reducedMotion || (sEntering || tEntering) ? "none" : `stroke-dashoffset 800ms cubic-bezier(0.22, 1, 0.36, 1) ${edgeDelay}ms, stroke-opacity ${EASE_NORMAL} ${edgeDelay}ms, stroke 200ms cubic-bezier(0.22, 1, 0.36, 1)` }}
+                    >
+                      {showTrace && <animate attributeName="stroke-dashoffset" from="20" to="0" dur={isForeignBridge ? "0.4s" : "0.6s"} repeatCount="indefinite" />}
+                    </path>
+                  </g>
                 );
               })}
           </g>
@@ -525,11 +644,23 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
               const ny = pos ? pos.y : (node.y || cy);
               const radius = nodeVisualRadius(node.structuralImportance);
 
+              // PR-6: hydrate the base presentation state with this canvas's
+              // interaction state, then apply the focus-scope recede rule.
+              const vs = nodeStateFor(node);
+              const focusRecede =
+                focusActive &&
+                !vs.hypothesisRelevance &&
+                !vs.evidenceInScope &&
+                !vs.gapAffected &&
+                vs.evidencePosture !== "contradicted" &&
+                !isActive;
+
               let fillColor = "fill-surface-0";
               let strokeColor = "stroke-accent-amber";
               
               if (isActive && inTimeRange) { fillColor = "fill-surface-200"; strokeColor = "stroke-accent-rose shadow-[0_0_15px_var(--color-accent-rose)]"; }
               else if (isForeign) { fillColor = "fill-surface-50"; strokeColor = "stroke-accent-blue/80"; }
+              else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) { fillColor = "fill-surface-100"; strokeColor = "stroke-accent-rose/70"; }
               else if (node.isBridge) { fillColor = "fill-surface-100"; strokeColor = "stroke-accent-rose"; }
               else if (node.type === "ENTITY") { fillColor = "fill-surface-100"; strokeColor = "stroke-surface-400"; }
 
@@ -539,8 +670,38 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 <g
                   key={node.id}
                   className={isActive ? "focus-target" : ""}
-                  style={{ opacity: (!inTimeRange ? 0 : hoverDimmed ? 0.1 : bloom ? 1 : 0) * (pos ? pos.alpha : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
+                  data-graph-node-state={JSON.stringify({
+                    posture: vs.evidencePosture,
+                    role: vs.structuralRole,
+                    temporal: vs.temporal,
+                    scope: vs.caseScope,
+                    hypRel: vs.hypothesisRelevance,
+                    evidenceInScope: vs.evidenceInScope,
+                    gapAffected: vs.gapAffected,
+                    attentionLevel: vs.attentionLevel,
+                  })}
+                  data-graph-selected={vs.selected ? "true" : undefined}
+                  data-graph-focused={vs.focused ? "true" : undefined}
+                  data-graph-hovered={vs.hovered ? "true" : undefined}
+                  data-graph-case-scope={vs.caseScope}
+                  data-graph-attention-level={String(vs.attentionLevel)}
+                  data-graph-node-posture={vs.evidencePosture}
+                  style={{ opacity: (!inTimeRange ? 0 : hoverDimmed ? 0.1 : bloom ? 1 : 0) * (pos ? pos.alpha : 1) * (focusRecede ? 0.5 : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
                 >
+                  {vs.evidencePosture === "contradicted" && (
+                    <circle
+                      cx={nx} cy={ny} r={radius + 3} fill="none" stroke="var(--color-danger)" strokeWidth={1.5} strokeDasharray="3 4"
+                      data-graph-node-posture="contradicted"
+                      style={{ opacity: bloom ? (focusRecede ? 0.5 : 0.85) : 0, transition: reducedMotion ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms` }}
+                    />
+                  )}
+                  {vs.gapAffected && (
+                    <circle
+                      cx={nx} cy={ny} r={radius + 7} fill="none" stroke="var(--color-warning)" strokeWidth={1.5} strokeDasharray="3 4"
+                      data-graph-gap-affected="true"
+                      style={{ opacity: bloom ? (focusRecede ? 0.5 : 0.85) : 0, transition: reducedMotion ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms` }}
+                    />
+                  )}
                   <circle
                     cx={nx} cy={ny} r={radius} filter={isActive || isForeign ? "url(#node-glow)" : "url(#ambient-shadow)"}
                     className={`outline-none transition-colors duration-fast ${fillColor} ${strokeColor}`}

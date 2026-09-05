@@ -22,6 +22,7 @@ import type { ObservationContradiction, ForeignCaseOverlay } from "@/lib/provide
 import type { InvestigativeGap, Lead, RelationHypothesis, ReviewTask } from "@indago/contracts";
 import type { InvestigativeContext, ContextKind } from "@/lib/context/investigative-context";
 import { isOpenGap, isActiveLead } from "@/lib/context/context-details";
+import { WEAK_SUPPORT_BAND_THRESHOLD } from "@/lib/graph/graph-visual-state";
 import {
   IntelligencePanel,
   IntelligenceLoading,
@@ -31,8 +32,15 @@ import {
   SelectOnGraphButton,
 } from "./shared";
 
-/** Documented weakness threshold for relation support edges. */
-export const WEAK_SUPPORT_THRESHOLD = 0.3;
+/**
+ * Documented weakness threshold for relation support edges.
+ *
+ * Canonical constant lives in the PR-6 graph visual-language module (the graph
+ * layer must NOT import the intelligence tab); this re-export keeps existing
+ * consumers and the PR-5 regression tests (`WEAK_SUPPORT_THRESHOLD === 0.3`)
+ * working without drift.
+ */
+export const WEAK_SUPPORT_THRESHOLD = WEAK_SUPPORT_BAND_THRESHOLD;
 
 export type SignalKind = "contradiction" | "open-gap" | "weak-relation" | "active-lead" | "cross-case" | "review";
 
