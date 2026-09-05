@@ -30,6 +30,7 @@ import type {
   GraphEdge,
   GraphHole,
   CrossCaseMatch,
+  Hypothesis,
   RobustnessResult,
   EvidenceSubmissionRequest,
   UploadedFileReference,
@@ -43,6 +44,7 @@ import type {
 } from "@indago/contracts";
 import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
+import type { CapabilityStatusTable } from "./capabilities";
 
 // ============================================================================
 // Data Mode
@@ -250,6 +252,42 @@ export function catalogKey(action: string, targetId: string): string {
 }
 
 // ============================================================================
+// Cross-Case Overlay (documented local)
+//
+// The foreign-island topology the graph UI draws when an analyst opens a
+// case boundary. Owned by the CrossCaseProvider seam so UI code never imports
+// demo fixtures. `ref` is a stable presentation key (e.g. "cobalt"); `caseId`
+// is the canonical foreign case id.
+// ============================================================================
+
+export interface ForeignGraphNode {
+  readonly id: string;
+  readonly type: string;
+  readonly label: string;
+  readonly isForeign: true;
+  readonly structuralImportance: number;
+}
+
+export interface ForeignGraphEdge {
+  readonly id: string;
+  readonly sourceNodeId: string;
+  readonly targetNodeId: string;
+  readonly support: number;
+  readonly isForeignEdge: true;
+}
+
+export interface ForeignCaseOverlay {
+  readonly ref: string;
+  readonly caseId: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly localTargetMatch: string;
+  readonly bridgeSupport: number;
+  readonly nodes: readonly ForeignGraphNode[];
+  readonly edges: readonly ForeignGraphEdge[];
+}
+
+// ============================================================================
 // Intelligence domain projections (documented local)
 //
 //  - ObservationContradiction   a first-class, never-auto-resolved A/∼A pairing
@@ -452,8 +490,26 @@ export interface RobustnessProvider {
   getResult(investigationId: string, hypothesisId: string): Promise<RobustnessResult>;
 }
 
+/** Working-hypothesis seam. The canonical Hypothesis model (contracts) is the
+ *  single hypothesis shape — the provider only EXPOSES existing hypotheses, it
+ *  never derives new ones. Demo returns its deterministic seeded hypotheses;
+ *  live is UNSUPPORTED (no platform hypothesis endpoint yet) and must not
+ *  fabricate or reuse demo data. */
+export interface HypothesisProvider {
+  listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<Hypothesis>>;
+  get(id: string): Promise<Hypothesis>;
+}
+
 export interface CrossCaseProvider {
   listMatches(caseId: string, query?: ProviderQuery): Promise<Paginated<CrossCaseMatch>>;
+  /** Case-boundary overlays for the graph UI (foreign islands). Provider-owned
+   *  DATA: demo returns its deterministic cobalt/crimson islands keyed by ref;
+   *  live is UNSUPPORTED (no backend route) and must NOT fabricate or reuse
+   *  demo data. UI consumes this seam — it never imports cross-case fixtures. */
+  listForeignOverlays(caseId: string, query?: ProviderQuery): Promise<Paginated<ForeignCaseOverlay>>;
 }
 
 export interface RealtimeProvider {
@@ -504,6 +560,12 @@ export interface WorkspaceIdentity {
 
 export interface WorkspaceProviders extends WorkspaceIdentity {
   readonly mode: Exclude<DataMode, "auto">;
+  /** Declared capability status for THIS workspace in THIS effective mode
+   *  (lib/providers/capabilities). UI/nav/representation seams read this
+   *  instead of importing Demo/Live implementations or branching on provider
+   *  behavior. A capability reported "not-ready" cannot be silently demo-served:
+   *  calls fail typed. */
+  readonly capabilities: CapabilityStatusTable;
   readonly cases: CaseProvider;
   readonly investigations: InvestigationProvider;
   readonly evidence: EvidenceProvider;
@@ -517,6 +579,7 @@ export interface WorkspaceProviders extends WorkspaceIdentity {
   readonly gaps: GapProvider;
   readonly review: ReviewProvider;
   readonly robustness: RobustnessProvider;
+  readonly hypotheses: HypothesisProvider;
   readonly crossCase: CrossCaseProvider;
   readonly realtime: RealtimeProvider;
 }

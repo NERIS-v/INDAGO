@@ -16,6 +16,12 @@
 //   - workspaceId     = stable frontend bundle-instance key
 //
 // UI never branches on DataMode and never imports Demo/Live implementations.
+//
+// F-PR5: <NetworkWorkspaceProvider> is mounted between <WorkspaceProvider> and
+// <WorkspaceShell> so the Network workspace's shared analytical state (view,
+// timeRange, focus) survives sub-route remounts while remaining scoped to this
+// workspace instance. It uses useSearchParams() and is therefore inside the
+// Suspense boundary, exactly like WorkspaceBoundaryContent itself.
 // ============================================================================
 
 "use client";
@@ -23,6 +29,7 @@
 import { Suspense, useMemo, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { createWorkspaceProviders } from "@/lib/providers/factory";
+import { NetworkWorkspaceProvider } from "@/lib/network/use-network-workspace";
 import { WorkspaceProvider } from "./context";
 import { WorkspaceShell } from "./shell";
 
@@ -56,7 +63,9 @@ function WorkspaceBoundaryContent({ children }: { readonly children: ReactNode }
 
   return (
     <WorkspaceProvider providers={providers}>
-      <WorkspaceShell>{children}</WorkspaceShell>
+      <NetworkWorkspaceProvider>
+        <WorkspaceShell>{children}</WorkspaceShell>
+      </NetworkWorkspaceProvider>
     </WorkspaceProvider>
   );
 }

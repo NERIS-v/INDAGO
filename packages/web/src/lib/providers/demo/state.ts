@@ -30,6 +30,7 @@ import type {
   CandidatePair,
   CandidateResolution,
   EntityHypothesis,
+  Hypothesis,
 } from "@indago/contracts";
 import { demoFixtures } from "./demo-fixtures";
 import type { InvestigationTimeline, ObservationContradiction } from "../types";
@@ -51,6 +52,7 @@ export interface DemoWorkspaceState {
   sourceById: Map<string, Source>;
   artifactById: Map<string, Artifact>;
   relationById: Map<string, RelationHypothesis>;
+  hypothesisById: Map<string, Hypothesis>;
   timeline: InvestigationTimeline;
   contradictions: readonly ObservationContradiction[];
   /** ER store — mutable decision state. Fixture constants are never mutated;
@@ -91,6 +93,7 @@ export function createDemoWorkspaceState(workspaceId: string): DemoWorkspaceStat
     sourceById: toMap(demoFixtures.sources),
     artifactById: toMap(demoFixtures.artifacts),
     relationById: toMap(demoFixtures.relations),
+    hypothesisById: toMap(demoFixtures.hypotheses),
     timeline: demoFixtures.timeline,
     contradictions: demoFixtures.contradictions,
     candidateById: toMap(demoFixtures.candidates),
@@ -121,6 +124,7 @@ export function resetDemoWorkspaceState(state: DemoWorkspaceState): void {
   state.sourceById = toMap(demoFixtures.sources);
   state.artifactById = toMap(demoFixtures.artifacts);
   state.relationById = toMap(demoFixtures.relations);
+  state.hypothesisById = toMap(demoFixtures.hypotheses);
   state.timeline = demoFixtures.timeline;
   state.contradictions = demoFixtures.contradictions;
   state.candidateById = toMap(demoFixtures.candidates);

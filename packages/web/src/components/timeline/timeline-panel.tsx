@@ -4,10 +4,21 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import type { InvestigationTimeline, TimelineBand } from "@/lib/providers/types";
+import type { InvestigationTimeline, TimelineBand, TimelineItem } from "@/lib/providers/types";
 
 interface TimelinePanelProps {
   onTimeRangeChange: (range: [number, number] | null) => void;
+  /** PR-3 narrow seam: a timeline diamond ACTs as an intent to surface the
+   *  linked object (evidence/observation) in the context bridge. Passed by
+   *  the shell; TimelinePanel itself is not rewritten. */
+  onEventActivate?: (item: TimelineItem) => void;
+  /** F-PR5 narrow seam: the workspace-wide temporal scope this panel previously
+   *  shared from a LOCAL rangePct. When the shell remounts (e.g. returning to
+   *  the Graph route), rangePct would otherwise silently reset to [0,100] and
+   *  overwrite the shared scope. When THIS prop is supplied, rangePct is seeded
+   *  once from it (never re-seeded afterwards). Absent/null = existing default
+   *  "full timeline" behavior, unchanged. */
+  restoredTimeRange?: [number, number] | null;
 }
 
 const BAND_KIND_ORDER: TimelineBand["kind"][] = ["milestone", "evidence", "observation", "relationship"];
@@ -37,7 +48,7 @@ function formatTime(t: number) {
   return new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
-export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
+export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTimeRange }: TimelinePanelProps) {
   const workspace = useWorkspace();
   const [timeline, setTimeline] = useState<InvestigationTimeline | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -49,6 +60,8 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playAnimRef = useRef<number | null>(null);
   const lastPlayApplyRef = useRef(0);
+  const hasRestored = restoredTimeRange !== undefined && restoredTimeRange !== null;
+  const restoredAppliedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -123,11 +136,32 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
     }, [domain, onTimeRangeChange]
   );
 
+  // F-PR5: seed rangePct ONCE from the shared workspace scope once the timeline
+  // domain is known. Without this, a shell remount silent-resets rangePct to
+  // [0,100], which would overwrite the shared temporal scope as if the analyst
+  // had never narrowed it. Seeding is a one-time projection of the restored
+  // epoch range into domain percent space. The debounce below is gated while a
+  // restore is pending so the defaulted [0,100] never emits a spurious
+  // full-range onChange ahead of the seed.
+  useEffect(() => {
+    if (!hasRestored || restoredAppliedRef.current) return;
+    if (!timeline || timeline.items.length === 0) return;
+    const span = domain.end - domain.start;
+    if (span <= 0) return;
+    const clamp = (v: number) => Math.min(100, Math.max(0, v));
+    restoredAppliedRef.current = true;
+    setRangePct([
+      clamp(((restoredTimeRange![0] - domain.start) / span) * 100),
+      clamp(((restoredTimeRange![1] - domain.start) / span) * 100),
+    ]);
+  }, [hasRestored, timeline, domain, restoredTimeRange]);
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (hasRestored && !restoredAppliedRef.current) return;
     debounceRef.current = setTimeout(() => applyRange(rangePct), 50);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [rangePct, applyRange]);
+  }, [rangePct, applyRange, hasRestored]);
 
   const spanD = domain.end - domain.start;
   const itemTimes = timeline ? timeline.items.map((it) => new Date(it.time).getTime()).filter((t) => !Number.isNaN(t)) : [];
@@ -330,8 +364,18 @@ export function TimelinePanel({ onTimeRangeChange }: TimelinePanelProps) {
                   return (
                     <div
                       key={item.id}
-                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-40 transition-all duration-300"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Activate ${item.label}`}
+                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-40 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:rounded-sm"
                       style={{ left: `${pos}%` }}
+                      onClick={() => onEventActivate?.(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onEventActivate?.(item);
+                        }
+                      }}
                       onMouseEnter={() => setHoverItem({ x: pos, label: item.label, time: `${formatDate(t)} ${formatTime(t)}`, kind })}
                       onMouseLeave={() => setHoverItem(null)}
                     >

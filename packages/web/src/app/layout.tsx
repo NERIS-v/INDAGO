@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppNavDock } from "@/components/layout/app-nav-dock";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,8 +31,8 @@ export default function RootLayout({
       className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
     >
       <body className="grain min-h-screen bg-surface-0 font-sans text-surface-700 antialiased">
-        <Sidebar />
-        <main className="pl-60 min-h-screen">
+        <AppNavDock />
+        <main className="min-h-screen">
           {children}
         </main>
       </body>

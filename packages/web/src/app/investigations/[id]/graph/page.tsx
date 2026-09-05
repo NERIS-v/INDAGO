@@ -1,26 +1,26 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { GraphPanel } from "@/components/graph/graph-panel";
-import { TimelinePanel } from "@/components/timeline/timeline-panel";
+import { Suspense } from "react";
+import { GraphControlCenter } from "@/components/graph/control-center/graph-control-center";
+import { useNetworkWorkspace } from "@/lib/network/use-network-workspace";
 
 function GraphTabContent() {
-  const [timeRange, setTimeRange] = useState<[number, number] | null>(null);
-  const searchParams = useSearchParams();
-  const focusNodeId = searchParams?.get("focus") ?? null;
+  // F-PR5: the workspace-wide temporal scope + durable focus target are OWNED
+  // by the shared Network workspace state (mounted at the workspace boundary),
+  // so they survive sub-route navigation and are two-way URL-synced. The page
+  // no longer keeps page-local copies that would reset on every visit.
+  const { timeRange, setTimeRange, focusEntityId, setFocusEntityId } =
+    useNetworkWorkspace();
 
   return (
-    <div className="flex flex-col h-full w-full gap-4 overflow-hidden">
-
-      <div className="flex-1 min-h-0 relative">
-        <GraphPanel activeTimeRange={timeRange} initialFocusNodeId={focusNodeId} />
-      </div>
-
-      <div className="shrink-0">
-        <TimelinePanel onTimeRangeChange={setTimeRange} />
-      </div>
-
+    <div className="h-full w-full min-h-0 overflow-hidden">
+      <GraphControlCenter
+        activeTimeRange={timeRange}
+        onTimeRangeChange={setTimeRange}
+        initialFocusNodeId={focusEntityId}
+        onFocusEntityChange={setFocusEntityId}
+        restoredTimeRange={timeRange}
+      />
     </div>
   );
 }
