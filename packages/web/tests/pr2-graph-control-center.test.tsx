@@ -340,3 +340,119 @@ describe("PR-2 — source guards and provider boundary", () => {
     expect(src).toContain("@/lib/providers/workspace/context");
   });
 });
+
+describe("PR-16 — representation bar owns the visualization region only", () => {
+  it("renders the switcher as an in-flow strip of the visualization region, never inside the context region", () => {
+    const providers = createWorkspaceDemoProviders(identity(), config);
+    const { container } = render(
+      <WorkspaceProvider providers={providers}>
+        <GraphControlCenter
+          activeTimeRange={null}
+          onTimeRangeChange={() => undefined}
+          activeNetworkView="graph"
+          onNetworkViewChange={() => undefined}
+        />
+      </WorkspaceProvider>,
+    );
+
+    const bar = container.querySelector("[data-representation-bar]");
+    const vizRegion = container.querySelector("[data-network-visualization-region]");
+    const contextRegion = container.querySelector("[data-context-region]");
+    expect(bar).toBeTruthy();
+    expect(vizRegion).toBeTruthy();
+    expect(contextRegion).toBeTruthy();
+
+    // The switcher lives inside the NETWORK VISUALIZATION REGION header strip...
+    const switcher = container.querySelector("[data-testid='representation-switcher']");
+    expect(switcher).toBeTruthy();
+    expect(vizRegion?.contains(switcher)).toBe(true);
+    expect(bar?.contains(switcher)).toBe(true);
+
+    // ...and the CONTEXT REGION is an independent sibling — neither contains
+    // the other, so the views bar structurally cannot cover context content.
+    expect(contextRegion?.contains(switcher)).toBe(false);
+    expect(switcher?.contains(contextRegion)).toBe(false);
+    expect(vizRegion?.contains(contextRegion)).toBe(false);
+  });
+
+  it("hides the bar when the workspace view seam is absent (unchanged standalone behavior)", () => {
+    const providers = createWorkspaceDemoProviders(identity(), config);
+    const { container } = render(
+      <WorkspaceProvider providers={providers}>
+        <GraphControlCenter
+          activeTimeRange={null}
+          onTimeRangeChange={() => undefined}
+        />
+      </WorkspaceProvider>,
+    );
+    expect(container.querySelector("[data-representation-bar]")).toBeNull();
+    expect(container.querySelector("[data-testid='representation-switcher']")).toBeNull();
+  });
+});
+
+// F-PR16 — operation-panel lifecycle: every non-committed operation offers an
+// explicit close/cancel and Escape behaves the same. The cross-case merge runs
+// real 1800/3300 ms timers, so these tests close the panel before they elapse
+// (and assert reopening starts IDLE, proving a closed operation left no live
+// timer behind).
+describe("PR-16 — operation-panel lifecycle", () => {
+  async function openMergeDrawer() {
+    fireEvent.click(screen.getByRole("button", { name: /^Cross-Case/ }));
+    const picker = await screen.findByText("Match: Operation Cobalt");
+    fireEvent.click(picker);
+    await screen.findByText("Authorize Graph Merge");
+  }
+
+  it("Cancel closes the merge panel and reopening starts from IDLE again", async () => {
+    renderControlCenter();
+    await screen.findByTestId("graph-canvas");
+    await openMergeDrawer();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("Shared Infrastructure Detected")).not.toBeInTheDocument();
+
+    await openMergeDrawer();
+    expect(screen.getByRole("button", { name: "Authorize Graph Merge" })).toBeInTheDocument();
+  });
+
+  it("the merge panel closes via its in-panel close button", async () => {
+    renderControlCenter();
+    await screen.findByTestId("graph-canvas");
+    await openMergeDrawer();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close cross-case merge panel" }));
+    expect(screen.queryByText("Shared Infrastructure Detected")).not.toBeInTheDocument();
+  });
+
+  it("Escape closes the merge panel, Discovery, Gaps, and the upload modal", async () => {
+    renderControlCenter();
+    await screen.findByTestId("graph-canvas");
+    await openMergeDrawer();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Shared Infrastructure Detected")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Discover/ }));
+    await screen.findByText("Discovery Mode");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Discovery Mode")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Detect Gaps/ }));
+    await screen.findByText("Investigative Gaps");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Investigative Gaps")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Add Evidence/ }));
+    await screen.findByRole("heading", { name: "Upload Evidence" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("heading", { name: "Upload Evidence" })).not.toBeInTheDocument();
+  });
+
+  it("the Discovery panel closes via its own close button", async () => {
+    renderControlCenter();
+    await screen.findByTestId("graph-canvas");
+    fireEvent.click(screen.getByRole("button", { name: /^Discover/ }));
+    await screen.findByText("Discovery Mode");
+    fireEvent.click(screen.getByRole("button", { name: "Close discovery panel" }));
+    expect(screen.queryByText("Discovery Mode")).not.toBeInTheDocument();
+  });
+});

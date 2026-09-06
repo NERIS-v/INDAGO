@@ -19,8 +19,23 @@ export default function JudgeModePage({ params }: { params: Promise<{ id: string
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [leadVisible, setLeadVisible] = useState(false);
+  const [gapVisible, setGapVisible] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  // F-PR16: the stage drawers were rendered with dead onClose={() => {}}.
+  // They are now dismissible for the span of their narrative step; the
+  // visibility resets whenever the narration moves between steps.
+  useEffect(() => {
+    const eventId = narrativeScript[currentStep]?.id;
+    setLeadVisible(eventId === "narrative-05");
+    setGapVisible(
+      eventId === "narrative-06" ||
+        eventId === "narrative-07" ||
+        eventId === "narrative-08",
+    );
+  }, [currentStep]);
 
   const totalSteps = narrativeScript.length;
   const currentEvent = narrativeScript[currentStep];
@@ -84,7 +99,9 @@ export default function JudgeModePage({ params }: { params: Promise<{ id: string
         return (
           <div className="relative mt-8 w-full max-w-6xl h-[60vh] rounded-xl border border-surface-200/50 shadow-2xl overflow-hidden bg-surface-0">
             <GraphPanel activeTimeRange={null} />
-            <LeadDrawer leadId="lead-victor-meridian" onClose={() => {}} />
+            {leadVisible && (
+              <LeadDrawer leadId="lead-victor-meridian" onClose={() => setLeadVisible(false)} />
+            )}
           </div>
         );
       case "narrative-06":
@@ -93,7 +110,9 @@ export default function JudgeModePage({ params }: { params: Promise<{ id: string
         return (
           <div className="relative mt-8 w-full max-w-6xl h-[60vh] rounded-xl border border-surface-200/50 shadow-2xl overflow-hidden bg-surface-0">
             <GraphPanel activeTimeRange={null} />
-            <GapDrawer gapId="gap-meridian-ownership" onClose={() => {}} />
+            {gapVisible && (
+              <GapDrawer gapId="gap-meridian-ownership" onClose={() => setGapVisible(false)} />
+            )}
           </div>
         );
       case "narrative-09":

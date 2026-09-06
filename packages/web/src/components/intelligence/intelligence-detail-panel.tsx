@@ -47,6 +47,15 @@ export function IntelligenceDetailPanel({
   onSelectRelation,
 }: IntelligenceDetailPanelProps) {
   const workspace = useWorkspace();
+
+  // F-PR16: Escape dismisses the modal observation detail surface.
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
   const [observationState, setObservationState] = useState<FetchState<Observation>>({
     kind: "loading",
   });

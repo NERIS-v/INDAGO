@@ -40,6 +40,15 @@ export function EntityResolutionPanel({
   onOpenObservation,
 }: EntityResolutionPanelProps) {
   const workspace = useWorkspace();
+
+  // F-PR16: Escape dismisses the modal resolution surface.
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
   const [view, setView] = useState<IntelligenceCandidateView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

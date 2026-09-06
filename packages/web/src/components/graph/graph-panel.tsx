@@ -584,25 +584,63 @@ export function GraphPanel({
     controlsRef.current?.focusNode(target.id);
   }, [focusRequest, data, finalNodes]);
 
-  const handleMergeAction = () => {
+  // F-PR16: the merge operation owns a set of timers. They are cleared on
+  // cancel/unmount so a closed operation can never mutate UI after the
+  // operator leaves the panel (e.g. auto-closing a reopened panel or marking
+  // a case MERGED the operator already dismissed).
+  const mergeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const clearMergeTimers = useCallback(() => {
+    for (const timer of mergeTimersRef.current) clearTimeout(timer);
+    mergeTimersRef.current = [];
+  }, []);
+
+  useEffect(() => clearMergeTimers, [clearMergeTimers]);
+
+  const closeMergePanel = useCallback(() => {
+    clearMergeTimers();
+    if (activeForeignCaseId) {
+      setMergeStatus((prev) => ({ ...prev, [activeForeignCaseId]: "IDLE" }));
+    }
+    publish({ activeForeignCaseId: null, crossCaseOpen: false });
+  }, [activeForeignCaseId, clearMergeTimers, publish]);
+
+  const handleMergeAction = useCallback(() => {
     const targetId = activeForeignCaseId;
     if (!targetId) return;
-    
-    setMergeStatus(prev => ({ ...prev, [targetId]: "PROCESSING" }));
-    
-    setTimeout(() => {
-      setMergeStatus(prev => ({ ...prev, [targetId]: "MERGED" }));
-      setMergedCases(prev => {
-        const next = prev.includes(targetId) ? prev : [...prev, targetId];
-        return next;
-      });
 
-      setTimeout(() => {
-        publish({ activeForeignCaseId: null, crossCaseOpen: false });
-      }, 1500);
+    setMergeStatus((prev) => ({ ...prev, [targetId]: "PROCESSING" }));
 
+    const markMerged = setTimeout(() => {
+      setMergeStatus((prev) => ({ ...prev, [targetId]: "MERGED" }));
+      setMergedCases((prev) =>
+        prev.includes(targetId) ? prev : [...prev, targetId],
+      );
     }, 1800);
-  };
+    const autoClose = setTimeout(() => {
+      publish({ activeForeignCaseId: null, crossCaseOpen: false });
+    }, 1800 + 1500);
+    mergeTimersRef.current.push(markMerged, autoClose);
+  }, [activeForeignCaseId, publish]);
+
+  // F-PR16: Escape dismisses the transient operation surfaces (cross-case
+  // merge drawer, discovery, gaps) the same way their in-panel controls do.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (effectiveActions.uploadOpen) {
+        publish({ uploadOpen: false });
+      } else if (effectiveActions.activeForeignCaseId) {
+        closeMergePanel();
+      } else if (effectiveActions.discoveryOpen) {
+        publish({ discoveryOpen: false });
+      } else if (effectiveActions.gapsOpen) {
+        publish({ gapsOpen: false });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [effectiveActions, closeMergePanel, publish]);
 
   if (error) {
     return (
@@ -753,17 +791,27 @@ export function GraphPanel({
       >
         {activeForeignCase && (
           <div className="flex flex-col h-full">
-            <div className="p-6 border-b border-surface-200/50 bg-surface-50">
-              <span className="text-[10px] font-mono text-semantic-foreign font-bold uppercase tracking-widest flex items-center gap-2 mb-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse" />
-                Boundary Alert
-              </span>
-              <h2 className="text-xl font-medium text-surface-900 leading-tight">Shared Infrastructure Detected</h2>
+            <div className="p-6 border-b border-surface-200/50 bg-surface-50 flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-mono text-semantic-foreign font-bold uppercase tracking-widest flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse" />
+                  Boundary Alert
+                </span>
+                <h2 className="text-xl font-medium text-surface-900 leading-tight">Shared Infrastructure Detected</h2>
+                <p className="text-xs text-surface-500 mt-1 max-w-60">A node in this case shares observable infrastructure with an external case. You may authorize a read-only merge to trace the shared surface.</p>
+              </div>
+              <button
+                aria-label="Close cross-case merge panel"
+                onClick={closeMergePanel}
+                className="w-8 h-8 shrink-0 flex items-center justify-center text-surface-500 hover:text-surface-900 hover:bg-surface-200/50 rounded-md transition-colors focus-visible:outline-none"
+              >
+                ✕
+              </button>
             </div>
-            
-            <div className="p-6 flex flex-col gap-6 h-full">
+
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col gap-6">
               <div className="space-y-2">
-                <span className="text-[10px] font-mono text-surface-500 uppercase tracking-widest font-bold">Match Telemetry</span>
+                <span className="text-[10px] font-mono text-surface-500 uppercase tracking-widest font-bold">Current Object</span>
                 <div className="flex flex-col gap-3 bg-surface-100/50 p-4 rounded-lg border border-surface-200">
                   <div className="flex justify-between items-end">
                     <span className="text-xs font-sans text-surface-700">Identity Match</span>
@@ -783,27 +831,49 @@ export function GraphPanel({
                 </div>
               </div>
 
-              <div className="mt-auto pt-4">
+              <div className="border-t border-surface-200/60" />
+
+              <div className="mt-auto pt-4 flex flex-col gap-2">
                 {currentMergeState === "IDLE" && (!activeForeignCaseId || !mergedCases.includes(activeForeignCaseId)) && (
-                  <Button 
-                    onClick={handleMergeAction} 
-                    className="w-full bg-accent-blue text-surface-0 hover:bg-accent-blue/80 font-mono text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--color-accent-blue-subtle)] transition-all"
-                  >
-                    Authorize Graph Merge
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      onClick={handleMergeAction} 
+                      className="w-full bg-accent-blue text-surface-0 hover:bg-accent-blue/80 font-mono text-[10px] uppercase tracking-widest shadow-[0_0_15px_var(--color-accent-blue-subtle)] transition-all"
+                    >
+                      Authorize Graph Merge
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={closeMergePanel}
+                      className="w-full font-mono text-[10px] uppercase tracking-widest text-surface-500 hover:text-surface-900"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 )}
                 
                 {currentMergeState === "PROCESSING" && (
-                  <div className="w-full bg-surface-800 text-semantic-foreign border border-semantic-foreign/30 font-mono text-[10px] uppercase tracking-widest p-2 rounded flex flex-col items-center justify-center relative overflow-hidden h-10 shadow-inner">
-                    <div className="absolute inset-0 w-full h-[2px] bg-accent-blue/50 blur-[2px] animate-filament" />
-                    <span className="animate-pulse font-bold">Authorizing Sync...</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="w-full bg-surface-800 text-semantic-foreign border border-semantic-foreign/30 font-mono text-[10px] uppercase tracking-widest p-2 rounded flex flex-col items-center justify-center relative overflow-hidden h-10 shadow-inner">
+                      <div className="absolute inset-0 w-full h-[2px] bg-accent-blue/50 blur-[2px] animate-filament" />
+                      <span className="animate-pulse font-bold">Authorizing Sync...</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      onClick={closeMergePanel}
+                      className="w-full font-mono text-[10px] uppercase tracking-widest text-surface-500 hover:text-surface-900"
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 )}
 
                 {(currentMergeState === "MERGED" || (activeForeignCaseId && mergedCases.includes(activeForeignCaseId))) && (
-                  <div className="w-full bg-success/10 text-success border border-success/30 font-mono text-[10px] uppercase tracking-widest p-2 rounded flex items-center justify-center gap-2 h-10 font-bold shadow-[0_0_15px_var(--color-success-subtle)]">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    Nodes Merged
+                  <div className="flex flex-col gap-2">
+                    <div className="w-full bg-success/10 text-success border border-success/30 font-mono text-[10px] uppercase tracking-widest p-2 rounded flex items-center justify-center gap-2 h-10 font-bold shadow-[0_0_15px_var(--color-success-subtle)]">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      Nodes Merged
+                    </div>
                   </div>
                 )}
               </div>
@@ -813,8 +883,20 @@ export function GraphPanel({
       </div>
 
       {effectiveActions.discoveryOpen && (
-        <div className="absolute inset-y-0 right-0 z-30 w-96 border-l border-surface-200 glass-panel rounded-none! rounded-r-xl! shadow-2xl overflow-y-auto transition-transform duration-500 ease-out translate-x-0">
-          <DiscoveryPanel investigationId={workspace.investigationId} onFocusNode={(nodeId) => controlsRef.current?.focusNode(nodeId)} />
+        <div className="absolute inset-y-0 right-0 z-30 w-96 border-l border-surface-200 glass-panel rounded-none! rounded-r-xl! shadow-2xl overflow-hidden transition-transform duration-500 ease-out translate-x-0 flex flex-col">
+          <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-2 border-b border-surface-200/60 bg-surface-50/80 backdrop-blur-md">
+            <span className="text-[10px] font-mono text-surface-500 uppercase tracking-widest font-bold">Structural Exploration</span>
+            <button
+              aria-label="Close discovery panel"
+              onClick={() => publish({ discoveryOpen: false })}
+              className="w-8 h-8 flex items-center justify-center text-surface-500 hover:text-surface-900 hover:bg-surface-200/50 rounded-md transition-colors focus-visible:outline-none"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <DiscoveryPanel investigationId={workspace.investigationId} onFocusNode={(nodeId) => controlsRef.current?.focusNode(nodeId)} />
+          </div>
         </div>
       )}
 

@@ -1,12 +1,17 @@
 // ============================================================================
-// F-PR6 — Representation Switcher (Zone 2 view pill)
+// F-PR6 — Representation Switcher (Zone 2 view bar)
 //
-// A minimal, floating switch between the declared Network representations
-// (Network / Pulse / Matrix / Adaptive Flow). It is an absolutely-positioned,
-// non-invasive pill in the top-right corner of Zone 2 so it never alters the
-// five-zone shell geometry. Buttons for representations that are declared but
-// "not-ready" in the effective mode are disabled with an explanatory title —
-// honest absence, never a fake-enabled control.
+// Switches between the declared Network representations (Network / Pulse /
+// Matrix / Adaptive Flow). F-PR16: the switcher is an IN-FLOW control strip of
+// the NETWORK VISUALIZATION REGION — it is rendered above Zone 2's content by
+// the shell (never absolutely positioned), so it cannot float over Zone 3's
+// context panel or over the graph's own top-right chrome (zoom cluster, stat
+// chips). The context panel owns its region independently; region separation
+// comes from layout ownership, not z-index stacking.
+//
+// Buttons for representations that are declared but "not-ready" in the
+// effective mode are disabled with an explanatory title — honest absence,
+// never a fake-enabled control.
 // ============================================================================
 
 "use client";
@@ -45,7 +50,7 @@ export function RepresentationSwitcher({
   return (
     <div
       data-testid="representation-switcher"
-      className="absolute top-6 right-6 z-30 flex items-center gap-2 rounded-lg border border-surface-300/60 bg-surface-50/80 backdrop-blur-md px-2 py-1 shadow-md"
+      className="flex items-center gap-2 rounded-lg border border-surface-300/60 bg-surface-50/80 backdrop-blur-md px-2 py-1"
     >
       <span
         aria-hidden

@@ -572,17 +572,34 @@ export function GraphControlCenter({
           )
         }
         graph={
-          <div className="relative h-full w-full min-h-0 min-w-0">
-            {/* F-PR6: minimal Zone 2 representation switcher. Hidden when the
-                caller does not supply the workspace view seam (unchanged for
-                existing callers and PR-2/PR-3 tests). */}
+          <div
+            className="flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden"
+            data-network-visualization-region
+          >
+            {/* F-PR16: the representation bar is a dedicated IN-FLOW strip of
+                the network visualization region. It never leaves this column
+                and cannot cover the adjacent context region nor the graph's
+                own top-right chrome. The zone-two panel renders in its own
+                region below the bar — independent layout ownership. */}
             {onNetworkViewChange && (
-              <RepresentationSwitcher
-                current={view}
-                onChange={onNetworkViewChange}
-                availability={availability}
-              />
+              <div
+                data-representation-bar
+                className="flex shrink-0 items-center justify-end gap-3 px-3 pt-2 pb-0"
+              >
+                <span
+                  aria-hidden
+                  className="mr-auto font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-surface-400"
+                >
+                  Network
+                </span>
+                <RepresentationSwitcher
+                  current={view}
+                  onChange={onNetworkViewChange}
+                  availability={availability}
+                />
+              </div>
             )}
+            <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
             {presentation.zoneTwo === "graph" ? (
               <div className="relative h-full w-full min-h-0 min-w-0">
                 <GraphPanel
@@ -633,6 +650,7 @@ export function GraphControlCenter({
                 />
               </div>
             )}
+            </div>
           </div>
         }
         context={

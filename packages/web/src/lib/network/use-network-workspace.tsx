@@ -140,6 +140,17 @@ export function NetworkWorkspaceProvider({
   const focusRef = useRef(focusEntityId);
   const filterRef = useRef(graphFilter);
 
+  // F-PR16 — coalesced URL-write buffer. Multiple setters firing within the
+  // SAME synchronous tick (e.g. "Show on Graph" switching the view AND the
+  // focus) must NOT each snapshot the pre-navigation searchParams: the second
+  // write would rebuild from a URL that still carries ?view=pulse and
+  // resurrect the param the first write just dropped — the "snap back" bug.
+  // Writes accumulate from the LATEST intended params here and each still
+  // issues a single router.replace of the cumulatively-correct URL; the
+  // buffer is drained by the URL->state effect once a committed URL lands, so
+  // the next tick naturally starts from fresh params.
+  const pendingParamsRef = useRef<URLSearchParams | null>(null);
+
   // URL -> state (back/forward, manual edits, direct nav).
   useEffect(() => {
     const view = currentView(searchParams);
@@ -155,16 +166,22 @@ export function NetworkWorkspaceProvider({
     setGraphFilterState((prev) =>
       filterKey(filter) === filterKey(prev) ? prev : filter,
     );
+    // The committed URL is now the source of truth; a fresh write tick must
+    // start from these params, not whatever an earlier coalesced write staged.
+    pendingParamsRef.current = null;
   }, [searchParams]);
 
   // State -> URL. Every mutation is a copy of the CURRENT params so ?caseId=
   // and every other present search param survive; default values are dropped.
+  // Reads the coalesced buffer first so a second setter in the same tick
+  // mutates the URL the FIRST setter just produced (bugfix for snap-back).
   const writeUrl = useCallback(
     (mutate: (params: URLSearchParams) => URLSearchParams) => {
-      const base = new URLSearchParams(searchParams.toString());
-      router.replace(pathWithParams(pathname, mutate(base)), {
-        scroll: false,
-      });
+      const base =
+        pendingParamsRef.current ?? new URLSearchParams(searchParams.toString());
+      const next = mutate(new URLSearchParams(base.toString()));
+      pendingParamsRef.current = next;
+      router.replace(pathWithParams(pathname, next), { scroll: false });
     },
     [router, pathname, searchParams],
   );

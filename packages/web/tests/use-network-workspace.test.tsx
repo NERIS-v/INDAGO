@@ -31,6 +31,15 @@ function Probe() {
       </span>
       <button onClick={() => ws.setActiveNetworkView("flow")}>set-view-flow</button>
       <button onClick={() => ws.setActiveNetworkView("graph")}>set-view-graph</button>
+      <button
+        onClick={() => {
+          // F-PR16 "Show on Graph": switch to graph AND focus in one tick.
+          ws.setActiveNetworkView("graph");
+          ws.setFocusEntityId("ent-9");
+        }}
+      >
+        show-on-graph
+      </button>
       <button onClick={() => ws.setFocusEntityId("ent-9")}>set-focus-nine</button>
       <button onClick={() => ws.setFocusEntityId("ent-9")}>set-focus-nine-again</button>
       <button onClick={() => ws.setFocusEntityId(null)}>clear-focus</button>
@@ -234,6 +243,35 @@ describe("F-PR5 — NetworkWorkspaceProvider two-way URL state", () => {
 
   it("throws when used outside a NetworkWorkspaceProvider", () => {
     expect(() => render(<Probe />)).toThrowError(/NetworkWorkspaceProvider/);
+  });
+
+  it("F-PR16: Show on Graph from Pulse does NOT snap back (coalesced URL writes)", () => {
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1", view: "pulse" });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("pulse");
+
+    // "Show on Graph" switches representation AND sets focus within one tick —
+    // the exact sequence that used to re-serialize ?view=pulse and snap back.
+    act(() => {
+      screen.getByRole("button", { name: "show-on-graph" }).click();
+    });
+
+    // Final written URL: graph is the REST-ful default (param dropped) and the
+    // focus must be applied atop THAT URL, never resurrecting ?view=pulse.
+    expect(lanes.replaceMock).toHaveBeenLastCalledWith(
+      "/investigations/i-1/graph?caseId=c-1&focus=ent-9",
+      { scroll: false },
+    );
+    expect(lanes.replaceMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("view=pulse"),
+    );
+    // State reflects graph as the active representation with focus intact.
+    expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("graph");
+    expect(container.querySelector('[data-testid="focus"]')?.textContent).toBe("ent-9");
   });
 });
 
