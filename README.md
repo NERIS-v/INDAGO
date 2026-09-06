@@ -947,7 +947,7 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
 packages/
 ├── contracts/      Zod schemas for domain models & API validation
 ├── platform/       Express API server, auth, upload queue, orchestrator
-├── web/            Next.js 15 dark-mode UI with vis.js graph rendering
+├── web/            Next.js 15 investigative workspace UI (five-zone shell, representable graph)
 └── intelligence/   Ingestion pipeline (OCR, NER, CDR/financial parsing)
 ```
 
@@ -977,6 +977,26 @@ packages/
   <tr>
     <td><img src="https://img.shields.io/badge/Temporal-Graph_Versioning-00D4AA?style=flat-square" alt="Temporal"></td>
     <td>Temporal history store, interval reconstruction, and graph versioning with historical projection</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Workspace-Five--Zone-00D4AA?style=flat-square" alt="Workspace"></td>
+    <td>Investigative workspace: five-zone shell (graph, context, temporal, intelligence) over a DEMO/LIVE provider seam with AUTO capability resolution</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Representations-Pulse__Matrix__Flow-6A5ACD?style=flat-square" alt="Representations"></td>
+    <td>Representation-aware Zone 2: entity pulse, relationship matrix, and adaptive flow — one shared temporal controller</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Reverse_Hypothesis-Deterministic-00D4AA?style=flat-square" alt="Reverse Hypothesis"></td>
+    <td>Deterministic reverse hypothesis mode added beside the preserved pipeline — classifies saved observations as supporting / contradicting / unresolved with reasons; no scores or AI verdicts</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Relation-Pulse_Authority-1A1A2E?style=flat-square" alt="Relation authority"></td>
+    <td>Relation authority (accept/reject), contradiction-backed deep-dive bridges, temporal versions and activity feed replay</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/UX-A11y__Theme-FF6B35?style=flat-square" alt="UX"></td>
+    <td>Cinematic semantic color language, reduced-motion support, roving-tab keyboard semantics, deep links, and panel error boundaries</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square" alt="CI"></td>
