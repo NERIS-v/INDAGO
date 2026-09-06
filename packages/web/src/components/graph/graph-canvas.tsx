@@ -11,7 +11,14 @@ import { DEFAULT_NODE_VISUAL_STATE, DEFAULT_EDGE_VISUAL_STATE } from "@/lib/grap
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
+  /** RENDERED edge projection (PR-4 filter applied). Always a subset (or the
+   *  same set) of `physicsEdges`; only these are drawn. */
   edges: GraphEdge[];
+  /** PR-10: the FULL topology that feeds the physics simulation
+   *  (useGraphLayout). Kept separate from `edges` so a readability-filter
+   *  change never changes the simulation content key / restarts the physics.
+   *  Absent → defaults to `edges` (standalone/back-compat callers). */
+  physicsEdges?: GraphEdge[];
   holes: GraphHole[];
   onNodeClick: (nodeId: string) => void;
   activeTimeRange: [number, number] | null;
@@ -65,7 +72,11 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext }: GraphCanvasProps) {
+  // PR-10: the physics topology defaults to the rendered edges for standalone
+  // callers and is the FULL merged topology when the panel supplies it — so
+  // readability-filter interactions never restart the simulation.
+  const physicsEdges = physicsEdgesProp ?? edges;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const interactionLayerRef = useRef<SVGGElement>(null);
@@ -134,7 +145,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
   const cx = dimensions.width / 2;
   const cy = dimensions.height / 2;
 
-  const { layoutRef, apiRef, settled } = useGraphLayout(nodes, edges, dimensions.width, dimensions.height, { hoveredNodeId: hoveredNode, focusedNodeId: focusedNode, reducedMotion });
+  const { layoutRef, apiRef, settled } = useGraphLayout(nodes, physicsEdges, dimensions.width, dimensions.height, { hoveredNodeId: hoveredNode, focusedNodeId: focusedNode, reducedMotion });
 
   useEffect(() => { apiRef.current.onTick(() => setTick((t) => t + 1)); return () => { apiRef.current.onTick(() => undefined); }; }, [apiRef]);
 
@@ -148,13 +159,24 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
     return () => cancelAnimationFrame(raf1);
   }, [settled]);
 
+  // PR-10: precompute nodeId → timestamp once per node snapshot. The old
+  // `nodes.find` per call turned every render into O(V²)+ (node layer, edge
+  // layer twice per edge, annotation layer, entrance pass).
+  const nodeTimeById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const n of nodes) {
+      const t = n.createdAt?.value ? new Date(n.createdAt.value).getTime() : NaN;
+      if (!Number.isNaN(t)) map.set(n.id, t);
+    }
+    return map;
+  }, [nodes]);
+
   const isNodeInTimeRange = useCallback((nodeId: string) => {
     if (!activeTimeRange) return true;
-    const originalNode = nodes.find((n) => n.id === nodeId);
-    if (!originalNode || !originalNode.createdAt?.value) return true;
-    const nodeTime = new Date(originalNode.createdAt.value).getTime();
+    const nodeTime = nodeTimeById.get(nodeId);
+    if (nodeTime === undefined) return true;
     return nodeTime >= activeTimeRange[0] && nodeTime <= activeTimeRange[1];
-  }, [nodes, activeTimeRange]);
+  }, [activeTimeRange, nodeTimeById]);
 
   const enterRef = useRef<Map<string, { t0: number; fromX: number; fromY: number }>>(new Map());
   const enterAnimRef = useRef<number | null>(null);
@@ -329,23 +351,55 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
   const communities = layoutRef.current.communities;
   const focusActive = visualContext?.focus != null;
 
+  // PR-10: index layout nodes once per physics snapshot so the render path
+  // (edge geometry, attention regions, entrance easing, edge endpoints) is
+  // O(E) + O(V) instead of O(E·V) / O(V²) `.find` scans every frame.
+  const layoutNodesById = useMemo(() => {
+    const map = new Map<string, LayoutNode>();
+    for (const n of layoutNodes) map.set(n.id, n);
+    return map;
+  }, [layoutNodes]);
+
+  // PR-10: the PR-4 filter prunes RENDERED edges only. Physics still runs on
+  // the full topology; only these ids are drawn from the layout's edge set.
+  const visibleEdgeIds = useMemo(() => {
+    return new Set(edges.map((e) => e.id));
+  }, [edges]);
+
+  // PR-10: undirected adjacency over the RENDERED edges only (matches the
+  // pre-existing hover-dim semantics: a node dims unless it shares a visible
+  // relation with the hovered node). Replaces the per-node `edges.some(...)`
+  // O(E) scan inside the node render loop.
+  const adjacencyFor = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const e of edges) {
+      const a = map.get(e.sourceNodeId) ?? new Set<string>();
+      a.add(e.targetNodeId);
+      map.set(e.sourceNodeId, a);
+      const b = map.get(e.targetNodeId) ?? new Set<string>();
+      b.add(e.sourceNodeId);
+      map.set(e.targetNodeId, b);
+    }
+    return map;
+  }, [edges]);
+
   const edgeGeometry = useMemo(() => {
     const map = new Map<string, number>();
     layoutEdges.forEach((edge) => {
-      const source = layoutNodes.find((n) => n.id === edge.sourceNodeId);
-      const target = layoutNodes.find((n) => n.id === edge.targetNodeId);
+      const source = layoutNodesById.get(edge.sourceNodeId);
+      const target = layoutNodesById.get(edge.targetNodeId);
       if (source && target) map.set(edge.id, Math.max(1, Math.hypot((target.x||0) - (source.x||0), (target.y||0) - (source.y||0))));
     });
     return map;
-  }, [layoutEdges, layoutNodes]);
+  }, [layoutEdges, layoutNodesById]);
 
   const enterPos = useCallback((id: string): { x: number; y: number; alpha: number; active: boolean } | null => {
     const e = enterRef.current.get(id); if (!e) return null;
-    const node = layoutNodes.find((n) => n.id === id); if (!node) return null;
+    const node = layoutNodesById.get(id); if (!node) return null;
     const t = Math.min(1, (performance.now() - e.t0) / ENTER_MS);
     const k = easeInOutCubic(t);
     return { x: e.fromX + ((node.x||cx) - e.fromX) * k, y: e.fromY + ((node.y||cy) - e.fromY) * k, alpha: k, active: t < 1 };
-  }, [layoutNodes, cx, cy]);
+  }, [layoutNodesById, cx, cy]);
 
   // PR-6: hydrate the presentation model with THIS canvas's interaction state.
   // The base map is derived once in the panel; interaction is canvas-local and
@@ -384,7 +438,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
     if (!visualContext?.regions.length) return [];
     return visualContext.regions.map((region) => {
       const members = region.memberNodeIds
-        .map((id) => layoutNodes.find((n) => n.id === id))
+        .map((id) => layoutNodesById.get(id))
         .filter((n): n is LayoutNode => Boolean(n))
         .map((n) => ({ x: n.x ?? cx, y: n.y ?? cy }));
       if (members.length === 0) return null;
@@ -393,7 +447,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
       const radius = Math.max(56, Math.max(0, ...members.map((m) => Math.hypot(m.x - centerX, m.y - centerY))) + 30);
       return { id: region.id, signals: region.signalTypes, cx: centerX, cy: centerY, radius };
     }).filter((r): r is { id: string; signals: GraphAttentionRegion["signalTypes"]; cx: number; cy: number; radius: number } => Boolean(r));
-  }, [visualContext, layoutNodes, cx, cy]);
+  }, [visualContext, layoutNodesById, cx, cy]);
 
   if (!dimensions.width) return <div ref={containerRef} className="w-full h-full" />;
 
@@ -404,7 +458,9 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden bg-surface-0/0 animate-fade-in"
+      className="w-full h-full relative overflow-hidden bg-semantic-background animate-fade-in"
+      data-graph-physics-edges={physicsEdges.length}
+      data-graph-render-edges={visibleEdgeIds.size}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={stopPanning}
@@ -424,33 +480,33 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
           <radialGradient id="fog-gradient">
-            <stop offset="0%" stopColor="var(--color-surface-300)" stopOpacity="0.08" />
+            <stop offset="0%" stopColor="var(--color-surface-300)" stopOpacity="0.06" />
             <stop offset="100%" stopColor="var(--color-surface-400)" stopOpacity="0" />
           </radialGradient>
           <radialGradient id="bridge-halo-gradient">
-            <stop offset="0%" stopColor="var(--color-accent-rose)" stopOpacity="0.3" />
+            <stop offset="0%" stopColor="var(--color-accent-rose)" stopOpacity="0.22" />
             <stop offset="100%" stopColor="var(--color-accent-rose)" stopOpacity="0" />
           </radialGradient>
           
           <radialGradient id="foreign-halo-gradient">
-            <stop offset="0%" stopColor="var(--color-accent-blue)" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="var(--color-accent-blue)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-semantic-foreign)" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="var(--color-semantic-foreign)" stopOpacity="0" />
           </radialGradient>
 
           <radialGradient id="attention-gradient">
-            <stop offset="0%" stopColor="var(--color-accent-amber)" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="var(--color-accent-amber)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-semantic-attention)" stopOpacity="0.14" />
+            <stop offset="100%" stopColor="var(--color-semantic-attention)" stopOpacity="0" />
           </radialGradient>
 
           <pattern id="canvas-grid" width="64" height="64" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1" fill="var(--color-surface-400)" opacity="0.3" />
-            <path d="M 32 30 L 32 34 M 30 32 L 34 32" stroke="var(--color-surface-400)" strokeWidth="0.5" opacity="0.15" />
+            <circle cx="2" cy="2" r="1" fill="var(--color-surface-400)" opacity="0.16" />
+            <path d="M 32 30 L 32 34 M 30 32 L 34 32" stroke="var(--color-surface-400)" strokeWidth="0.5" opacity="0.08" />
           </pattern>
           <marker id="edge-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M0 0.5 L10 5 L0 9.5 z" fill="context-stroke" />
           </marker>
           <marker id="edge-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0 0.5 L10 5 L0 9.5 z" fill="var(--color-accent-blue)" />
+            <path d="M0 0.5 L10 5 L0 9.5 z" fill="var(--color-semantic-foreign)" />
           </marker>
         </defs>
 
@@ -486,7 +542,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 data-graph-attention-members={region.id}
               >
                 <circle cx={region.cx} cy={region.cy} r={region.radius} fill="url(#attention-gradient)" style={{ opacity: bloom ? 1 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 500ms` }} />
-                <circle cx={region.cx} cy={region.cy} r={region.radius + 6} fill="none" stroke="var(--color-accent-amber)" strokeWidth={1.5} strokeDasharray="3 6" style={{ opacity: bloom ? 0.65 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 800ms` }} />
+                <circle cx={region.cx} cy={region.cy} r={region.radius + 6} fill="none" stroke="var(--color-semantic-attention)" strokeWidth={1.5} strokeDasharray="3 6" style={{ opacity: bloom ? 0.65 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 800ms` }} />
               </g>
             ))}
           </g>
@@ -509,8 +565,11 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
           <g id="edge-layer">
             {layoutNodes.length > 0 &&
               layoutEdges.map((edge) => {
-                const source = layoutNodes.find((n) => n.id === edge.sourceNodeId);
-                const target = layoutNodes.find((n) => n.id === edge.targetNodeId);
+                // PR-10: the physics layout holds the FULL topology; only the
+                // PR-4 filtered projection is rendered.
+                if (!visibleEdgeIds.has(edge.id)) return null;
+                const source = layoutNodesById.get(edge.sourceNodeId);
+                const target = layoutNodesById.get(edge.targetNodeId);
                 if (!source || !target) return null;
 
                 const support = edge.support ?? 1;
@@ -557,12 +616,12 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                   !isForeignBridge &&
                   !isContradicted;
 
-                let colorClass = "stroke-surface-500/60";
-                if (isForeignBridge) colorClass = "stroke-accent-blue drop-shadow-[0_0_8px_var(--color-accent-blue)]";
-                else if (isForeignEdge) colorClass = "stroke-accent-blue/40";
-                else if (isContradicted) colorClass = "stroke-danger";
-                else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) colorClass = "stroke-accent-rose";
-                else if (isConnected && !isOutOfBounds) colorClass = "stroke-accent-rose";
+                let colorClass = "stroke-semantic-foreground-faint/70";
+                if (isForeignBridge) colorClass = "stroke-semantic-foreign drop-shadow-[0_0_8px_var(--color-semantic-foreign)]";
+                else if (isForeignEdge) colorClass = "stroke-semantic-foreign/35";
+                else if (isContradicted) colorClass = "stroke-semantic-contradiction";
+                else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) colorClass = "stroke-semantic-supported";
+                else if (isConnected && !isOutOfBounds) colorClass = "stroke-semantic-selection";
                 
                 const dashArray = isForeignBridge ? "8 6" : isContradicted ? "4 4" : isLowConfidence ? "6 6" : reducedMotion ? undefined : `${length} ${length}`;
                 const dashOffset = isForeignBridge || isLowConfidence || isContradicted || reducedMotion ? 0 : bloom ? 0 : initialOffset;
@@ -582,7 +641,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                   edgeDashArray = `${drawLen} ${drawLen}`; edgeDashOffset = drawLen * (1 - progress); edgeMarkerEnd = undefined;
                 }
 
-                const baseOpacity = isOutOfBounds ? 0 : isForeignBridge ? 1 : isContradicted ? 0.6 : isConnected ? 1 : isLowConfidence ? 0.3 : support * 0.4 + 0.2;
+                const baseOpacity = isOutOfBounds ? 0 : isForeignBridge ? 1 : isContradicted ? 0.6 : isConnected ? 1 : isLowConfidence ? 0.28 : support * 0.34 + 0.14;
                 const showTrace = (isConnected || isForeignBridge) && !isContradicted && !isLowConfidence && !reducedMotion;
 
                 const edgeOpacity = baseOpacity * entranceAlpha * (focusRecede ? 0.4 : 1);
@@ -637,7 +696,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
               const isForeign = (node as any).isForeign;
               const inTimeRange = isNodeInTimeRange(node.id);
               const isActive = hoveredNode === node.id || focusedNode === node.id || internalSelectedNode === node.id;
-              const hoverDimmed = hoveredNode !== null && !isActive && !edges.some((e) => (e.sourceNodeId === node.id && e.targetNodeId === hoveredNode) || (e.targetNodeId === node.id && e.sourceNodeId === hoveredNode));
+              const hoverDimmed = hoveredNode !== null && !isActive && !(adjacencyFor.get(hoveredNode)?.has(node.id) ?? false);
 
               const pos = enterPos(node.id);
               const nx = pos ? pos.x : (node.x || cx); 
@@ -655,14 +714,14 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 vs.evidencePosture !== "contradicted" &&
                 !isActive;
 
-              let fillColor = "fill-surface-0";
-              let strokeColor = "stroke-accent-amber";
-              
-              if (isActive && inTimeRange) { fillColor = "fill-surface-200"; strokeColor = "stroke-accent-rose shadow-[0_0_15px_var(--color-accent-rose)]"; }
-              else if (isForeign) { fillColor = "fill-surface-50"; strokeColor = "stroke-accent-blue/80"; }
-              else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) { fillColor = "fill-surface-100"; strokeColor = "stroke-accent-rose/70"; }
-              else if (node.isBridge) { fillColor = "fill-surface-100"; strokeColor = "stroke-accent-rose"; }
-              else if (node.type === "ENTITY") { fillColor = "fill-surface-100"; strokeColor = "stroke-surface-400"; }
+              let fillColor = "fill-semantic-surface-soft";
+              let strokeColor = "stroke-semantic-foreground-muted";
+
+              if (isActive && inTimeRange) { fillColor = "fill-semantic-selection-subtle"; strokeColor = "stroke-semantic-selection shadow-[0_0_18px_var(--color-semantic-selection)]"; }
+              else if (isForeign) { fillColor = "fill-semantic-foreign/15"; strokeColor = "stroke-semantic-foreign/80"; }
+              else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) { fillColor = "fill-semantic-supported/15"; strokeColor = "stroke-semantic-supported/90"; }
+              else if (node.isBridge) { fillColor = "fill-semantic-surface-elevated"; strokeColor = "stroke-accent-rose/70"; }
+              else if (node.type === "ENTITY") { fillColor = "fill-semantic-surface-soft"; strokeColor = "stroke-semantic-foreground-faint"; }
 
               const nodeDelay = Math.max(0, Math.hypot(nx - cx, ny - cy) * 1.5) || 0;
 
@@ -690,7 +749,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 >
                   {vs.evidencePosture === "contradicted" && (
                     <circle
-                      cx={nx} cy={ny} r={radius + 3} fill="none" stroke="var(--color-danger)" strokeWidth={1.5} strokeDasharray="3 4"
+                      cx={nx} cy={ny} r={radius + 3} fill="none" stroke="var(--color-semantic-contradiction)" strokeWidth={1.5} strokeDasharray="3 4"
                       data-graph-node-posture="contradicted"
                       style={{ opacity: bloom ? (focusRecede ? 0.5 : 0.85) : 0, transition: reducedMotion ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms` }}
                     />
@@ -709,7 +768,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                   />
                   <svg
                     x={nx - (radius * 1.15) / 2} y={ny - (radius * 1.15) / 2} width={radius * 1.15} height={radius * 1.15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
-                    className={`pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "text-accent-rose" : isForeign ? "text-accent-blue" : "text-surface-500"}`}
+                    className={`pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "text-semantic-selection" : isForeign ? "text-semantic-foreign" : "text-semantic-foreground-faint"}`}
                   >
                     <path d={getNodeIconPath(node)} />
                   </svg>
@@ -721,10 +780,11 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
           <g id="interaction-layer" ref={interactionLayerRef}>
             {layoutNodes.map((node) => {
               const inTimeRange = isNodeInTimeRange(node.id);
+              const selected = internalSelectedNode === node.id || focusedNode === node.id;
               return (
                 <circle
-                  key={`interact-${node.id}`} ref={bindNodeDrag} data-nodeid={node.id} cx={node.x || cx} cy={node.y || cy} r={32} tabIndex={inTimeRange ? 0 : -1} role="button" aria-label={`${node.label ?? "Entity"}${node.isBridge ? ", bridge candidate" : ""}`}
-                  className={`fill-transparent outline-none ${inTimeRange ? "cursor-grab active:cursor-grabbing" : "pointer-events-none"}`}
+                  key={`interact-${node.id}`} ref={bindNodeDrag} data-nodeid={node.id} cx={node.x || cx} cy={node.y || cy} r={32} tabIndex={inTimeRange ? 0 : -1} role="button" aria-label={`${node.label ?? "Entity"}${node.isBridge ? ", bridge candidate" : ""}`} aria-pressed={selected ? "true" : undefined}
+                  className={`fill-transparent outline-none ${inTimeRange ? "cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-semantic-focus" : "pointer-events-none"}`}
                   onMouseEnter={() => setHoveredNode(node.id)} onMouseLeave={() => setHoveredNode(null)}
                   onFocus={() => setFocusedNode(node.id)} onBlur={() => setFocusedNode(null)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
@@ -755,7 +815,7 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
                 <g key={`label-${node.id}`} transform={`translate(${lx}, ${ly}) scale(${1 / zoom}) translate(${-lx}, ${-ly})`}>
                   <text
                     x={lx} y={ly} textAnchor={textAnchor} paintOrder="stroke fill"
-                    className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "fill-surface-900 font-bold" : isForeign ? "fill-accent-blue font-bold drop-shadow-[0_0_4px_var(--color-accent-blue)]" : "fill-surface-600 font-medium"}`}
+                    className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "fill-semantic-selection font-bold" : isForeign ? "fill-semantic-foreign font-bold drop-shadow-[0_0_4px_var(--color-semantic-foreign)]" : "fill-semantic-foreground-muted font-medium"}`}
                     style={{ opacity: (!inTimeRange ? 0 : hoveredNode !== null && !isActive ? 0.05 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
                   >
                     {node.label}
@@ -767,9 +827,6 @@ export function GraphCanvas({ nodes, edges, holes, onNodeClick, activeTimeRange,
         </g>
       </svg>
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_50%_50%,transparent_50%,rgba(0,0,0,0.6)_100%)] mix-blend-multiply" />
-      <ul className="sr-only" aria-label="Graph entities">
-        {layoutNodes.map((node) => (<li key={`a11y-${node.id}`}><button type="button" onClick={() => { setInternalSelectedNode(node.id); onNodeClick(node.id); }}>{node.label}</button></li>))}
-      </ul>
     </div>
   );
 }
