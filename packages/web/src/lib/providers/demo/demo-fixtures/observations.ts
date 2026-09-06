@@ -79,6 +79,12 @@ const o3: Observation = {
   observedAt: evt("2024-02-05", "day"),
   createdAt: obs("2024-05-21"),
   updatedAt: obs("2024-05-21"),
+  metadata: {
+    customFields: {
+      flowAmount: 250000,
+      flowCurrency: "INR",
+    },
+  },
 };
 
 const o4: Observation = {
@@ -94,6 +100,12 @@ const o4: Observation = {
   observedAt: evt("2024-02-06", "day"),
   createdAt: obs("2024-05-21"),
   updatedAt: obs("2024-05-21"),
+  metadata: {
+    customFields: {
+      flowAmount: 245000,
+      flowCurrency: "INR",
+    },
+  },
 };
 
 const o5: Observation = {
@@ -109,6 +121,13 @@ const o5: Observation = {
   observedAt: evt("2024-03-18", "day"),
   createdAt: obs("2024-05-21"),
   updatedAt: obs("2024-05-21"),
+  metadata: {
+    customFields: {
+      flowAmount: 180000,
+      flowCurrency: "INR",
+      flowGap: "destination",
+    },
+  },
 };
 
 const o6: Observation = {

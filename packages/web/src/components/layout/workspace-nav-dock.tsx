@@ -64,11 +64,11 @@ export function WorkspaceNavDock() {
     <div className="px-6 pt-4">
       <nav
         aria-label="Investigation workspace"
-        className="relative mx-auto flex max-w-fit flex-wrap items-center gap-1 rounded-xl border border-surface-200/60 bg-surface-50/80 px-3 py-2 shadow-xl backdrop-blur-xl"
+        className="cc-panel-floating relative mx-auto flex max-w-fit flex-wrap items-center gap-1 px-3 py-2"
       >
         <Link
           href="/"
-          className="mr-2 flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="mr-2 flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
           aria-label="INDAGO Dashboard"
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-md border border-brand-500/20 bg-brand-500/15">
@@ -76,10 +76,10 @@ export function WorkspaceNavDock() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
             </svg>
           </span>
-          <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-surface-600">INDAGO</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-semantic-foreground-faint">INDAGO</span>
         </Link>
 
-        <span className="h-5 w-px bg-surface-300/70" aria-hidden />
+        <span className="h-5 w-px bg-semantic-border" aria-hidden />
 
         {WORKSPACE_NAV.map((entry) => {
           const href =
@@ -92,10 +92,10 @@ export function WorkspaceNavDock() {
               key={entry.label}
               href={href}
               aria-current={isActive ? "page" : undefined}
-              className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+              className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
                 isActive
-                  ? "bg-brand-500/10 text-brand-500"
-                  : "text-surface-500 hover:bg-surface-100 hover:text-surface-700"
+                  ? "bg-semantic-surface-soft text-semantic-selection"
+                  : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
               }`}
             >
               {entry.label}
@@ -103,11 +103,11 @@ export function WorkspaceNavDock() {
           );
         })}
 
-        <span className="h-5 w-px bg-surface-300/70" aria-hidden />
+        <span className="h-5 w-px bg-semantic-border" aria-hidden />
 
         <div className="flex items-center gap-2">
           {investigation && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface-100 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-surface-500" title={investigation.title}>
+            <span className="status-tag" title={investigation.title}>
               <span className="max-w-40 truncate">{investigation.title}</span>
               {investigation.status && (
                 <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-success" aria-label={`Status ${investigation.status}`} />
@@ -115,11 +115,11 @@ export function WorkspaceNavDock() {
             </span>
           )}
           {graphVersion && (
-            <span className="rounded-full border border-border-subtle bg-surface-100 px-2.5 py-1 text-[10px] font-mono font-medium uppercase tracking-widest text-surface-500">
+            <span className="status-tag">
               {graphVersion}
             </span>
           )}
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface-100 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-surface-500">
+          <span className="status-tag">
             <span className={`h-1.5 w-1.5 rounded-full ${modeDot}`} />
             {modeLabel}
           </span>

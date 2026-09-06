@@ -165,7 +165,8 @@ export const OPERATIONAL_REASONS = {
   NO_TRACE_SEAM: "Evidence trace is not yet wired for this context",
   NO_REVIEW: "No review workflow is wired for this object type",
   NO_RESOLVE: "There is no generic resolver — resolution follows the object's own domain API",
-  NO_CHALLENGE: "Challenge uses the object's relation-authority workflow (PR-8), not yet wired",
+  NO_CHALLENGE: "Challenge requires a relation selection (relation-authority workflow)",
+  NO_RELATION_AUTHORITY_LIVE: "Relation authority is not available in live mode (typed unsupported on this provider seam)",
 } as const;
 
 // ----------------------------------------------------------------------------
@@ -191,7 +192,7 @@ export function getOperationalActionState(
   action: OperationalAction,
   context: InvestigativeContext | null,
   capabilities: ContextualCapabilities,
-  _workspace: OperationalActionWorkspace,
+  workspace: OperationalActionWorkspace,
 ): OperationalActionState {
   const kind = COMMAND_KIND[action];
   const implemented = IMPLEMENTED.has(action);
@@ -281,11 +282,26 @@ export function getOperationalActionState(
       });
 
     case "challenge":
-      return project(kind, {
-        enabled: false,
-        implemented,
-        reason: OPERATIONAL_REASONS.NO_CHALLENGE,
-      });
+      // PR-8: the reserved relation-authority command is now wired for RELATION
+      // contexts in demo mode. The rail is the ENTRY surface — clicking it
+      // reveals the relation context where the authority panel lives — while
+      // per-action legality (Accept/Reject/Reverse) is decided by the authority
+      // model + provider, not by the rail.
+      if (context?.kind !== "relation") {
+        return project(kind, {
+          enabled: false,
+          implemented: false,
+          reason: OPERATIONAL_REASONS.NO_CHALLENGE,
+        });
+      }
+      if (workspace.mode !== "demo") {
+        return project(kind, {
+          enabled: false,
+          implemented: false,
+          reason: OPERATIONAL_REASONS.NO_RELATION_AUTHORITY_LIVE,
+        });
+      }
+      return project(kind, { enabled: true, implemented: true });
   }
 }
 

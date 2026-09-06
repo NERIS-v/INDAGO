@@ -79,7 +79,7 @@ describe("PR-1 — WorkspaceNavDock", () => {
     for (const label of [
       "Dashboard",
       "Overview",
-      "Graph",
+      "Network",
       "Timeline",
       "Observations",
       "Leads",
@@ -95,11 +95,11 @@ describe("PR-1 — WorkspaceNavDock", () => {
     }
   });
 
-  it("marks the Graph route as the active page", () => {
+  it("marks the Network route as the active page", () => {
     renderWorkspaceDock(graphPath());
-    const graph = screen.getByRole("link", { name: "Graph" });
-    expect(graph).toHaveAttribute("aria-current", "page");
-    expect(graph).toHaveAttribute("href", withCaseBoundary(graphPath()));
+    const network = screen.getByRole("link", { name: "Network" });
+    expect(network).toHaveAttribute("aria-current", "page");
+    expect(network).toHaveAttribute("href", withCaseBoundary(graphPath()));
   });
 
   it("marks the Hypothesis route as the active page", () => {

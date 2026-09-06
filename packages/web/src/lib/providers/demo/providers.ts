@@ -50,7 +50,22 @@ import { demoFixtures } from "./demo-fixtures";
 import { uploadDemoCatalog } from "./demo-fixtures/upload-demo-sequence";
 import { MOCK_FOREIGN_CASES, FOREIGN_ENTITIES_DB } from "./demo-fixtures/cross-case";
 import { ENTITY_LINK_BY_CANDIDATE } from "./demo-fixtures/entity-resolution";
+import { HYPOTHESIS_ALIASES } from "./demo-fixtures/hypothesis-aliases";
 import { createdNow } from "./demo-fixtures/times";
+import {
+  assembleAssessment,
+  buildEntityCatalog,
+  buildInverseConditions,
+  classifyReverseHypothesis,
+  interpretHypothesis,
+} from "@/lib/intel/reverse-hypothesis/hypothesis-model";
+import type {
+  HypothesisAssessment,
+  HypothesisDecisionInput,
+  HypothesisDecisionRecord,
+  HypothesisTestInput,
+  ObservationInput,
+} from "@/lib/intel/reverse-hypothesis/hypothesis-model";
 import type {
   IntelligenceCandidateView,
   ObservationContradiction,
@@ -395,6 +410,33 @@ export class DemoGraphProvider implements GraphProvider {
     return demoFixtures.graphVersion;
   }
 
+  async listVersions(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<import("@indago/contracts").GraphVersion>> {
+    await deterministicSleep(heavyLatency(this.config), resolveSignal(query));
+    throwIfAborted(resolveSignal(query));
+    if (investigationId !== this.state.investigation.id) {
+      throw ProviderError.notFound("Investigation not found.");
+    }
+    return paginate([...demoFixtures.graphVersions], query);
+  }
+
+  async getVersionById(
+    investigationId: string,
+    graphVersionId: string,
+  ): Promise<import("@indago/contracts").GraphVersion> {
+    await deterministicSleep(baseLatency(this.config));
+    if (investigationId !== this.state.investigation.id) {
+      throw ProviderError.notFound("Investigation not found.");
+    }
+    const version = demoFixtures.graphVersions.find((v) => v.id === graphVersionId);
+    if (!version) {
+      throw ProviderError.notFound("Graph version not found.");
+    }
+    return version;
+  }
+
   async getNodes(
     _investigationId: string,
     query?: ProviderQuery,
@@ -620,6 +662,62 @@ export class DemoRelationProvider implements RelationProvider {
     private readonly config: DataModeConfig,
   ) {}
 
+  private assertInvestigation(investigationId: string): void {
+    if (investigationId !== this.state.investigation.id) {
+      throw ProviderError.notFound("Investigation not found.");
+    }
+  }
+
+  private requireRelation(id: string): import("@indago/contracts").RelationHypothesis {
+    const it = this.state.relationById.get(id);
+    if (!it) throw ProviderError.notFound("Relation hypothesis not found.");
+    return it;
+  }
+
+  /** PR-8 — deliberate analyst relation authority. Records the decision on the
+   *  relation hypothesis AND reconciles the canonical graph projection so a
+   *  refetch shows the new standing (ACCEPTED keeps the edge; REJECTED/REVERSED
+   *  archvies it — the disposition always mirrors the relation lifecycle). A
+   *  previously CONTRADICTED edge that is ACCEPTED stays CONTRADICTED (the
+   *  counter-evidence is real; PR-6 grounds the visual state). */
+  private applyAuthority(
+    relation: import("@indago/contracts").RelationHypothesis,
+    action: "accept" | "reject" | "reverse",
+    reason?: string,
+  ): import("@indago/contracts").RelationHypothesis {
+    const status = action === "accept" ? "ACCEPTED" : action === "reject" ? "REJECTED" : "REVERSED";
+    const now = createdNow();
+    const updated: import("@indago/contracts").RelationHypothesis = {
+      ...relation,
+      status,
+      updatedAt: now,
+    };
+    this.state.relationById.set(relation.id, updated);
+
+    for (const [edgeId, edge] of this.state.graphEdgeById) {
+      if (edge.relationHypothesisId !== relation.id) continue;
+      const edgeStatus =
+        status === "ACCEPTED"
+          ? edge.status === "CONTRADICTED"
+            ? "CONTRADICTED"
+            : "ACTIVE"
+          : "ARCHIVED";
+      this.state.graphEdgeById.set(edgeId, {
+        ...edge,
+        status: edgeStatus as import("@indago/contracts").GraphEdge["status"],
+        updatedAt: now,
+      });
+    }
+
+    this.state.relationAuthorityAuditById.set(relation.id, {
+      action,
+      by: "analyst",
+      at: now,
+      ...(reason ? { reason } : {}),
+    });
+    return updated;
+  }
+
   /** List relation hypotheses for an investigation (default demo: REL_1..REL_6). */
   async listByInvestigation(
     investigationId: string,
@@ -638,6 +736,62 @@ export class DemoRelationProvider implements RelationProvider {
     const it = this.state.relationById.get(id);
     if (!it) throw ProviderError.notFound();
     return it;
+  }
+  /** PR-8 — deliberate analyst decision: accept a PROPOSED relation hypothesis.
+   *  Mirrors the platform accept route's transition legality. */
+  async accept(
+    investigationId: string,
+    relationHypothesisId: string,
+  ): Promise<import("@indago/contracts").RelationHypothesis> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const relation = this.requireRelation(relationHypothesisId);
+    if (relation.status !== "PROPOSED") {
+      throw ProviderError.validation(
+        `Only a PROPOSED relation hypothesis can be accepted (current: ${relation.status}).`,
+      );
+    }
+    return this.applyAuthority(relation, "accept");
+  }
+  /** PR-8 — deliberate analyst decision: reject a PROPOSED relation hypothesis. */
+  async reject(
+    investigationId: string,
+    relationHypothesisId: string,
+    reason?: string,
+  ): Promise<import("@indago/contracts").RelationHypothesis> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const relation = this.requireRelation(relationHypothesisId);
+    if (relation.status !== "PROPOSED") {
+      throw ProviderError.validation(
+        `Only a PROPOSED relation hypothesis can be rejected (current: ${relation.status}).`,
+      );
+    }
+    return this.applyAuthority(relation, "reject", reason);
+  }
+  /** PR-8 — deliberate analyst decision: reverse a prior acceptance or rejection.
+   *  REVERSED keeps the hypothesis and its audit history — reversal never
+   *  deletes. Mirrors the platform reverse route's transition legality. */
+  async reverse(
+    investigationId: string,
+    relationHypothesisId: string,
+    reason?: string,
+  ): Promise<import("@indago/contracts").RelationHypothesis> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const relation = this.requireRelation(relationHypothesisId);
+    if (relation.status !== "ACCEPTED" && relation.status !== "REJECTED") {
+      throw ProviderError.validation(
+        `Only an ACCEPTED or REJECTED relation hypothesis can be reversed (current: ${relation.status}).`,
+      );
+    }
+    return this.applyAuthority(relation, "reverse", reason);
+  }
+
+  /** PR-8 test seam: the authority audit record for a relation hypothesis
+   *  (undefined when no authority decision has been made in this bundle). */
+  getAudit(id: string) {
+    return this.state.relationAuthorityAuditById.get(id);
   }
 }
 
@@ -815,6 +969,89 @@ export class DemoIntelligenceProvider implements IntelligenceProvider {
     const it = this.state.artifactById.get(id);
     if (!it) throw ProviderError.notFound();
     return it;
+  }
+
+  /** F-PR9 Reverse Hypothesis — deterministic test. Interprets the
+   *  investigator-written hypothesis against the pure model, classifying saved
+   *  observations (canonical-shaped) into SUPPORTING / CONTRADICTING /
+   *  UNRESOLVED. Never returns a truth/confidence verdict. */
+  async testHypothesis(
+    investigationId: string,
+    input: HypothesisTestInput,
+  ): Promise<HypothesisAssessment> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const catalog = buildEntityCatalog(
+      [...this.state.entityById.values()].map((entity) => ({
+        id: entity.id,
+        canonicalName: entity.canonicalName,
+      })),
+      HYPOTHESIS_ALIASES,
+    );
+    const observationInputs: ObservationInput[] = [
+      ...this.state.observationById.values(),
+    ].map((obs) => ({
+      id: obs.id,
+      type: obs.type,
+      content: obs.content,
+      entityIds: obs.entityIds,
+      observedAt: obs.observedAt?.value,
+      evidenceId: obs.evidenceId,
+      sourceId: obs.sourceId,
+    }));
+    const contradictions = this.state.contradictions.map((c) => ({
+      id: c.id,
+      leftObservationId: c.leftObservationId,
+      rightObservationId: c.rightObservationId,
+      contradictionType: c.contradictionType,
+    }));
+    const interpretation = interpretHypothesis(input.hypothesis, catalog);
+    const { supporting, contradicting, unresolved } = classifyReverseHypothesis(
+      observationInputs,
+      interpretation,
+      catalog,
+      contradictions,
+    );
+    const inverseConditions = buildInverseConditions(interpretation);
+    return assembleAssessment({
+      hypothesisText: input.hypothesis,
+      interpretation,
+      supporting,
+      contradicting,
+      unresolved,
+      inverseConditions,
+      generatedAt: createdNow().value,
+    });
+  }
+
+  /** F-PR9 — record a deliberate analyst decision. Session/workspace-scoped;
+   *  canonical evidence is never mutated. Returns the current trail. */
+  async recordHypothesisDecision(
+    investigationId: string,
+    input: HypothesisDecisionInput,
+  ): Promise<readonly HypothesisDecisionRecord[]> {
+    await deterministicSleep(baseLatency(this.config));
+    this.assertInvestigation(investigationId);
+    const trail = this.state.reverseHypothesisDecisions.get(investigationId) ?? [];
+    const updated: HypothesisDecisionRecord[] = [
+      ...trail,
+      {
+        investigationId,
+        hypothesisText: input.hypothesis,
+        decision: input.decision,
+        at: createdNow().value,
+      },
+    ];
+    this.state.reverseHypothesisDecisions.set(investigationId, updated);
+    return updated;
+  }
+
+  /** F-PR9 — read the session decision trail for an investigation. */
+  async listHypothesisDecisions(
+    investigationId: string,
+  ): Promise<readonly HypothesisDecisionRecord[]> {
+    this.assertInvestigation(investigationId);
+    return this.state.reverseHypothesisDecisions.get(investigationId) ?? [];
   }
 
   private assertView(resolutionId: string): IntelligenceCandidateView {

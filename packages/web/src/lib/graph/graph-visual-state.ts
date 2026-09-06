@@ -267,6 +267,10 @@ export interface AttentionInput {
   readonly holes: GraphHole[];
   readonly filter?: GraphFilterState | null;
   readonly foreignNodeIds?: ReadonlySet<string>;
+  /** PR-10: optional PRE-COMPUTED signals (the full context derivation computes
+   *  them once and reuses them for regions instead of deriving twice). Absent →
+   *  derived here (leaf-function behavior unchanged). */
+  readonly signals?: Map<string, Set<AttentionSignalType>>;
 }
 
 /** Distinct investigative signals attached to every node, from visible edges,
@@ -332,7 +336,7 @@ export const ATTENTION_CONVERGENCE_HOPS = 2;
 export function deriveAttentionRegions(
   input: AttentionInput,
 ): GraphAttentionRegion[] {
-  const signals = deriveNodeSignals(input);
+  const signals = input.signals ?? deriveNodeSignals(input);
   const visibleEdges = applyGraphFilter(input.edges, input.filter);
 
   const signalNodeIds = new Set<string>();
@@ -416,6 +420,9 @@ export function deriveGraphVisualContext(
   const foreignNodeIds = input.foreignNodeIds ?? new Set<string>();
   const foreignEdgeIds = input.foreignEdgeIds ?? new Set<string>();
 
+  // PR-10: index nodes once (the per-edge `.find` was O(V·E) per derivation).
+  const nodeById = new Map<string, GraphNode>(input.nodes.map((n) => [n.id, n]));
+
   // Structural bridges over the visible ACTIVE topology (reuses the existing
   // Tarjan derivation from the layout engine — no new analytics).
   const structuralEdges = visibleEdges.filter((e) => e.status === "ACTIVE");
@@ -471,12 +478,19 @@ export function deriveGraphVisualContext(
     return contradictedByNode.get(node.id) ? "contradicting" : "supporting";
   };
 
+  // PR-10: grounded-evidence incident membership computed in ONE O(E) pass.
+  // The previous implementation ran an O(E) `edges.some` per node → O(V·E) per
+  // derivation on every evidence focus.
+  const groundedIncidentByNode = new Map<string, boolean>();
+  if (input.focusSeed?.kind === "evidence") {
+    for (const e of input.edges) {
+      if (e.status === "CONTRADICTED" || e.status === "ARCHIVED" || !edgeIsGrounded(e)) continue;
+      groundedIncidentByNode.set(e.sourceNodeId, true);
+      groundedIncidentByNode.set(e.targetNodeId, true);
+    }
+  }
   const evidenceInScopeForNode = (node: GraphNode): boolean =>
-    input.focusSeed?.kind === "evidence" &&
-    input.edges.some((e) => {
-      const isIncident = e.sourceNodeId === node.id || e.targetNodeId === node.id;
-      return isIncident && e.status !== "CONTRADICTED" && e.status !== "ARCHIVED" && edgeIsGrounded(e);
-    });
+    groundedIncidentByNode.get(node.id) ?? false;
 
   const gapAffectedForNode = (node: GraphNode): boolean => {
     if (input.focusSeed?.kind !== "gap") return false;
@@ -487,6 +501,8 @@ export function deriveGraphVisualContext(
   };
 
   // Signals + regions.
+  // PR-10: derive signals ONCE and share them with the region derivation
+  // (was computed twice per full context).
   const signals = deriveNodeSignals({
     nodes: input.nodes,
     edges: input.edges,
@@ -500,6 +516,7 @@ export function deriveGraphVisualContext(
     holes: input.holes,
     filter: input.filter,
     foreignNodeIds,
+    signals,
   });
   const regionOf = new Map<string, GraphAttentionRegion>();
   for (const region of regions) {
@@ -533,8 +550,8 @@ export function deriveGraphVisualContext(
 
   const edgesMap = new Map<string, GraphEdgeVisualState>();
   for (const edge of input.edges) {
-    const sourceNode = input.nodes.find((n) => n.id === edge.sourceNodeId);
-    const targetNode = input.nodes.find((n) => n.id === edge.targetNodeId);
+    const sourceNode = nodeById.get(edge.sourceNodeId);
+    const targetNode = nodeById.get(edge.targetNodeId);
     if (!sourceNode || !targetNode) continue;
     const relevance =
       input.focusSeed?.kind === "hypothesis"

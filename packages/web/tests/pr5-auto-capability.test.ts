@@ -60,6 +60,9 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
     expect(providers.mode).toBe("live");
     expect(providers.capabilities.evidence).toBe("live");
     expect(providers.capabilities.graph).toBe("not-ready");
+    // F-PR6: an explicit-live Entity Pulse is TYPED not-ready — a live workspace
+    // must never silently fall back to the demo pulse visualization.
+    expect(providers.capabilities["network.pulse"]).toBe("not-ready");
 
     // A demo-only capability in a pure live workspace fails typed (never demo).
     await expect(providers.graph.getNodes("any")).rejects.toBeInstanceOf(ProviderError);
@@ -102,7 +105,7 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
     expect(providers.capabilities.intelligence).toBe("demo");
     expect(providers.capabilities.leads).toBe("demo");
     expect(providers.capabilities["network.graph"]).toBe("demo");
-    expect(providers.capabilities["network.pulse"]).toBe("not-ready");
+    expect(providers.capabilities["network.pulse"]).toBe("demo");
   });
 
   it("falling back for one capability does not switch the live ones, and a live failure does not contaminate the demo slot", async () => {

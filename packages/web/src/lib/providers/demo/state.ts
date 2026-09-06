@@ -34,6 +34,7 @@ import type {
 } from "@indago/contracts";
 import { demoFixtures } from "./demo-fixtures";
 import type { InvestigationTimeline, ObservationContradiction } from "../types";
+import type { HypothesisDecisionRecord } from "@/lib/intel/reverse-hypothesis/hypothesis-model";
 
 export interface DemoWorkspaceState {
   readonly workspaceId: string;
@@ -67,6 +68,21 @@ export interface DemoWorkspaceState {
     string,
     { action: "keep-unresolved" | "accept" | "reverse"; by: string; at: { value: string; precision: "exact" } }
   >;
+  /** PR-8 relation-authority audit — local projection of the platform
+   *  relation-hypothesis accept/reject/reverse routes. A REVERSED hypothesis
+   *  keeps its history — reversal never deletes. */
+  relationAuthorityAuditById: Map<
+    string,
+    {
+      action: "accept" | "reject" | "reverse";
+      reason?: string;
+      by: string;
+      at: { value: string; precision: "exact" };
+    }
+  >;
+  /** F-PR9 Reverse Hypothesis — session decision trail per investigation
+   *  (session/workspace-scoped; canonical evidence is never mutated). */
+  reverseHypothesisDecisions: Map<string, HypothesisDecisionRecord[]>;
   /** Rolling log of emitted (normalized) realtime events. */
   eventLog: unknown[];
 }
@@ -103,6 +119,8 @@ export function createDemoWorkspaceState(workspaceId: string): DemoWorkspaceStat
     ),
     entityHypothesisById: toMap(demoFixtures.entityHypotheses),
     erAuditById: new Map(),
+    relationAuthorityAuditById: new Map(),
+    reverseHypothesisDecisions: new Map(),
     eventLog: [],
   };
   return s;
@@ -134,6 +152,8 @@ export function resetDemoWorkspaceState(state: DemoWorkspaceState): void {
   );
   state.entityHypothesisById = toMap(demoFixtures.entityHypotheses);
   state.erAuditById = new Map();
+  state.relationAuthorityAuditById = new Map();
+  state.reverseHypothesisDecisions = new Map();
   state.eventLog = [];
 }
 

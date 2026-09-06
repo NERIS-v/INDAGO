@@ -45,6 +45,12 @@ import type {
 import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
 import type { CapabilityStatusTable } from "./capabilities";
+import type {
+  HypothesisAssessment,
+  HypothesisDecisionInput,
+  HypothesisDecisionRecord,
+  HypothesisTestInput,
+} from "@/lib/intel/reverse-hypothesis/hypothesis-model";
 
 // ============================================================================
 // Data Mode
@@ -428,6 +434,19 @@ export interface GraphProvider {
    *  deterministic choreography catalog; live returns {} because the platform
    *  does not expose graph deltas yet (typed unsupported, no fabrication). */
   getOverlayCatalog(): Promise<GraphRealtimeCatalog>;
+  /** Optional: enumerate a case's historical graph versions, ascending by
+   *  versionNumber. Demo returns its deterministic version series; live is
+   *  UNSUPPORTED and must NOT fabricate or reuse demo data. Absent method →
+   *  consumers render an honest "historical surface unavailable" state. */
+  listVersions?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<GraphVersion>>;
+  /** Optional: resolve a single historical GraphVersion's metadata by id. */
+  getVersionById?(
+    investigationId: string,
+    graphVersionId: string,
+  ): Promise<GraphVersion>;
 }
 
 export interface RelationProvider {
@@ -436,6 +455,24 @@ export interface RelationProvider {
     query?: ProviderQuery,
   ): Promise<Paginated<RelationHypothesis>>;
   get(id: string): Promise<RelationHypothesis>;
+  /** PR-8 relation authority — deliberate analyst mutations of a relation
+   *  hypothesis, mirroring the platform's relation-hypothesis accept/reject/
+   *  reverse routes. OPTIONAL: an absent method means "authority unavailable on
+   *  this provider seam" and consumers render an honest unavailable state. */
+  accept?(
+    investigationId: string,
+    relationHypothesisId: string,
+  ): Promise<RelationHypothesis>;
+  reject?(
+    investigationId: string,
+    relationHypothesisId: string,
+    reason?: string,
+  ): Promise<RelationHypothesis>;
+  reverse?(
+    investigationId: string,
+    relationHypothesisId: string,
+    reason?: string,
+  ): Promise<RelationHypothesis>;
 }
 
 export interface IntelligenceProvider {
@@ -465,6 +502,29 @@ export interface IntelligenceProvider {
   ): Promise<Paginated<DiscoveryCandidate>>;
   getSource(id: string): Promise<Source>;
   getArtifact(id: string): Promise<Artifact>;
+  /** F-PR9 Reverse Hypothesis — run an investigator-written hypothesis through
+   *  the deterministic reverse-test model. The provider interprets and
+   *  classifies against saved observations; the assessment carries the full
+   *  three-way result (SUPPORTING / CONTRADICTING / UNRESOLVED), the
+   *  generated inverse conditions, and a provenance trail. NEVER returns a
+   *  truth/confidence verdict — absence of evidence is never contradiction.
+   *  Demo is deterministic; live is typed-unsupported (no platform endpoint). */
+  testHypothesis(
+    investigationId: string,
+    input: HypothesisTestInput,
+  ): Promise<HypothesisAssessment>;
+  /** F-PR9 — record a deliberate analyst decision against a tested hypothesis.
+   *  Session/workspace-scoped only; never mutates canonical evidence. Demo
+   *  persists in the workspace state; live is typed-unsupported. Returns the
+   *  current session decision trail. */
+  recordHypothesisDecision(
+    investigationId: string,
+    input: HypothesisDecisionInput,
+  ): Promise<readonly HypothesisDecisionRecord[]>;
+  /** F-PR9 — read the session decision trail for an investigation. */
+  listHypothesisDecisions(
+    investigationId: string,
+  ): Promise<readonly HypothesisDecisionRecord[]>;
 }
 
 export interface TimelineProvider {
