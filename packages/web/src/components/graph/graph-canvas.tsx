@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { drag as d3Drag } from "d3-drag";
 import { select as d3Select, pointer as d3Pointer } from "d3-selection";
-import { useGraphLayout, nodeVisualRadius, screenToWorld, type LayoutNode, type LayoutEdge } from "./use-graph-layout";
+import { useGraphLayout, nodeVisualRadius, screenToWorld, type LayoutNode, type LayoutEdge, type GraphMotionState } from "./use-graph-layout";
 import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
 import { GraphHoleBurstLayer } from "./graph-hole-burst-layer";
 import type { GraphVisualContext, GraphNodeVisualState, GraphEdgeVisualState, GraphAttentionRegion } from "@/lib/graph/graph-visual-state";
@@ -38,6 +38,11 @@ const MAX_ZOOM = 3.0;
 const FIT_PADDING = 0.85;
 const ENTER_MS = 700;
 const OFF_CANVAS_GAP = 60;
+// F-PR17: focus-aura lifecycle timing — fade out fast when the graph wakes,
+// commit short after real settle, fade in gently at the CURRENT settled position.
+const AURA_FADE_OUT_MS = 150;
+const AURA_FADE_IN_MS = 250;
+const AURA_SETTLE_DELAY_MS = 160;
 
 const ICON_PATHS = {
   PERSON: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
@@ -145,9 +150,37 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   const cx = dimensions.width / 2;
   const cy = dimensions.height / 2;
 
-  const { layoutRef, apiRef, settled } = useGraphLayout(nodes, physicsEdges, dimensions.width, dimensions.height, { hoveredNodeId: hoveredNode, focusedNodeId: focusedNode, reducedMotion });
+  const { layoutRef, apiRef, settled, motionState } = useGraphLayout(nodes, physicsEdges, dimensions.width, dimensions.height, { hoveredNodeId: hoveredNode, focusedNodeId: focusedNode, reducedMotion });
 
   useEffect(() => { apiRef.current.onTick(() => setTick((t) => t + 1)); return () => { apiRef.current.onTick(() => undefined); }; }, [apiRef]);
+
+  // F-PR17 focus-aura lifecycle. The SIMULATION is the motion clock: any live
+  // re-tick fades the analytical aura out (~150ms); a genuine settle arms a
+  // short delay then fades the aura back in at the node's CURRENT position.
+  // Reduced motion rides the same machine — every transition is `none`.
+  const [focusAuraOn, setFocusAuraOn] = useState(false);
+  const prevMotionRef = useRef<GraphMotionState>("settled");
+  const auraReturnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const prev = prevMotionRef.current;
+    prevMotionRef.current = motionState;
+    if (prev === motionState) return;
+    if (motionState === "moving") {
+      if (auraReturnTimerRef.current) { clearTimeout(auraReturnTimerRef.current); auraReturnTimerRef.current = null; }
+      setFocusAuraOn(false);
+    } else {
+      if (auraReturnTimerRef.current) clearTimeout(auraReturnTimerRef.current);
+      auraReturnTimerRef.current = setTimeout(() => {
+        auraReturnTimerRef.current = null;
+        setFocusAuraOn(true);
+      }, AURA_SETTLE_DELAY_MS);
+    }
+  }, [motionState]);
+
+  useEffect(() => () => {
+    if (auraReturnTimerRef.current) { clearTimeout(auraReturnTimerRef.current); auraReturnTimerRef.current = null; }
+  }, []);
 
   useEffect(() => {
     if (!settled) return;
@@ -236,6 +269,15 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   const zoomIn = useCallback(() => setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.15).toFixed(2))), []);
   const zoomOut = useCallback(() => setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.15).toFixed(2))), []);
 
+  // F-PR17: focus is an analytical action — waking a gentle local response is
+  // the intended "focus-triggered movement" (the graph flexes toward the target
+  // through the existing focusBias force, then settles). The aura machine hides
+  // the overlay during that wake and commits at the settled position.
+  const applyFocus = useCallback((id: string | null) => {
+    setFocusedNode(id);
+    apiRef.current.setFocus(id);
+  }, [apiRef]);
+
   const focusNode = useCallback((id: string) => {
     const node = layoutRef.current.layoutNodes.find((n) => n.id === id);
     if (!node || !dimensions.width || !dimensions.height) return;
@@ -246,9 +288,9 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
     const targetZoom = Math.max(1.4, Math.min(MAX_ZOOM, 1.2 + d * 1.3));
     setPan({ x: -((node.x || cx) - cx) * targetZoom, y: -((node.y || cy) - cy) * targetZoom });
     setZoom(targetZoom);
-    setFocusedNode(id);
+    applyFocus(id);
     setInternalSelectedNode(id);
-  }, [layoutRef, dimensions, cx, cy]);
+  }, [layoutRef, dimensions, cx, cy, applyFocus]);
 
   // PR-3 UX: frame a PAIR of nodes (e.g. the local bridge anchor + the foreign
   // island head) in ONE smooth, slightly slower camera move instead of the
@@ -461,6 +503,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
       className="w-full h-full relative overflow-hidden bg-semantic-background animate-fade-in"
       data-graph-physics-edges={physicsEdges.length}
       data-graph-render-edges={visibleEdgeIds.size}
+      data-graph-motion={motionState}
+      data-focus-aura={focusAuraOn ? "visible" : "hidden"}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={stopPanning}
@@ -695,7 +739,14 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
             {layoutNodes.map((node) => {
               const isForeign = (node as any).isForeign;
               const inTimeRange = isNodeInTimeRange(node.id);
-              const isActive = hoveredNode === node.id || focusedNode === node.id || internalSelectedNode === node.id;
+              // F-PR17: SELECTION (a committed node state) stays lit through
+              // motion; the FOCUS AURA (analytical overlay from focus/hover)
+              // commits only when the graph is genuinely still.
+              const isSelectedNode = internalSelectedNode === node.id;
+              const isFocusTarget = focusedNode === node.id;
+              const isHovered = hoveredNode === node.id;
+              const isActive = isSelectedNode || isFocusTarget || isHovered;
+              const auraLit = isSelectedNode || (focusAuraOn && (isFocusTarget || isHovered));
               const hoverDimmed = hoveredNode !== null && !isActive && !(adjacencyFor.get(hoveredNode)?.has(node.id) ?? false);
 
               const pos = enterPos(node.id);
@@ -717,7 +768,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
               let fillColor = "fill-semantic-surface-soft";
               let strokeColor = "stroke-semantic-foreground-muted";
 
-              if (isActive && inTimeRange) { fillColor = "fill-semantic-selection-subtle"; strokeColor = "stroke-semantic-selection shadow-[0_0_18px_var(--color-semantic-selection)]"; }
+              if (auraLit && inTimeRange) { fillColor = "fill-semantic-selection-subtle"; strokeColor = "stroke-semantic-selection shadow-[0_0_18px_var(--color-semantic-selection)]"; }
               else if (isForeign) { fillColor = "fill-semantic-foreign/15"; strokeColor = "stroke-semantic-foreign/80"; }
               else if (focusActive && (vs.hypothesisRelevance === "supporting" || vs.evidenceInScope)) { fillColor = "fill-semantic-supported/15"; strokeColor = "stroke-semantic-supported/90"; }
               else if (node.isBridge) { fillColor = "fill-semantic-surface-elevated"; strokeColor = "stroke-accent-rose/70"; }
@@ -761,6 +812,19 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   data-graph-node-posture={vs.evidencePosture}
                   style={{ opacity: (!inTimeRange ? 0 : bloom ? stateDim : 0) * (pos ? pos.alpha : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
                 >
+                  {/* F-PR17 analytical focus aura: a thin dashed ring rendered at
+                      the node's CURRENT live position. SELECTION (a committed
+                      node state) stays lit through motion; the FOCUS/hover aura
+                      hides while the graph moves and fades back in on settle. */}
+                  {isSelectedNode || isFocusTarget || isHovered ? (
+                    <circle
+                      cx={nx} cy={ny} r={radius + 8} fill="none" stroke="var(--color-semantic-selection)" strokeWidth={1.5} strokeDasharray="1.5 4" strokeLinecap="round"
+                      data-graph-aura={isSelectedNode ? "selection" : isFocusTarget || isHovered ? (focusAuraOn ? "focus" : "hidden") : undefined}
+                      data-graph-aura-x={nx}
+                      data-graph-aura-y={ny}
+                      style={{ opacity: auraLit && inTimeRange ? 1 : 0, transition: reducedMotion ? "none" : `opacity ${focusAuraOn ? AURA_FADE_IN_MS : AURA_FADE_OUT_MS}ms cubic-bezier(0.22, 1, 0.36, 1)` }}
+                    />
+                  ) : null}
                   {vs.evidencePosture === "contradicted" && (
                     <circle
                       cx={nx} cy={ny} r={radius + 3} fill="none" stroke="var(--color-semantic-contradiction)" strokeWidth={1.5} strokeDasharray="3 4"
@@ -776,13 +840,13 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                     />
                   )}
                   <circle
-                    cx={nx} cy={ny} r={radius} filter={isActive || isForeign ? "url(#node-glow)" : "url(#ambient-shadow)"}
+                    cx={nx} cy={ny} r={radius} filter={auraLit || isForeign ? "url(#node-glow)" : "url(#ambient-shadow)"}
                     className={`outline-none transition-colors duration-fast ${fillColor} ${strokeColor}`}
-                    strokeWidth={isActive || isForeign ? 2.5 : 1.5}
+                    strokeWidth={auraLit || isForeign ? 2.5 : 1.5}
                   />
                   <svg
                     x={nx - (radius * 1.15) / 2} y={ny - (radius * 1.15) / 2} width={radius * 1.15} height={radius * 1.15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
-                    className={`pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "text-semantic-selection" : isForeign ? "text-semantic-foreign" : "text-semantic-foreground-faint"}`}
+                    className={`pointer-events-none transition-colors duration-fast ${auraLit && inTimeRange ? "text-semantic-selection" : isForeign ? "text-semantic-foreign" : "text-semantic-foreground-faint"}`}
                   >
                     <path d={getNodeIconPath(node)} />
                   </svg>
@@ -800,7 +864,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   key={`interact-${node.id}`} ref={bindNodeDrag} data-nodeid={node.id} cx={node.x || cx} cy={node.y || cy} r={32} tabIndex={inTimeRange ? 0 : -1} role="button" aria-label={`${node.label ?? "Entity"}${node.isBridge ? ", bridge candidate" : ""}`} aria-pressed={selected ? "true" : undefined}
                   className={`fill-transparent outline-none ${inTimeRange ? "cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-semantic-focus" : "pointer-events-none"}`}
                   onMouseEnter={() => setHoveredNode(node.id)} onMouseLeave={() => setHoveredNode(null)}
-                  onFocus={() => setFocusedNode(node.id)} onBlur={() => setFocusedNode(null)}
+                  onFocus={() => applyFocus(node.id)} onBlur={() => applyFocus(null)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
                   onClick={() => { setInternalSelectedNode(node.id); onNodeClick(node.id); }}
                 />
@@ -811,7 +875,13 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
           <g id="annotation-layer">
             {layoutNodes.map((node) => {
               const inTimeRange = isNodeInTimeRange(node.id);
-              const isActive = hoveredNode === node.id || focusedNode === node.id || internalSelectedNode === node.id;
+              const isSelectedNode = internalSelectedNode === node.id;
+              const isFocusTarget = focusedNode === node.id;
+              const isHovered = hoveredNode === node.id;
+              const isActive = isSelectedNode || isFocusTarget || isHovered;
+              // F-PR17: label emphasis (selection always, focus/hover only when
+              // the analytical aura is committed) mirrors the node layer.
+              const auraLit = isSelectedNode || (focusAuraOn && (isFocusTarget || isHovered));
               const isForeign = (node as any).isForeign;
               const pos = enterPos(node.id);
               
@@ -829,7 +899,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                 <g key={`label-${node.id}`} transform={`translate(${lx}, ${ly}) scale(${1 / zoom}) translate(${-lx}, ${-ly})`}>
                   <text
                     x={lx} y={ly} textAnchor={textAnchor} paintOrder="stroke fill"
-                    className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "fill-semantic-selection font-bold" : isForeign ? "fill-semantic-foreign font-bold drop-shadow-[0_0_4px_var(--color-semantic-foreign)]" : "fill-semantic-foreground-muted font-medium"}`}
+                    className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${auraLit && inTimeRange ? "fill-semantic-selection font-bold" : isForeign ? "fill-semantic-foreign font-bold drop-shadow-[0_0_4px_var(--color-semantic-foreign)]" : "fill-semantic-foreground-muted font-medium"}`}
                     style={{ opacity: (!inTimeRange ? 0 : hoveredNode !== null && !isActive ? 0.3 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
                   >
                     {node.label}

@@ -64,6 +64,14 @@ export interface GraphSimulationControls {
   reducedMotion: boolean;
 }
 
+/** True simulation "is it still?" signal, derived from the same physics state
+ *  as `active`/`settled` — NOT an arbitrary timer. `moving` means the sim is
+ *  actively re-ticking (initial layout, drag, wake, data repositioning);
+ *  `settled` means it reached genuine rest (alpha low AND no node velocity).
+ *  F-PR17: the analytical focus aura consumes this to hide during motion and
+ *  commit at the node's CURRENT settled position. */
+export type GraphMotionState = "moving" | "settled";
+
 /**
  * Imperative controls the canvas uses to interact with the live simulation.
  * The hook owns all physics state; the canvas only calls into this API (and
@@ -95,6 +103,9 @@ interface LayoutResult {
   layoutRef: MutableRefObject<LayoutBox>;
   apiRef: MutableRefObject<GraphSimAPI>;
   settled: boolean;
+  /** F-PR17: reaction-grade graph stillness. False while physics re-tick,
+   *  true once the simulation reaches genuine rest (see GraphMotionState). */
+  motionState: GraphMotionState;
 }
 
 // Boundary clamp margin. Kept small so nodes can spring freely across most of
@@ -352,6 +363,17 @@ export function useGraphLayout(
   const [settled, setSettled] = useState(false);
   const settledRef = useRef(false);
   const settledTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // F-PR17 motion state: flips only on genuine physics state transitions so it
+  // never re-renders spinners; the canvas's focus aura keys off these edges.
+  const [motionState, setMotionState] = useState<GraphMotionState>("moving");
+  const motionStateRef = useRef<GraphMotionState>("moving");
+
+  function syncMotion(next: GraphMotionState) {
+    if (motionStateRef.current === next) return;
+    motionStateRef.current = next;
+    setMotionState(next);
+  }
 
   const simRef = useRef<{
     simulation: ReturnType<typeof forceSimulation<SimNode>>;
@@ -664,6 +686,8 @@ export function useGraphLayout(
       if (!simRef.current) return;
       simRef.current.active = false;
       simRef.current.dragging = false;
+      // F-PR17: the simulation reached genuine rest -> consume the settle edge.
+      syncMotion("settled");
       // Persist final positions.
       const nextCache = new Map<string, { x: number; y: number }>();
       simRef.current.nodeArray.forEach((n) => nextCache.set(n.id, { x: n.x, y: n.y }));
@@ -682,6 +706,8 @@ export function useGraphLayout(
     simulation.on("tick", () => {
       if (!simRef.current) return;
       simRef.current.active = true;
+      // F-PR17: any live re-tick counts as motion until the sim stops for real.
+      syncMotion("moving");
       const { nodeArray: arr, simulation: sim } = simRef.current;
       // Persist the live energy so a resize-only rebuild can resume the
       // simulation where it left off instead of blasting it back to alpha(1).
@@ -819,11 +845,20 @@ export function useGraphLayout(
     const sim = simRef.current;
     if (!sim || controlsRef.current.reducedMotion || sim.dragging) return;
     if (id) {
-      sim.simulation.alpha(Math.max(sim.simulation.alpha(), HOVER_ALPHA));
-      sim.simulation.alphaTarget(HOVER_ALPHA);
+      // F-PR17: focus is ONE analytical flex — a short wake that DECAYS to
+      // genuine rest, so the settled edge fires and the focus aura can commit
+      // at the node's current position. A persistent alphaTarget (hover-style
+      // breathing) would keep the sim humming at 0.07 forever and the aura
+      // would never commit.
+      if (sim.simulation.alpha() < HOVER_ALPHA) {
+        sim.simulation.alpha(HOVER_ALPHA);
+      }
+      sim.simulation.alphaTarget(0);
       sim.active = true;
+      // restart() is idempotent in d3-timer (safe on a running timer).
       sim.simulation.restart();
     } else {
+      // Clear focus: let the sim decay to idle.
       sim.simulation.alphaTarget(0);
     }
   };
@@ -886,5 +921,5 @@ export function useGraphLayout(
     }
   };
 
-  return { layoutRef, apiRef, settled };
+  return { layoutRef, apiRef, settled, motionState };
 }
