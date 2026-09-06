@@ -63,6 +63,9 @@ interface OperationalRailProps {
   onFilterChange: (filter: GraphFilterState) => void;
   /** Invoked when Focus is enabled and clicked (selection already set). */
   onFocus: () => void;
+  /** PR-8: invoked when Challenge is enabled and clicked (relation authority
+   *  entry — the shell reveals the relation context + authority panel). */
+  onChallenge?: () => void;
 }
 
 interface RailSlotProps {
@@ -92,12 +95,12 @@ function RailSlot({
   ariaPressed,
 }: RailSlotProps) {
   const base =
-    "w-full rounded-md px-3 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500";
+    "w-full rounded-md px-3 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus";
   const color = disabled
     ? "opacity-50"
     : active
-      ? "bg-surface-900 text-surface-0 shadow-sm"
-      : "text-surface-600 hover:bg-surface-100/70 hover:text-surface-800";
+      ? "bg-semantic-surface-soft text-semantic-foreground"
+      : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground";
   return (
     <button
       type="button"
@@ -118,7 +121,7 @@ function RailSlot({
           />
         )}
       </span>
-      <span className="block truncate text-[10px] font-mono uppercase tracking-widest text-surface-400">
+      <span className="block truncate text-[10px] font-mono uppercase tracking-widest text-semantic-foreground-faint">
         {hint}
       </span>
     </button>
@@ -128,7 +131,7 @@ function RailSlot({
 function RailGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section data-rail-group={title} aria-label={title} className="flex flex-col gap-1">
-      <h3 className="mb-1 px-1 text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-surface-400">
+      <h3 className="mb-1 px-1 text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-semantic-foreground-faint">
         {title}
       </h3>
       {children}
@@ -195,10 +198,14 @@ function dispatchAction(
   action: OperationalAction,
   onActionToggle: (key: ControlCenterSurfaceKey) => void,
   onFocus: () => void,
+  onChallenge?: () => void,
 ): void {
   switch (action) {
     case "focus":
       onFocus();
+      break;
+    case "challenge":
+      onChallenge?.();
       break;
     case "layers":
       onActionToggle("legendOpen");
@@ -237,6 +244,7 @@ export function OperationalRail({
   filter,
   onFilterChange,
   onFocus,
+  onChallenge,
 }: OperationalRailProps) {
   const states = useMemo(
     () => getOperationalRailStates(context, capabilities, { mode }),
@@ -255,10 +263,10 @@ export function OperationalRail({
     <aside
       id="operational-rail"
       aria-label="Graph operations"
-      className="flex h-full w-full min-h-0 flex-col overflow-hidden rounded-xl border border-surface-200/60 bg-surface-50/60 shadow-sm backdrop-blur-md"
+      className="cc-panel flex h-full w-full min-h-0 flex-col overflow-hidden"
     >
-      <header className="flex shrink-0 items-center justify-between border-b border-surface-200/50 bg-surface-50/80 px-3 py-2.5">
-        <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-surface-500">
+      <header className="cc-panel-header flex shrink-0 items-center justify-between px-3 py-2.5">
+        <span className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-semantic-foreground-faint">
           Operations
         </span>
         <PanelToggle
@@ -288,15 +296,15 @@ export function OperationalRail({
                     active={state.enabled && active}
                     disabled={!state.enabled}
                     reason={state.reason}
-                    onClick={state.enabled ? () => dispatchAction(action, onActionToggle, onFocus) : undefined}
+                    onClick={state.enabled ? () => dispatchAction(action, onActionToggle, onFocus, onChallenge) : undefined}
                     dataCapability={capability}
                     dataSlot={action}
                     ariaPressed={isToggle && state.enabled ? active : undefined}
                   />
                   {action === "filter" && actions.filterOpen && (
-                    <div className="ml-2 mt-1 flex flex-col gap-2.5 border-l border-surface-200 p-2">
+                    <div className="ml-2 mt-1 flex flex-col gap-2.5 border-l border-semantic-border-subtle p-2">
                       <label className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-semantic-foreground-faint">
                           Min support
                         </span>
                         <input
@@ -312,7 +320,7 @@ export function OperationalRail({
                           aria-label="Minimum relation support threshold"
                           className="accent-accent-blue"
                         />
-                        <span className="text-[10px] font-mono text-surface-400">
+                        <span className="text-[10px] font-mono text-semantic-foreground-faint">
                           {filter.minSupport.toFixed(2)}
                           {filterActive ? "" : " — showing everything"}
                         </span>
@@ -327,17 +335,17 @@ export function OperationalRail({
                           aria-label="Hide contradicted relations"
                           className="accent-accent-blue"
                         />
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-semantic-foreground-faint">
                           Hide contradicted
                         </span>
                       </label>
-                      <p className="text-[10px] font-mono text-surface-400">
+                      <p className="text-[10px] font-mono text-semantic-foreground-faint">
                         Filters relations rendered on the graph.
                       </p>
                     </div>
                   )}
                   {action === "cross-case" && actions.crossCaseOpen && (
-                    <div className="ml-2 mt-1 flex flex-col gap-1 border-l border-surface-200 pl-2">
+                    <div className="ml-2 mt-1 flex flex-col gap-1 border-l border-semantic-border-subtle pl-2">
                       {foreignOverlays.length > 0 ? (
                         foreignOverlays.map((overlay) => {
                           const isActive = actions.activeForeignCaseId === overlay.ref;
@@ -351,10 +359,10 @@ export function OperationalRail({
                                   activeForeignCaseId: isActive ? null : overlay.ref,
                                 })
                               }
-                              className={`w-full truncate rounded-md px-2.5 py-1 text-left text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                              className={`w-full truncate rounded-md px-2.5 py-1 text-left text-[10px] font-mono uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
                                 isActive
-                                  ? "bg-accent-blue/15 text-accent-blue"
-                                  : "text-surface-500 hover:bg-surface-100 hover:text-surface-800"
+                                  ? "bg-semantic-foreign/15 text-semantic-foreign"
+                                  : "text-semantic-foreground-faint hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
                               }`}
                             >
                               Match: {overlay.title}
@@ -362,7 +370,7 @@ export function OperationalRail({
                           );
                         })
                       ) : (
-                        <p className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-surface-400">
+                        <p className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-semantic-foreground-faint">
                           No cross-case matches available.
                         </p>
                       )}
