@@ -6,9 +6,10 @@ import { useWorkspace } from "@/lib/providers/workspace/context";
 import { toProviderError } from "@/lib/providers";
 import type { Observation } from "@indago/contracts";
 import { ObservationsList } from "@/components/observations/observations-list";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { IntelligenceDetailPanel } from "@/components/intelligence/intelligence-detail-panel";
 import { EntityResolutionPanel } from "@/components/intelligence/entity-resolution-panel";
 import type {
@@ -245,28 +246,35 @@ function ObservationsContent() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="type-title text-text-primary">Observations</h1>
-        <Badge variant="muted">Canonical Observations</Badge>
-        {entityFilter && (
-          <Badge variant="info" dot>
-            filtered to entity {entityFilter.slice(0, 8)}
-          </Badge>
-        )}
-        {!contradictionsUnavailable && relevantContradictions.length > 0 && (
-          <Badge variant="danger" dot>
-            {relevantContradictions.length} contradiction
-            {relevantContradictions.length === 1 ? "" : "s"}
-          </Badge>
-        )}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-surface-500">
+          <span>Intelligence</span>
+          <span className="h-px w-8 bg-surface-200" aria-hidden="true" />
+          <span>Canonical feed</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="type-title text-text-primary">Observations</h1>
+          <Badge variant="muted">Canonical Observations</Badge>
+          {entityFilter && (
+            <Badge variant="info" dot>
+              filtered to entity {entityFilter.slice(0, 8)}
+            </Badge>
+          )}
+          {!contradictionsUnavailable && relevantContradictions.length > 0 && (
+            <Badge variant="danger" dot>
+              {relevantContradictions.length} contradiction
+              {relevantContradictions.length === 1 ? "" : "s"}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Hide the contradiction block entirely if there are none for the current filter */}
       {!contradictionsUnavailable && relevantContradictions.length > 0 && (
         <Card>
-          <CardHeader className="border-b border-border-subtle px-6 py-4">
-            <CardTitle>Detected contradictions</CardTitle>
-          </CardHeader>
+          <div className="border-b border-border-subtle px-6 py-4">
+            <SectionHeading overline="Conflict surface" title="Detected contradictions" />
+          </div>
           <div className="flex flex-col gap-3 p-6">
             {relevantContradictions.map((c) => (
               <div
@@ -295,9 +303,9 @@ function ObservationsContent() {
       )}
 
       <Card>
-        <CardHeader className="border-b border-border-subtle px-6 py-4">
-          <CardTitle>Observations in this investigation</CardTitle>
-        </CardHeader>
+        <div className="border-b border-border-subtle px-6 py-4">
+          <SectionHeading overline="Canonical feed" title="Observations in this investigation" />
+        </div>
         <div className="p-6">
           <ObservationsList
             items={filteredItems}
@@ -330,9 +338,9 @@ function ObservationsContent() {
 
       {resolutions.length > 0 && (
         <Card>
-          <CardHeader className="border-b border-border-subtle px-6 py-4">
-            <CardTitle>Entity resolution queue</CardTitle>
-          </CardHeader>
+          <div className="border-b border-border-subtle px-6 py-4">
+            <SectionHeading overline="Identity" title="Entity resolution queue" />
+          </div>
           <div className="p-6">
             <ul className="flex flex-col gap-3">
               {resolutions.map((candidate) => (
