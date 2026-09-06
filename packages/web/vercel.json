@@ -1,5 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rootDirectory": "packages/web",
   "buildCommand": "pnpm --filter @indago/web... run build"
 }
