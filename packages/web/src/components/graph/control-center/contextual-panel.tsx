@@ -81,23 +81,23 @@ function ResolvedContextView({ resolution }: { resolution: Extract<ContextResolu
   return (
     <div className="flex flex-col gap-4" data-context-resolved>
       <div>
-        <h3 className="text-base font-medium leading-tight text-surface-900" data-context-resolved-title>
+        <h3 className="text-base font-medium leading-tight text-semantic-foreground" data-context-resolved-title>
           {display.title}
         </h3>
-        <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-surface-400">
+        <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-semantic-foreground-faint">
           {display.subtitle}
         </p>
       </div>
 
-      <p className="type-caption text-surface-600">{display.summary}</p>
+      <p className="type-caption">{display.summary}</p>
 
-      <dl className="flex flex-col gap-px overflow-hidden rounded-lg border border-surface-200 bg-surface-200/50">
+      <dl className="flex flex-col divide-y divide-semantic-border-subtle border-y border-semantic-border-subtle">
         {display.rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-3 bg-surface-50 px-3 py-2">
-            <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+          <div key={row.label} className="flex items-center justify-between gap-3 py-2">
+            <dt className="text-[10px] font-mono uppercase tracking-widest text-semantic-foreground-faint">
               {row.label}
             </dt>
-            <dd className="text-right text-[12px] font-medium text-surface-800" data-context-row-value>
+            <dd className="text-right text-[12px] font-medium text-semantic-foreground" data-context-row-value>
               {row.value}
             </dd>
           </div>
@@ -124,15 +124,15 @@ export function ContextualPanel({
     <aside
       id="contextual-panel"
       aria-label="Contextual panel"
-      className="flex h-full w-full min-h-0 flex-col overflow-hidden rounded-xl border border-surface-200/60 bg-surface-50/60 shadow-sm backdrop-blur-md"
+      className="cc-panel flex h-full w-full min-h-0 flex-col overflow-hidden"
     >
-      <header className="flex shrink-0 items-center justify-between border-b border-surface-200/50 bg-surface-50/80 px-3 py-2.5">
+      <header className="cc-panel-header flex shrink-0 items-center justify-between px-3 py-2.5">
         <div className="min-w-0">
-          <span className="block text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-surface-500">
+          <span className="block text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-semantic-foreground-faint">
             Context
           </span>
           {context && (
-            <span className="block truncate text-[12px] font-medium text-surface-800" data-context-panel-kind>
+            <span className="block truncate text-[12px] font-medium text-semantic-foreground" data-context-panel-kind>
               {contextKindLabel(context.kind)}
             </span>
           )}
@@ -164,7 +164,7 @@ export function ContextualPanel({
             <ResolvedContextView resolution={resolution} />
             {detailsResolved && details && (
               <div className="flex flex-col gap-2">
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-surface-400" data-context-details-heading>
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-semantic-foreground-faint" data-context-details-heading>
                   In context
                 </h4>
                 <ContextDetailsSlices details={details} onSelectContext={onSelectContext} />
@@ -175,10 +175,10 @@ export function ContextualPanel({
 
         {state === "unsupported" && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center" data-context-state-label>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-surface-500">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-semantic-foreground-faint">
               Context unavailable
             </p>
-            <p className="type-caption max-w-sm text-surface-500">
+            <p className="type-caption max-w-sm">
               This object has no context adapter in the current data mode. The selection is
               preserved — only its contextual view is unavailable.
             </p>
@@ -187,10 +187,10 @@ export function ContextualPanel({
 
         {state === "not-found" && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center" data-context-state-label>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-surface-500">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-semantic-foreground-faint">
               Object unavailable
             </p>
-            <p className="type-caption max-w-sm text-surface-500">
+            <p className="type-caption max-w-sm">
               The selected object no longer exists in the current investigation or boundary.
             </p>
           </div>
@@ -204,13 +204,13 @@ export function ContextualPanel({
           <EmptyState
             title="Nothing selected"
             description="Select an entity, relation, evidence item, gap, or other graph object to inspect its investigative context."
-            className="min-h-0 border-0 bg-surface-100/20 py-10"
+            className="min-h-0 border-0 bg-semantic-surface-soft/30 py-10"
           />
         )}
       </div>
 
       {footerSlot && (
-        <footer className="shrink-0 border-t border-surface-200/50 bg-surface-50/80 p-3">
+        <footer className="shrink-0 border-t border-semantic-border-subtle p-3">
           {footerSlot}
         </footer>
       )}

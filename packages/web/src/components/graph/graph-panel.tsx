@@ -74,6 +74,7 @@ export function GraphPanel({
   selectedContext,
   focusRequest,
   filter,
+  graphReloadRequest,
 }: {
   activeTimeRange: [number, number] | null;
   initialFocusNodeId?: string | null;
@@ -98,6 +99,11 @@ export function GraphPanel({
   /** PR-4: readability filter applied to the RENDERED edges only. The graph
    *  physics and the entity drawer keep the full topology. */
   filter?: GraphFilterState | null | undefined;
+  /** PR-8: post-mutation canonical-graph refetch request. Bumping the nonce
+   *  refetches version/nodes/edges so a relation-authority decision's projection
+   *  change (edge archived, retained, contradicted) becomes visible. Absent or
+   *  unchanged nonce → behavior is identical to today. */
+  graphReloadRequest?: { nonce: number } | null;
 }) {
   const workspace = useWorkspace();
   const [data, setData] = useState<GraphData | null>(null);
@@ -188,7 +194,7 @@ export function GraphPanel({
     }
     fetchGraph();
     return () => { isMounted = false; };
-  }, [workspace]);
+  }, [workspace, graphReloadRequest?.nonce]);
 
   const activeCatalog = useMemo(() => overlayCatalog ?? {}, [overlayCatalog]);
 
@@ -268,6 +274,13 @@ export function GraphPanel({
   // PR-4: readability filter changes ONLY the rendered edges — the force
   // simulation still runs on the FULL topology (no physics restart on filter
   // interaction) and the entity drawer still sees every relation.
+  //
+  // PR-10 hardening: this contract is now enforced structurally. The canvas
+  // receives TWO edge sets:
+  //   - edges        → the FILTERED projection that is RENDERED (applyGraphFilter)
+  //   - physicsEdges → the FULL merged topology that feeds useGraphLayout, so
+  //     the simulation's content key (nodes + edges) never changes on a filter
+  //     interaction and the physics does not restart.
   const canvasEdges = useMemo(
     () => applyGraphFilter(finalEdges, filter),
     [finalEdges, filter],
@@ -606,6 +619,7 @@ export function GraphPanel({
           <GraphCanvas
             nodes={finalNodes as GraphNode[]}
             edges={canvasEdges as GraphEdge[]}
+            physicsEdges={finalEdges as GraphEdge[]}
             holes={mergedHoles}
             selectedNodeId={selectedGraphNodeId}
             onNodeClick={handleNodeSelect}
@@ -624,42 +638,42 @@ export function GraphPanel({
           </div>
         )}
 
-        <div className={`absolute top-6 flex gap-4 pointer-events-none animate-fade-in z-20 bg-surface-50/60 border border-surface-200 backdrop-blur-md px-5 py-2.5 rounded-lg shadow-md transition-opacity ${activeForeignCase ? "left-[336px]" : "left-6"}`}>
+        <div className={`absolute top-6 flex gap-4 pointer-events-none animate-fade-in z-20 bg-semantic-surface/95 border border-semantic-border backdrop-blur-md px-5 py-2.5 rounded-lg shadow-md transition-opacity ${activeForeignCase ? "left-[336px]" : "left-6"}`}>
           <TelemetryStat label="NODES" value={finalNodes.length} />
-          <div className="w-px h-5 bg-surface-400/30 my-auto" />
+          <div className="w-px h-5 bg-semantic-border my-auto" />
           <TelemetryStat label="EDGES" value={finalEdges.length} />
         </div>
 
-        <div className="absolute top-6 right-6 flex flex-col gap-px animate-fade-in z-20 bg-surface-50/60 border border-surface-200 backdrop-blur-md rounded-lg overflow-hidden p-1 shadow-md">
-          <button className="w-8 h-8 flex items-center justify-center text-surface-400 hover:text-surface-900 hover:bg-surface-200/50 rounded transition-colors focus-visible:outline-none" onClick={() => controlsRef.current?.zoomIn()}>+</button>
-          <button className="w-8 h-8 flex items-center justify-center text-surface-400 hover:text-surface-900 hover:bg-surface-200/50 rounded transition-colors focus-visible:outline-none" onClick={() => controlsRef.current?.zoomOut()}>−</button>
-          <div className="w-5 mx-auto h-px bg-surface-200 my-0.5" />
-          <button className="w-8 h-8 flex items-center justify-center text-surface-400 hover:text-surface-900 hover:bg-surface-200/50 rounded transition-colors focus-visible:outline-none text-xs" onClick={() => controlsRef.current?.fit()}>⤢</button>
+        <div className="absolute top-6 right-6 flex flex-col gap-px animate-fade-in z-20 bg-semantic-surface/95 border border-semantic-border backdrop-blur-md rounded-lg overflow-hidden p-1 shadow-md">
+          <button aria-label="Zoom in" className="w-8 h-8 flex items-center justify-center text-semantic-foreground-muted hover:text-semantic-foreground hover:bg-semantic-surface-elevated rounded transition-colors focus-visible:outline-none" onClick={() => controlsRef.current?.zoomIn()}>+</button>
+          <button aria-label="Zoom out" className="w-8 h-8 flex items-center justify-center text-semantic-foreground-muted hover:text-semantic-foreground hover:bg-semantic-surface-elevated rounded transition-colors focus-visible:outline-none" onClick={() => controlsRef.current?.zoomOut()}>−</button>
+          <div className="w-5 mx-auto h-px bg-semantic-border my-0.5" />
+          <button aria-label="Fit graph to view" className="w-8 h-8 flex items-center justify-center text-semantic-foreground-muted hover:text-semantic-foreground hover:bg-semantic-surface-elevated rounded transition-colors focus-visible:outline-none text-xs" onClick={() => controlsRef.current?.fit()}>⤢</button>
         </div>
 
         <div className="absolute bottom-6 left-6 flex flex-col gap-2 z-20 animate-slide-up">
           
           {effectiveActions.legendOpen && (
-            <div className="bg-surface-50/95 border border-surface-200 backdrop-blur-md p-5 rounded-lg shadow-2xl animate-fade-in flex flex-col gap-3 min-w-48 transform origin-bottom-left">
-              <h3 className="type-mono-small mb-1 border-b border-surface-200/50 pb-2">GRAPH LEGEND</h3>
-              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-surface-100 ring-2 ring-surface-400" />} label="Entity" />
-              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-surface-0 ring-2 ring-accent-amber" />} label="Other node" />
-              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-surface-100 ring-2 ring-accent-rose animate-slow-pulse" />} label="Bridge candidate" />
-              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-surface-500" />} label="Low-confidence link" />
-              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-danger" />} label="Contradicted link" />
-              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-accent-amber" />} label="Graph hole" />
-              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full ring-2 ring-accent-rose shadow-[0_0_8px_var(--color-accent-rose)]" />} label="Live arrival" />
-              <LegendRow swatch={<span className="relative w-4 h-4 flex items-center justify-center"><span className="w-1.5 h-1.5 rounded-full bg-accent-amber ring-1 ring-surface-0" /></span>} label="Evidence-grounded link" />
-              <LegendRow swatch={<span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-accent-amber/60 bg-accent-amber/10" />} label="Attention region" />
-              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-surface-50 ring-2 ring-accent-blue" />} label="Foreign case node" />
-              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-accent-rose" />} label="Current focus area" />
+            <div className="cc-panel-floating p-5 flex flex-col gap-3 min-w-48 transform origin-bottom-left">
+              <h3 className="type-mono-small mb-1 border-b border-semantic-border-subtle pb-2">GRAPH LEGEND</h3>
+              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-semantic-surface-soft ring-2 ring-semantic-foreground-muted" />} label="Entity" />
+              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-semantic-surface ring-2 ring-semantic-foreground-faint" />} label="Other node" />
+              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-semantic-surface-elevated ring-2 ring-accent-rose animate-slow-pulse" />} label="Bridge candidate" />
+              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-semantic-foreground-faint" />} label="Low-confidence link" />
+              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-semantic-contradiction" />} label="Contradicted link" />
+              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-dashed border-warning" />} label="Graph hole" />
+              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full ring-2 ring-semantic-selection shadow-[0_0_8px_var(--color-semantic-selection)]" />} label="Live arrival" />
+              <LegendRow swatch={<span className="relative w-4 h-4 flex items-center justify-center"><span className="w-1.5 h-1.5 rounded-full bg-accent-amber ring-1 ring-semantic-background" /></span>} label="Evidence-grounded link" />
+              <LegendRow swatch={<span className="w-4 h-4 rounded-full border-[1.5px] border-dashed border-semantic-attention/70 bg-semantic-attention/10" />} label="Attention region" />
+              <LegendRow swatch={<span className="w-2.5 h-2.5 rounded-full bg-semantic-surface-soft ring-2 ring-semantic-foreign" />} label="Foreign case node" />
+              <LegendRow swatch={<span className="w-4 border-t-[1.5px] border-semantic-selection" />} label="Current focus area" />
             </div>
           )}
         </div>
 
         {activeForeignCase && (
           <div className="absolute top-6 left-1/2 -translate-x-1/2 animate-slide-up z-20 pointer-events-none">
-            <Badge variant="info" dot className="bg-accent-blue/10 text-accent-blue border-accent-blue/30 backdrop-blur-md px-4 py-2 uppercase tracking-widest font-mono shadow-[0_0_15px_var(--color-accent-blue-subtle)]">
+            <Badge variant="info" dot className="bg-semantic-foreign/10 text-semantic-foreign border-semantic-foreign/30 backdrop-blur-md px-4 py-2 uppercase tracking-widest font-mono shadow-[0_0_15px_rgba(127,146,163,0.25)]">
               Foreign Boundary Scan Active
             </Badge>
           </div>
@@ -672,7 +686,7 @@ export function GraphPanel({
         {activeForeignCase && (
           <div className="flex flex-col h-full">
             <div className="p-6 border-b border-surface-200/50 bg-surface-50">
-              <span className="text-[10px] font-mono text-accent-blue font-bold uppercase tracking-widest flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-mono text-semantic-foreign font-bold uppercase tracking-widest flex items-center gap-2 mb-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-pulse" />
                 Boundary Alert
               </span>
@@ -712,7 +726,7 @@ export function GraphPanel({
                 )}
                 
                 {currentMergeState === "PROCESSING" && (
-                  <div className="w-full bg-surface-800 text-accent-blue border border-accent-blue/30 font-mono text-[10px] uppercase tracking-widest p-2 rounded flex flex-col items-center justify-center relative overflow-hidden h-10 shadow-inner">
+                  <div className="w-full bg-surface-800 text-semantic-foreign border border-semantic-foreign/30 font-mono text-[10px] uppercase tracking-widest p-2 rounded flex flex-col items-center justify-center relative overflow-hidden h-10 shadow-inner">
                     <div className="absolute inset-0 w-full h-[2px] bg-accent-blue/50 blur-[2px] animate-filament" />
                     <span className="animate-pulse font-bold">Authorizing Sync...</span>
                   </div>
