@@ -39,11 +39,22 @@ import type {
   CaseProvider,
   EvidenceProvider,
   InvestigationProvider,
+  ObservationContradiction,
 } from "./types";
+import type {
+  Investigation,
+  Lead,
+  InvestigativeGap,
+  GraphNode,
+  GraphEdge,
+  Source,
+  Evidence,
+  Observation,
+} from "@indago/contracts";
 import { createWorkspaceDemoProviders } from "./demo/providers";
 import { createLiveWorkspaceProviders } from "./live/providers";
 import { DemoCaseProvider, DemoEvidenceProvider, DemoInvestigationProvider } from "./demo/providers";
-import { createDemoWorkspaceState } from "./demo/state";
+import { createDemoWorkspaceState, type DemoWorkspaceState } from "./demo/state";
 import { LiveCaseProvider, LiveEvidenceProvider, LiveInvestigationProvider } from "./live/providers";
 
 /**
@@ -164,6 +175,46 @@ export function resolveCaseListMode(
 export interface CaseListProviders {
   readonly mode: AppDataMode;
   readonly cases: CaseProvider;
+  /** Genuine demo workspace state projected for the Case List (demo mode
+   *  only). This is DATA, not a second provider interface: the dashboard reads
+   *  immutable fixture projections to render real lead/gap/contradiction/
+   *  graph/recency state. Absent in live mode — the dashboard never fabricates
+   *  enrichments the platform cannot serve. */
+  readonly enrichment?: DashboardEnrichment;
+}
+
+/**
+ * Read-only dashboard projection of the demo workspace. Built in the factory
+ * seam from the SAME canonical workspace state the case provider serves, so the
+ * featured case, its leads, gaps, contradictions, graph topology, and recency
+ * metadata are all genuine fixture data — never invented on the dashboard.
+ */
+export interface DashboardEnrichment {
+  readonly investigationId: string;
+  readonly investigation: Investigation;
+  readonly leads: readonly Lead[];
+  readonly gaps: readonly InvestigativeGap[];
+  readonly contradictions: readonly ObservationContradiction[];
+  readonly graphNodes: readonly GraphNode[];
+  readonly graphEdges: readonly GraphEdge[];
+  readonly sources: readonly Source[];
+  readonly evidence: readonly Evidence[];
+  readonly observations: readonly Observation[];
+}
+
+function toDashboardEnrichment(state: DemoWorkspaceState): DashboardEnrichment {
+  return {
+    investigationId: state.investigation.id,
+    investigation: state.investigation,
+    leads: Array.from(state.leadById.values()),
+    gaps: Array.from(state.gapById.values()),
+    contradictions: state.contradictions,
+    graphNodes: Array.from(state.graphNodeById.values()),
+    graphEdges: Array.from(state.graphEdgeById.values()),
+    sources: Array.from(state.sourceById.values()),
+    evidence: Array.from(state.evidenceById.values()),
+    observations: Array.from(state.observationById.values()),
+  };
 }
 
 export function createCaseListProviders(
@@ -173,7 +224,11 @@ export function createCaseListProviders(
   const config = getDataModeConfig(env);
   if (mode === "demo") {
     const state = createDemoWorkspaceState("case-list");
-    return { mode, cases: new DemoCaseProvider(state, config) };
+    return {
+      mode,
+      cases: new DemoCaseProvider(state, config),
+      enrichment: toDashboardEnrichment(state),
+    };
   }
   return { mode, cases: new LiveCaseProvider() };
 }

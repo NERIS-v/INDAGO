@@ -57,6 +57,8 @@ export {
   createCaseListProviders,
   createIntakeProviders,
   resolveCaseListMode,
+  type CaseListProviders,
+  type DashboardEnrichment,
 } from "./factory";
 
 export {

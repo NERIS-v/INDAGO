@@ -49,7 +49,11 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-[1440px] px-10 py-8">
-        <CaseList cases={providers.cases} mode={providers.mode} />
+        <CaseList
+          cases={providers.cases}
+          mode={providers.mode}
+          enrichment={providers.enrichment}
+        />
       </main>
     </div>
   );

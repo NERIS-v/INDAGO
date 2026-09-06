@@ -247,4 +247,41 @@ describe("CaseList", () => {
     expect(screen.getByRole("checkbox", { name: /Select Beta Case/ })).toBeChecked();
     expect(screen.getByRole("button", { name: /Delete selected \(2\)/ })).not.toBeDisabled();
   });
+
+  describe("Command center topology", () => {
+    const enrichment = (() => {
+      const state = createDemoWorkspaceState("case-list:test");
+      return {
+        investigationId: state.investigation.id,
+        investigation: state.investigation,
+        leads: Array.from(state.leadById.values()),
+        gaps: Array.from(state.gapById.values()),
+        contradictions: state.contradictions,
+        graphNodes: Array.from(state.graphNodeById.values()),
+        graphEdges: Array.from(state.graphEdgeById.values()),
+        sources: Array.from(state.sourceById.values()),
+        evidence: Array.from(state.evidenceById.values()),
+        observations: Array.from(state.observationById.values()),
+      };
+    })();
+
+    it("renders the network mini-map from the real fixture node ids", async () => {
+      const { cases } = mockProvider();
+      const { container } = render(
+        <CaseList cases={cases} mode="demo" enrichment={enrichment} />,
+      );
+      await screen.findByRole("img", {
+        name: "Preview of the active investigation topology",
+      });
+
+      // All six fixture nodes render a circle (plus the hub halo);
+      // prior to the MINI_LAYOUT id fix nothing matched and the mini-map was
+      // an empty near-black card.
+      expect(screen.getByText("Topology · 6 nodes")).toBeInTheDocument();
+      expect(container.querySelectorAll("svg circle").length).toBeGreaterThanOrEqual(7);
+      expect(container.querySelectorAll("svg line")).toHaveLength(6);
+      expect(screen.getByText("Victor Aldridge")).toBeInTheDocument();
+      expect(screen.getByText("Intermediary")).toBeInTheDocument();
+    });
+  });
 });
