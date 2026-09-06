@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import type {
   Investigation,
@@ -10,13 +11,10 @@ import type {
 } from "@indago/contracts";
 import type { EvidenceListItem } from "@/lib/api/types";
 import { toProviderError, type ProviderEvent } from "@/lib/providers/types";
-import { Card, CardContent } from "@/components/ui/card";
+import { investigationUrl } from "@/lib/workspace/url";
 import { Badge } from "@/components/ui/badge";
-import { StatChip } from "@/components/ui/stat-chip";
-import { SectionHeading } from "@/components/ui/section-heading";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import { EmptyState } from "@/components/ui/empty-state";
 import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
 
 // F6: Import the visual feedback components
@@ -160,122 +158,263 @@ export function InvestigationOverview({
 
   const { investigation } = data;
 
+  // F-PR15 briefing signals — derived ONLY from genuinely loaded list data.
+  // "Unavailable" (null) is distinct from "no data" (0).
+  const signals = useMemo(() => {
+    const outstandingGapStatuses = ["IDENTIFIED", "ACKNOWLEDGED", "WORKING"];
+    const inPursuitLeadStatuses = ["NEW", "UNDER_REVIEW", "ACTIVE"];
+    return {
+      openGaps: data.gaps === null
+        ? null
+        : data.gaps.filter((g) => outstandingGapStatuses.includes(g.status)).length,
+      activeLeads: data.leads === null
+        ? null
+        : data.leads.filter((l) => inPursuitLeadStatuses.includes(l.status)).length,
+    };
+  }, [data.gaps, data.leads]);
+
+  const nextActions = useMemo(() => {
+    const base = investigationUrl(investigation.id, investigation.caseId);
+    return [
+      { label: "Review outstanding gaps", value: signals.openGaps, href: `${base}/gaps` },
+      { label: "Review potential leads", value: signals.activeLeads, href: `${base}/leads` },
+      { label: "Inspect evidence", href: `${base}/evidence` },
+      { label: "Test hypothesis", href: `${base}/hypothesis` },
+    ];
+  }, [investigation.id, investigation.caseId, signals]);
+
+  const stat = (value: number | null) =>
+    value === null
+      ? { display: "—", muted: true }
+      : { display: String(value).padStart(2, "0"), muted: false };
+
+  const evidenceStat = stat(data.evidence === null ? null : data.evidence.length);
+  const entitiesStat = stat(data.entities === null ? null : data.entities.length);
+  const leadsStat = stat(data.leads === null ? null : data.leads.length);
+  const gapsStat = stat(data.gaps === null ? null : data.gaps.length);
+
+  const activity = events.slice(0, 12);
+
   return (
-    <div className="relative space-y-6 p-6 animate-fade-in">
-      
+    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
       {/* F6: Visual Feedback Layer */}
       <ProcessingFilament isProcessing={loading} />
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-surface-500">
+      <div className="mx-auto max-w-[1080px]">
+        {/* ── CASE IDENTITY ─────────────────────────────────────────── */}
+        <header className="border-b border-semantic-border-subtle pb-8">
+          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
             <span>Investigation</span>
-            <span className="h-px w-8 bg-surface-200" aria-hidden="true" />
-            <span className="text-surface-400">{investigation.id}</span>
+            <span className="h-px w-12 bg-semantic-border" aria-hidden="true" />
+            <span className="text-semantic-foreground-faint">{investigation.id.slice(0, 8)}</span>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="type-title text-text-primary">
-              {investigation.title}
-            </h1>
-            <Badge variant={live ? "success" : "muted"} dot dotPulse={live}>
-              {live ? "Live" : "Offline"}
-            </Badge>
-            <RecoveryRing isReconnecting={!live && data !== null} />
+
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-6">
+            <div className="min-w-0 max-w-3xl">
+              <h1 className="font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+                {investigation.title}
+              </h1>
+              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                <Badge variant={live ? "success" : "muted"} dot dotPulse={live}>
+                  {live ? "Live" : "Offline"}
+                </Badge>
+                <Badge variant="info">{investigation.status}</Badge>
+                <Badge variant="accent">{investigation.priority}</Badge>
+                {investigation.owner && (
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                    Owner {investigation.owner}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-3">
+              {investigation.confidence !== undefined && (
+                <ConfidenceIndicator
+                  value={investigation.confidence}
+                  label="Confidence"
+                  showBar
+                />
+              )}
+              <RecoveryRing isReconnecting={!live && data !== null} />
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="info">{investigation.status}</Badge>
-          <Badge variant="accent">{investigation.priority}</Badge>
-          {investigation.confidence !== undefined && (
-            <ConfidenceIndicator
-              value={investigation.confidence}
-              label="Confidence"
-              showBar
-            />
-          )}
-        </div>
-      </div>
+        </header>
 
-      <p className="type-body text-surface-600 max-w-3xl">
-        {investigation.description}
-      </p>
-
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-1 py-5">
-            {data.evidence === null ? (
-              <StatChip label="Evidence" value="—" caption="Unavailable" accent="text-surface-400" />
-            ) : (
-              <StatChip label="Evidence" value={data.evidence.length} />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex flex-col items-center gap-1 py-5">
-            {data.entities === null ? (
-              <StatChip label="Entities" value="—" caption="Unavailable" accent="text-surface-400" />
-            ) : (
-              <StatChip label="Entities" value={data.entities.length} />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex flex-col items-center gap-1 py-5">
-            {data.leads === null ? (
-              <StatChip label="Leads" value="—" caption="Unavailable" accent="text-surface-400" />
-            ) : (
-              <StatChip label="Leads" value={data.leads.length} />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex flex-col items-center gap-1 py-5">
-            {data.gaps === null ? (
-              <StatChip label="Gaps" value="—" caption="Unavailable" accent="text-surface-400" />
-            ) : (
-              <StatChip label="Gaps" value={data.gaps.length} />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <div className="border-b border-surface-200/40 px-6 py-4">
-          <SectionHeading overline="Realtime" title="Activity Feed" action={<Badge variant="muted">{events.length}</Badge>} />
-        </div>
-        <div className="max-h-72 overflow-y-auto">
-          {events.length === 0 ? (
-            <EmptyState
-              title="No activity yet"
-              description="Events appear as the investigation progresses."
-            />
+        {/* ── CURRENT PICTURE ───────────────────────────────────────── */}
+        <section className="pt-10">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              Current picture
+            </span>
+            <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+          </div>
+          {investigation.description ? (
+            <p className="mt-5 max-w-[70ch] font-display text-[1.35rem] font-light leading-[1.6] tracking-[-0.005em] text-semantic-foreground-muted">
+              {investigation.description}
+            </p>
           ) : (
-            <div className="divide-y divide-surface-200/30">
-              {events.map((event, idx) => (
-                <div key={`${event.id ?? idx}`} className="px-6 py-3">
-                  <div className="flex items-center justify-between gap-4">
+            <p className="mt-5 type-caption text-semantic-foreground-faint">
+              No case description has been recorded for this investigation.
+            </p>
+          )}
+        </section>
+
+        {/* ── INVESTIGATIVE STATE ───────────────────────────────────── */}
+        <section className="mt-10">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              Investigative state
+            </span>
+            <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-px border border-semantic-border-subtle bg-semantic-border-subtle rounded-lg overflow-hidden sm:grid-cols-4">
+            {[
+              ["Evidence", evidenceStat.display],
+              ["Entities", entitiesStat.display],
+              ["Leads", leadsStat.display],
+              ["Gaps", gapsStat.display],
+            ].map(([label, display]) => {
+              const isMuted =
+                (label === "Evidence" && evidenceStat.muted) ||
+                (label === "Entities" && entitiesStat.muted) ||
+                (label === "Leads" && leadsStat.muted) ||
+                (label === "Gaps" && gapsStat.muted);
+              return (
+                <div key={label} className="bg-semantic-surface px-6 py-5">
+                  <span className="font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+                    {label}
+                  </span>
+                  <p className={`mt-2 font-mono text-3xl font-extralight tracking-wide ${isMuted ? "text-semantic-foreground-faint" : "text-semantic-foreground"}`}>
+                    {display}
+                  </p>
+                  {isMuted && (
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-semantic-foreground-faint">
+                      Unavailable
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ── SIGNALS / NEXT ACTIONS ────────────────────────────────── */}
+        <section className="mt-12 grid gap-10 sm:grid-cols-5">
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+                Signals
+              </span>
+              <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+            </div>
+            <div className="mt-5 space-y-0 divide-y divide-semantic-border-subtle">
+              <div className="flex items-center justify-between gap-4 py-3">
+                <span className="type-caption text-semantic-foreground-muted">Outstanding gaps</span>
+                {signals.openGaps === null ? (
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">Unavailable</span>
+                ) : (
+                  <span className="font-mono text-sm text-semantic-foreground">
+                    {String(signals.openGaps).padStart(2, "0")}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-4 py-3">
+                <span className="type-caption text-semantic-foreground-muted">Leads in pursuit</span>
+                {signals.activeLeads === null ? (
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">Unavailable</span>
+                ) : (
+                  <span className="font-mono text-sm text-semantic-foreground">
+                    {String(signals.activeLeads).padStart(2, "0")}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-4 py-3">
+                <span className="type-caption text-semantic-foreground-muted">Live events</span>
+                <span className="font-mono text-sm text-semantic-foreground">
+                  {String(events.length).padStart(2, "0")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="sm:col-span-3">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+                Next actions
+              </span>
+              <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+            </div>
+            <div className="mt-5 grid gap-px border border-semantic-border-subtle bg-semantic-border-subtle rounded-lg overflow-hidden sm:grid-cols-2">
+              {nextActions.map((action) => (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  className="group flex items-center justify-between gap-3 bg-semantic-surface px-5 py-4 transition-colors duration-fast hover:bg-semantic-surface-elevated"
+                >
+                  <span className="text-sm text-semantic-foreground">
+                    {action.label}
+                    {action.value !== undefined && action.value !== null && (
+                      <span className="ml-2 font-mono text-[10px] text-semantic-foreground-faint">
+                        {String(action.value)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono text-sm text-accent-rose transition-transform duration-fast group-hover:translate-x-0.5">→</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── RECENT INVESTIGATIVE ACTIVITY ─────────────────────────── */}
+        <section className="mt-12">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              Recent investigative activity
+            </span>
+            <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+              {String(events.length).padStart(2, "0")}
+            </span>
+          </div>
+
+          <div className="mt-5">
+            {activity.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-semantic-border px-6 py-10 text-center">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+                  No activity yet
+                </p>
+                <p className="mt-2 type-caption text-semantic-foreground-faint">
+                  Events appear as the investigation progresses.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-semantic-border-subtle">
+                {activity.map((event, idx) => (
+                  <div key={`${event.id ?? idx}`} className="flex items-baseline justify-between gap-4 py-3">
                     <div className="min-w-0">
-                      <p className="text-sm text-surface-700">
+                      <p className="text-sm text-semantic-foreground">
                         {event.action ?? "Event"}
                       </p>
                       {event.description && (
-                        <p className="truncate text-[11px] text-surface-500">
+                        <p className="mt-0.5 truncate font-mono text-[10px] text-semantic-foreground-faint">
                           {event.description}
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 text-[11px] text-surface-500">
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
                       {event.timestamp
                         ? new Date(event.timestamp).toLocaleTimeString()
                         : ""}
                     </span>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
