@@ -74,7 +74,7 @@ Consistent with F-PR6 contracts: SELECT stays distinct from FOCUS, sample counts
 - F-PR6 pulse contracts are preserved byte-for-attribute (sample count 96, aria structure, card testids, SELECT≠FOCUS, `pulse-open-in-graph`, `pulse-markers`).
 - F-PR9 hypothesis pipeline is untouched (mode-1 surface preserved; its own honest-data rules remain scoped to F-PR9).
 - Canonical evidence is never mutated; merge timers are the real 1800/3300 ms and are cancelled by `closeMergePanel`.
-- `opencode.json` and unrelated repo docs remain untracked/untouched.
+- Untracked local configuration and unrelated repo docs remain untracked/untouched.
 
 ## 5. Honest-data thread
 

@@ -66,7 +66,7 @@ A is 2/0/2 (support/unresolved); the two in-reach-but-unmatched observations are
 - Graph implementation, Network visualizations, five-zone shell, cross-case auth, temporal system, and Judge untouched.
 - The previous hypothesis pipeline is preserved byte-for-byte — its revert is feature work, not a regression.
 - Canonical evidence is never mutated by the reverse engine; decisions are session-scoped only.
-- `opencode.json` and unrelated prior-PR reports remain untracked/untouched.
+- Untracked local configuration and unrelated prior-PR reports remain untracked/untouched.
 
 ## 6. Honest-data thread
 

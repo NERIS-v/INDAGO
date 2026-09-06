@@ -50,7 +50,7 @@ The originally delivered F-PR6 Entity Pulse rendered the whole topic set as ONE 
 - `graph-canvas.tsx`, `graph-panel.tsx`, `intelligence-signals.tsx`, `graph-visual-state.ts` — untouched (parallel Graph Visual Language owner).
 - `timeline-panel.tsx`, `capabilities.ts`, `page.tsx`, `pr6-timeline-default-scope.test.tsx`, `scratch-shared-time.test.tsx` — PR-6 timeline agent's uncommitted WIP; not modified by this pass (the corrective pass only reads `activeTimeRange`/`restoredTimeRange` through the existing seam).
 - No new dependencies; native SVG path built by the model (no d3-shape).
-- `opencode.json` (untracked parallel artifact) was never staged or committed.
+- The untracked local configuration artifact was never staged or committed.
 
 ## 5. Honest-data thread
 

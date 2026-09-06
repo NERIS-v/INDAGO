@@ -55,7 +55,7 @@ Add **Adaptive Flow** as the third served representation inside the five-zone Gr
 - Only `packages/web/**` changed. No backend/contracts/platform/judge/Prisma/workers/SSE files; no new routes or dependencies (native SVG paths; no d3).
 - Five-zone geometry, `graph-canvas`, `graph-panel`, matrix, pulse, Zone 5 design, temporal system, and cross-case auth untouched by this PR.
 - The mode toggle is hidden when only one domain holds data (demo case: FINANCIAL only), so the "adaptive" claim is never fake.
-- `opencode.json` and unrelated prior-PR reports remain untracked/untouched.
+- Untracked local configuration and unrelated prior-PR reports remain untracked/untouched.
 
 ## 5. Honest-data thread
 

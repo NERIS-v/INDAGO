@@ -32,7 +32,7 @@ Matrix represents the investigator's relationship view *as a matrix*: rows are t
 - `pr6-timeline-default-scope.test.tsx`, `scratch-shared-time.test.tsx` — untouched (parallel PR-6 timeline owner).
 - Parallel-owner components untouched: `graph-canvas.tsx`, `graph-panel.tsx`, `graph-visual-state.ts`, `intelligence-signals.tsx`.
 - No new dependencies; the grid is semantic HTML + native SVG, model-computed.
-- `opencode.json` (untracked parallel artifact) was never staged or committed.
+- The untracked local configuration artifact was never staged or committed.
 
 ## 5. Honest-data thread
 
