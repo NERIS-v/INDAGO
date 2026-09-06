@@ -89,7 +89,7 @@ describe("PR-10 §49 — relation deep-dive links", () => {
     expect(hypotheses.available).toBe(false);
     expect(hypotheses.note).toBe("Hypotheses are not exposed in this data mode.");
     // Page-level destinations stay available regardless of slices.
-    for (const pageId of ["evidence", "leads", "gaps", "timeline", "review", "robustness", "ledger", "cross-case"]) {
+    for (const pageId of ["evidence", "leads", "gaps", "review", "robustness", "ledger", "cross-case"]) {
       expect(links.find((l) => l.id === pageId)!.available).toBe(true);
     }
   });
@@ -134,7 +134,7 @@ describe("PR-10 §49 — entity deep-dive links", () => {
       expect(link.available).toBe(false);
       expect(link.note).toBe(note);
     }
-    for (const pageId of ["timeline", "review", "robustness", "ledger"]) {
+    for (const pageId of ["review", "robustness", "ledger"]) {
       expect(links.find((l) => l.id === pageId)!.available).toBe(true);
     }
   });

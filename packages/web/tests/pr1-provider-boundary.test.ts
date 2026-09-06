@@ -191,16 +191,15 @@ describe("PR-1 — navigation module (shared WORKSPACE_NAV + route helpers)", ()
       "Dashboard",
       "Overview",
       "Network",
-      "Timeline",
+      "Evidence",
       "Observations",
       "Leads",
       "Gaps",
-      "Evidence",
+      "Hypothesis",
       "Cross-Case",
       "Ledger",
       "Robustness",
       "Review",
-      "Hypothesis",
     ]);
   });
 

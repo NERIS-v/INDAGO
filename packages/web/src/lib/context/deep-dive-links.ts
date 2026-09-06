@@ -107,13 +107,6 @@ export function relationDeepDiveLinks(
       available: true,
     },
     {
-      id: "timeline",
-      label: "Timeline",
-      hint: "The investigation timeline",
-      href: investigationUrl(source.investigationId, source.caseId, "timeline"),
-      available: true,
-    },
-    {
       id: "review",
       label: "Review",
       hint: "Review tasks for this case",
@@ -207,13 +200,6 @@ export function entityDeepDiveLinks(
       ...(details.openGaps === null
         ? { note: "Gaps are not exposed in this data mode." }
         : {}),
-    },
-    {
-      id: "timeline",
-      label: "Timeline",
-      hint: "The investigation timeline",
-      href: investigationUrl(source.investigationId, source.caseId, "timeline"),
-      available: true,
     },
     {
       id: "review",

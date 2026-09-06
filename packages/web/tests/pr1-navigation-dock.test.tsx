@@ -80,16 +80,15 @@ describe("PR-1 — WorkspaceNavDock", () => {
       "Dashboard",
       "Overview",
       "Network",
-      "Timeline",
+      "Evidence",
       "Observations",
       "Leads",
       "Gaps",
-      "Evidence",
+      "Hypothesis",
       "Cross-Case",
       "Ledger",
       "Robustness",
       "Review",
-      "Hypothesis",
     ]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
@@ -100,6 +99,13 @@ describe("PR-1 — WorkspaceNavDock", () => {
     const network = screen.getByRole("link", { name: "Network" });
     expect(network).toHaveAttribute("aria-current", "page");
     expect(network).toHaveAttribute("href", withCaseBoundary(graphPath()));
+  });
+
+  it("groups workspaces into Core / Intelligence / Analysis segments", () => {
+    renderWorkspaceDock(graphPath());
+    for (const group of ["Core", "Intelligence", "Analysis"]) {
+      expect(screen.getByText(group, { selector: "span.sr-only" })).toBeInTheDocument();
+    }
   });
 
   it("marks the Hypothesis route as the active page", () => {

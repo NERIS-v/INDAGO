@@ -81,27 +81,45 @@ export function WorkspaceNavDock() {
 
         <span className="h-5 w-px bg-semantic-border" aria-hidden />
 
-        {WORKSPACE_NAV.map((entry) => {
-          const href =
-            entry.href === "/"
-              ? "/"
-              : investigationUrl(investigationId, workspace.caseId, entry.href || undefined);
-          const isActive = isNavEntryActive(entry, pathname);
-          return (
-            <Link
-              key={entry.label}
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-              className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
-                isActive
-                  ? "bg-semantic-surface-soft text-semantic-selection"
-                  : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
-              }`}
-            >
-              {entry.label}
-            </Link>
-          );
-        })}
+        {(() => {
+          const groups: { label: string; entries: typeof WORKSPACE_NAV[number][] }[] = [];
+          for (const entry of WORKSPACE_NAV) {
+            const label = entry.group ?? "Core";
+            const last = groups[groups.length - 1];
+            if (!last || last.label !== label) {
+              groups.push({ label, entries: [entry] });
+            } else {
+              last.entries.push(entry);
+            }
+          }
+          return groups.map((g, gi) => (
+            <span key={g.label} className="flex items-center gap-0.5">
+              {gi > 0 && <span className="h-5 w-px bg-semantic-border" aria-hidden />}
+              <span className="sr-only">{g.label}</span>
+              {g.entries.map((entry) => {
+                const href =
+                  entry.href === "/"
+                    ? "/"
+                    : investigationUrl(investigationId, workspace.caseId, entry.href || undefined);
+                const isActive = isNavEntryActive(entry, pathname);
+                return (
+                  <Link
+                    key={entry.label}
+                    href={href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
+                      isActive
+                        ? "bg-semantic-surface-soft text-semantic-selection"
+                        : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
+                    }`}
+                  >
+                    {entry.label}
+                  </Link>
+                );
+              })}
+            </span>
+          ));
+        })()}
 
         <span className="h-5 w-px bg-semantic-border" aria-hidden />
 

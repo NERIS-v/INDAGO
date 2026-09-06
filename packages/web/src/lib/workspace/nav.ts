@@ -18,27 +18,28 @@ export interface NavEntry {
   readonly href: string;
   /** Set true for scaffolded views rendered on the same route. */
   readonly scaffolded?: boolean;
+  /** Visual grouping label in the workspace dock. */
+  readonly group?: string;
 }
 
 /** Investigation workspace destinations (real routes only — do not invent). */
 export const WORKSPACE_NAV: readonly NavEntry[] = [
-  { label: "Dashboard", href: "/" },
-  { label: "Overview", href: "" },
+  { label: "Dashboard", href: "/", group: "Core" },
+  { label: "Overview", href: "", group: "Core" },
   // F-PR6: the parent network destination is labelled NETWORK; its five-zone
   // shell serves the selected representation (Graph / Pulse / Matrix / Flow).
-  { label: "Network", href: "graph" },
-  { label: "Timeline", href: "timeline" },
-  { label: "Observations", href: "observations" },
-  { label: "Leads", href: "leads" },
-  { label: "Gaps", href: "gaps" },
-  { label: "Evidence", href: "evidence" },
+  { label: "Network", href: "graph", group: "Core" },
+  { label: "Evidence", href: "evidence", group: "Core" },
+  { label: "Observations", href: "observations", group: "Intelligence" },
+  { label: "Leads", href: "leads", group: "Intelligence" },
+  { label: "Gaps", href: "gaps", group: "Intelligence" },
+  { label: "Hypothesis", href: "hypothesis", group: "Intelligence" },
   // Cross-Case is a REAL, fully rendered module (CrossCaseSignals + case-boundary
   // graph overlays) — its PR-1 "scaffolded" flag was stale metadata and is gone.
-  { label: "Cross-Case", href: "cross-case" },
-  { label: "Ledger", href: "ledger", scaffolded: true },
-  { label: "Robustness", href: "robustness", scaffolded: true },
-  { label: "Review", href: "review", scaffolded: true },
-  { label: "Hypothesis", href: "hypothesis" },
+  { label: "Cross-Case", href: "cross-case", group: "Analysis" },
+  { label: "Ledger", href: "ledger", scaffolded: true, group: "Analysis" },
+  { label: "Robustness", href: "robustness", scaffolded: true, group: "Analysis" },
+  { label: "Review", href: "review", scaffolded: true, group: "Analysis" },
 ];
 
 /**

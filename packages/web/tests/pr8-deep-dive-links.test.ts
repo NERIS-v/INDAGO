@@ -69,7 +69,6 @@ describe("PR-8 — relation deep-dive links", () => {
     expect(ids).toContain("hypotheses");
     expect(ids).toContain("leads");
     expect(ids).toContain("gaps");
-    expect(ids).toContain("timeline");
     expect(ids).toContain("review");
     expect(ids).toContain("robustness");
     expect(ids).toContain("ledger");
@@ -114,7 +113,7 @@ describe("PR-8 — relation deep-dive links", () => {
 
   it("page-level bridges are always valid destinations", () => {
     const links = relationDeepDiveLinks(source, relation({ linkedObservations: null }));
-    for (const id of ["network", "evidence", "leads", "gaps", "timeline", "review", "robustness", "ledger", "cross-case"]) {
+    for (const id of ["network", "evidence", "leads", "gaps", "review", "robustness", "ledger", "cross-case"]) {
       const link = links.find((l) => l.id === id)!;
       expect(link.available).toBe(true);
     }
@@ -124,7 +123,7 @@ describe("PR-8 — relation deep-dive links", () => {
 describe("PR-8 — entity deep-dive links", () => {
   it("every link is REAL with ?caseId= preserved and no dead routes", () => {
     const links = entityDeepDiveLinks(source, entity());
-    expect(links).toHaveLength(11);
+    expect(links).toHaveLength(10);
     for (const link of links) {
       expect(link.href).toMatch(new RegExp(`^/investigations/${INVESTIGATION_ID}`));
       expect(link.href).toContain(`caseId=${CASE_ID}`);
@@ -145,7 +144,6 @@ describe("PR-8 — entity deep-dive links", () => {
     expect(links.find((l) => l.id === "cross-case")!.note).toContain("not exposed");
     expect(links.find((l) => l.id === "leads")!.available).toBe(true);
     expect(links.find((l) => l.id === "gaps")!.available).toBe(true);
-    expect(links.find((l) => l.id === "timeline")!.available).toBe(true);
   });
 
   it("labels/hints are stable and non-empty", () => {
