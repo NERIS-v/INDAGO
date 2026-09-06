@@ -10,6 +10,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatChip } from "@/components/ui/stat-chip";
 import { useGraphLiveOverlay, triggerOrQueueUploadSequence } from "./graph-live";
 import { DiscoveryPanel } from "@/components/intelligence/discovery-panel";
 import { EvidenceIntake } from "@/components/evidence/evidence-intake";
@@ -675,13 +676,13 @@ export function GraphPanel({
         )}
 
         <div className={`absolute top-6 flex gap-4 pointer-events-none animate-fade-in z-20 bg-semantic-surface/95 border border-semantic-border backdrop-blur-md px-5 py-2.5 rounded-lg shadow-md transition-opacity ${activeForeignCase ? "left-[336px]" : "left-6"}`}>
-          <TelemetryStat label="NODES" value={finalNodes.length} />
+          <StatChip label="NODES" value={finalNodes.length} />
           <div className="w-px h-5 bg-semantic-border my-auto" />
-          <TelemetryStat label="EDGES" value={finalEdges.length} />
+          <StatChip label="EDGES" value={finalEdges.length} />
           {filterStats.active && (
             <>
               <div className="w-px h-5 bg-semantic-border my-auto" />
-              <TelemetryStat label="RENDERED" value={canvasEdges.length} />
+              <StatChip label="RENDERED" value={canvasEdges.length} />
             </>
           )}
         </div>
@@ -882,15 +883,6 @@ export function GraphPanel({
         </div>,
         document.body
       )}
-    </div>
-  );
-}
-
-function TelemetryStat({ label, value, colorClass = "text-surface-900" }: { label: string; value: number, colorClass?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center leading-none">
-      <span className="text-[8px] font-mono text-surface-500 uppercase tracking-widest mb-1">{label}</span>
-      <span className={`text-sm font-mono font-bold ${colorClass}`}>{value}</span>
     </div>
   );
 }

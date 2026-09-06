@@ -28,6 +28,7 @@ import {
 } from "@/lib/network/matrix/matrix-model";
 import type { InvestigativeContext } from "@/lib/context/investigative-context";
 import type { GraphFilterState } from "@/lib/graph/graph-filter";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { PanelToggle } from "../panel-toggle";
 
 interface MatrixRailProps {
@@ -131,6 +132,7 @@ export function MatrixRail({
             </section>
 
             <section aria-label="Matrix overview" className="flex flex-col gap-1.5">
+              <SectionHeading overline="Zone 1" title="Matrix overview" />
               {(() => {
                 const counts = matrixCellCounts(meta.meta);
                 return (
