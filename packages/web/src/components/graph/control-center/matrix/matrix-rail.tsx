@@ -27,6 +27,7 @@ import {
   parseMatrixCellId,
 } from "@/lib/network/matrix/matrix-model";
 import type { InvestigativeContext } from "@/lib/context/investigative-context";
+import type { GraphFilterState } from "@/lib/graph/graph-filter";
 import { PanelToggle } from "../panel-toggle";
 
 interface MatrixRailProps {
@@ -49,6 +50,10 @@ interface MatrixRailProps {
   readonly onOpenInGraph?: (entityId: string) => void;
   /** Releases the selection (SELECT ≠ FOCUS: clears the highlight only). */
   readonly onClearSelection: () => void;
+  /** F-PR14: workspace readability filter. When `hideContradicted` is set the
+   *  conflict stat reports the suppressed count (presentation-only; the model
+   *  keeps `contradictionPresent`). `minSupport` stays edge-lens-only. */
+  readonly filter?: GraphFilterState | null;
 }
 
 export function MatrixRail({
@@ -66,6 +71,7 @@ export function MatrixRail({
   context,
   onOpenInGraph,
   onClearSelection,
+  filter = null,
 }: MatrixRailProps) {
   const selectedEntityId =
     context?.kind === "entity"
@@ -161,6 +167,16 @@ export function MatrixRail({
                           </dt>
                           <dd className="font-mono text-[11px] text-accent-rose">
                             {meta.meta.hiddenCandidateCount}
+                          </dd>
+                        </div>
+                      )}
+                      {filter?.hideContradicted && counts.conflict > 0 && (
+                        <div className="flex items-center justify-between gap-3 border-t border-surface-200/50 pt-1.5">
+                          <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+                            Conflict cells hidden by filter
+                          </dt>
+                          <dd className="font-mono text-[11px] text-accent-rose">
+                            {counts.conflict}
                           </dd>
                         </div>
                       )}

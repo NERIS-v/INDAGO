@@ -248,3 +248,82 @@ describe("F-PR7 — relationship matrix panel (Zone 2)", () => {
     expect(screen.getByText("provider failed")).toBeInTheDocument();
   });
 });
+
+describe("F-PR14 — matrix conflict-cell suppression (presentation-only)", () => {
+  const conflictState = buildMatrix({
+    nodes: operationFinancialShadowGraph.nodes,
+    observations,
+    relations,
+    contradictions,
+    candidates: [],
+    matches,
+    overlays,
+    caseId: CASE_ID,
+    investigationId: INVESTIGATION_ID,
+    timeRange: null,
+    mode: "within-case",
+    boundaryCaseId: null,
+    authorizedBoundaries: [],
+  });
+  const conflictCount = matrixCellCounts(conflictState).conflict;
+  const hiddenMeta: MatrixLoadState = {
+    status: "ready",
+    meta: conflictState,
+    boundaryOptions: [],
+    error: null,
+  };
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("leaves conflict cells untouched without hideContradicted", () => {
+    render(<MatrixPanel meta={hiddenMeta} mode="within-case" filter={null} />);
+    expect(
+      document.querySelectorAll('[data-matrix-state="conflict"]'),
+    ).toHaveLength(conflictCount);
+    expect(
+      document.querySelectorAll('[data-matrix-state="suppressed"]'),
+    ).toHaveLength(0);
+    expect(screen.queryByTestId("matrix-suppressed-tally")).not.toBeInTheDocument();
+  });
+
+  it("suppresses conflict cells as ghosts and reports the honest tally when hideContradicted", () => {
+    render(
+      <MatrixPanel
+        meta={hiddenMeta}
+        mode="within-case"
+        filter={{ minSupport: 0, hideContradicted: true }}
+      />,
+    );
+    expect(
+      document.querySelectorAll('[data-matrix-state="suppressed"]'),
+    ).toHaveLength(conflictCount);
+    expect(
+      document.querySelectorAll('[data-matrix-state="conflict"]'),
+    ).toHaveLength(0);
+    expect(
+      document.querySelectorAll('[data-matrix-suppressed="true"]'),
+    ).toHaveLength(conflictCount);
+    expect(screen.getByTestId("matrix-suppressed-tally")).toHaveTextContent(
+      new RegExp(`${conflictCount} conflict cell`),
+    );
+  });
+
+  it("treats minSupport as an edge-lens dimension: cells are unaffected", () => {
+    render(
+      <MatrixPanel
+        meta={hiddenMeta}
+        mode="within-case"
+        filter={{ minSupport: 0.5, hideContradicted: false }}
+      />,
+    );
+    expect(
+      document.querySelectorAll('[data-matrix-state="conflict"]'),
+    ).toHaveLength(conflictCount);
+    expect(
+      document.querySelectorAll('[data-matrix-state="suppressed"]'),
+    ).toHaveLength(0);
+    expect(screen.queryByTestId("matrix-suppressed-tally")).not.toBeInTheDocument();
+  });
+});

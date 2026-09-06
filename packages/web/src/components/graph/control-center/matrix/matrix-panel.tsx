@@ -37,6 +37,7 @@ import {
   matrixWindowLabel,
 } from "@/lib/network/matrix/matrix-model";
 import type { InvestigativeContext } from "@/lib/context/investigative-context";
+import type { GraphFilterState } from "@/lib/graph/graph-filter";
 
 interface MatrixPanelProps {
   /** Shell-owned matrix analysis shared with every supporting zone. */
@@ -53,6 +54,13 @@ interface MatrixPanelProps {
   readonly onOpenPulse?: (entityId: string) => void;
   /** Shell handler that starts the boundary authorization flow. */
   readonly onRequestAuthorization?: (caseId: string) => void;
+  /** F-PR14: workspace readability filter. When `hideContradicted` is set, the
+   *  presentation suppresses CONFLICT cells (ghost render — derived, the
+   *  underlying model keeps `contradictionPresent`) and surfaces an honest
+   *  "N cells hidden by filter" tally. `minSupport` deliberately does NOT map
+   *  to matrix cells: matrix cells carry no per-cell support signal, so this
+   *  dimension stays a graph / relation-edge lens only. */
+  readonly filter?: GraphFilterState | null;
 }
 
 function CellGlyphs({ cell }: { cell: MatrixCell }) {
@@ -89,6 +97,7 @@ export function MatrixPanel({
   onOpenInGraph,
   onOpenPulse,
   onRequestAuthorization,
+  filter = null,
 }: MatrixPanelProps) {
   const gridRef = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState<[number, number] | null>(null);
@@ -96,6 +105,17 @@ export function MatrixPanel({
   const selectedCell = useMemo(
     () => (meta.status === "ready" ? matrixCellFromContext(meta.meta, context) : null),
     [meta, context],
+  );
+
+  const suppressConflict = Boolean(filter?.hideContradicted);
+  const suppressedConflictCount = useMemo(
+    () =>
+      meta.status === "ready"
+        ? meta.meta.cells.filter(
+            (cell) => !cell.self && cell.state === "conflict",
+          ).length
+        : 0,
+    [meta, suppressConflict],
   );
 
   if (meta.status === "error") {
@@ -191,6 +211,24 @@ export function MatrixPanel({
         </div>
       )}
 
+      {suppressConflict && suppressedConflictCount > 0 && (
+        <div
+          role="alert"
+          className="flex shrink-0 flex-col gap-1 rounded-xl border border-accent-rose/30 bg-accent-rose/5 p-3"
+          data-testid="matrix-suppressed-tally"
+        >
+          <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-surface-700">
+            {suppressedConflictCount} conflict cell{suppressedConflictCount === 1 ? "" : "s"} hidden by the readability filter
+          </p>
+          <p className="type-caption text-surface-500">
+            NOT DISPLAYED ≠ DOES NOT EXIST — the underlying model keeps the
+            contradiction signals; clear the filter to review them. Matrix
+            cells carry no per-cell support signal, so min-support stays a
+            graph / relation-edge lens only.
+          </p>
+        </div>
+      )}
+
       <div
         ref={gridRef}
         role="grid"
@@ -255,6 +293,35 @@ export function MatrixPanel({
                   >
                     <span className="truncate font-mono text-[9px] text-surface-400">
                       {row.label}
+                    </span>
+                  </div>
+                );
+              }
+
+              // F-PR14: hideContradicted suppresses CONFLICT cells at the
+              // presentation layer (ghost render — the model keeps
+              // contradictionPresent; the cell count & selection notes stay
+              // honest). Suppressed cells remain viewable/titled but inert.
+              if (suppressConflict && cell.state === "conflict") {
+                return (
+                  <div
+                    role="gridcell"
+                    key={column.entityId}
+                    data-matrix-cell
+                    data-matrix-state="suppressed"
+                    data-matrix-suppressed="true"
+                    data-matrix-row-id={row.entityId}
+                    data-matrix-col-id={column.entityId}
+                    title={[
+                      cell.ariaDescription,
+                      cell.contradictionNote ?? "",
+                    ]
+                      .filter(Boolean)
+                      .join(" — ")}
+                    className="flex h-10 w-40 shrink-0 items-center justify-between gap-1 rounded-md border border-dashed border-surface-200 bg-surface-50/40 px-2 py-1"
+                  >
+                    <span className="truncate font-mono text-[8px] font-bold uppercase tracking-widest text-surface-300">
+                      Suppressed
                     </span>
                   </div>
                 );

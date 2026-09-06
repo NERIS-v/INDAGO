@@ -19,6 +19,8 @@ function GraphTabContent() {
     setTimeRange,
     focusEntityId,
     setFocusEntityId,
+    graphFilter,
+    setGraphFilter,
   } = useNetworkWorkspace();
 
   return (
@@ -31,6 +33,8 @@ function GraphTabContent() {
         activeNetworkView={activeNetworkView}
         onNetworkViewChange={setActiveNetworkView}
         restoredTimeRange={timeRange}
+        graphFilter={graphFilter}
+        onGraphFilterChange={setGraphFilter}
       />
     </div>
   );

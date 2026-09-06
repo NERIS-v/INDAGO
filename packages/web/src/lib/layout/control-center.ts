@@ -14,9 +14,6 @@
 // Provider-agnostic: never imports providers, demo/live fixtures or UI.
 // ============================================================================
 
-import type { GraphFilterState } from "@/lib/graph/graph-filter";
-import { DEFAULT_GRAPH_FILTER } from "@/lib/graph/graph-filter";
-
 export type TemporalTab = "time" | "activity" | "versions";
 
 export type IntelligenceTab = "overview" | "hypotheses" | "signals" | "evidence" | "activity";
@@ -48,10 +45,10 @@ export interface GraphControlCenterActions {
   gapsOpen: boolean;
   crossCaseOpen: boolean;
   uploadOpen: boolean;
-  /** PR-4: graph readability filter surface (inline in the rail). */
+  /** PR-4: graph readability filter surface (inline in the rail). The filter
+   *  VALUE is F-PR14 workspace-scoped state (?support=/?hidec=), so only the
+   *  surface open/closed flag remains owned by the actions object. */
   filterOpen: boolean;
-  /** PR-4: the active graph readability filter (see graph-filter.ts). */
-  filter: GraphFilterState;
   /** Overlay ref ("cobalt"/"crimson") currently active on the canvas. */
   activeForeignCaseId: string | null;
 }
@@ -74,7 +71,6 @@ export const DEFAULT_ACTIONS: GraphControlCenterActions = {
   crossCaseOpen: false,
   uploadOpen: false,
   filterOpen: false,
-  filter: DEFAULT_GRAPH_FILTER,
   activeForeignCaseId: null,
 };
 

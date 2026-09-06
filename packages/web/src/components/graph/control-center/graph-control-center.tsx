@@ -28,6 +28,8 @@ import type {
   GraphControlCenterActions,
 } from "@/lib/layout/control-center";
 import type { ControlCenterSurfaceKey } from "@/lib/layout/control-center";
+import type { GraphFilterState } from "@/lib/graph/graph-filter";
+import { DEFAULT_GRAPH_FILTER } from "@/lib/graph/graph-filter";
 import type { ForeignCaseOverlay, TimelineItem } from "@/lib/providers/types";
 import { useInvestigativeContext } from "@/lib/context/use-investigative-context";
 import { getContextualCapabilities, sameContextIdentity } from "@/lib/context/investigative-context";
@@ -100,6 +102,14 @@ interface GraphControlCenterProps {
   /** F-PR5 seam: the shared workspace temporal scope to restore across remount
    *  so a returning route does not silently reset the timeline to full range. */
   restoredTimeRange?: [number, number] | null;
+  /** F-PR14 seam: the workspace-scoped readability filter (?support=/?hidec=),
+   *  owned by the Network workspace state seam so it survives sub-route nav and
+   *  is shared by every representation. Absent → a local fallback keeps
+   *  standalone/test renders valid. */
+  graphFilter?: GraphFilterState;
+  /** F-PR14 seam: reports filter changes so the workspace seam can serialize
+   *  the URL. Absent → the local fallback applies (no URL churn). */
+  onGraphFilterChange?: (filter: GraphFilterState) => void;
 }
 
 export function GraphControlCenter({
@@ -110,6 +120,8 @@ export function GraphControlCenter({
   onFocusEntityChange,
   onNetworkViewChange,
   restoredTimeRange,
+  graphFilter: graphFilterProp,
+  onGraphFilterChange,
 }: GraphControlCenterProps) {
   const workspace = useWorkspace();
 
@@ -138,6 +150,20 @@ export function GraphControlCenter({
   const [layout, setLayout] = useState<ControlCenterLayoutState>(DEFAULT_LAYOUT_STATE);
   const [actions, setActions] = useState<GraphControlCenterActions>(DEFAULT_ACTIONS);
   const [foreignOverlays, setForeignOverlays] = useState<ForeignCaseOverlay[]>([]);
+
+  // F-PR14: the readability filter VALUE is workspace-scoped (deterministic,
+  // URL-serialized, survives remounts). When the caller supplies the seam use
+  // it; otherwise fall back to a local copy so standalone/test renders stay
+  // valid (the rail surface state stays in `actions.filterOpen` regardless).
+  const [localFilter, setLocalFilter] = useState<GraphFilterState>(DEFAULT_GRAPH_FILTER);
+  const effectiveFilter = graphFilterProp ?? localFilter;
+  const handleFilterChange = useCallback(
+    (next: GraphFilterState) => {
+      setLocalFilter(next);
+      onGraphFilterChange?.(next);
+    },
+    [onGraphFilterChange],
+  );
 
   // PR-10: the temporal version selection is SHELL-owned (lifted out of
   // TemporalContextPanel) so the contextual-panel authority footer can be gated
@@ -321,7 +347,6 @@ export function GraphControlCenter({
           activeForeignCaseId: prev.activeForeignCaseId,
           legendOpen: prev.legendOpen,
           filterOpen: prev.filterOpen,
-          filter: prev.filter,
         };
         next[key] = nowOpen;
         return next;
@@ -494,6 +519,7 @@ export function GraphControlCenter({
               context={context}
               onOpenInGraph={onNetworkViewChange ? openEntityInGraph : undefined}
               onClearSelection={clearSelection}
+              filter={effectiveFilter}
             />
           ) : presentation.zoneOne === "flow-rail" ? (
             <FlowRail
@@ -528,8 +554,8 @@ export function GraphControlCenter({
               capabilities={capabilities}
               context={context}
               mode={workspace.mode}
-              filter={actions.filter}
-              onFilterChange={(next) => updateActions({ filter: next })}
+              filter={effectiveFilter}
+              onFilterChange={handleFilterChange}
               onFocus={() => {
                 if (context) focusContext(context);
               }}
@@ -568,7 +594,8 @@ export function GraphControlCenter({
                   onContextSelect={handleGraphContextSelect}
                   selectedContext={context}
                   focusRequest={focusRequest}
-                  filter={actions.filter}
+                  filter={effectiveFilter}
+                  onFilterChange={handleFilterChange}
                   graphReloadRequest={graphReloadRequest}
                 />
               </div>
@@ -581,6 +608,7 @@ export function GraphControlCenter({
                 onOpenInGraph={openEntityInGraph}
                 onOpenPulse={openEntityInPulse}
                 onRequestAuthorization={beginAuthorize}
+                filter={effectiveFilter}
               />
             ) : presentation.zoneTwo === "flow" ? (
               <FlowPanel

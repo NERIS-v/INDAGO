@@ -117,7 +117,6 @@ describe("PR-2 — geometry contract (pure)", () => {
       crossCaseOpen: false,
       uploadOpen: false,
       filterOpen: false,
-      filter: { minSupport: 0, hideContradicted: false },
       activeForeignCaseId: null,
     });
   });

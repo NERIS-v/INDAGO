@@ -18,7 +18,7 @@ import type { InvestigativeGap } from "@indago/contracts";
 import type { GraphRealtimeCatalog, ForeignCaseOverlay } from "@/lib/providers/types";
 import { mapInvestigativeGapToGapMock } from "@/lib/intel/gap-adapter";
 import type { InvestigativeContext } from "@/lib/context/investigative-context";
-import { applyGraphFilter } from "@/lib/graph/graph-filter";
+import { applyGraphFilter, DEFAULT_GRAPH_FILTER } from "@/lib/graph/graph-filter";
 import type { GraphFilterState } from "@/lib/graph/graph-filter";
 import { deriveGraphVisualContext } from "@/lib/graph/graph-visual-state";
 import type { GraphFocusSeed, GraphVisualContext } from "@/lib/graph/graph-visual-state";
@@ -74,6 +74,7 @@ export function GraphPanel({
   selectedContext,
   focusRequest,
   filter,
+  onFilterChange,
   graphReloadRequest,
 }: {
   activeTimeRange: [number, number] | null;
@@ -99,6 +100,10 @@ export function GraphPanel({
   /** PR-4: readability filter applied to the RENDERED edges only. The graph
    *  physics and the entity drawer keep the full topology. */
   filter?: GraphFilterState | null | undefined;
+  /** F-PR14: optional filter-reset callback so the honest "filter hides
+   *  relations of the selection" annotation can offer a reveal shortcut.
+   *  Absent → the annotation renders without the button. */
+  onFilterChange?: (filter: GraphFilterState) => void;
   /** PR-8: post-mutation canonical-graph refetch request. Bumping the nonce
    *  refetches version/nodes/edges so a relation-authority decision's projection
    *  change (edge archived, retained, contradicted) becomes visible. Absent or
@@ -372,6 +377,37 @@ export function GraphPanel({
     return finalNodes.find((n) => n.entityId === source)?.id ?? null;
   }, [selectedContext, selectedEntityId, finalNodes]);
 
+  // F-PR14: deterministic hidden-selection rule. The filter only ever removes
+  // RENDERED edges (provider topology is untouched), so a selected node's
+  // incident edges may be hidden even though the node stays. This derived
+  // count drives the honest annotation beside the selection ("N relations
+  // hidden by filter") — the selection is never silently cleared or re-scoped.
+  const filterStats = useMemo(() => {
+    const active = Boolean(
+      filter && (filter.minSupport > 0 || filter.hideContradicted),
+    );
+    if (!active || !selectedGraphNodeId) {
+      return { active, hiddenIncidentCount: 0, totalIncidentCount: 0 };
+    }
+    const isIncident = (edge: GraphEdge, nodeId: string | null) =>
+      nodeId !== null &&
+      (edge.sourceNodeId === nodeId || edge.targetNodeId === nodeId);
+    let totalIncidentCount = 0;
+    let visibleIncidentCount = 0;
+    for (const edge of finalEdges) {
+      if (!isIncident(edge, selectedGraphNodeId)) continue;
+      totalIncidentCount += 1;
+      if (canvasEdges.some((rendered) => rendered.id === edge.id)) {
+        visibleIncidentCount += 1;
+      }
+    }
+    return {
+      active,
+      hiddenIncidentCount: totalIncidentCount - visibleIncidentCount,
+      totalIncidentCount,
+    };
+  }, [filter, selectedGraphNodeId, finalEdges, canvasEdges]);
+
   // PR-6: the presentation model is derived ONCE per meaningful snapshot change
   // (memoized), then hydrated with interaction state inside the canvas per
   // render. It never runs on the physics tick.
@@ -642,7 +678,38 @@ export function GraphPanel({
           <TelemetryStat label="NODES" value={finalNodes.length} />
           <div className="w-px h-5 bg-semantic-border my-auto" />
           <TelemetryStat label="EDGES" value={finalEdges.length} />
+          {filterStats.active && (
+            <>
+              <div className="w-px h-5 bg-semantic-border my-auto" />
+              <TelemetryStat label="RENDERED" value={canvasEdges.length} />
+            </>
+          )}
         </div>
+
+        {filterStats.active && filterStats.hiddenIncidentCount > 0 && (
+          <div className="absolute left-6 top-24 lg:top-28 z-20 max-w-md animate-slide-up">
+            <div className="flex items-start gap-3 bg-semantic-surface/95 border border-semantic-attention/40 backdrop-blur-md px-4 py-3 rounded-lg shadow-md">
+              <div className="flex flex-col gap-0.5">
+                <p className="type-mono-small text-semantic-foreground-muted">
+                  {filterStats.hiddenIncidentCount} of {filterStats.totalIncidentCount} relation{filterStats.totalIncidentCount === 1 ? "" : "s"} of the selection hidden by the current filter
+                </p>
+                <p className="text-xs text-semantic-foreground-muted">
+                  NODES DISPLAYED ≠ DOES NOT EXIST — reduce the filter ({filter && filter.minSupport > 0 ? `support ≥ ${filter.minSupport}` : ""}{filter && filter.minSupport > 0 && filter.hideContradicted ? " · " : ""}{filter && filter.hideContradicted ? "contradicted hidden" : ""}) to reveal them.
+                </p>
+              </div>
+              {onFilterChange && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 mt-0.5"
+                  onClick={() => onFilterChange(DEFAULT_GRAPH_FILTER)}
+                >
+                  Reveal all
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="absolute top-6 right-6 flex flex-col gap-px animate-fade-in z-20 bg-semantic-surface/95 border border-semantic-border backdrop-blur-md rounded-lg overflow-hidden p-1 shadow-md">
           <button aria-label="Zoom in" className="w-8 h-8 flex items-center justify-center text-semantic-foreground-muted hover:text-semantic-foreground hover:bg-semantic-surface-elevated rounded transition-colors focus-visible:outline-none" onClick={() => controlsRef.current?.zoomIn()}>+</button>

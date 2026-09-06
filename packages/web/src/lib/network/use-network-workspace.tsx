@@ -47,10 +47,16 @@ import {
   type NetworkTimeRange,
   type NetworkView,
 } from "./network-workspace";
+import type { GraphFilterState } from "@/lib/graph/graph-filter";
+import { DEFAULT_GRAPH_FILTER, graphFilterIsActive } from "@/lib/graph/graph-filter";
 import {
   NETWORK_FOCUS_PARAM,
+  NETWORK_HIDEC_PARAM,
+  NETWORK_SUPPORT_PARAM,
   NETWORK_VIEW_PARAM,
+  networkFilterToParams,
   pathWithParams,
+  readNetworkFilter,
   readNetworkFocus,
   readNetworkView,
   withoutSearchParam,
@@ -70,7 +76,14 @@ export interface NetworkWorkspaceValue {
   readonly focusEntityId: string | null;
   /** Set/replace the focus target; serializes ?focus=. null clears it. */
   setFocusEntityId(entityId: string | null): void;
-  /** Reset view + focus to defaults and drop their query params. */
+  /** F-PR14: the workspace-wide readability filter (min support / hide
+   *  contradicted). Shared by every representation; survives sub-route
+   *  remounts and URL-syncs via ?support=/?hidec= (defaults are dropped). */
+  readonly graphFilter: GraphFilterState;
+  /** Replace the readability filter; serializes the URL. Default values are
+   *  dropped so a fresh workspace URL stays clean. */
+  setGraphFilter(filter: GraphFilterState): void;
+  /** Reset view + focus + filter to defaults and drop their query params. */
   clearAnalyticalState(): void;
 }
 
@@ -90,6 +103,16 @@ function currentFocus(
   return readNetworkFocus(searchParams);
 }
 
+function currentFilter(
+  searchParams: ReturnType<typeof useSearchParams>,
+): GraphFilterState {
+  return readNetworkFilter(searchParams);
+}
+
+function filterKey(filter: GraphFilterState): string {
+  return `${filter.minSupport}|${filter.hideContradicted ? "1" : "0"}`;
+}
+
 export function NetworkWorkspaceProvider({
   children,
 }: {
@@ -106,12 +129,16 @@ export function NetworkWorkspaceProvider({
   const [focusEntityId, setFocusEntityIdState] = useState<string | null>(() =>
     currentFocus(searchParams),
   );
+  const [graphFilter, setGraphFilterState] = useState<GraphFilterState>(() =>
+    currentFilter(searchParams),
+  );
 
   // Mirrors of the query-param state used to make setters no-op when the value
   // has not actually changed, so repeated calls (e.g. selection clears that do
   // not own a focus) never churn the URL / history.
   const viewRef = useRef(activeNetworkView);
   const focusRef = useRef(focusEntityId);
+  const filterRef = useRef(graphFilter);
 
   // URL -> state (back/forward, manual edits, direct nav).
   useEffect(() => {
@@ -123,6 +150,11 @@ export function NetworkWorkspaceProvider({
     const focus = currentFocus(searchParams);
     focusRef.current = focus;
     setFocusEntityIdState((prev) => (focus === prev ? prev : focus));
+    const filter = currentFilter(searchParams);
+    filterRef.current = filter;
+    setGraphFilterState((prev) =>
+      filterKey(filter) === filterKey(prev) ? prev : filter,
+    );
   }, [searchParams]);
 
   // State -> URL. Every mutation is a copy of the CURRENT params so ?caseId=
@@ -165,21 +197,49 @@ export function NetworkWorkspaceProvider({
     [writeUrl],
   );
 
+  const setGraphFilter = useCallback(
+    (filter: GraphFilterState) => {
+      if (filterKey(filterRef.current) === filterKey(filter)) return;
+      filterRef.current = filter;
+      setGraphFilterState(filter);
+      writeUrl((params) => {
+        let next = params;
+        const entries = networkFilterToParams(filter);
+        next = withoutSearchParam(next, NETWORK_SUPPORT_PARAM);
+        next = withoutSearchParam(next, NETWORK_HIDEC_PARAM);
+        for (const { key, value } of entries) {
+          next = withSearchParam(next, key, value);
+        }
+        return next;
+      });
+    },
+    [writeUrl],
+  );
+
   const clearAnalyticalState = useCallback(() => {
     if (
       viewRef.current === DEFAULT_NETWORK_VIEW &&
-      focusRef.current === null
+      focusRef.current === null &&
+      !graphFilterIsActive(filterRef.current)
     ) {
       return;
     }
     viewRef.current = DEFAULT_NETWORK_VIEW;
     focusRef.current = null;
+    filterRef.current = DEFAULT_GRAPH_FILTER;
     setActiveNetworkViewState(DEFAULT_NETWORK_VIEW);
     setFocusEntityIdState(null);
+    setGraphFilterState(DEFAULT_GRAPH_FILTER);
     writeUrl((params) =>
       withoutSearchParam(
-        withoutSearchParam(params, NETWORK_VIEW_PARAM),
-        NETWORK_FOCUS_PARAM,
+        withoutSearchParam(
+          withoutSearchParam(
+            withoutSearchParam(params, NETWORK_VIEW_PARAM),
+            NETWORK_FOCUS_PARAM,
+          ),
+          NETWORK_SUPPORT_PARAM,
+        ),
+        NETWORK_HIDEC_PARAM,
       ),
     );
   }, [writeUrl]);
@@ -192,6 +252,8 @@ export function NetworkWorkspaceProvider({
       setTimeRange,
       focusEntityId,
       setFocusEntityId,
+      graphFilter,
+      setGraphFilter,
       clearAnalyticalState,
     }),
     [
@@ -201,6 +263,8 @@ export function NetworkWorkspaceProvider({
       setTimeRange,
       focusEntityId,
       setFocusEntityId,
+      graphFilter,
+      setGraphFilter,
       clearAnalyticalState,
     ],
   );

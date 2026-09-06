@@ -13,6 +13,8 @@
 // ============================================================================
 
 import { parseNetworkView, type NetworkView } from "@/lib/network/network-workspace";
+import type { GraphFilterState } from "@/lib/graph/graph-filter";
+import { DEFAULT_GRAPH_FILTER, MIN_SUPPORT_MAX } from "@/lib/graph/graph-filter";
 
 /** Build an investigation workspace URL, preserving the case boundary. */
 export function investigationUrl(
@@ -43,6 +45,10 @@ export const NETWORK_VIEW_PARAM = "view";
 export const NETWORK_FOCUS_PARAM = "focus";
 /** `?entity=` — the observations route filter (read-only deep link today). */
 export const NETWORK_ENTITY_PARAM = "entity";
+/** F-PR14: `?support=` — the workspace readability filter min-support (0 default). */
+export const NETWORK_SUPPORT_PARAM = "support";
+/** F-PR14: `?hidec=` — the workspace readability filter "hide contradicted" flag. */
+export const NETWORK_HIDEC_PARAM = "hidec";
 
 export type SearchParamsLike = {
   get(name: string): string | null;
@@ -61,6 +67,44 @@ export function readNetworkView(
 export function readNetworkFocus(searchParams: SearchParamsLike): string | null {
   if (!searchParams) return null;
   return searchParams.get(NETWORK_FOCUS_PARAM) ?? null;
+}
+
+/**
+ * F-PR14 — Read the workspace readability filter from the URL deterministically.
+ * Absent/invalid params resolve to the DEFAULT (unfiltered) state so a fresh
+ * workspace URL has no ?support=/?hidec= noise and corrupted values never crash
+ * the workspace. Explicit values only ever appear when the filter is active —
+ * default values are dropped on serialization (same REST-ful rule as ?view=).
+ */
+export function readNetworkFilter(
+  searchParams: SearchParamsLike,
+): GraphFilterState {
+  if (!searchParams) return DEFAULT_GRAPH_FILTER;
+  const supportRaw = searchParams.get(NETWORK_SUPPORT_PARAM);
+  const hidecRaw = searchParams.get(NETWORK_HIDEC_PARAM);
+  const parsedSupport = supportRaw ? Number(supportRaw) : NaN;
+  const minSupport =
+    Number.isFinite(parsedSupport) && parsedSupport > 0
+      ? Math.min(MIN_SUPPORT_MAX, parsedSupport)
+      : 0;
+  return {
+    minSupport,
+    hideContradicted: hidecRaw === "1" || hidecRaw === "true",
+  };
+}
+
+/** F-PR14 — The non-default filter dimension entries to serialize (?support=/?hidec=). */
+export function networkFilterToParams(
+  filter: GraphFilterState,
+): { readonly key: string; readonly value: string }[] {
+  const params: { key: string; value: string }[] = [];
+  if (filter.minSupport > 0) {
+    params.push({ key: NETWORK_SUPPORT_PARAM, value: String(filter.minSupport) });
+  }
+  if (filter.hideContradicted) {
+    params.push({ key: NETWORK_HIDEC_PARAM, value: "1" });
+  }
+  return params;
 }
 
 /**

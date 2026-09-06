@@ -26,12 +26,30 @@ function Probe() {
       <span data-testid="range">
         {ws.timeRange ? ws.timeRange.join(":") : "null"}
       </span>
+      <span data-testid="filter">
+        {ws.graphFilter.minSupport}:{ws.graphFilter.hideContradicted ? "1" : "0"}
+      </span>
       <button onClick={() => ws.setActiveNetworkView("flow")}>set-view-flow</button>
       <button onClick={() => ws.setActiveNetworkView("graph")}>set-view-graph</button>
       <button onClick={() => ws.setFocusEntityId("ent-9")}>set-focus-nine</button>
       <button onClick={() => ws.setFocusEntityId("ent-9")}>set-focus-nine-again</button>
       <button onClick={() => ws.setFocusEntityId(null)}>clear-focus</button>
       <button onClick={() => ws.setTimeRange([1, 500])}>set-range</button>
+      <button
+        onClick={() => ws.setGraphFilter({ minSupport: 0.5, hideContradicted: true })}
+      >
+        set-filter-both
+      </button>
+      <button
+        onClick={() => ws.setGraphFilter({ minSupport: 0.5, hideContradicted: true })}
+      >
+        set-filter-both-again
+      </button>
+      <button
+        onClick={() => ws.setGraphFilter({ minSupport: 0, hideContradicted: false })}
+      >
+        set-filter-clear
+      </button>
       <button onClick={() => ws.clearAnalyticalState()}>clear-all</button>
     </div>
   );
@@ -216,5 +234,136 @@ describe("F-PR5 — NetworkWorkspaceProvider two-way URL state", () => {
 
   it("throws when used outside a NetworkWorkspaceProvider", () => {
     expect(() => render(<Probe />)).toThrowError(/NetworkWorkspaceProvider/);
+  });
+});
+
+describe("F-PR14 — NetworkWorkspaceProvider readability filter URL state", () => {
+  it("seeds the filter from ?support= and ?hidec=", () => {
+    lanes.searchParamsRef.current = urlWith({
+      caseId: "c-1",
+      support: "0.5",
+      hidec: "1",
+    });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0.5:1");
+  });
+
+  it("defaults to the unfiltered workspace when the URL is clean or malformed", () => {
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1" });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0:0");
+    cleanup();
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1", support: "bogus", hidec: "not1" });
+    const { container: second } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(second.querySelector('[data-testid="filter"]')?.textContent).toBe("0:0");
+  });
+
+  it("writes both params on set, preserving ?caseId= and other params", () => {
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1", view: "matrix" });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    act(() => {
+      screen.getByRole("button", { name: "set-filter-both" }).click();
+    });
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0.5:1");
+    expect(lanes.replaceMock).toHaveBeenCalledWith(
+      "/investigations/i-1/graph?caseId=c-1&view=matrix&support=0.5&hidec=1",
+      { scroll: false },
+    );
+  });
+
+  it("drops ?support= and ?hidec= when the filter returns to default (REST-ful)", () => {
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1", support: "0.7", hidec: "1" });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    act(() => {
+      screen.getByRole("button", { name: "set-filter-clear" }).click();
+    });
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0:0");
+    expect(lanes.replaceMock).toHaveBeenCalledWith(
+      "/investigations/i-1/graph?caseId=c-1",
+      { scroll: false },
+    );
+  });
+
+  it("guards no-op filter writes: repeating the same value never churns the URL", () => {
+    render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    act(() => {
+      screen.getByRole("button", { name: "set-filter-both" }).click();
+    });
+    expect(lanes.replaceMock).toHaveBeenCalledTimes(1);
+    lanes.replaceMock.mockClear();
+    act(() => {
+      screen.getByRole("button", { name: "set-filter-both-again" }).click();
+    });
+    expect(lanes.replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("applies back/forward URL filter changes to state without looping", () => {
+    const { container, rerender } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0:0");
+    act(() => {
+      lanes.searchParamsRef.current = urlWith({
+        caseId: "c-1",
+        support: "0.4",
+        hidec: "1",
+      });
+    });
+    rerender(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0.4:1");
+    expect(lanes.replaceMock).not.toHaveBeenCalled();
+  });
+
+  it("clearAnalyticalState resets the filter and drops both params", () => {
+    lanes.searchParamsRef.current = urlWith({
+      caseId: "c-1",
+      view: "flow",
+      support: "0.5",
+      hidec: "1",
+    });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0.5:1");
+    act(() => {
+      screen.getByRole("button", { name: "clear-all" }).click();
+    });
+    expect(container.querySelector('[data-testid="filter"]')?.textContent).toBe("0:0");
+    expect(lanes.replaceMock).toHaveBeenCalledWith(
+      "/investigations/i-1/graph?caseId=c-1",
+      { scroll: false },
+    );
   });
 });
