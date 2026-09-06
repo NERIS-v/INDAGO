@@ -10,8 +10,10 @@ import type {
 } from "@indago/contracts";
 import type { EvidenceListItem } from "@/lib/api/types";
 import { toProviderError, type ProviderEvent } from "@/lib/providers/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatChip } from "@/components/ui/stat-chip";
+import { SectionHeading } from "@/components/ui/section-heading";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -163,24 +165,25 @@ export function InvestigationOverview({
       
       {/* F6: Visual Feedback Layer */}
       <ProcessingFilament isProcessing={loading} />
-      <div className="absolute top-6 right-6 z-50">
-        <RecoveryRing isReconnecting={!live && data !== null} />
-      </div>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-surface-500">
+            <span>Investigation</span>
+            <span className="h-px w-8 bg-surface-200" aria-hidden="true" />
+            <span className="text-surface-400">{investigation.id}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="type-title text-text-primary">
               {investigation.title}
             </h1>
             <Badge variant={live ? "success" : "muted"} dot dotPulse={live}>
               {live ? "Live" : "Offline"}
             </Badge>
+            <RecoveryRing isReconnecting={!live && data !== null} />
           </div>
-          <p className="type-mono-small">{investigation.id}</p>
         </div>
-        <div className="flex items-center gap-3 pr-24">
-          {/* Added pr-24 to ensure badges don't overlap with the absolute RecoveryRing */}
+        <div className="flex items-center gap-3">
           <Badge variant="info">{investigation.status}</Badge>
           <Badge variant="accent">{investigation.priority}</Badge>
           {investigation.confidence !== undefined && (
@@ -199,42 +202,38 @@ export function InvestigationOverview({
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card>
-          <CardContent>
-            <p className="type-section text-text-muted">Evidence</p>
+          <CardContent className="flex flex-col items-center gap-1 py-5">
             {data.evidence === null ? (
-              <p className="type-caption text-surface-500">Unavailable</p>
+              <StatChip label="Evidence" value="—" caption="Unavailable" accent="text-surface-400" />
             ) : (
-              <p className="type-mono-xl text-text-primary">{data.evidence.length}</p>
+              <StatChip label="Evidence" value={data.evidence.length} />
             )}
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <p className="type-section text-text-muted">Entities</p>
+          <CardContent className="flex flex-col items-center gap-1 py-5">
             {data.entities === null ? (
-              <p className="type-caption text-surface-500">Unavailable</p>
+              <StatChip label="Entities" value="—" caption="Unavailable" accent="text-surface-400" />
             ) : (
-              <p className="type-mono-xl text-text-primary">{data.entities.length}</p>
+              <StatChip label="Entities" value={data.entities.length} />
             )}
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <p className="type-section text-text-muted">Leads</p>
+          <CardContent className="flex flex-col items-center gap-1 py-5">
             {data.leads === null ? (
-              <p className="type-caption text-surface-500">Unavailable</p>
+              <StatChip label="Leads" value="—" caption="Unavailable" accent="text-surface-400" />
             ) : (
-              <p className="type-mono-xl text-text-primary">{data.leads.length}</p>
+              <StatChip label="Leads" value={data.leads.length} />
             )}
           </CardContent>
         </Card>
         <Card>
-          <CardContent>
-            <p className="type-section text-text-muted">Gaps</p>
+          <CardContent className="flex flex-col items-center gap-1 py-5">
             {data.gaps === null ? (
-              <p className="type-caption text-surface-500">Unavailable</p>
+              <StatChip label="Gaps" value="—" caption="Unavailable" accent="text-surface-400" />
             ) : (
-              <p className="type-mono-xl text-text-primary">{data.gaps.length}</p>
+              <StatChip label="Gaps" value={data.gaps.length} />
             )}
           </CardContent>
         </Card>
@@ -242,10 +241,7 @@ export function InvestigationOverview({
 
       <Card>
         <div className="border-b border-surface-200/40 px-6 py-4">
-          <CardHeader>
-            <CardTitle>Activity Feed</CardTitle>
-            <Badge variant="muted">{events.length}</Badge>
-          </CardHeader>
+          <SectionHeading overline="Realtime" title="Activity Feed" action={<Badge variant="muted">{events.length}</Badge>} />
         </div>
         <div className="max-h-72 overflow-y-auto">
           {events.length === 0 ? (
