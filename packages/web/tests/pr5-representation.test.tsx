@@ -184,8 +184,8 @@ describe("F-PR6 corrective pass — the five-zone shell adapts per representatio
     const { rerender, providers } = renderControlCenter("pulse", undefined, jan2024);
     // Jan-2024 holds exactly OBS_7: 1 of 9 observations (11%).
     // The pulse pipeline refetches on shell state changes (timeRange, overlays)
-    // and briefly unmounts the ready overview between frames. Poll with a
-    // fresh query each attempt so a transiently detached node never fails an
+    // while the ready overview stays mounted (stale-while-revalidate). Poll
+    // with a fresh query each attempt so a remounted node never fails an
     // otherwise-correct assertion.
     await waitFor(
       () =>

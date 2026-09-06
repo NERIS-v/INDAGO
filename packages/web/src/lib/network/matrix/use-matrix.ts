@@ -113,7 +113,10 @@ export function useMatrixAnalysis({
       return;
     }
     let active = true;
-    setData(null);
+    // Stale-while-revalidate: keep the previous ready meta mounted while a
+    // refetch (enabled/overlays/boundary change) is in flight so the rail and
+    // zones never unmount into the loading frame between fresh data. The first
+    // load still shows loading (data starts null); failures still surface.
     setError(null);
     Promise.all([
       fetchAllPages<GraphNode>((query) =>

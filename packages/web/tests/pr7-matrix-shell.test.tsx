@@ -253,17 +253,16 @@ describe("F-PR7 — the five-zone shell serves the Relationship Matrix", () => {
       expect(screen.getByTestId("matrix-boundary-select")).toBeInTheDocument(),
     );
 
-    // Switching the mode re-fetches the matrix; the rail ready branch briefly
-    // unmounts, so re-resolve the toggles once the refetch settles.
-    fireEvent.click(screen.getByTestId("matrix-mode-within-case"));
-    await waitFor(
-      () =>
-        expect(screen.getByTestId("matrix-mode-within-case")).toHaveAttribute(
-          "aria-pressed",
-          "true",
-        ),
-      { timeout: 5000 },
-    );
+    // Switching the mode re-fetches the matrix; the ready branch stays mounted
+    // across the refetch (stale-while-revalidate), so re-query the toggle until
+    // the switch takes effect.
+    await waitFor(() => {
+      fireEvent.click(screen.getByTestId("matrix-mode-within-case"));
+      expect(screen.getByTestId("matrix-mode-within-case")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
     await waitFor(() => {
       expect(screen.getByTestId("matrix-mode-cross-case")).toHaveAttribute(
         "aria-pressed",
@@ -287,8 +286,8 @@ describe("F-PR7 — the five-zone shell serves the Relationship Matrix", () => {
 
   it("the matrix temporal note narrates the SHARED timeRange (zone 4)", async () => {
     renderControlCenter("matrix", undefined, jan2024);
-    // Re-query the note each poll — it keeps its testid while loading but can
-    // briefly remount while the matrix refetches.
+    // Re-query the note each poll — it keeps its testid while loading and stays
+    // mounted across refetches (stale-while-revalidate).
     await waitFor(
       () =>
         expect(screen.getByTestId("matrix-temporal-note")).toHaveTextContent(
