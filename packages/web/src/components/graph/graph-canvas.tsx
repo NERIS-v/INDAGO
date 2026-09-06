@@ -725,6 +725,20 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
 
               const nodeDelay = Math.max(0, Math.hypot(nx - cx, ny - cy) * 1.5) || 0;
 
+              // F-PR14: the node group DIM is floor-clamped. Previously the
+              // multiplicative chain dropped a simultaneously hover-dimmed +
+              // focus-receded body to 0.05 opacity — effectively invisible, so
+              // edge strokes rendered straight through the node. The body must
+              // stay composited above the edge layer: attention signals ride
+              // the rings/labels instead of collapsing the body into a hole.
+              const stateDim = hoverDimmed
+                ? focusRecede
+                  ? 0.35
+                  : 0.4
+                : focusRecede
+                  ? 0.65
+                  : 1;
+
               return (
                 <g
                   key={node.id}
@@ -745,7 +759,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   data-graph-case-scope={vs.caseScope}
                   data-graph-attention-level={String(vs.attentionLevel)}
                   data-graph-node-posture={vs.evidencePosture}
-                  style={{ opacity: (!inTimeRange ? 0 : hoverDimmed ? 0.1 : bloom ? 1 : 0) * (pos ? pos.alpha : 1) * (focusRecede ? 0.5 : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
+                  style={{ opacity: (!inTimeRange ? 0 : bloom ? stateDim : 0) * (pos ? pos.alpha : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
                 >
                   {vs.evidencePosture === "contradicted" && (
                     <circle
@@ -816,7 +830,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   <text
                     x={lx} y={ly} textAnchor={textAnchor} paintOrder="stroke fill"
                     className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${isActive && inTimeRange ? "fill-semantic-selection font-bold" : isForeign ? "fill-semantic-foreign font-bold drop-shadow-[0_0_4px_var(--color-semantic-foreign)]" : "fill-semantic-foreground-muted font-medium"}`}
-                    style={{ opacity: (!inTimeRange ? 0 : hoveredNode !== null && !isActive ? 0.05 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
+                    style={{ opacity: (!inTimeRange ? 0 : hoveredNode !== null && !isActive ? 0.3 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
                   >
                     {node.label}
                   </text>
