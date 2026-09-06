@@ -59,6 +59,35 @@ export function InvestigationOverview({
   dataRef.current = data;
   const connectedOnceRef = useRef(false);
 
+  // F-PR15 briefing signals — derived ONLY from genuinely loaded list data.
+  // "Unavailable" (null) is distinct from "no data" (0). These memos run on
+  // EVERY render (above the loading/error guards) so hook order never changes
+  // between the guarded and fully-loaded paths.
+  const signals = useMemo(() => {
+    const outstandingGapStatuses = ["IDENTIFIED", "ACKNOWLEDGED", "WORKING"];
+    const inPursuitLeadStatuses = ["NEW", "UNDER_REVIEW", "ACTIVE"];
+    if (!data) return { openGaps: null, activeLeads: null };
+    return {
+      openGaps: data.gaps === null
+        ? null
+        : data.gaps.filter((g) => outstandingGapStatuses.includes(g.status)).length,
+      activeLeads: data.leads === null
+        ? null
+        : data.leads.filter((l) => inPursuitLeadStatuses.includes(l.status)).length,
+    };
+  }, [data?.gaps, data?.leads]);
+
+  const nextActions = useMemo(() => {
+    if (!data) return [];
+    const base = investigationUrl(data.investigation.id, data.investigation.caseId);
+    return [
+      { label: "Review outstanding gaps", value: signals.openGaps, href: `${base}/gaps` },
+      { label: "Review potential leads", value: signals.activeLeads, href: `${base}/leads` },
+      { label: "Inspect evidence", href: `${base}/evidence` },
+      { label: "Test hypothesis", href: `${base}/hypothesis` },
+    ];
+  }, [data, signals]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -157,31 +186,6 @@ export function InvestigationOverview({
   if (!data) return null;
 
   const { investigation } = data;
-
-  // F-PR15 briefing signals — derived ONLY from genuinely loaded list data.
-  // "Unavailable" (null) is distinct from "no data" (0).
-  const signals = useMemo(() => {
-    const outstandingGapStatuses = ["IDENTIFIED", "ACKNOWLEDGED", "WORKING"];
-    const inPursuitLeadStatuses = ["NEW", "UNDER_REVIEW", "ACTIVE"];
-    return {
-      openGaps: data.gaps === null
-        ? null
-        : data.gaps.filter((g) => outstandingGapStatuses.includes(g.status)).length,
-      activeLeads: data.leads === null
-        ? null
-        : data.leads.filter((l) => inPursuitLeadStatuses.includes(l.status)).length,
-    };
-  }, [data.gaps, data.leads]);
-
-  const nextActions = useMemo(() => {
-    const base = investigationUrl(investigation.id, investigation.caseId);
-    return [
-      { label: "Review outstanding gaps", value: signals.openGaps, href: `${base}/gaps` },
-      { label: "Review potential leads", value: signals.activeLeads, href: `${base}/leads` },
-      { label: "Inspect evidence", href: `${base}/evidence` },
-      { label: "Test hypothesis", href: `${base}/hypothesis` },
-    ];
-  }, [investigation.id, investigation.caseId, signals]);
 
   const stat = (value: number | null) =>
     value === null
