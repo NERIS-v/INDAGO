@@ -1,7 +1,6 @@
 "use client";
 
 import { ReviewCenter, type ReviewTaskMock } from "@/components/intel/review-center";
-import { Badge } from "@/components/ui/badge";
 
 const DEMO_TASKS: ReviewTaskMock[] = [
   {
@@ -22,35 +21,28 @@ const DEMO_TASKS: ReviewTaskMock[] = [
 
 export default function ReviewPage() {
   return (
-    <div className="relative mx-auto max-w-6xl space-y-8 p-8 animate-fade-in">
-      
-      {/* TACTICAL PAGE HEADER */}
-      <header className="space-y-4 border-b border-surface-200/50 pb-6">
-        <div className="flex flex-col gap-1">
-          <span className="type-mono-small text-warning font-bold uppercase tracking-widest">
-            System Module // Human-In-The-Loop
-          </span>
-          
-          <div className="flex flex-wrap items-center gap-4 mt-1">
-            <h1 className="text-3xl font-light text-surface-900 tracking-tight">
-              Review Center
-            </h1>
-            <Badge variant="warning" dot className="bg-warning/10 border-warning/30 backdrop-blur-md text-surface-900">
-              Authorization Required
-            </Badge>
+    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
+      <div className="mx-auto max-w-[1080px]">
+        <header className="border-b border-semantic-border-subtle pb-8">
+          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+            <span>Oversight</span>
+            <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
+            <span>Human in the loop</span>
           </div>
-        </div>
-        
-        <p className="text-sm text-surface-700 max-w-3xl leading-relaxed font-sans">
-          Critical juncture points where autonomous inference sequences require explicit human authorization before mutating the canonical case graph or requesting external data.
-        </p>
-      </header>
+          <h1 className="mt-4 font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+            Review center
+          </h1>
+          <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+            Juncture points where autonomous inference requires explicit human
+            authorization before mutating the canonical case graph or requesting
+            external data.
+          </p>
+        </header>
 
-      {/* MAIN MODULE MOUNT */}
-      <div className="w-full">
-        <ReviewCenter initialTasks={DEMO_TASKS} />
+        <div className="flex w-full flex-col pt-6">
+          <ReviewCenter initialTasks={DEMO_TASKS} />
+        </div>
       </div>
-      
     </div>
   );
 }

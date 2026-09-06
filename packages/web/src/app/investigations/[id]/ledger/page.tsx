@@ -1,7 +1,6 @@
 "use client";
 
 import { ReasoningLedger, type LedgerEventMock } from "@/components/intel/reasoning-ledger";
-import { Badge } from "@/components/ui/badge";
 
 const DEMO_LEDGER: LedgerEventMock[] = [
   {
@@ -41,32 +40,26 @@ const DEMO_LEDGER: LedgerEventMock[] = [
 
 export default function LedgerPage() {
   return (
-    <div className="relative mx-auto max-w-6xl space-y-8 p-8 animate-fade-in">
-      {/* TACTICAL PAGE HEADER */}
-      <header className="space-y-4 border-b border-surface-200/50 pb-6">
-        <div className="flex flex-col gap-1">
-          <span className="type-mono-small text-accent-rose font-bold uppercase tracking-widest">
-            Audit Trail // Chain of Custody
-          </span>
-
-          <div className="flex flex-wrap items-center gap-4 mt-1">
-            <h1 className="text-3xl font-light text-surface-900 tracking-tight">
-              Reasoning Ledger
-            </h1>
-            <Badge variant="accent" dot className="bg-accent-rose/10 border-accent-rose/30 backdrop-blur-md">
-              Append-Only Ledger
-            </Badge>
+    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
+      <div className="mx-auto max-w-[1080px]">
+        <header className="border-b border-semantic-border-subtle pb-8">
+          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+            <span>Traceability</span>
+            <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
+            <span>Chain of custody</span>
           </div>
+          <h1 className="mt-4 font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+            Reasoning ledger
+          </h1>
+          <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+            Immutable audit record of autonomous inference, anomaly resolution, and
+            investigator intervention across the lifetime of this case.
+          </p>
+        </header>
+
+        <div className="flex w-full flex-col pt-6">
+          <ReasoningLedger events={DEMO_LEDGER} />
         </div>
-
-        <p className="text-sm text-surface-700 max-w-3xl leading-relaxed font-sans">
-          Immutable audit record tracing autonomous inference sequences, anomaly resolutions, and investigator interventions across the lifetime of this case.
-        </p>
-      </header>
-
-      {/* MAIN MODULE MOUNT */}
-      <div className="w-full">
-        <ReasoningLedger events={DEMO_LEDGER} />
       </div>
     </div>
   );

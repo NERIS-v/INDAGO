@@ -1,42 +1,31 @@
 "use client";
 
 import { CrossCaseSignals } from "@/components/intel/cross-case-signals";
-import { Badge } from "@/components/ui/badge";
 
 export default function CrossCasePage() {
   return (
-    <div className="relative mx-auto max-w-6xl space-y-8 p-8 animate-fade-in">
-      
-      {/* TACTICAL PAGE HEADER */}
-      <header className="space-y-4 border-b border-surface-200/50 pb-6">
-        <div className="flex flex-col gap-1">
-          {/* Eyebrow Label */}
-          <span className="type-mono-small text-accent-blue font-bold uppercase tracking-widest">
-            System Module // Boundary Analysis
-          </span>
-          
-          {/* Main Title & Status */}
-          <div className="flex items-center gap-4 mt-1">
-            <h1 className="text-3xl font-light text-surface-900 tracking-tight">
-              Cross-Case Signals
-            </h1>
-            <Badge variant="info" dot className="bg-info/10 border-info/30 backdrop-blur-md">
-              Global Scan Active
-            </Badge>
+    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
+      <div className="mx-auto max-w-[1080px]">
+        <header className="border-b border-semantic-border-subtle pb-8">
+          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+            <span>Analysis</span>
+            <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
+            <span>Comparative</span>
           </div>
-        </div>
-        
-        {/* Module Description */}
-        <p className="text-sm text-surface-700 max-w-3xl leading-relaxed font-sans">
-          INDAGO autonomously correlates entities, communication channels, and financial infrastructure in this investigation against the global case registry. Candidates below represent potential overlaps with isolated operations.
-        </p>
-      </header>
+          <h1 className="mt-4 font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+            Cross-case signals
+          </h1>
+          <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+            Potential overlaps between this investigation and the global case
+            registry — entities, communication channels, and financial infrastructure
+            that recur across otherwise-isolated operations.
+          </p>
+        </header>
 
-      {/* MAIN MODULE MOUNT */}
-      <div className="w-full">
-        <CrossCaseSignals />
+        <div className="flex w-full flex-col pt-6">
+          <CrossCaseSignals />
+        </div>
       </div>
-      
     </div>
   );
 }
