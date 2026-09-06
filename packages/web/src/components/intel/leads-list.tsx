@@ -1,8 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-
 export interface LeadMock {
   id: string;
   claim: string;
@@ -21,60 +18,77 @@ interface LeadsListProps {
   loading?: boolean;
 }
 
+const STATUS_META: Record<LeadMock["status"], { label: string; className: string }> = {
+  REVIEW: { label: "Under review", className: "text-semantic-warning border-semantic-warning/30 bg-semantic-warning/5" },
+  AUTHORIZED: { label: "Authorized", className: "text-semantic-accent border-semantic-accent/30 bg-semantic-accent/5" },
+  REJECTED: { label: "Rejected", className: "text-semantic-foreground-faint border-semantic-border bg-semantic-surface" },
+};
+
 export function LeadsList({ leads, onSelectLead, loading }: LeadsListProps) {
   if (loading) {
-    return <div className="animate-pulse space-y-3 p-4">Loading leads...</div>;
+    return <div className="flex items-center justify-center py-16 font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">Loading leads...</div>;
   }
 
   if (!leads.length) {
     return (
-      <div className="flex h-40 w-full items-center justify-center rounded-lg border border-surface-200/60 bg-surface-50 p-5">
-        <span className="text-xs text-surface-500">
-          No leads yet. Leads emerge as evidence is processed and analyzed.
-        </span>
+      <div className="rounded-lg border border-dashed border-semantic-border px-6 py-10 text-center">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+          No leads yet
+        </p>
+        <p className="mt-2 text-sm text-semantic-foreground-faint">
+          Leads emerge as evidence is processed and analyzed.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 p-4">
+    <div>
       {leads.map((lead, i) => (
         <button
           key={lead.id}
           onClick={() => onSelectLead(lead.id)}
-          className="group w-full animate-fade-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          className="w-full border-b border-semantic-border-subtle py-6 text-left transition-colors duration-fast hover:bg-semantic-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-rose rounded-lg px-2 -mx-2"
           style={{ animationDelay: `${i * 40}ms` }}
         >
-          <Card className="border-surface-200/60 bg-surface-50 p-5 transition-colors duration-fast hover:border-brand-500/20 hover:bg-surface-100">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1.5">
-                {/* Visual Hierarchy 1: Lead Statement */}
-                <h3 className="font-sans text-sm font-medium text-surface-800 leading-snug">
-                  {lead.claim}
-                </h3>
-                
-                {/* Visual Hierarchy 2: Confidence / Signals */}
-                <div className="flex items-center gap-3 font-mono text-xs text-brand-500">
-                  <span>Confidence: {(lead.confidence * 100).toFixed(0)}%</span>
-                  <span className="text-surface-400">·</span>
-                  <span className="text-surface-600">Signal: {lead.structuralSignal}</span>
-                  <span className="text-surface-400">·</span>
-                  <span className="text-surface-600">Coverage: {(lead.coverage * 100).toFixed(0)}%</span>
-                </div>
-
-                {/* Visual Hierarchy 3: Evidence Context */}
-                <div className="mt-2 flex items-center gap-3 text-[11px] uppercase tracking-widest text-surface-500">
-                  <span>{lead.supportCount} Supporting</span>
-                  <span className="text-surface-300">|</span>
-                  <span>{lead.againstCount} Against</span>
-                </div>
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-semantic-foreground-faint">
+                <span>{String(i + 1).padStart(2, "0")}</span>
+                <span className="h-px w-4 bg-semantic-border-subtle" aria-hidden="true" />
+                <span>Signal {lead.structuralSignal}</span>
+                <span className="h-px w-4 bg-semantic-border-subtle" aria-hidden="true" />
+                <span>Relevance {lead.relevance}</span>
               </div>
 
-              <Badge variant={lead.status === "REVIEW" ? "warning" : "muted"} dot>
-                {lead.status}
-              </Badge>
+              <p className="mt-3 text-[1.0625rem] font-light leading-relaxed text-semantic-foreground">
+                {lead.claim}
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] text-semantic-foreground-faint">
+                <span>
+                  <span className="font-bold uppercase tracking-widest">Confidence </span>
+                  {(lead.confidence * 100).toFixed(0)}%
+                </span>
+                <span>
+                  <span className="font-bold uppercase tracking-widest">Coverage </span>
+                  {(lead.coverage * 100).toFixed(0)}%
+                </span>
+                <span>
+                  <span className="font-bold uppercase tracking-widest">Support </span>
+                  {lead.supportCount}
+                </span>
+                <span>
+                  <span className="font-bold uppercase tracking-widest">Against </span>
+                  {lead.againstCount}
+                </span>
+              </div>
             </div>
-          </Card>
+
+            <span className={`shrink-0 rounded-full border px-2.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest ${STATUS_META[lead.status].className}`}>
+              {STATUS_META[lead.status].label}
+            </span>
+          </div>
         </button>
       ))}
     </div>

@@ -99,6 +99,14 @@
   --color-semantic-foreign: #7f92a3;
   --color-semantic-attention: #c79a8f;
   --color-semantic-attention-subtle: #c79a8f26;
+
+  /* — semantic status tokens (maps to accent palette) ------------------------- */
+  --color-semantic-accent: #c98f8a;
+  --color-semantic-accent-subtle: #c98f8a24;
+  --color-semantic-warning: #b0906a;
+  --color-semantic-warning-subtle: #b0906a24;
+  --color-semantic-info: #728ca3;
+  --color-semantic-info-subtle: #728ca324;
 }
 
 /* ============================================================================
