@@ -9,8 +9,6 @@ import {
   EvidenceIntake,
   type EvidenceIntakeSubmitRequest,
 } from "@/components/evidence/evidence-intake";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { triggerOrQueueUploadSequence } from "@/components/graph/graph-live";
 
 export default function EvidencePage() {
@@ -59,32 +57,60 @@ export default function EvidencePage() {
   );
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="type-title text-text-primary">Evidence</h1>
-        <Badge variant="muted">Evidence Items</Badge>
-      </div>
+    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
+      <div className="mx-auto max-w-[1080px]">
+        <header className="border-b border-semantic-border-subtle pb-8">
+          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+            <span>Materials</span>
+            <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
+            <span>Source workspace</span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+              Evidence
+            </h1>
+            {items !== null && !loading && (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                {String(items.length).padStart(2, "0")} catalogued
+              </span>
+            )}
+          </div>
+          <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+            Source material submitted to this investigation. Each item is
+            ingested and processed into the canonical observation set.
+          </p>
+        </header>
 
-      <Card>
-        <CardHeader className="border-b border-border-subtle px-6 py-4">
-          <CardTitle>Add Evidence</CardTitle>
-        </CardHeader>
-        <div className="p-6">
-          <EvidenceIntake
-            evidence={workspace.evidence}
-            investigationId={workspace.investigationId}
-            caseId={workspace.caseId}
-            onSubmitEvidence={handleSubmit}
-            onComplete={() => undefined}
-          />
-        </div>
-      </Card>
+        <section className="pt-10">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              Submit evidence
+            </span>
+            <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+          </div>
+          <div className="mt-5 rounded-lg border border-semantic-border-subtle bg-semantic-surface p-6">
+            <EvidenceIntake
+              evidence={workspace.evidence}
+              investigationId={workspace.investigationId}
+              caseId={workspace.caseId}
+              onSubmitEvidence={handleSubmit}
+              onComplete={() => undefined}
+            />
+          </div>
+        </section>
 
-      <Card>
-        <CardHeader className="border-b border-border-subtle px-6 py-4">
-          <CardTitle>Evidence in this investigation</CardTitle>
-        </CardHeader>
-        <div className="p-6">
+        <section className="pt-10">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              Catalogued evidence
+            </span>
+            <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+            {items !== null && !loading && (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                {String(items.length).padStart(2, "0")}
+              </span>
+            )}
+          </div>
           <EvidenceList
             items={items}
             loading={loading}
@@ -92,8 +118,8 @@ export default function EvidencePage() {
             unavailable={unavailable}
             onRetry={() => void load()}
           />
-        </div>
-      </Card>
+        </section>
+      </div>
     </div>
   );
 }

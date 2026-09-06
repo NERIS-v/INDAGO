@@ -62,7 +62,7 @@ export function EvidenceList({
   }
 
   return (
-    <ul className="space-y-3">
+    <ul>
       {items.map((evidence, i) => (
         <EvidenceItem key={`${evidence.id}-${i}`} evidence={evidence} index={i} />
       ))}

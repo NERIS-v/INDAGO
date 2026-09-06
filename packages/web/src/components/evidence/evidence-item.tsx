@@ -1,35 +1,36 @@
 "use client";
 
 import type { EvidenceListItem } from "@/lib/api/types";
-import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
 
-function statusBadge(status: EvidenceListItem["status"]): {
-  variant: BadgeVariant;
-  pulse: boolean;
-} {
-  switch (status) {
-    case "INGESTED":
-      return { variant: "accent", pulse: true };
-    case "PROCESSING":
-      return { variant: "accent", pulse: true };
-    case "PROCESSED":
-      return { variant: "info", pulse: false };
-    case "UNDER_REVIEW":
-      return { variant: "warning", pulse: false };
-    case "VERIFIED":
-      return { variant: "success", pulse: false };
-    case "REJECTED":
-      return { variant: "danger", pulse: false };
-    case "ARCHIVED":
-      return { variant: "muted", pulse: false };
-  }
-}
+const STATUS_TEXT: Record<EvidenceListItem["status"], string> = {
+  INGESTED: "INGESTED",
+  PROCESSING: "PROCESSING",
+  PROCESSED: "PROCESSED",
+  UNDER_REVIEW: "UNDER REVIEW",
+  VERIFIED: "VERIFIED",
+  REJECTED: "REJECTED",
+  ARCHIVED: "ARCHIVED",
+};
+
+const STATUS_CLASS: Record<EvidenceListItem["status"], string> = {
+  INGESTED: "text-accent-rose border-accent-rose/30 bg-accent-rose/5",
+  PROCESSING: "text-accent-rose border-accent-rose/30 bg-accent-rose/5",
+  PROCESSED: "text-accent-blue border-accent-blue/30 bg-accent-blue/5",
+  UNDER_REVIEW: "text-accent-amber border-accent-amber/30 bg-accent-amber/5",
+  VERIFIED: "text-semantic-foreground border-semantic-border bg-semantic-surface",
+  REJECTED: "text-semantic-contradiction border-semantic-contradiction/30 bg-semantic-contradiction/5",
+  ARCHIVED: "text-semantic-foreground-faint border-semantic-border bg-semantic-surface",
+};
 
 function formatEventTime(value: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
-  return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).toUpperCase();
 }
 
 interface EvidenceItemProps {
@@ -38,44 +39,60 @@ interface EvidenceItemProps {
 }
 
 export function EvidenceItem({ evidence, index = 0 }: EvidenceItemProps) {
-  const badge = statusBadge(evidence.status);
   return (
-    <li
-      className="flex flex-col gap-3 rounded-xl border border-border-standard bg-surface-50 p-4 transition-colors duration-fast hover:border-border-emphasis"
-      style={{ transform: `rotate(${[0, -0.5, 0.5, -0.25, 0.75][index % 5]}deg)` }}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-text-strong">{evidence.title}</p>
+    <li className="border-b border-semantic-border-subtle py-6">
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-semantic-foreground-faint">
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <span className="h-px w-4 bg-semantic-border-subtle" aria-hidden="true" />
+            <span className="text-accent-amber">{evidence.type}</span>
+          </div>
+
+          <p className="mt-3 text-[1.0625rem] font-light leading-relaxed text-semantic-foreground">
+            {evidence.title}
+          </p>
           {evidence.description && (
-            <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">
+            <p className="mt-1 line-clamp-2 max-w-[70ch] text-sm text-semantic-foreground-muted">
               {evidence.description}
             </p>
           )}
-        </div>
-        <Badge variant={badge.variant} dot dotPulse={badge.pulse}>
-          {evidence.status}
-        </Badge>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Badge variant="muted">{evidence.type}</Badge>
-        {evidence.strength !== undefined && (
-          <ConfidenceIndicator value={evidence.strength} label="Strength" />
-        )}
-        <span className="type-mono-small text-text-muted">
-          {evidence.artifactIds.length} file
-          {evidence.artifactIds.length === 1 ? "" : "s"}
-        </span>
-        {evidence.observedAt && (
-          <span className="type-mono-small text-text-muted">
-            Observed {formatEventTime(evidence.observedAt.value)}
-          </span>
-        )}
-        <span className="type-mono-small ml-auto text-text-faint">
-          src:{evidence.sourceRef}
-        </span>
-      </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] text-semantic-foreground-faint">
+            {evidence.observedAt && (
+              <span>
+                <span className="font-bold uppercase tracking-widest">Observed </span>
+                {formatEventTime(evidence.observedAt.value)}
+              </span>
+            )}
+            {evidence.artifactIds.length > 0 && (
+              <span>
+                <span className="font-bold uppercase tracking-widest">Files </span>
+                {evidence.artifactIds.length}
+              </span>
+            )}
+            {evidence.observationCount !== undefined && (
+              <span>
+                <span className="font-bold uppercase tracking-widest">Observations </span>
+                {evidence.observationCount}
+              </span>
+            )}
+            {evidence.strength !== undefined && (
+              <span className="flex items-center gap-2">
+                <span className="font-bold uppercase tracking-widest">Strength</span>
+                <ConfidenceIndicator value={evidence.strength} showBar />
+              </span>
+            )}
+          </div>
+
+          <p className="mt-3 font-mono text-[9px] text-semantic-foreground-faint">
+            src:{evidence.sourceRef}
+          </p>
+        </div>
+
+        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest ${STATUS_CLASS[evidence.status]}`}>
+          {STATUS_TEXT[evidence.status]}
+        </span>      </div>
     </li>
   );
 }
