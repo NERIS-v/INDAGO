@@ -863,9 +863,17 @@ export function GraphPanel({
                 investigationId={workspace.investigationId} 
                 evidence={workspace.evidence} 
                 onSubmitEvidence={async (request) => {
+                  // F-PR14 (Phase 5): the DEMO ingestion choreography only
+                  // starts AFTER the provider accepts the submission. Firing
+                  // it fire-and-forget ahead of the await would keep playing
+                  // simulated events even when submit() rejects — a fabricated
+                  // success. A rejected submit surfaces the provider error to
+                  // the intake (retry) and never plays the sequence.
+                  await workspace.evidence.submit(
+                    workspace.investigationId,
+                    request,
+                  );
                   triggerOrQueueUploadSequence(workspace.realtime);
-                  workspace.evidence.submit(workspace.investigationId, request).catch(console.error);
-                  return Promise.resolve();
                 }}
                 onComplete={() => publish({ uploadOpen: false })} 
               />
