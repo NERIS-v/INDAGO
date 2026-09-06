@@ -190,7 +190,7 @@ describe("PR-1 — navigation module (shared WORKSPACE_NAV + route helpers)", ()
     expect(WORKSPACE_NAV.map((n) => n.label)).toEqual([
       "Dashboard",
       "Overview",
-      "Graph",
+      "Network",
       "Timeline",
       "Observations",
       "Leads",

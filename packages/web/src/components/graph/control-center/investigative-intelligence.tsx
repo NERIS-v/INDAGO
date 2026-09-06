@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { IntelligenceTab } from "@/lib/layout/control-center";
+import type { ReactNode } from "react";
 import type { InvestigativeContext } from "@/lib/context/investigative-context";
 import { IntelligenceOverview } from "./intelligence/intelligence-overview";
 import { IntelligenceHypotheses } from "./intelligence/intelligence-hypotheses";
@@ -29,6 +30,11 @@ interface InvestigativeIntelligenceProps {
   context?: InvestigativeContext | null;
   /** Re-materialize a canonical selection through the shell (single owner). */
   onSelectContext: (ctx: InvestigativeContext) => void;
+  /** F-PR6 ADDITIVE representation adapter slot: rendered above the Overview
+   *  tab content when a representation supplies one. Absent (any graph-railed
+   *  representation) → the tab body is unchanged. The Zone 5 shell itself is
+   *  NOT redesigned for representations. */
+  adapterSlot?: ReactNode;
 }
 
 const TABS: { id: IntelligenceTab; label: string }[] = [
@@ -46,13 +52,14 @@ export function InvestigativeIntelligence({
   onTabChange,
   context = null,
   onSelectContext,
+  adapterSlot,
 }: InvestigativeIntelligenceProps) {
   return (
     <section
       aria-label="Investigative intelligence"
-      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-surface-200/60 bg-surface-50/60 shadow-sm backdrop-blur-md"
+      className="cc-panel flex min-h-0 flex-col overflow-hidden"
     >
-      <header className="flex shrink-0 items-center justify-between border-b border-surface-200/50 bg-surface-50/80 px-3 py-0">
+      <header className="cc-panel-header flex shrink-0 items-center justify-between px-3 py-0">
         <div
           role="tablist"
           aria-label="Investigative intelligence tabs"
@@ -77,10 +84,10 @@ export function InvestigativeIntelligence({
                   onTabChange(next.id);
                   document.getElementById(`intel-tab-${next.id}`)?.focus();
                 }}
-                className={`rounded-t-lg border-b-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                className={`rounded-t-lg border-b-2 px-3 py-2 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
                   active
-                    ? "border-brand-500 text-surface-900"
-                    : "border-transparent text-surface-400 hover:text-surface-700"
+                    ? "border-semantic-selection text-semantic-foreground"
+                    : "border-transparent text-semantic-foreground-faint hover:text-semantic-foreground"
                 }`}
               >
                 {t.label}
@@ -88,7 +95,7 @@ export function InvestigativeIntelligence({
             );
           })}
         </div>
-        <span className="pr-3 text-[9px] font-mono uppercase tracking-[0.2em] text-surface-400">
+        <span className="pr-3 text-[9px] font-mono uppercase tracking-[0.2em] text-semantic-foreground-faint">
           Intelligence
         </span>
       </header>
@@ -99,7 +106,12 @@ export function InvestigativeIntelligence({
         aria-labelledby={`intel-tab-${tab}`}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        {tab === "overview" ? (
+        {tab === "overview" && adapterSlot ? (
+          <div className="flex flex-col gap-3 p-3">
+            {adapterSlot}
+            <IntelligenceOverview context={context} />
+          </div>
+        ) : tab === "overview" ? (
           <IntelligenceOverview context={context} />
         ) : tab === "hypotheses" ? (
           <IntelligenceHypotheses context={context} onSelectContext={onSelectContext} />

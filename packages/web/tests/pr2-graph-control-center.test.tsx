@@ -149,7 +149,7 @@ describe("PR-2 — initial five-zone layout", () => {
     expect((await screen.findAllByText("MILESTONES")).length).toBeGreaterThan(0);
     fireEvent.click(within(temporalTabs()).getByRole("tab", { name: "Versions" }));
     expect(screen.queryByText("MILESTONES")).not.toBeInTheDocument();
-    expect(screen.getByText(/Graph version list, historical view, and replay/)).toBeInTheDocument();
+    expect(screen.getByText("Graph versions")).toBeInTheDocument();
     fireEvent.click(within(temporalTabs()).getByRole("tab", { name: "Time" }));
     expect((await screen.findAllByText("MILESTONES")).length).toBeGreaterThan(0);
   });

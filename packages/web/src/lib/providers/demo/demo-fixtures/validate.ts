@@ -81,6 +81,7 @@ export function validateDemoFixtures(): ValidationReport {
     ["reviewTasks", demoFixtures.reviewTasks, ReviewTaskSchema],
     ["graphNodes", demoFixtures.graphNodes, GraphNodeSchema],
     ["graphEdges", demoFixtures.graphEdges, GraphEdgeSchema],
+    ["graphVersions", demoFixtures.graphVersions, GraphVersionSchema],
     ["crossCase", demoFixtures.crossCase, CrossCaseMatchSchema],
     ["candidates", demoFixtures.candidates, EntityMentionCandidateSchema],
     ["candidatePairs", demoFixtures.candidatePairs, CandidatePairSchema],

@@ -46,7 +46,7 @@ export function PanelToggle({
         aria-controls={controlsId}
         aria-label={label}
         title={`Open ${label}`}
-        className="flex h-full w-full items-center justify-center text-surface-400 transition-colors hover:bg-surface-100/60 hover:text-surface-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        className="flex h-full w-full items-center justify-center text-semantic-foreground-faint transition-colors hover:bg-semantic-surface-elevated hover:text-semantic-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
       >
         <span aria-hidden className="text-sm">{glyph}</span>
       </button>
@@ -63,7 +63,7 @@ export function PanelToggle({
       aria-controls={controlsId}
       aria-label={expandedActionLabel}
       title={expandedActionLabel}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-semantic-foreground-faint transition-colors hover:bg-semantic-surface-elevated hover:text-semantic-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
     >
       <span aria-hidden className="text-xs">{glyph}</span>
     </button>

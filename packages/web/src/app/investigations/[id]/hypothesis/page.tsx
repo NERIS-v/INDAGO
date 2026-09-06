@@ -1,4 +1,4 @@
-import { HypothesisEngine } from "@/components/intel/hypothesis-engine";
+import { HypothesisWorkspace } from "@/components/intel/hypothesis-workspace";
 
 interface PageProps {
   params: Promise<{
@@ -8,11 +8,11 @@ interface PageProps {
 
 export default async function HypothesisPage({ params }: PageProps) {
   // In Next.js 15, params must be awaited
-  const resolvedParams = await params;
-  
+  await params;
+
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto">
-      <HypothesisEngine investigationId={resolvedParams.id} />
+      <HypothesisWorkspace />
     </div>
   );
 }

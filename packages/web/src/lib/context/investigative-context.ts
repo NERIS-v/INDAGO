@@ -40,9 +40,12 @@ export type ContextSource =
   | "context-panel"
   | "intelligence"
   | "rail"
+  | "matrix"
+  | "flow"
   | "deep-link"
   | "drawer"
-  | "external";
+  | "external"
+  | "authority";
 
 /** The canonical investigative selection. `null` = nothing selected. */
 export interface InvestigativeContext {
@@ -75,6 +78,8 @@ export const CONTEXT_SOURCES: readonly ContextSource[] = [
   "context-panel",
   "intelligence",
   "rail",
+  "matrix",
+  "flow",
   "deep-link",
   "drawer",
   "external",

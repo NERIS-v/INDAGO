@@ -53,6 +53,21 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
   const [timeline, setTimeline] = useState<InvestigationTimeline | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [rangePct, setRangePct] = useState<[number, number]>([0, 100]);
+  // True once the restored-scope seed has COMMITTED (see seed effect below). The
+  // debounce effect gates on this state (not a ref) so the mount-default
+  // [0,100] can never schedule a publish in the same effect pass the seed runs:
+  // a ref would already be flipped by the time the debounce effect reads it,
+  // letting a stale full-range timer fire ahead of the seeded window.
+  const [restoredSeeded, setRestoredSeeded] = useState(false);
+  // The debounce callback must never publish a STALE rangePct. On a restored
+  // mount the seed projects the shared scope into rangePct in the same pass an
+  // earlier debounce could be scheduled from the mount-default [0,100]; if that
+  // 50ms timer fires before the effect cleanup cancels it, the full range would
+  // be published briefly ahead of the seeded window. The callback reads the ref
+  // (latest committed value), so a pending publish always carries the current
+  // temporal scope, never the mount-time default.
+  const rangePctRef = useRef<[number, number]>(rangePct);
+  rangePctRef.current = rangePct;
   const [isPlaying, setIsPlaying] = useState(false);
   const [hoverItem, setHoverItem] = useState<{ x: number; label: string; time: string; kind: TimelineBand["kind"] } | null>(null);
   
@@ -62,6 +77,14 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
   const lastPlayApplyRef = useRef(0);
   const hasRestored = restoredTimeRange !== undefined && restoredTimeRange !== null;
   const restoredAppliedRef = useRef(false);
+  // Regression (PR-6 §T): a fresh mount must NOT auto-publish a window. Before
+  // the timeline resolves, domain is the fallback [now-90d, now]; publishing
+  // even the "full" [0,100] selection maps to that fallback epoch window, which
+  // excludes every historical node (all case data predates it) -> the graph
+  // renders with every node out-of-range until the analyst presses play. The
+  // workspace temporal scope stays null ("current status of everything") until
+  // a real restore is applied or the analyst explicitly drags/plays/scrubs.
+  const hasInteractedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -154,14 +177,16 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
       clamp(((restoredTimeRange![0] - domain.start) / span) * 100),
       clamp(((restoredTimeRange![1] - domain.start) / span) * 100),
     ]);
+    setRestoredSeeded(true);
   }, [hasRestored, timeline, domain, restoredTimeRange]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (hasRestored && !restoredAppliedRef.current) return;
-    debounceRef.current = setTimeout(() => applyRange(rangePct), 50);
+    if (hasRestored && !restoredSeeded) return;
+    if (!hasRestored && !hasInteractedRef.current) return;
+    debounceRef.current = setTimeout(() => applyRange(rangePctRef.current), 50);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [rangePct, applyRange, hasRestored]);
+  }, [rangePct, applyRange, hasRestored, restoredSeeded]);
 
   const spanD = domain.end - domain.start;
   const itemTimes = timeline ? timeline.items.map((it) => new Date(it.time).getTime()).filter((t) => !Number.isNaN(t)) : [];
@@ -174,6 +199,7 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
   }, []);
 
   const startPlay = useCallback(() => {
+    hasInteractedRef.current = true;
     const startTime = performance.now();
     const targetEnd = nowPct;
 
@@ -212,6 +238,7 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
       let newPct = ((moveEvent.clientX - rect.left) / rect.width) * 100;
       newPct = Math.max(0, Math.min(100, newPct));
 
+      hasInteractedRef.current = true;
       setRangePct((prev) => {
         const newRange = [...prev] as [number, number];
         newRange[index] = newPct;
@@ -457,8 +484,8 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
                 style={{ left: `${rangePct[index]}%` }}
                 onPointerDown={handleDrag(index as 0 | 1)}
                 onKeyDown={(e) => {
-                  if (e.key === "ArrowLeft") setRangePct((p) => index === 0 ? [Math.max(0, p[0] - 1), p[1]] : [p[0], Math.max(p[0] + 1, p[1] - 1)]);
-                  if (e.key === "ArrowRight") setRangePct((p) => index === 0 ? [Math.min(p[1] - 1, p[0] + 1), p[1]] : [p[0], Math.min(100, p[1] + 1)]);
+                  if (e.key === "ArrowLeft") { hasInteractedRef.current = true; setRangePct((p) => index === 0 ? [Math.max(0, p[0] - 1), p[1]] : [p[0], Math.max(p[0] + 1, p[1] - 1)]); }
+                  if (e.key === "ArrowRight") { hasInteractedRef.current = true; setRangePct((p) => index === 0 ? [Math.min(p[1] - 1, p[0] + 1), p[1]] : [p[0], Math.min(100, p[1] + 1)]); }
                 }}
               >
                 {/* Visual Drag Handle */}

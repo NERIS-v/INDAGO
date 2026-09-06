@@ -38,13 +38,46 @@ import {
 } from "@/lib/network/network-workspace";
 import type { NetworkView } from "@/lib/network/network-workspace";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PanelErrorBoundary } from "@/components/ui/panel-error-boundary";
 import { ControlCenterLayout } from "./control-center-layout";
 import { OperationalRail } from "./operational-rail";
 import { ContextualPanel } from "./contextual-panel";
+import { ContextualPanelFooter } from "./contextual-panel-footer";
 import { TemporalContextPanel } from "./temporal-context-panel";
+import {
+  CURRENT_VERSION_SELECTION,
+  isHistoricalView,
+  type TemporalVersionSelection,
+} from "@/lib/context/temporal-workspace";
 import { InvestigativeIntelligence } from "./investigative-intelligence";
+import { PulsePanel } from "./pulse/pulse-panel";
+import { PulseRail } from "./pulse/pulse-rail";
+import { PulseContextSummary } from "./pulse/pulse-context-summary";
+import { PulseTemporalNote } from "./pulse/pulse-temporal-note";
+import { PulseIntelligenceInsight } from "./pulse/pulse-intelligence-insight";
+import { RepresentationSwitcher } from "./representation-switcher";
+import { presentationFor } from "@/lib/network/representations";
+import { useEntityPulseAnalysis } from "@/lib/network/pulse/use-entity-pulse";
 import { GraphPanel } from "@/components/graph/graph-panel";
 import { TimelinePanel } from "@/components/timeline/timeline-panel";
+import { useMatrixAnalysis } from "@/lib/network/matrix/use-matrix";
+import type { MatrixAuthStep, MatrixMode } from "@/lib/network/matrix/matrix-model";
+import { MatrixPanel } from "./matrix/matrix-panel";
+import { MatrixRail } from "./matrix/matrix-rail";
+import { MatrixContextSummary } from "./matrix/matrix-context-summary";
+import { MatrixTemporalNote } from "./matrix/matrix-temporal-note";
+import { MatrixIntelligenceInsight } from "./matrix/matrix-intelligence-insight";
+import { useFlowAnalysis } from "@/lib/network/flow/use-flow-analysis";
+import type { FlowDomain, FlowRoleFilter } from "@/lib/network/flow/flow-model";
+import { FlowPanel } from "./flow/flow-panel";
+import { FlowRail } from "./flow/flow-rail";
+import { FlowContextSummary } from "./flow/flow-context-summary";
+import { FlowTemporalNote } from "./flow/flow-temporal-note";
+import { FlowIntelligenceInsight } from "./flow/flow-intelligence-insight";
+import {
+  investigationUrl,
+  NETWORK_ENTITY_PARAM,
+} from "@/lib/workspace/url";
 
 type ActionKey = ControlCenterSurfaceKey;
 
@@ -60,6 +93,10 @@ interface GraphControlCenterProps {
    *  workspace state seam can serialize ?focus= (null = clear). SELECT is NOT
    *  FOCUS: this is only wired to the deliberate rail Focus and to clearing. */
   onFocusEntityChange?: (entityId: string | null) => void;
+  /** F-PR6 seam: reports Zone 2 representation changes so the workspace state
+   *  seam can serialize ?view=. Absent → the representation switcher is hidden
+   *  and behavior is unchanged (tests / standalone renders stay stable). */
+  onNetworkViewChange?: (view: NetworkView) => void;
   /** F-PR5 seam: the shared workspace temporal scope to restore across remount
    *  so a returning route does not silently reset the timeline to full range. */
   restoredTimeRange?: [number, number] | null;
@@ -71,15 +108,140 @@ export function GraphControlCenter({
   initialFocusNodeId,
   activeNetworkView,
   onFocusEntityChange,
+  onNetworkViewChange,
   restoredTimeRange,
 }: GraphControlCenterProps) {
   const workspace = useWorkspace();
 
   const view = activeNetworkView ?? DEFAULT_NETWORK_VIEW;
 
+  // F-PR6: the pulse renders only when the effective workspace mode can serve
+  // it (DEMO / AUTO-demo). In a LIVE workspace (or any mode where the typed
+  // resolution is "not-ready") the shell renders the honest typed pane instead
+  // of the representation. Read from the capability table — never branch on
+  // Demo/Live implementations here.
+  const pulseServed =
+    workspace.capabilities["network.pulse"] !== "not-ready";
+  // F-PR7: same gate for the Cross-Case / Relationship matrix.
+  const matrixServed =
+    workspace.capabilities["network.matrix"] !== "not-ready";
+  // F-PR8: same gate for the Adaptive Flow representation.
+  const flowServed =
+    workspace.capabilities["network.flow"] !== "not-ready";
+  const availability = {
+    graph: workspace.capabilities["network.graph"],
+    pulse: workspace.capabilities["network.pulse"],
+    matrix: workspace.capabilities["network.matrix"],
+    flow: workspace.capabilities["network.flow"],
+  } as const;
+
   const [layout, setLayout] = useState<ControlCenterLayoutState>(DEFAULT_LAYOUT_STATE);
   const [actions, setActions] = useState<GraphControlCenterActions>(DEFAULT_ACTIONS);
   const [foreignOverlays, setForeignOverlays] = useState<ForeignCaseOverlay[]>([]);
+
+  // PR-10: the temporal version selection is SHELL-owned (lifted out of
+  // TemporalContextPanel) so the contextual-panel authority footer can be gated
+  // honestly — a historical selection must never permit a mutation that would
+  // apply to the live graph while the analyst believes they are editing history.
+  const [temporalSelection, setTemporalSelection] = useState<TemporalVersionSelection>(
+    CURRENT_VERSION_SELECTION,
+  );
+  const historicalView = isHistoricalView(temporalSelection);
+
+  // PR-8: post-mutation canonical-graph refetch nonce. A relation-authority
+  // decision reconciles the projection in the provider store; bumping this
+  // nonce makes GraphPanel refetch version/nodes/edges so the change renders.
+  const [graphReloadRequest, setGraphReloadRequest] = useState<{ nonce: number } | null>(null);
+  const requestGraphReload = useCallback(
+    () => setGraphReloadRequest((prev) => ({ nonce: (prev?.nonce ?? 0) + 1 })),
+    [],
+  );
+
+  // F-PR6 corrective pass: the five-zone shell GEOMETRY is fixed; what adapts
+  // per representation is zone CONTENT, resolved by a typed presentation model
+  // — never scattered `view === "pulse"` checks in this shell.
+  const presentation = useMemo(
+    () => presentationFor(view, pulseServed, matrixServed, flowServed),
+    [view, pulseServed, matrixServed, flowServed],
+  );
+
+  // ONE shell-owned Entity Pulse analysis shared by every supporting zone
+  // (rail, panel, context, temporal note, intelligence adapter). Provider
+  // fetches are strictly gated to the pulse representation — graph mode never
+  // triggers pulse fetches.
+  const pulse = useEntityPulseAnalysis({
+    enabled: presentation.zoneTwo === "pulse",
+    timeRange: activeTimeRange,
+    overlays: foreignOverlays,
+  });
+
+  // F-PR7: ONE shell-owned Matrix analysis shared by every supporting zone
+  // (rail, panel, context, temporal note, intelligence adapter). Provider
+  // fetches are strictly gated to the matrix representation — graph/pulse
+  // modes never trigger matrix fetches.
+  const [matrixMode, setMatrixMode] = useState<MatrixMode>("cross-case");
+  const [matrixBoundary, setMatrixBoundary] = useState<string | null>(null);
+  const [matrixAuth, setMatrixAuth] = useState<
+    Readonly<Record<string, MatrixAuthStep>>
+  >({});
+  const authorizedBoundaries = useMemo(
+    () =>
+      Object.entries(matrixAuth)
+        .filter(
+          (entry): entry is [string, "authorized"] =>
+            entry[1] === "authorized",
+        )
+        .map(([caseId]) => caseId),
+    [matrixAuth],
+  );
+
+  const matrix = useMatrixAnalysis({
+    enabled: presentation.zoneTwo === "matrix",
+    timeRange: activeTimeRange,
+    overlays: foreignOverlays,
+    mode: matrixMode,
+    boundaryCaseId: matrixBoundary,
+    authorizedBoundaries,
+  });
+
+  // F-PR8: ONE shell-owned Flow analysis shared by every supporting zone
+  // (rail, panel, context, temporal note, intelligence adapter). Provider
+  // fetches are strictly gated to the flow representation — graph/pulse/
+  // matrix modes never trigger flow fetches.
+  const [flowMode, setFlowMode] = useState<FlowDomain | null>(null);
+  const [flowRoleFilter, setFlowRoleFilter] = useState<FlowRoleFilter>("all");
+
+  const flow = useFlowAnalysis({
+    enabled: presentation.zoneTwo === "flow",
+    timeRange: activeTimeRange,
+    mode: flowMode,
+    roleFilter: flowRoleFilter,
+  });
+
+  // F-PR7: when no boundary has been chosen yet, the picker
+  // deterministically follows the boundary the model resolved (the first
+  // comparison candidate in provider order). A ready meta can transiently
+  // report a null boundary until the provider surfaces (foreign overlays /
+  // match records) land, so the follow ALSO latches the first option the
+  // model can resolve. If the model still resolves nothing on the current
+  // frame, re-poll briefly — the surfaces can settle a beat later, and the
+  // picker must never sit empty while comparison candidates exist (the
+  // refetch cascade can otherwise wedge it). Switching to within-case keeps
+  // the analyst's choice for when they toggle back.
+  const matrixMeta = matrix.meta;
+  const [boundaryRetry, setBoundaryRetry] = useState(0);
+  useEffect(() => {
+    if (matrixBoundary !== null) return;
+    const resolvedBoundary =
+      matrixMeta?.boundaryCaseId ?? matrix.boundaryOptions[0]?.caseId ?? null;
+    if (resolvedBoundary !== null) {
+      setMatrixBoundary(resolvedBoundary);
+      return;
+    }
+    if (!matrixMeta || boundaryRetry >= 20) return;
+    const t = setTimeout(() => setBoundaryRetry((n) => n + 1), 50);
+    return () => clearTimeout(t);
+  }, [matrixMeta, matrix.boundaryOptions, matrixBoundary, boundaryRetry]);
 
   // PR-3: the canonical selection owner lives HERE, never inside a panel.
   const { context, select, focus, reveal } = useInvestigativeContext();
@@ -208,6 +370,69 @@ export function GraphControlCenter({
     [reveal, updateLayout],
   );
 
+  // F-PR6: "Open in Graph" hands a pulse entity to the EXISTING graph focus
+  // seam — switch the representation to graph, rematerialize the selection and
+  // request the deterministic camera focus (same path as the rail Focus).
+  const openEntityInGraph = useCallback(
+    (entityId: string) => {
+      onNetworkViewChange?.("graph");
+      const next: InvestigativeContext = {
+        kind: "entity",
+        id: entityId,
+        source: "graph",
+      };
+      select(next);
+      setFocusRequest((prev) => ({
+        nonce: (prev?.nonce ?? 0) + 1,
+        entityId,
+      }));
+      onFocusEntityChange?.(entityId);
+    },
+    [onNetworkViewChange, select, onFocusEntityChange],
+  );
+
+  // F-PR7: "Open in Pulse" hands a matrix row entity to the Entity Pulse seam
+  // — switch the representation to pulse and rematerialize the selection so
+  // the pulse panel highlights the entity (no camera seam — pulse/zoom are
+  // graph-only).
+  const openEntityInPulse = useCallback(
+    (entityId: string) => {
+      onNetworkViewChange?.("pulse");
+      select({ kind: "entity", id: entityId, source: "matrix" });
+    },
+    [onNetworkViewChange, select],
+  );
+
+  // F-PR7: "View Evidence" deep-links to the evidence surface preserving
+  // ?caseId= and appending ?entity=<row> so the surface opens pre-filtered.
+  // A plain anchor — the matrix cone never intercepts navigation.
+  const viewEvidenceHref = useCallback(
+    (entityId: string) => {
+      const base = investigationUrl(
+        workspace.investigationId,
+        workspace.caseId,
+        "observations",
+      );
+      const sep = base.includes("?") ? "&" : "?";
+      return `${base}${sep}${NETWORK_ENTITY_PARAM}=${encodeURIComponent(entityId)}`;
+    },
+    [workspace.investigationId, workspace.caseId],
+  );
+
+  // F-PR7: pure frontend cross-case authorization (idle → confirming →
+  // authorized), mirrored from the cross-case signals seam. Beginning the
+  // flow only ever flips the review step; the actual candidate reveal happens
+  // when the analyst confirms.
+  const beginAuthorize = useCallback((caseId: string) => {
+    setMatrixAuth((prev) => ({ ...prev, [caseId]: "confirming" }));
+  }, []);
+  const confirmAuthorize = useCallback((caseId: string) => {
+    setMatrixAuth((prev) => ({ ...prev, [caseId]: "authorized" }));
+  }, []);
+  const cancelAuthorize = useCallback((caseId: string) => {
+    setMatrixAuth((prev) => ({ ...prev, [caseId]: "idle" }));
+  }, []);
+
   // PR-3 UX: graph clicks REMATERIALIZE the selection with reveal semantics —
   // clicking a node/gap while the right panel is collapsed reopens it. The
   // one exception: re-clicking the SAME object while the panel is still open
@@ -253,60 +478,198 @@ export function GraphControlCenter({
         onToggleLeft={toggleLeft}
         onToggleRight={toggleRight}
         rail={
-          <OperationalRail
-            open={layout.leftRailOpen}
-            onToggle={toggleLeft}
-            actions={actions}
-            onActionToggle={toggleAction}
-            onActionsChange={handleActionsChange}
-            foreignOverlays={foreignOverlays}
-            capabilities={capabilities}
-            context={context}
-            mode={workspace.mode}
-            filter={actions.filter}
-            onFilterChange={(next) => updateActions({ filter: next })}
-            onFocus={() => {
-              if (context) focusContext(context);
-            }}
-          />
-        }
-        graph={
-          view === "graph" ? (
-            <div className="relative h-full w-full min-h-0 min-w-0">
-              <GraphPanel
-                activeTimeRange={activeTimeRange}
-                initialFocusNodeId={initialFocusNodeId}
-                actions={actions}
-                onActionsChange={handleActionsChange}
-                foreignOverlays={foreignOverlays}
-                onContextSelect={handleGraphContextSelect}
-                selectedContext={context}
-                focusRequest={focusRequest}
-                filter={actions.filter}
-              />
-            </div>
+          presentation.zoneOne === "matrix-rail" ? (
+            <MatrixRail
+              open={layout.leftRailOpen}
+              onToggle={toggleLeft}
+              meta={matrix}
+              mode={matrixMode}
+              onModeChange={setMatrixMode}
+              boundaryCaseId={matrixBoundary}
+              onBoundaryChange={setMatrixBoundary}
+              authByBoundary={matrixAuth}
+              onBeginAuthorize={beginAuthorize}
+              onConfirmAuthorize={confirmAuthorize}
+              onCancelAuthorize={cancelAuthorize}
+              context={context}
+              onOpenInGraph={onNetworkViewChange ? openEntityInGraph : undefined}
+              onClearSelection={clearSelection}
+            />
+          ) : presentation.zoneOne === "flow-rail" ? (
+            <FlowRail
+              open={layout.leftRailOpen}
+              onToggle={toggleLeft}
+              meta={flow}
+              mode={flowMode}
+              onModeChange={setFlowMode}
+              roleFilter={flowRoleFilter}
+              onRoleFilterChange={setFlowRoleFilter}
+              context={context}
+              onOpenInGraph={onNetworkViewChange ? openEntityInGraph : undefined}
+              onClearSelection={clearSelection}
+            />
+          ) : presentation.zoneOne === "pulse-rail" ? (
+            <PulseRail
+              open={layout.leftRailOpen}
+              onToggle={toggleLeft}
+              overview={pulse}
+              context={context}
+              onOpenInGraph={onNetworkViewChange ? openEntityInGraph : undefined}
+              onClearSelection={clearSelection}
+            />
           ) : (
-            <div className="flex h-full w-full min-h-0 min-w-0 flex-col items-center justify-center p-6">
-              <EmptyState
-                title={`${networkViewLabel(view)} is not yet available`}
-                description="This representation is declared in the workspace state seam but has no implementation yet. Its zone will render here once the representation ships. Switch back to the Network view to continue."
-              />
-            </div>
+            <OperationalRail
+              open={layout.leftRailOpen}
+              onToggle={toggleLeft}
+              actions={actions}
+              onActionToggle={toggleAction}
+              onActionsChange={handleActionsChange}
+              foreignOverlays={foreignOverlays}
+              capabilities={capabilities}
+              context={context}
+              mode={workspace.mode}
+              filter={actions.filter}
+              onFilterChange={(next) => updateActions({ filter: next })}
+              onFocus={() => {
+                if (context) focusContext(context);
+              }}
+              onChallenge={() => {
+                // PR-8: the rail Challenge command is the ENTRY to the
+                // relation-authority workflow — reveal the relation context so
+                // the authority panel (footer slot) is visible. Fresh object
+                // identity re-resolves the context details.
+                if (context?.kind === "relation") {
+                  revealContext({ kind: "relation", id: context.id, source: "rail" });
+                }
+              }}
+            />
           )
         }
+        graph={
+          <div className="relative h-full w-full min-h-0 min-w-0">
+            {/* F-PR6: minimal Zone 2 representation switcher. Hidden when the
+                caller does not supply the workspace view seam (unchanged for
+                existing callers and PR-2/PR-3 tests). */}
+            {onNetworkViewChange && (
+              <RepresentationSwitcher
+                current={view}
+                onChange={onNetworkViewChange}
+                availability={availability}
+              />
+            )}
+            {presentation.zoneTwo === "graph" ? (
+              <div className="relative h-full w-full min-h-0 min-w-0">
+                <GraphPanel
+                  activeTimeRange={activeTimeRange}
+                  initialFocusNodeId={initialFocusNodeId}
+                  actions={actions}
+                  onActionsChange={handleActionsChange}
+                  foreignOverlays={foreignOverlays}
+                  onContextSelect={handleGraphContextSelect}
+                  selectedContext={context}
+                  focusRequest={focusRequest}
+                  filter={actions.filter}
+                  graphReloadRequest={graphReloadRequest}
+                />
+              </div>
+            ) : presentation.zoneTwo === "matrix" ? (
+              <MatrixPanel
+                meta={matrix}
+                mode={matrixMode}
+                context={context}
+                onSelectContext={handleGraphContextSelect}
+                onOpenInGraph={openEntityInGraph}
+                onOpenPulse={openEntityInPulse}
+                onRequestAuthorization={beginAuthorize}
+              />
+            ) : presentation.zoneTwo === "flow" ? (
+              <FlowPanel
+                meta={flow}
+                context={context}
+                onSelectContext={handleGraphContextSelect}
+                onOpenInGraph={openEntityInGraph}
+              />
+            ) : presentation.zoneTwo === "pulse" ? (
+              <PulsePanel
+                overview={pulse}
+                context={context}
+                onSelectContext={handleGraphContextSelect}
+                focusEntityId={initialFocusNodeId}
+                onOpenInGraph={openEntityInGraph}
+              />
+            ) : (
+              <div className="flex h-full w-full min-h-0 min-w-0 flex-col items-center justify-center p-6">
+                <EmptyState
+                  title={`${networkViewLabel(view)} is not yet available`}
+                  description="This representation is declared in the workspace state seam but has no implementation yet in this mode. Its zone will render here once the representation ships. Switch back to the Network view to continue."
+                />
+              </div>
+            )}
+          </div>
+        }
         context={
-          <ContextualPanel
-            open={layout.rightPanelOpen}
-            onToggle={toggleRight}
-            context={context}
-            onSelectContext={revealContext}
-          />
+          presentation.zoneThree === "graph-context" ? (
+            <PanelErrorBoundary label="Contextual panel">
+              <ContextualPanel
+                open={layout.rightPanelOpen}
+                onToggle={toggleRight}
+                context={context}
+                onSelectContext={revealContext}
+                footerSlot={
+                  <ContextualPanelFooter
+                    context={context}
+                    onReselect={revealContext}
+                    onReloadRequest={requestGraphReload}
+                    historical={historicalView}
+                  />
+                }
+              />
+            </PanelErrorBoundary>
+          ) : presentation.zoneThree === "matrix-context" ? (
+            <MatrixContextSummary
+              open={layout.rightPanelOpen}
+              onToggle={toggleRight}
+              meta={matrix}
+              context={context}
+              mode={matrixMode}
+              onOpenInGraph={openEntityInGraph}
+              onOpenPulse={openEntityInPulse}
+              viewEvidenceHref={viewEvidenceHref}
+            />
+          ) : presentation.zoneThree === "flow-context" ? (
+            <FlowContextSummary
+              open={layout.rightPanelOpen}
+              onToggle={toggleRight}
+              meta={flow}
+              context={context}
+              onOpenInGraph={openEntityInGraph}
+            />
+          ) : (
+            <PulseContextSummary
+              open={layout.rightPanelOpen}
+              onToggle={toggleRight}
+              overview={pulse}
+              context={context}
+              onOpenInGraph={openEntityInGraph}
+            />
+          )
         }
         temporal={
           <TemporalContextPanel
             tab={layout.temporalTab}
             onTabChange={(tab) => updateLayout({ temporalTab: tab })}
+            selection={temporalSelection}
+            onSelectionChange={setTemporalSelection}
           >
+            {presentation.zoneFourNote === "matrix" && (
+              <MatrixTemporalNote meta={matrix} context={context} />
+            )}
+            {presentation.zoneFourNote === "flow" && (
+              <FlowTemporalNote meta={flow} />
+            )}
+            {presentation.zoneFourNote === "pulse" && (
+              <PulseTemporalNote overview={pulse} />
+            )}
             <TimelinePanel
               onTimeRangeChange={onTimeRangeChange}
               onEventActivate={handleTimelineActivate}
@@ -315,12 +678,23 @@ export function GraphControlCenter({
           </TemporalContextPanel>
         }
         intelligence={
-          <InvestigativeIntelligence
-            tab={layout.intelligenceTab}
-            onTabChange={(tab) => updateLayout({ intelligenceTab: tab })}
-            context={context}
-            onSelectContext={revealContext}
-          />
+          <PanelErrorBoundary label="Intelligence">
+            <InvestigativeIntelligence
+              tab={layout.intelligenceTab}
+              onTabChange={(tab) => updateLayout({ intelligenceTab: tab })}
+              context={context}
+              onSelectContext={revealContext}
+              adapterSlot={
+                presentation.zoneFive === "matrix"
+                  ? <MatrixIntelligenceInsight meta={matrix} />
+                  : presentation.zoneFive === "flow"
+                    ? <FlowIntelligenceInsight meta={flow} />
+                    : presentation.zoneFive === "pulse"
+                      ? <PulseIntelligenceInsight overview={pulse} />
+                      : undefined
+              }
+            />
+          </PanelErrorBoundary>
         }
       />
     </div>

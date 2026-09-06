@@ -46,7 +46,7 @@ import { operationFinancialShadowLeads } from "./leads";
 import { operationFinancialShadowGaps } from "./gaps";
 import { operationFinancialShadowEvidenceRequests } from "./evidence-requests";
 import { operationFinancialShadowReviewTasks } from "./review-tasks";
-import { operationFinancialShadowGraph } from "./graph";
+import { operationFinancialShadowGraph, operationFinancialShadowVersions } from "./graph";
 import { operationFinancialShadowTimeline } from "./timeline";
 import { operationFinancialShadowCrossCase } from "./cross-case";
 import { operationFinancialShadowRobustness } from "./robustness";
@@ -75,6 +75,7 @@ export interface DemoFixtureSet {
   evidenceRequests: EvidenceRequest[];
   reviewTasks: ReviewTask[];
   graphVersion: GraphVersion;
+  graphVersions: GraphVersion[];
   graphNodes: GraphNode[];
   graphEdges: GraphEdge[];
   timeline: InvestigationTimeline;
@@ -105,6 +106,7 @@ export const demoFixtures: DemoFixtureSet = {
   evidenceRequests: operationFinancialShadowEvidenceRequests,
   reviewTasks: operationFinancialShadowReviewTasks,
   graphVersion: operationFinancialShadowGraph.version,
+  graphVersions: operationFinancialShadowVersions,
   graphNodes: operationFinancialShadowGraph.nodes,
   graphEdges: operationFinancialShadowGraph.edges,
   timeline: operationFinancialShadowTimeline,

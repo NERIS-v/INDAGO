@@ -89,12 +89,13 @@ export const CAPABILITY_AVAILABILITY: Record<
   hypotheses: { demo: true, live: false },
   crossCase: { demo: true, live: false },
   // ---- Network representations --------------------------------------------
-  // "graph" is implemented (demo); the future representations are declared but
-  // NOT READY in either mode — no fake/incomplete visualization is ever shown.
+  // "graph", "entity pulse", "cross-case matrix" AND "adaptive flow" are
+  // implemented (demo); LIVE serving stays typed-unsupported (never
+  // fabricated).
   "network.graph": { demo: true, live: false },
-  "network.pulse": { demo: false, live: false },
-  "network.matrix": { demo: false, live: false },
-  "network.flow": { demo: false, live: false },
+  "network.pulse": { demo: true, live: false },
+  "network.matrix": { demo: true, live: false },
+  "network.flow": { demo: true, live: false },
 };
 
 /**

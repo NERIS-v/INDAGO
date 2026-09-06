@@ -61,6 +61,8 @@ export const REL_5 = "b1e0c9a6-0000-4000-8000-000000000055";
 export const REL_6 = "b1e0c9a6-0000-4000-8000-000000000056";
 
 // Graph version / nodes / edges --------------------------------------------
+export const GRAPH_VERSION_V1 = "b1e0c9a6-0000-4000-8000-00000000005e";
+export const GRAPH_VERSION_V2 = "b1e0c9a6-0000-4000-8000-00000000005f";
 export const GRAPH_VERSION = "b1e0c9a6-0000-4000-8000-000000000060";
 export const GN_VICTOR = "b1e0c9a6-0000-4000-8000-000000000071";
 export const GN_MARIA = "b1e0c9a6-0000-4000-8000-000000000072";

@@ -95,11 +95,11 @@ function ObjectRow({
       data-context-slice-object
       data-object-kind={kind}
       onClick={() => onSelect({ kind, id, source: "context-panel" })}
-      className="flex w-full items-baseline justify-between gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-surface-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      className="flex w-full items-baseline justify-between gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-semantic-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
     >
-      <span className="min-w-0 truncate text-[12px] font-medium text-surface-800">{title}</span>
+      <span className="min-w-0 truncate text-[12px] font-medium text-semantic-foreground">{title}</span>
       {detail && (
-        <span className="shrink-0 text-[10px] font-mono text-surface-400">{detail}</span>
+        <span className="shrink-0 text-[10px] font-mono text-semantic-foreground-faint">{detail}</span>
       )}
     </button>
   );
@@ -107,7 +107,7 @@ function ObjectRow({
 
 function UnavailableRow() {
   return (
-    <p className="px-2.5 py-1.5 text-[11px] italic text-surface-400" data-context-slice-unavailable>
+    <p className="px-2.5 py-1.5 text-[11px] italic text-semantic-foreground-faint" data-context-slice-unavailable>
       Unavailable in this data mode
     </p>
   );
@@ -115,7 +115,7 @@ function UnavailableRow() {
 
 function EmptyRow() {
   return (
-    <p className="px-2.5 py-1.5 text-[11px] text-surface-400" data-context-slice-empty>
+    <p className="px-2.5 py-1.5 text-[11px] text-semantic-foreground-faint" data-context-slice-empty>
       None
     </p>
   );

@@ -310,6 +310,12 @@ class UnsupportedGraphProvider implements GraphProvider {
   getVersion(): Promise<never> {
     return providerUnsupported("graph.getVersion");
   }
+  listVersions(): Promise<Paginated<never>> {
+    return providerUnsupportedPaginated("graph.listVersions");
+  }
+  getVersionById(): Promise<never> {
+    return providerUnsupported("graph.getVersionById");
+  }
   getNodes(): Promise<Paginated<never>> {
     return providerUnsupportedPaginated("graph.getNodes");
   }
@@ -330,6 +336,15 @@ class UnsupportedRelationProvider implements RelationProvider {
   }
   get(): Promise<never> {
     return providerUnsupported("relations.get");
+  }
+  accept(): Promise<never> {
+    return providerUnsupported("relations.accept");
+  }
+  reject(): Promise<never> {
+    return providerUnsupported("relations.reject");
+  }
+  reverse(): Promise<never> {
+    return providerUnsupported("relations.reverse");
   }
 }
 
@@ -360,6 +375,15 @@ class UnsupportedIntelligenceProvider implements IntelligenceProvider {
   }
   getArtifact(): Promise<never> {
     return providerUnsupported("intelligence.getArtifact");
+  }
+  testHypothesis(): Promise<never> {
+    return providerUnsupported("intelligence.testHypothesis");
+  }
+  recordHypothesisDecision(): Promise<never> {
+    return providerUnsupported("intelligence.recordHypothesisDecision");
+  }
+  listHypothesisDecisions(): Promise<never> {
+    return providerUnsupported("intelligence.listHypothesisDecisions");
   }
 }
 

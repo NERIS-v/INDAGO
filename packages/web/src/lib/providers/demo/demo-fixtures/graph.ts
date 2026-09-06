@@ -19,7 +19,7 @@
 import { GraphVersionSchema, GraphNodeSchema, GraphEdgeSchema } from "@indago/contracts";
 import type { GraphVersion, GraphNode, GraphEdge } from "@indago/contracts";
 import {
-  GRAPH_VERSION, INVESTIGATION_ID,
+  GRAPH_VERSION, GRAPH_VERSION_V1, GRAPH_VERSION_V2, INVESTIGATION_ID,
   GN_VICTOR, GN_MARIA, GN_SHELL_ONE, GN_SHELL_TWO, GN_BANK, GN_WITNESS,
   GE_1, GE_2, GE_3, GE_4, GE_5, GE_6,
   REL_1, REL_2, REL_3, REL_4, REL_5, REL_6,
@@ -38,6 +38,48 @@ const versionData: GraphVersion = {
   createdAt: obs("2024-06-15"),
   updatedAt: obs("2024-06-28"),
 };
+
+// PR-7: the deterministic version SERIES the demo surfaces through
+// GraphProvider.listVersions. v1/v2 are SUPERSEDED (historic, immutable); v3 is
+// the ACTIVE projection the graph actually renders. Ever-increasing
+// versionNumber matches the platform's ascending enumeration.
+const versionSeriesData: GraphVersion[] = [
+  {
+    id: GRAPH_VERSION_V1,
+    investigationId: INVESTIGATION_ID,
+    versionNumber: 1,
+    status: "SUPERSEDED",
+    projectionStatus: "COMPLETE",
+    nodeCount: 3,
+    edgeCount: 2,
+    createdAt: obs("2023-11-05"),
+    updatedAt: obs("2024-02-05"),
+  },
+  {
+    id: GRAPH_VERSION_V2,
+    investigationId: INVESTIGATION_ID,
+    versionNumber: 2,
+    status: "SUPERSEDED",
+    projectionStatus: "COMPLETE",
+    nodeCount: 5,
+    edgeCount: 4,
+    parentGraphVersionId: GRAPH_VERSION_V1,
+    createdAt: obs("2024-02-05"),
+    updatedAt: obs("2024-06-10"),
+  },
+  {
+    id: GRAPH_VERSION,
+    investigationId: INVESTIGATION_ID,
+    versionNumber: 3,
+    status: "ACTIVE",
+    projectionStatus: "COMPLETE",
+    nodeCount: 6,
+    edgeCount: 6,
+    parentGraphVersionId: GRAPH_VERSION_V2,
+    createdAt: obs("2024-06-15"),
+    updatedAt: obs("2024-06-28"),
+  },
+];
 
 const nodes: GraphNode[] = [
   {
@@ -138,3 +180,7 @@ export const operationFinancialShadowGraph = {
   nodes: nodes.map((n) => GraphNodeSchema.parse(n)),
   edges: edges.map((e) => GraphEdgeSchema.parse(e)),
 };
+
+/** Historical version series surfaced by GraphProvider.listVersions (ascending). */
+export const operationFinancialShadowVersions: GraphVersion[] =
+  versionSeriesData.map((v) => GraphVersionSchema.parse(v));

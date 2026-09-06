@@ -9,8 +9,17 @@ function GraphTabContent() {
   // by the shared Network workspace state (mounted at the workspace boundary),
   // so they survive sub-route navigation and are two-way URL-synced. The page
   // no longer keeps page-local copies that would reset on every visit.
-  const { timeRange, setTimeRange, focusEntityId, setFocusEntityId } =
-    useNetworkWorkspace();
+  // F-PR6: the active Zone 2 representation is the same shared state — the
+  // page reports ?view= mutations through it so representations survive
+  // refresh and back/forward.
+  const {
+    activeNetworkView,
+    setActiveNetworkView,
+    timeRange,
+    setTimeRange,
+    focusEntityId,
+    setFocusEntityId,
+  } = useNetworkWorkspace();
 
   return (
     <div className="h-full w-full min-h-0 overflow-hidden">
@@ -19,6 +28,8 @@ function GraphTabContent() {
         onTimeRangeChange={setTimeRange}
         initialFocusNodeId={focusEntityId}
         onFocusEntityChange={setFocusEntityId}
+        activeNetworkView={activeNetworkView}
+        onNetworkViewChange={setActiveNetworkView}
         restoredTimeRange={timeRange}
       />
     </div>

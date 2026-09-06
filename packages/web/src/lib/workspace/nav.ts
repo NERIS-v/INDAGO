@@ -24,7 +24,9 @@ export interface NavEntry {
 export const WORKSPACE_NAV: readonly NavEntry[] = [
   { label: "Dashboard", href: "/" },
   { label: "Overview", href: "" },
-  { label: "Graph", href: "graph" },
+  // F-PR6: the parent network destination is labelled NETWORK; its five-zone
+  // shell serves the selected representation (Graph / Pulse / Matrix / Flow).
+  { label: "Network", href: "graph" },
   { label: "Timeline", href: "timeline" },
   { label: "Observations", href: "observations" },
   { label: "Leads", href: "leads" },
