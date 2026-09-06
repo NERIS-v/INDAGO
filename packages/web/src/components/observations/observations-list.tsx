@@ -68,15 +68,16 @@ export function ObservationsList({
   }
 
   return (
-    <ul className="space-y-3">
-      {items.map((observation) => (
+    <div>
+      {items.map((observation, idx) => (
         <ObservationItem
           key={observation.id}
           observation={observation}
+          index={idx}
           contradictions={contradictionsById?.get(observation.id) ?? []}
           onSelect={onSelectObservation}
         />
       ))}
-    </ul>
+    </div>
   );
 }

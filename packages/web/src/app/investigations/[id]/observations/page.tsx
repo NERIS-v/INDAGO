@@ -6,10 +6,6 @@ import { useWorkspace } from "@/lib/providers/workspace/context";
 import { toProviderError } from "@/lib/providers";
 import type { Observation } from "@indago/contracts";
 import { ObservationsList } from "@/components/observations/observations-list";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { SectionHeading } from "@/components/ui/section-heading";
 import { IntelligenceDetailPanel } from "@/components/intelligence/intelligence-detail-panel";
 import { EntityResolutionPanel } from "@/components/intelligence/entity-resolution-panel";
 import type {
@@ -244,69 +240,158 @@ function ObservationsContent() {
   const selectedResolution =
     selection?.kind === "resolution" ? selection.resolutionId : null;
 
+  const obsLookup = useMemo(() => {
+    const map = new Map<string, Observation>();
+    for (const o of filteredItems) map.set(o.id, o);
+    return map;
+  }, [filteredItems]);
+
   return (
-    <div className="space-y-6 p-6">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-surface-500">
-          <span>Intelligence</span>
-          <span className="h-px w-8 bg-surface-200" aria-hidden="true" />
-          <span>Canonical feed</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="type-title text-text-primary">Observations</h1>
-          <Badge variant="muted">Canonical Observations</Badge>
-          {entityFilter && (
-            <Badge variant="info" dot>
-              filtered to entity {entityFilter.slice(0, 8)}
-            </Badge>
-          )}
-          {!contradictionsUnavailable && relevantContradictions.length > 0 && (
-            <Badge variant="danger" dot>
-              {relevantContradictions.length} contradiction
-              {relevantContradictions.length === 1 ? "" : "s"}
-            </Badge>
-          )}
-        </div>
-      </div>
+    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
+      <div className="mx-auto max-w-[1080px]">
 
-      {/* Hide the contradiction block entirely if there are none for the current filter */}
-      {!contradictionsUnavailable && relevantContradictions.length > 0 && (
-        <Card>
-          <div className="border-b border-border-subtle px-6 py-4">
-            <SectionHeading overline="Conflict surface" title="Detected contradictions" />
+        {/* ── HEADER ──────────────────────────────────────────────────── */}
+        <header className="border-b border-semantic-border-subtle pb-8">
+          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+            <span>Intelligence</span>
+            <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
+            <span>Canonical feed</span>
           </div>
-          <div className="flex flex-col gap-3 p-6">
-            {relevantContradictions.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-lg border border-danger/30 bg-danger/5 p-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <Badge variant="danger" dot>
-                    {c.contradictionType.replace(/_/g, " ")}
-                  </Badge>
-                  <Button
-                    variant="quiet"
-                    size="sm"
-                    onClick={() =>
-                      setSelection({ kind: "observation", observationId: c.leftObservationId })
-                    }
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+              Observations
+            </h1>
+            {entityFilter && (
+              <span className="rounded-full border border-semantic-accent/30 bg-semantic-accent/5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-semantic-accent">
+                Filtered to entity {entityFilter.slice(0, 8)}
+              </span>
+            )}
+            {!contradictionsUnavailable && relevantContradictions.length > 0 && (
+              <span className="rounded-full border border-semantic-contradiction/30 bg-semantic-contradiction/5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-semantic-contradiction">
+                {relevantContradictions.length} contradiction{relevantContradictions.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
+          <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+            Observations extracted from evidence in this investigation. Each entry
+            is a canonical statement derived from source material.
+          </p>
+        </header>
+
+        {/* ── CONTRADICTION COMPARISON ─────────────────────────────────── */}
+        {!contradictionsUnavailable && relevantContradictions.length > 0 && (
+          <section className="pt-10">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+                Conflict surface
+              </span>
+              <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+            </div>
+            <p className="mt-3 text-[0.9375rem] text-semantic-foreground-muted">
+              Contradictions represent explicit conflicts between observations that
+              cannot both be true. Each pair below surfaces a direct factual
+              inconsistency.
+            </p>
+            <div className="mt-6 space-y-8">
+              {relevantContradictions.map((c) => {
+                const leftObs = obsLookup.get(c.leftObservationId);
+                const rightObs = obsLookup.get(c.rightObservationId);
+                return (
+                  <div
+                    key={c.id}
+                    className="rounded-lg border border-semantic-contradiction/20 bg-semantic-contradiction/[0.03] p-6"
                   >
-                    Open observations
-                  </Button>
-                </div>
-                <p className="mt-2 text-sm text-text-strong">{c.description}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+                    <div className="flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-semantic-contradiction">
+                      <span>{c.contradictionType.replace(/_/g, " ")}</span>
+                      {c.strength !== undefined && (
+                        <>
+                          <span className="h-px w-4 bg-semantic-contradiction/20" aria-hidden="true" />
+                          <span>strength {c.strength.toFixed(2)}</span>
+                        </>
+                      )}
+                    </div>
 
-      <Card>
-        <div className="border-b border-border-subtle px-6 py-4">
-          <SectionHeading overline="Canonical feed" title="Observations in this investigation" />
-        </div>
-        <div className="p-6">
+                    <div className="mt-5 grid items-center gap-6 sm:grid-cols-[1fr_auto_1fr]">
+                      {/* Left observation */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelection({ kind: "observation", observationId: c.leftObservationId })
+                        }
+                        className="text-left rounded-md border border-semantic-border-subtle bg-semantic-surface p-4 transition-colors duration-fast hover:bg-semantic-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-rose"
+                      >
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-semantic-foreground-faint">
+                          {c.leftObservationId.slice(0, 8)}
+                        </span>
+                        {leftObs ? (
+                          <p className="mt-1.5 text-sm leading-relaxed text-semantic-foreground">
+                            {leftObs.content}
+                          </p>
+                        ) : (
+                          <p className="mt-1.5 text-sm italic text-semantic-foreground-faint">
+                            Observation unavailable
+                          </p>
+                        )}
+                      </button>
+
+                      {/* ≠ marker */}
+                      <span className="flex items-center justify-center font-mono text-xl font-extralight text-semantic-contradiction select-none" aria-label="contradicts">
+                        ≠
+                      </span>
+
+                      {/* Right observation */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelection({ kind: "observation", observationId: c.rightObservationId })
+                        }
+                        className="text-left rounded-md border border-semantic-border-subtle bg-semantic-surface p-4 transition-colors duration-fast hover:bg-semantic-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-rose"
+                      >
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-semantic-foreground-faint">
+                          {c.rightObservationId.slice(0, 8)}
+                        </span>
+                        {rightObs ? (
+                          <p className="mt-1.5 text-sm leading-relaxed text-semantic-foreground">
+                            {rightObs.content}
+                          </p>
+                        ) : (
+                          <p className="mt-1.5 text-sm italic text-semantic-foreground-faint">
+                            Observation unavailable
+                          </p>
+                        )}
+                      </button>
+                    </div>
+
+                    {c.description && (
+                      <p className="mt-4 text-sm leading-relaxed text-semantic-foreground-muted">
+                        {c.description}
+                      </p>
+                    )}
+
+                    {c.evidenceIds.length > 0 && (
+                      <p className="mt-3 font-mono text-[10px] text-semantic-foreground-faint">
+                        {c.evidenceIds.length} evidence sources referenced
+                      </p>
+                    )}                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ── OBSERVATIONS JOURNAL ────────────────────────────────────── */}
+        <section className="pt-10">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              Canonical feed
+            </span>
+            <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+            {!loading && items !== null && (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                {String(filteredItems.length).padStart(2, "0")}
+              </span>
+            )}
+          </div>
           <ObservationsList
             items={filteredItems}
             loading={loading}
@@ -315,7 +400,6 @@ function ObservationsContent() {
             onRetry={() => void load()}
             contradictionsById={contradictionsById()}
             onSelectObservation={(id) => {
-              // PREVENT BACKEND CRASH
               if (id.startsWith("live-obs")) {
                 console.warn("Detail panel disabled for frontend demo observations.");
                 return;
@@ -333,52 +417,61 @@ function ObservationsContent() {
                 : undefined
             }
           />
-        </div>
-      </Card>
+        </section>
 
-      {resolutions.length > 0 && (
-        <Card>
-          <div className="border-b border-border-subtle px-6 py-4">
-            <SectionHeading overline="Identity" title="Entity resolution queue" />
-          </div>
-          <div className="p-6">
-            <ul className="flex flex-col gap-3">
-              {resolutions.map((candidate) => (
-                <li key={candidate.resolutionId}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelection({
-                        kind: "resolution",
-                        resolutionId: candidate.resolutionId,
-                      })
-                    }
-                    className="w-full rounded-xl border border-border-standard bg-surface-50 p-4 text-left transition-colors duration-fast ease-restrained hover:border-accent-rose/50 hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-accent-rose"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-text-strong">
-                        Unresolved identity: {candidate.left.text} vs{" "}
-                        {candidate.right.text}
-                      </span>
-                      <Badge
-                        variant={candidate.hypothesis.status === "ACCEPTED" ? "accent" : "warning"}
-                        dot
-                      >
-                        {candidate.hypothesis.status}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-text-muted">
-                      score {candidate.comparison.score} ·{" "}
-                      {candidate.left.provenance.sourceId.slice(0, 8)}
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card>
-      )}
+        {/* ── ENTITY RESOLUTION QUEUE ─────────────────────────────────── */}
+        {resolutions.length > 0 && (
+          <section className="pt-10 pb-6">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+                Identity
+              </span>
+              <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+              <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                {String(resolutions.length).padStart(2, "0")}
+              </span>
+            </div>
+            <div className="mt-5">
+              <ul className="divide-y divide-semantic-border-subtle">
+                {resolutions.map((candidate) => (
+                  <li key={candidate.resolutionId}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelection({
+                          kind: "resolution",
+                          resolutionId: candidate.resolutionId,
+                        })
+                      }
+                      className="w-full py-4 text-left transition-colors duration-fast hover:bg-semantic-surface-elevated rounded-lg px-3 -mx-3 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-rose"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-semantic-foreground">
+                          {candidate.left.text}
+                          <span className="mx-2 font-mono text-[10px] text-semantic-foreground-faint">vs</span>
+                          {candidate.right.text}
+                        </span>
+                        <span className={`shrink-0 rounded-full px-2.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest ${
+                          candidate.hypothesis.status === "ACCEPTED"
+                            ? "text-semantic-accent border border-semantic-accent/30 bg-semantic-accent/5"
+                            : "text-semantic-warning border border-semantic-warning/30 bg-semantic-warning/5"
+                        }`}>
+                          {candidate.hypothesis.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 font-mono text-[10px] text-semantic-foreground-faint">
+                        score {candidate.comparison.score} · {candidate.left.provenance.sourceId.slice(0, 8)}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+      </div>
 
+      {/* ── DETAIL / RESOLUTION PANELS ──────────────────────────────── */}
       {selectedObservation && (
         <IntelligenceDetailPanel
           investigationId={workspace.investigationId}
