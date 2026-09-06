@@ -937,7 +937,7 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
   <tr>
     <td><strong>Phase 3 — Integration & UI</strong></td>
     <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
-    <td>Next.js 15 web app, evidence workflow, vis.js graph shell</td>
+    <td>Next.js 15 investigative workspace — five-zone shell, graph control center, intelligence + hypothesis surfaces, deterministic demo mode</td>
   </tr>
 </table>
 
@@ -1003,6 +1003,30 @@ packages/
     <td>Build, typecheck, test on every push</td>
   </tr>
 </table>
+
+### Investigative Workspace (packages/web)
+
+The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provider seam. Every surface renders from the provider seam and never fabricates data; demo mode is deterministic and covered by `vitest` suites. Feature-scoped reports live in `docs/reports/`.
+
+| PR | Surface | Scope |
+|---|---|---|
+| PR-1 | Workspace navigation dock | Every workspace destination rendered as a link from the provider-backed nav model |
+| PR-2 | Graph control center (shell) | Five-zone layout (rail, graph workspace, contextual panel, bottom band, temporal), side-panel collapse/reopen, layered & legend surfaces, roving-tab keyboard semantics |
+| PR-3 | Investigative context bridge | Graph → context selection resolves the intelligence Overview, gap/hypothesis context, timeline evidence, node Focus, and `?focus=` deep links; legacy drawer preserved for standalone rendering |
+| PR-4 | Operational rail | Action model with real commands (Focus, Detect Gaps, Cross-Case, Filter) and capability-aware disabled stubs; surface exclusivity without faking un-wired commands |
+| PR-5 | Interwoven investigative intelligence | Overview / Hypotheses / Signals / Evidence / Activity tabs with grounded counts, entity-filtered re-materialization, and memory-bank activity replay that never duplicates |
+| F-PR5 | Provider boundary + AUTO | Capability-level DEMO / LIVE / AUTO resolution, shared workspace-temporal state across sub-routes, two-way URL state |
+| PR-6 | Living graph visual language | Six node states / six edge states with semantic posture, band, temporal, role and attention; attention convergence regions, filter honesty (model never polluted), foreign-vs-local scoping, reduced-motion support |
+| F-PR6 | Entity pulse representation | Representation-aware Zone 2: multi-entity pulse panel + corrective pass adapting the five-zone shell per representation with one shared `timeRange` controller |
+| PR-7 | Temporal activity & version context | Versions panel with an authority gate (Return to current), activity-feed replay via a memory bank, shared temporal workspace across sub-routes |
+| F-PR7 | Cross-case relationship matrix | Symmetric matrix grid with summary and active-cell inventory, provider-driven |
+| PR-8 | Relation authority & deep-dive | Accept / Reject relation authority (no Reverse), contradiction-backed deep-dive bridges, operational Challenge seam |
+| F-PR8 | Adaptive flow representation | Deterministic demo chain in Zone 2 (SELECT ≠ FOCUS), Open-in-Graph handoff to the graph representation |
+| PR-9 | Cinematic theme refinement | Semantic color language (restrained rose, contradiction red), attention-driven canvas states, reduced-motion collapse, one state per element at scale |
+| PR-10 | Reliability & accessibility | One tab stop per node, unambiguous labeled controls, `?focus=` deep links, panel error boundaries, single-subscription realtime lifecycle, no double-submit mutations, large-graph visual-state derivations, simulation stability |
+| F-PR9 | Reverse hypothesis engine | Deterministic reverse-test mode **added beside the preserved pipeline** on `/investigations/[id]/hypothesis` — classifies saved observations as supporting / contradicting / unresolved with reasons, records a session decision trail; no scores, probabilities, or AI verdicts |
+
+Additional workspace routes implemented for the investigation lifecycle: `/investigations/[id]` (detail), `evidence`, `observations`, `graph`, `hypothesis`, `cross-case`, `gaps`, `leads`, `timeline`, `judge`, `ledger`, `review`, `robustness`, plus a case-list dashboard and New Investigation flow.
 
 ### Getting Started
 
