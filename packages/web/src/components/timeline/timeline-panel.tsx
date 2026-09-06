@@ -23,6 +23,12 @@ interface TimelinePanelProps {
 
 const BAND_KIND_ORDER: TimelineBand["kind"][] = ["milestone", "evidence", "observation", "relationship"];
 
+// F-PR17: the analyst surface renders THREE bands (milestones / evidence /
+// observations). Relationship bands stay fully supported in the data seam
+// (BAND_KIND_ORDER / BAND_LABELS / BAND_COLORS) but are not part of the
+// display surface — the columns stay honest, never silently hidden data.
+const DISPLAY_KINDS = BAND_KIND_ORDER.filter((kind) => kind !== "relationship");
+
 const BAND_COLORS: Record<TimelineBand["kind"], string> = {
   milestone: "var(--color-accent-rose)",
   evidence: "var(--color-accent-amber)",
@@ -70,7 +76,7 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
   rangePctRef.current = rangePct;
   const [isPlaying, setIsPlaying] = useState(false);
   const [hoverItem, setHoverItem] = useState<{ x: number; label: string; time: string; kind: TimelineBand["kind"] } | null>(null);
-  
+
   const trackRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playAnimRef = useRef<number | null>(null);
@@ -105,11 +111,11 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
     const unsubscribe = workspace.realtime.subscribe((event) => {
       setTimeline((prev) => {
         if (!prev) return prev;
-        
+
         let kind: TimelineBand["kind"] | null = null;
         let label = "";
         const time = event.timestamp;
-        
+
         if (!time) return prev;
 
         switch (event.id) {
@@ -198,8 +204,22 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
     setIsPlaying(false);
   }, []);
 
+  // F-PR17: reduced-motion preference read once at mount. Guarded so the
+  // panel behaves identically in test DOMs where matchMedia is unstubbed.
+  const reducedMotionPref = useMemo(() => {
+    if (typeof window.matchMedia !== "function") return false;
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
+  }, []);
+
   const startPlay = useCallback(() => {
     hasInteractedRef.current = true;
+    if (reducedMotionPref) {
+      // F-PR17: reduced motion PUBLISHES the full analytical window instantly —
+      // no rAF stepping, no sweeping playback, no intermediate frames.
+      setRangePct([0, nowPct]);
+      applyRange([0, nowPct]);
+      return;
+    }
     const startTime = performance.now();
     const targetEnd = nowPct;
 
@@ -207,22 +227,22 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
       const elapsed = now - startTime;
       const progress = Math.min(1, elapsed / PLAY_DURATION_MS);
       const end = progress * targetEnd;
-      
+
       setRangePct((prev) => [0, Math.max(end, prev[1] < 0 ? 0 : prev[1])]);
       if (now - lastPlayApplyRef.current >= 40) {
         lastPlayApplyRef.current = now;
         applyRange([0, end]);
       }
-      
+
       if (progress < 1) playAnimRef.current = requestAnimationFrame(step);
       else { playAnimRef.current = null; setIsPlaying(false); }
     };
-    
+
     setRangePct([0, 1]);
     setIsPlaying(true);
     lastPlayApplyRef.current = 0;
     playAnimRef.current = requestAnimationFrame(step);
-  }, [applyRange, nowPct]);
+  }, [applyRange, nowPct, reducedMotionPref]);
 
   useEffect(() => () => {
     if (playAnimRef.current !== null) cancelAnimationFrame(playAnimRef.current);
@@ -274,7 +294,7 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
   }
 
   const span = domain.end - domain.start;
-  const bandsPresent = BAND_KIND_ORDER.filter((kind) => timeline.bands.some((b) => b.kind === kind));
+  const bandsPresent = DISPLAY_KINDS.filter((kind) => timeline.bands.some((b) => b.kind === kind));
   const hasItems = timeline.items.length > 0;
 
   const densityBins: number[] = new Array(DENSITY_BUCKETS).fill(0);
@@ -285,116 +305,99 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
   const maxDensity = Math.max(1, ...densityBins);
 
   return (
-    <div className="w-full mt-4 glass-panel rounded-xl border border-surface-200/50 bg-surface-50/40 backdrop-blur-2xl flex flex-col overflow-hidden select-none shadow-2xl animate-slide-up">
-      
-      <div className="flex items-center justify-between px-6 py-4 border-b border-surface-300 bg-surface-100/80 backdrop-blur-md z-20">
-        <div className="flex items-center gap-5">
+    <div
+      className="flex w-full min-h-0 flex-1 flex-col select-none overflow-hidden rounded-xl border border-surface-200/50 bg-surface-50/40 backdrop-blur-2xl shadow-2xl"
+      data-timeline-panel
+    >
+      {/* COMPACT HEADER — one ~46px row, never wraps */}
+      <div className="flex h-[46px] shrink-0 items-center justify-between gap-3 border-b border-surface-300 bg-surface-100/80 px-3 backdrop-blur-md z-20">
+        <div className="flex min-w-0 items-center gap-3">
           {/* Action Play Button */}
           <button
             type="button"
+            aria-label={isPlaying ? "Pause timeline replay" : "Play timeline replay"}
             onClick={() => (isPlaying ? stopPlay() : startPlay())}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 ring-accent-rose shadow-md ${
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md shadow transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 ring-accent-rose ${
               isPlaying
-                ? "bg-accent-rose text-surface-0 shadow-[0_0_15px_var(--color-accent-rose)] border border-accent-rose"
+                ? "bg-accent-rose text-surface-0 shadow-[0_0_12px_var(--color-accent-rose)] border border-accent-rose"
                 : "bg-surface-800 border border-surface-600 text-surface-0 hover:bg-surface-900 hover:border-accent-rose"
             }`}
           >
             {isPlaying ? (
-              <span className="flex gap-1 h-3.5">
+              <span className="flex gap-1 h-3">
                 <span className="w-0.5 h-full bg-current rounded-sm" />
                 <span className="w-0.5 h-full bg-current rounded-sm" />
               </span>
             ) : (
-              <svg className="w-4 h-4 ml-0.5 text-current" viewBox="0 0 24 24" fill="currentColor">
+              <svg className="w-3.5 h-3.5 ml-0.5 text-current" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z" />
               </svg>
             )}
           </button>
-          
-          <div className="flex flex-col">
-            <span className="text-[10px] font-mono text-surface-400 uppercase tracking-widest mb-1 font-bold">Investigation Window</span>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-mono text-surface-900 tracking-widest font-bold drop-shadow-sm">{formatDate(domain.start)}</span>
-              <span className="w-4 h-[2px] bg-surface-400/50" />
-              <span className="text-sm font-mono text-surface-900 tracking-widest font-bold drop-shadow-sm">{formatDate(domain.end)}</span>
+
+          <div className="min-w-0 leading-tight">
+            <span className="block text-[8px] font-mono text-surface-400 uppercase tracking-widest font-bold">Investigation Window</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-surface-900 tracking-widest font-bold">{formatDate(domain.start)}</span>
+              <span className="w-3 h-[2px] bg-surface-400/50" />
+              <span className="text-[11px] font-mono text-surface-900 tracking-widest font-bold">{formatDate(domain.end)}</span>
             </div>
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="hidden md:flex gap-5 bg-surface-0/50 px-4 py-2 rounded-lg border border-surface-200">
+        {/* Inline M/E/O legend */}
+        <div className="hidden md:flex shrink-0 items-center gap-3">
           {bandsPresent.map((kind) => (
-            <div key={kind} className="flex items-center gap-2 text-[10px] font-mono text-surface-900 font-bold uppercase tracking-widest">
-              <span className="w-2.5 h-2.5 rounded-sm rotate-45 shadow-sm" style={{ backgroundColor: BAND_COLORS[kind] }} />
+            <div key={kind} className="flex items-center gap-1.5 text-[9px] font-mono text-surface-900 font-bold uppercase tracking-widest">
+              <span className="w-2 h-2 rounded-sm rotate-45 shadow-sm" style={{ backgroundColor: BAND_COLORS[kind] }} />
               {BAND_LABELS[kind]}
             </div>
           ))}
         </div>
       </div>
 
-      <div className="w-full bg-surface-50 grid grid-cols-[140px_1fr] relative">
-        <div 
-          className="absolute inset-y-0 z-10 pointer-events-none transition-all duration-75 flex flex-col border-x border-accent-rose/60"
-          style={{ 
-            left: `calc(140px + ${rangePct[0]}% * calc(100% - 140px) / 100)`, 
-            right: `calc((100 - ${rangePct[1]})% * calc(100% - 140px) / 100)` 
-          }}
+      {/* TRACK + AXIS BLOCK — fills the panel (min-h-0 flex-1), never scrolls */}
+      <div className="relative flex min-h-0 flex-1 flex-col bg-surface-50" data-timeline-block>
+        {/* Analytical window overlay — plain % bounds over the WHOLE tracks */}
+        <div
+          className="pointer-events-none absolute inset-y-0 z-10 flex transition-all duration-75"
+          style={{ left: `${rangePct[0]}%`, right: `${100 - rangePct[1]}%` }}
+          data-timeline-window
         >
-          <div className="absolute inset-0 bg-accent-rose/10 backdrop-blur-[1px]" />
-          
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-accent-rose text-surface-0 px-2 py-0.5 rounded shadow-lg text-[9px] font-mono font-bold tracking-widest whitespace-nowrap opacity-90">
-             FOCUS: {formatDate(domain.start + span * (rangePct[0] / 100))} — {formatDate(domain.start + span * (rangePct[1] / 100))}
+          <div className="absolute inset-0 bg-accent-rose/10" />
+          <div className="absolute inset-y-0 left-0 w-px bg-accent-rose/80" />
+          <div className="absolute inset-y-0 right-0 w-px bg-accent-rose/80" />
+          <div className="absolute left-1/2 top-[3px] -translate-x-1/2 whitespace-nowrap rounded bg-accent-rose px-1.5 py-[1px] text-[8px] font-mono font-bold uppercase tracking-widest text-surface-0 opacity-90 shadow" data-timeline-focus-label>
+            FOCUS: {formatDate(domain.start + span * (rangePct[0] / 100))} — {formatDate(domain.start + span * (rangePct[1] / 100))}
           </div>
         </div>
 
-        {/* LEFT COLUMN: Sidebar Labels */}
-        <div className="flex flex-col pt-10 pb-2 border-r border-surface-200/50 bg-surface-100/30 z-20">
-          {hasItems ? bandsPresent.map((kind) => (
-            <div key={`sidebar-${kind}`} className="h-10 flex items-center px-4 justify-end">
-              <span className="text-[10px] font-mono text-surface-500 uppercase tracking-widest font-bold">
-                {BAND_LABELS[kind]}
-              </span>
-            </div>
-          )) : (
-            <div className="h-32" />
-          )}
-        </div>
-
-        {/* RIGHT COLUMN: The Data Tracks */}
-        <div className="relative flex flex-col pt-10 pb-2 overflow-hidden bg-surface-50">
-          
-          {/* Vertical Grid Lines */}
-          <div className="absolute inset-y-0 left-0 right-0 flex justify-between pointer-events-none opacity-[0.15] z-0">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div key={`grid-${i}`} className="h-full w-px bg-surface-500 border-r border-dashed border-surface-0/10" />
-            ))}
-          </div>
-
-          {/* Data Lanes */}
-          {hasItems && bandsPresent.map((kind) => {
+        {/* THREE DATA LANES */}
+        <div className="z-20 flex min-h-0 flex-1 flex-col gap-[3px] px-3 pb-1 pt-7">
+          {hasItems ? bandsPresent.map((kind) => {
             const bandIds = new Set(timeline.bands.filter((b) => b.kind === kind).map((b) => b.id));
             const items = timeline.items.filter((it) => bandIds.has(it.bandId));
             const color = BAND_COLORS[kind];
-            
+
             return (
-              <div key={`lane-${kind}`} className="relative h-10 w-full flex items-center group/lane z-20">
+              <div key={`lane-${kind}`} className="group/lane relative flex min-h-[9px] flex-1 items-center" data-timeline-lane={kind}>
                 {/* Horizontal Track Line */}
-                <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-surface-300 -translate-y-1/2 group-hover/lane:bg-surface-400 transition-colors" />
-                
+                <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-surface-300 -translate-y-1/2 transition-colors group-hover/lane:bg-surface-400" />
+
                 {/* Tactical Diamond Nodes */}
                 {items.map((item) => {
                   const t = new Date(item.time).getTime();
                   if (Number.isNaN(t)) return null;
                   const pos = ((t - domain.start) / span) * 100;
                   const inRange = pos >= rangePct[0] && pos <= rangePct[1];
-                  
+
                   return (
                     <div
                       key={item.id}
                       role="button"
                       tabIndex={0}
                       aria-label={`Activate ${item.label}`}
-                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-40 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:rounded-sm"
+                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-40 cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
                       style={{ left: `${pos}%` }}
                       onClick={() => onEventActivate?.(item)}
                       onKeyDown={(e) => {
@@ -406,98 +409,103 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
                       onMouseEnter={() => setHoverItem({ x: pos, label: item.label, time: `${formatDate(t)} ${formatTime(t)}`, kind })}
                       onMouseLeave={() => setHoverItem(null)}
                     >
-                      <div 
-                        className={`w-3 h-3 rotate-45 border-[1.5px] border-surface-0 transition-all duration-300 ${inRange ? 'opacity-100 scale-100' : 'opacity-40 scale-75'}`}
-                        style={{ 
-                          backgroundColor: color,
-                          boxShadow: inRange ? `0 0 12px ${color}` : 'none'
-                        }}
+                      <div
+                        className={`w-2.5 h-2.5 rotate-45 border-[1.5px] border-surface-0 transition-opacity ${inRange ? 'opacity-100' : 'opacity-40'}`}
+                        style={{ backgroundColor: color, boxShadow: inRange ? `0 0 10px ${color}` : 'none' }}
                       />
                     </div>
                   );
                 })}
               </div>
             );
-          })}
-
-          {/* Hover Crosshair Tooltip - Isolated to the Data Grid */}
-          {hoverItem && (
-            <div className="absolute top-0 bottom-0 pointer-events-none z-[60] transition-all duration-75" style={{ left: `${hoverItem.x}%` }}>
-              <div className="absolute top-0 bottom-0 w-[2px] bg-surface-0 -translate-x-1/2 shadow-[0_0_12px_rgba(255,255,255,1)]" />
-              
-              <div className="absolute top-1/2 -translate-y-1/2 left-4 bg-surface-900 border border-surface-600 shadow-2xl p-4 rounded-lg flex flex-col gap-2 w-max max-w-[300px]">
-                <div className="flex items-center gap-2">
-                   <span className="w-2.5 h-2.5 rotate-45 border border-surface-0 shadow-sm" style={{ backgroundColor: BAND_COLORS[hoverItem.kind] }} />
-                   <span className="text-[11px] font-mono text-surface-300 font-bold uppercase tracking-widest">{hoverItem.time}</span>
-                </div>
-                <span className="text-sm font-sans text-surface-0 font-medium leading-relaxed">{hoverItem.label}</span>
-              </div>
+          }) : (
+            <div className="flex flex-1 items-center justify-center">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-surface-400">No temporal events resolved</span>
             </div>
           )}
         </div>
-      </div>
 
-      {/* 3. HISTOGRAM & SCRUBBER SECTION */}
-      <div className="relative h-16 w-full border-t border-surface-300 bg-surface-100/50 z-20 grid grid-cols-[140px_1fr]">
-        <div className="border-r border-surface-200/50" />
-        
-        {/* Scrubber Area */}
-        <div className="relative w-full h-full">
+        {/* Hover Crosshair Tooltip — Isolated to the Lanes Block */}
+        {hoverItem && (
+          <div className="pointer-events-none absolute top-0 bottom-8 z-[60] transition-all duration-75" style={{ left: `${hoverItem.x}%` }}>
+            <div className="absolute top-0 bottom-0 w-[2px] bg-surface-0 -translate-x-1/2 shadow-[0_0_12px_rgba(255,255,255,1)]" />
+            <div className="absolute top-2 left-4 bg-surface-900 border border-surface-600 shadow-2xl p-2.5 rounded-lg flex flex-col gap-1.5 w-max max-w-[260px]">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rotate-45 border border-surface-0 shadow-sm" style={{ backgroundColor: BAND_COLORS[hoverItem.kind] }} />
+                <span className="text-[9px] font-mono text-surface-300 font-bold uppercase tracking-widest">{hoverItem.time}</span>
+              </div>
+              <span className="text-xs font-sans text-surface-0 font-medium leading-relaxed">{hoverItem.label}</span>
+            </div>
+          </div>
+        )}
+
+        {/* MONO TIME AXIS — density strip + minor/major ticks + NOW marker */}
+        <div className="relative z-20 h-[34px] shrink-0 border-t border-surface-300 bg-surface-100/60" data-timeline-axis>
           {hasItems && (
-            <div className="absolute inset-0 px-0.5 pt-2 flex items-end gap-[1px] pointer-events-none">
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex h-[3px] items-end gap-[1px] px-0.5">
               {densityBins.map((count, i) => {
-                const hPct = Math.max(5, (count / maxDensity) * 100);
                 const xPct = (i / DENSITY_BUCKETS) * 100;
                 const isActive = xPct >= rangePct[0] && xPct < rangePct[1];
-                
                 return (
-                  <div 
-                    key={`hist-${i}`} 
-                    className={`flex-1 transition-colors duration-300 ${isActive ? 'bg-accent-rose' : 'bg-surface-400'}`}
-                    style={{ 
-                      height: `${hPct}%`,
-                      opacity: isActive ? 1 : 0.3,
-                      borderTopLeftRadius: '1px',
-                      borderTopRightRadius: '1px'
-                    }} 
+                  <div
+                    key={`hist-${i}`}
+                    className={`flex-1 ${isActive ? 'bg-accent-rose' : 'bg-surface-400'}`}
+                    style={{ height: `${count > 0 ? Math.max(1.5, 3 * (count / maxDensity)) : 1.5}px`, opacity: isActive ? 1 : 0.35 }}
                   />
                 );
               })}
             </div>
           )}
 
-          {/* Now Marker Flag */}
-          {hasItems && (
-            <div className="absolute bottom-0 h-20 -translate-x-1/2 pointer-events-none z-30 flex flex-col items-center justify-end pb-1" style={{ left: `${nowPct}%` }}>
-              <div className="w-px h-full bg-surface-900 shadow-[0_0_8px_rgba(255,255,255,0.5)]" />
-              <span className="absolute -top-4 bg-surface-900 text-surface-0 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-widest shadow-md">NOW</span>
-            </div>
-          )}
-
-          {/* Interactive Drag Track */}
-          <div ref={trackRef} className="absolute inset-0 z-40 cursor-pointer">
-            {[0, 1].map((index) => (
-              <button
-                key={`handle-${index}`}
-                type="button"
-                className="absolute top-0 bottom-0 w-6 cursor-ew-resize hover:bg-surface-0/10 transition-colors flex flex-col items-center justify-center outline-none focus-visible:bg-accent-rose/20 z-50 -translate-x-1/2 group/handle"
-                style={{ left: `${rangePct[index]}%` }}
-                onPointerDown={handleDrag(index as 0 | 1)}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowLeft") { hasInteractedRef.current = true; setRangePct((p) => index === 0 ? [Math.max(0, p[0] - 1), p[1]] : [p[0], Math.max(p[0] + 1, p[1] - 1)]); }
-                  if (e.key === "ArrowRight") { hasInteractedRef.current = true; setRangePct((p) => index === 0 ? [Math.min(p[1] - 1, p[0] + 1), p[1]] : [p[0], Math.min(100, p[1] + 1)]); }
-                }}
-              >
-                {/* Visual Drag Handle */}
-                <div className="w-[3px] h-full bg-accent-rose shadow-[0_0_10px_var(--color-accent-rose)] group-hover/handle:w-[4px] transition-all" />
-                <div className="absolute top-1/2 -translate-y-1/2 w-4 h-8 bg-surface-0 border-2 border-accent-rose rounded shadow-xl flex flex-col items-center justify-center gap-[2px]">
-                  <div className="w-[2px] h-3 bg-surface-400" />
-                  <div className="w-[2px] h-3 bg-surface-400" />
-                </div>
-              </button>
+          {/* Minor ticks */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-[18px] flex justify-between">
+            {Array.from({ length: 17 }).map((_, i) => (
+              <div key={`minor-${i}`} className="w-px h-1 bg-surface-400/70" />
             ))}
           </div>
 
+          {/* Major ticks + mono labels */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-1 flex justify-between">
+            {[0, 25, 50, 75, 100].map((f) => (
+              <div key={`major-${f}`} className="flex flex-col items-center">
+                <div className="h-2 w-px bg-surface-500" />
+                <span className="mt-[3px] text-[7px] font-mono font-bold uppercase tracking-wider text-surface-500">{formatDate(domain.start + span * (f / 100))}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* NOW marker */}
+          {hasItems && (
+            <div className="pointer-events-none absolute bottom-[3px] z-30 flex -translate-x-1/2 flex-col items-center" style={{ left: `${nowPct}%` }}>
+              <div className="h-[14px] w-px bg-surface-900 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+              <span className="text-[7px] font-mono font-bold uppercase tracking-widest text-surface-900">NOW</span>
+            </div>
+          )}
+        </div>
+
+        {/* KEYBOARD-ACCESSIBLE DRAG HANDLES — span the whole track block */}
+        <div ref={trackRef} className="absolute inset-0 z-40 cursor-pointer">
+          {[0, 1].map((index) => (
+            <button
+              key={`handle-${index}`}
+              type="button"
+              aria-label={index === 0 ? "Timeline window start handle. Use arrow keys to adjust." : "Timeline window end handle. Use arrow keys to adjust."}
+              className="group/handle absolute top-0 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize flex-col items-center justify-center focus-visible:outline-none focus-visible:bg-accent-rose/20"
+              style={{ left: `${rangePct[index]}%` }}
+              onPointerDown={handleDrag(index as 0 | 1)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") { hasInteractedRef.current = true; setRangePct((p) => index === 0 ? [Math.max(0, p[0] - 1), p[1]] : [p[0], Math.max(p[0] + 1, p[1] - 1)]); }
+                if (e.key === "ArrowRight") { hasInteractedRef.current = true; setRangePct((p) => index === 0 ? [Math.min(p[1] - 1, p[0] + 1), p[1]] : [p[0], Math.min(100, p[1] + 1)]); }
+              }}
+            >
+              {/* Visual Drag Handle */}
+              <div className="h-full w-[3px] bg-accent-rose shadow-[0_0_8px_var(--color-accent-rose)] transition-all group-hover/handle:w-[4px]" data-timeline-handle-bar />
+              <div className="absolute top-1/2 -translate-y-1/2 flex h-7 w-3.5 flex-col items-center justify-center gap-[2px] rounded border-2 border-accent-rose bg-surface-0 shadow-xl">
+                <div className="h-3 w-[2px] bg-surface-400" />
+                <div className="h-3 w-[2px] bg-surface-400" />
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     </div>
