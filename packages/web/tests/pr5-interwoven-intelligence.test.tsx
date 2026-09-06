@@ -385,7 +385,7 @@ describe("PR-5 — live-mode unsupported honesty", () => {
       </WorkspaceProvider>,
     );
     await screen.findByText("Hypotheses");
-    expect(screen.getByText(/Working hypotheses are not supported in this data mode/) ).toBeInTheDocument();
+    expect(await screen.findByText(/Working hypotheses are not supported in this data mode/)).toBeInTheDocument();
     expect(screen.queryByText("Shell-network money laundering")).not.toBeInTheDocument();
   });
 
@@ -396,7 +396,7 @@ describe("PR-5 — live-mode unsupported honesty", () => {
       </WorkspaceProvider>,
     );
     await screen.findByText("Signals");
-    expect(screen.getByText(/Signal detection sources are not supported in this data mode/)).toBeInTheDocument();
+    expect(await screen.findByText(/Signal detection sources are not supported in this data mode/)).toBeInTheDocument();
   });
 
   it("overview shows dash cells and an availability statement when every count source is unsupported", async () => {
