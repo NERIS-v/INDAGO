@@ -102,7 +102,7 @@ export function ControlCenterLayout({
           {graph}
         </div>
 
-        <div className="min-h-0 min-w-0 overflow-hidden" data-context-region>
+        <div className="min-h-0 min-w-0 overflow-hidden">
           {rightPanelOpen ? (
             context
           ) : (

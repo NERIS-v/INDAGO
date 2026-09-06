@@ -273,6 +273,54 @@ describe("F-PR5 — NetworkWorkspaceProvider two-way URL state", () => {
     expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("graph");
     expect(container.querySelector('[data-testid="focus"]')?.textContent).toBe("ent-9");
   });
+
+  it("F-PR16: Show on Graph from Matrix does NOT snap back", () => {
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1", view: "matrix" });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("matrix");
+
+    act(() => {
+      screen.getByRole("button", { name: "show-on-graph" }).click();
+    });
+
+    expect(lanes.replaceMock).toHaveBeenLastCalledWith(
+      "/investigations/i-1/graph?caseId=c-1&focus=ent-9",
+      { scroll: false },
+    );
+    expect(lanes.replaceMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("view=matrix"),
+    );
+    expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("graph");
+    expect(container.querySelector('[data-testid="focus"]')?.textContent).toBe("ent-9");
+  });
+
+  it("F-PR16: Show on Graph from Flow does NOT snap back", () => {
+    lanes.searchParamsRef.current = urlWith({ caseId: "c-1", view: "flow" });
+    const { container } = render(
+      <NetworkWorkspaceProvider>
+        <Probe />
+      </NetworkWorkspaceProvider>,
+    );
+    expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("flow");
+
+    act(() => {
+      screen.getByRole("button", { name: "show-on-graph" }).click();
+    });
+
+    expect(lanes.replaceMock).toHaveBeenLastCalledWith(
+      "/investigations/i-1/graph?caseId=c-1&focus=ent-9",
+      { scroll: false },
+    );
+    expect(lanes.replaceMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("view=flow"),
+    );
+    expect(container.querySelector('[data-testid="view"]')?.textContent).toBe("graph");
+    expect(container.querySelector('[data-testid="focus"]')?.textContent).toBe("ent-9");
+  });
 });
 
 describe("F-PR14 — NetworkWorkspaceProvider readability filter URL state", () => {

@@ -1,14 +1,15 @@
 // ============================================================================
-// F-PR6 — Pulse operations rail (Zone 1, Entity Pulse representation variant)
+// F-PR6 + F-PR16 — Pulse operations rail (Zone 1, Entity Pulse variant)
 //
-// Same five-zone geometry, representation content. Real actions only:
+// Same five-zone geometry, representation content. F-PR16 §16: the rail holds
+// the DETAIL drill for the SELECTED pulse (window activity, observations,
+// analytical relevance, real key-events/peaks, entity-anchored case signals)
+// while the panel keeps the compact circular glyphs. Real actions only:
 //   - Open in Graph  → hands the selected entity to the graph focus seam
 //   - Clear selection → releases the investigative selection
 // plus a data-backed pulse overview (entities shown / observations in window /
 // dominant activity / window concentration). NO fabricated commands: unlike
-// the graph rail there is nothing else the pulse genuinely executes. The base
-// graph OperationalRail is untouched (this is a representation variant, not an
-// edit to that rail).
+// the graph rail there is nothing else the pulse genuinely executes.
 // ============================================================================
 
 "use client";
@@ -41,6 +42,17 @@ export function PulseRail({
 }: PulseRailProps) {
   const selectedEntityId = context?.kind === "entity" ? context.id : null;
   const canOpen = selectedEntityId !== null && onOpenInGraph !== undefined;
+  const selectedField =
+    overview.status === "ready" && selectedEntityId
+      ? (overview.overview.entities.find((field) => field.entityId === selectedEntityId) ??
+        null)
+      : null;
+  const selectedMarkers =
+    overview.status === "ready" && selectedEntityId
+      ? overview.overview.markers.filter(
+          (marker) => marker.entityId === selectedEntityId,
+        )
+      : [];
 
   return (
     <aside
@@ -109,6 +121,93 @@ export function PulseRail({
               )}
             </section>
 
+            {selectedField && (
+              <section
+                aria-label={`Selected entity ${selectedField.label}`}
+                className="flex flex-col gap-3 rounded-lg border border-accent-rose/30 bg-surface-100/60 p-3"
+                data-testid="pulse-rail-detail"
+                data-pulse-rail-entity={selectedField.entityId}
+              >
+                <h3 className="truncate text-[12px] font-medium text-surface-900">
+                  {selectedField.label}
+                </h3>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+                      Window activity
+                    </dt>
+                    <dd className="font-mono text-[11px] text-surface-800">
+                      {selectedField.categoryLabel}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+                      Observations
+                    </dt>
+                    <dd className="font-mono text-[11px] text-surface-800">
+                      {selectedField.observationCount} in window · {selectedField.totalObservationCount} total
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
+                      Analytical relevance
+                    </dt>
+                    <dd className="font-mono text-[11px] text-surface-800">
+                      {selectedField.salienceAvailable
+                        ? `${Math.round(selectedField.salience * 100)}%`
+                        : "Unavailable"}
+                    </dd>
+                  </div>
+                </div>
+
+                {(selectedField.peaks.length > 0 || selectedField.peaksTotal > 0) && (
+                  <div className="flex flex-col gap-1">
+                    <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-surface-500">
+                      Key events · {selectedField.peaksTotal} in window
+                      {selectedField.peaksCapped
+                        ? ` (showing ${selectedField.peaks.length})`
+                        : ""}
+                    </h4>
+                    <ul className="flex flex-col gap-1">
+                      {selectedField.peaks.map((peak) => (
+                        <li
+                          key={`${peak.key}:${peak.category}`}
+                          data-pulse-rail-peak
+                          data-pulse-rail-peak-label={peak.label}
+                          className="flex items-center justify-between gap-2 rounded-md border border-surface-200/60 bg-surface-50/70 px-2 py-1"
+                        >
+                          <span className="truncate font-mono text-[10px] font-bold uppercase tracking-widest text-surface-700" title={peak.detail}>
+                            {peak.label}
+                          </span>
+                          <span className="shrink-0 font-mono text-[10px] text-surface-500">
+                            ×{peak.observationCount}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedMarkers.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-surface-500">
+                      Case signals
+                    </h4>
+                    {selectedMarkers.map((marker) => (
+                      <span
+                        key={`${marker.kind}:${marker.label}`}
+                        data-pulse-rail-marker={marker.kind}
+                        className="truncate font-mono text-[10px] text-surface-600"
+                        title={marker.detail}
+                      >
+                        {marker.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
             <section aria-label="Pulse actions" className="flex flex-col gap-1.5">
               <button
                 type="button"
@@ -158,7 +257,9 @@ export function PulseRail({
             </section>
 
             <p className="type-caption text-surface-400">
-              The timeline below is the single temporal controller for the pulse.
+              {selectedField
+                ? "The timeline below is the single temporal controller for the pulse."
+                : "Select a pulse entity to inspect its detail. The timeline below is the single temporal controller."}
             </p>
           </>
         ) : overview.status === "error" ? (

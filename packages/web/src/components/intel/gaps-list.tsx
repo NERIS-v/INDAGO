@@ -66,7 +66,7 @@ export function GapsList({ gaps, onSelectGap, loading }: GapsListProps) {
                   <span className="h-px w-4 bg-semantic-border-subtle" aria-hidden="true" />
                   <span>{gap.holeType.replace(/_/g, " ")}</span>
                   <span className={`h-px w-4 bg-semantic-border-subtle`} aria-hidden="true" />
-                  <span className={IMPACT_CLASS[gap.impact]}>{gap.impact} impact</span>
+                  <span className={IMPACT_CLASS[gap.impact]}>{gap.impact} IMPACT</span>
                 </div>
 
                 <p className={`mt-3 text-[1.0625rem] font-light leading-relaxed ${isResolved ? "text-semantic-foreground-faint" : "text-semantic-foreground"}`}>

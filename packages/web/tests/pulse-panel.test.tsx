@@ -148,3 +148,68 @@ describe("F-PR6 — multi-entity pulse panel", () => {
     expect(document.querySelector('[data-pulse-marker="contradiction"]')).toBeTruthy();
   });
 });
+
+describe("F-PR16 — circular pulse redesign: peaks, empty states, selection", () => {
+  it("marks activity peaks on glyphs with real day-cluster labels", () => {
+    renderPanel();
+    const glyph = document.querySelector('[data-pulse-entity="' + ENT_BANK + '"]')!;
+    expect(glyph.getAttribute("data-pulse-peaks-count")).not.toBe("0");
+    const ticks = document.querySelectorAll(
+      '[data-pulse-entity="' + ENT_BANK + '"] [data-pulse-peak]',
+    );
+    expect(ticks.length).toBeGreaterThan(0);
+    const firstLabel = ticks[0]!.getAttribute("data-pulse-peak-label")!;
+    expect(firstLabel).toMatch(/^(FIN|COM|LOC|IDN|XCS|OTH)( · \d{2}-[A-Z]{3})?$/);
+  });
+
+  it("labels peaks as readable chips under each entity tile", () => {
+    renderPanel();
+    const chips = document.querySelectorAll("[data-pulse-peak-chip]");
+    expect(chips.length).toBeGreaterThan(0);
+    const chip = chips[0]!;
+    expect(chip.getAttribute("data-pulse-peak-label")).toBeTruthy();
+    expect(chip.getAttribute("title")).toMatch(/observation/);
+  });
+
+  it("truncates the chip row and narrates the remainder honestly", () => {
+    renderPanel();
+    const more = document.querySelectorAll("[data-pulse-peak-more]");
+    // Some entity has more day clusters than the visible chip cap.
+    expect(more.length).toBeGreaterThan(0);
+    expect(more[0]!.textContent).toMatch(/^\+(\d+) more$/);
+  });
+
+  it("shows an honest NO DATA state when no entities are placed", () => {
+    const empty = buildEntityPulseOverview({
+      nodes: [],
+      observations: [],
+      timeRange: null,
+    });
+    render(
+      <PulsePanel
+        overview={{ status: "ready", overview: empty, error: null }}
+      />,
+    );
+    expect(screen.getByTestId("pulse-empty-no-data")).toBeInTheDocument();
+    expect(screen.queryAllByTestId("pulse-entity-card")).toHaveLength(0);
+  });
+
+  it("reports NO ACTIVITY IN WINDOW honestly (real zero, not a fabricated calm)", () => {
+    const boundedWindow: [number, number] = [
+      Date.parse("2024-01-01T00:00:00.000Z"),
+      Date.parse("2024-01-31T23:59:59.999Z"),
+    ];
+    // Honest zero inside a bounded window, entities still placed.
+    const calm = buildEntityPulseOverview({
+      nodes,
+      observations: [],
+      timeRange: boundedWindow,
+    });
+    render(
+      <PulsePanel overview={{ status: "ready", overview: calm, error: null }} />,
+    );
+    expect(calm.totalObservationsInWindow).toBe(0);
+    expect(calm.windowLabel).toBe("selected window");
+    expect(screen.getByTestId("pulse-empty-no-window-activity")).toBeInTheDocument();
+  });
+});

@@ -26,6 +26,7 @@ import {
   PULSE_CATEGORY_COLORS,
   PULSE_CATEGORY_LABELS,
   PULSE_MAX_TOPIC_ENTITIES,
+  PULSE_PEAK_CHIPS_PER_ENTITY,
 } from "@/lib/network/pulse/pulse-model";
 import type { EntityPulseField, PulseMarker } from "@/lib/network/pulse/pulse-model";
 import type { EntityPulseLoadState } from "@/lib/network/pulse/use-entity-pulse";
@@ -93,7 +94,6 @@ interface PulseCardProps {
   readonly ariaLabel: string;
   readonly onSelect: () => void;
   readonly onOpenInGraph?: () => void;
-  readonly markers: readonly PulseMarker[];
 }
 
 function PulseCard({
@@ -104,25 +104,21 @@ function PulseCard({
   ariaLabel,
   onSelect,
   onOpenInGraph,
-  markers,
 }: PulseCardProps) {
-  const fieldMarkers = markers.filter(
-    (marker) => marker.entityId === field.entityId,
-  );
-  const superLabel = field.salienceAvailable
-    ? `Analytical relevance ${Math.round(field.salience * 100)}%`
-    : "Analytical relevance unavailable";
+  const chipPeaks = field.peaks.slice(0, PULSE_PEAK_CHIPS_PER_ENTITY);
+  const extraPeaks = field.peaksTotal - chipPeaks.length;
 
   return (
     <div
       data-pulse-card
       data-pulse-card-entity={field.entityId}
       data-pulse-card-prominent={String(prominent)}
-      className={`flex flex-col rounded-xl border bg-surface-50/70 p-3 shadow-sm transition-opacity duration-300 ${
+      data-pulse-card-selected={String(selected)}
+      className={`relative flex flex-col rounded-xl border bg-surface-50/70 p-3 shadow-sm transition-opacity duration-300 ${
         selected
           ? "border-accent-rose/60 ring-1 ring-accent-rose/30"
           : "border-surface-200/60"
-      } ${prominent ? "gap-4 sm:flex-row" : "gap-2"}`}
+      } ${prominent ? "gap-3" : "gap-2"}`}
     >
       <button
         type="button"
@@ -130,11 +126,9 @@ function PulseCard({
         aria-pressed={selected}
         aria-label={ariaLabel}
         data-testid="pulse-entity-card"
-        className={`flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-rose ${
-          prominent ? "sm:w-2/5" : ""
-        }`}
+        className="flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-rose"
       >
-        <span className={`${prominent ? "h-36 w-36 shrink-0" : "h-20 w-20 shrink-0"}`}>
+        <span className={`${prominent ? "h-36 w-36 shrink-0" : "h-32 w-32 shrink-0"}`}>
           <PulseGlyph field={field} dimmed={dimmed} selected={selected} ariaLabel={ariaLabel} />
         </span>
         <span className="min-w-0 flex-1">
@@ -153,8 +147,35 @@ function PulseCard({
         </span>
       </button>
 
+      {field.peaks.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-1"
+          data-testid="pulse-peak-chips"
+        >
+          {chipPeaks.map((peak) => (
+            <span
+              key={`${peak.key}:${peak.category}`}
+              data-pulse-peak-chip
+              data-pulse-peak-label={peak.label}
+              title={peak.detail}
+              className="rounded-full border border-surface-200 bg-surface-100/80 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-surface-600"
+            >
+              {peak.label}
+            </span>
+          ))}
+          {extraPeaks > 0 && (
+            <span
+              data-pulse-peak-more
+              className="rounded-full border border-surface-200 bg-surface-100/80 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-surface-500"
+            >
+              +{extraPeaks} more
+            </span>
+          )}
+        </div>
+      )}
+
       {prominent && onOpenInGraph && (
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="absolute right-3 top-3 flex shrink-0 items-center gap-3">
           <button
             type="button"
             onClick={onOpenInGraph}
@@ -164,47 +185,6 @@ function PulseCard({
             Open in Graph
           </button>
         </div>
-      )}
-
-      {prominent && (
-        <dl className="flex min-w-0 flex-1 flex-col gap-1.5 sm:border-l sm:border-surface-200 sm:pl-4">
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
-              Window activity
-            </dt>
-            <dd className="font-mono text-[11px] text-surface-800" data-pulse-dominant>
-              {field.categoryLabel}
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
-              Observations
-            </dt>
-            <dd className="font-mono text-[11px] text-surface-800">
-              {field.observationCount} in window · {field.totalObservationCount} total
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-[10px] font-mono uppercase tracking-widest text-surface-500">
-              {field.salienceAvailable ? "Analytical relevance" : "Analytical relevance"}
-            </dt>
-            <dd className="font-mono text-[11px] text-surface-800" data-pulse-salience>
-              {superLabel}
-            </dd>
-          </div>
-          {fieldMarkers.length > 0 && (
-            <div className="flex flex-col gap-1 pt-1">
-              {fieldMarkers.map((marker) => (
-                <span key={`${marker.kind}:${marker.label}`} className="flex items-center gap-1.5">
-                  <MarkerIcon kind={marker.kind} />
-                  <span className="truncate font-mono text-[10px] text-surface-600" title={marker.detail}>
-                    {marker.label}
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
-        </dl>
       )}
     </div>
   );
@@ -287,6 +267,37 @@ export function PulsePanel({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+        {entityNodeCount === 0 && (
+          <div
+            className="flex flex-col gap-1 rounded-xl border border-surface-200/60 bg-surface-50/70 p-4"
+            data-testid="pulse-empty-no-data"
+          >
+            <h3 className="font-mono text-[10px] font-bold uppercase tracking-widest text-surface-600">
+              No data
+            </h3>
+            <p className="type-caption text-surface-500">
+              No entities are placed on the graph — there is nothing to pulse.
+            </p>
+          </div>
+        )}
+
+        {entities.length > 0 &&
+          overview.overview.totalObservationsInWindow === 0 &&
+          overview.overview.windowLabel === "selected window" && (
+            <div
+              className="flex flex-col gap-1 rounded-xl border border-surface-200/60 bg-surface-50/70 p-4"
+              data-testid="pulse-empty-no-window-activity"
+            >
+              <h3 className="font-mono text-[10px] font-bold uppercase tracking-widest text-surface-600">
+                No activity in the selected window
+              </h3>
+              <p className="type-caption text-surface-500">
+                The fields below show the calm base geometry — no in-window
+                observations fall inside the current range.
+              </p>
+            </div>
+          )}
+
         {focused && (
           <PulseCard
             field={focused}
@@ -296,7 +307,6 @@ export function PulsePanel({
             ariaLabel={`${focused.label} pulse, ${focused.observationCount} observations in window, ${focused.categoryLabel} activity, ${Math.round(focused.salience * 100)}% analytical relevance`}
             onSelect={() => handleSelect(focused.entityId)}
             onOpenInGraph={onOpenInGraph ? () => onOpenInGraph(focused.entityId) : undefined}
-            markers={markerList}
           />
         )}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -308,7 +318,6 @@ export function PulsePanel({
               selected={field.entityId === selectedEntityId}
               ariaLabel={`${field.label} pulse, ${field.observationCount} observations in window, ${field.categoryLabel} activity, ${Math.round(field.salience * 100)}% analytical relevance`}
               onSelect={() => handleSelect(field.entityId)}
-              markers={markerList}
             />
           ))}
         </div>

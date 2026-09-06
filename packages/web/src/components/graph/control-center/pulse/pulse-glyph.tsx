@@ -1,16 +1,20 @@
 // ============================================================================
-// F-PR6 — Entity Pulse glyph (corrective pass): one entity's enclosed field.
+// F-PR6 + F-PR16 — Entity Pulse glyph: one entity's enclosed circular field.
 //
-// A single, memoized, localized SVG. The outer contour is the entity's own
-// continuous activity field; the inner halo is its analytical salience. The
-// contour MORPHS (restrained ease-out, 320 ms, IDLE→MORPH→SETTLE→IDLE) between
-// two deterministic states when the shared workspace timeRange changes — both
-// start and end timeline handles alter geometry through the derived overview.
-// prefers-reduced-motion (or a jsdom/embed environment without rAF/perf) skips
-// the morph and renders directly to the target geometry.
+// F-PR16 redesign (circular visual language): the entity is a large circular
+// NODE with its analytical aura (salience halo) and continuous in-window
+// activity contour behind it, its readable short name set at the centre, and
+// its REAL temporal peaks drawn as deterministic ticks around the perimeter
+// (magnitude → tick length, category → colour). Nothing is invented: geometry
+// derives from the entity's own provider-backed observations, salience and
+// peaks — every peak is a real day-cluster inside the shared workspace window.
 //
-// Animation state lives ONLY here (never in the shell or a global store), so a
-// time-range drag does not rerender the surrounding workspace.
+// The outer contour still MORPHS (restrained ease-out, 320 ms) between two
+// deterministic states when the shared workspace timeRange changes.
+// prefers-reduced-motion (or an environment without rAF/perf) renders directly
+// to the target geometry.
+//
+// Animation state lives ONLY here (never in the shell or a global store).
 // ============================================================================
 
 "use client";
@@ -21,12 +25,19 @@ import {
   PULSE_CATEGORY_COLORS,
   PULSE_PHASE,
   PULSE_SAMPLE_COUNT,
+  shortEntityLabel,
 } from "@/lib/network/pulse/pulse-model";
 import type { EntityPulseField } from "@/lib/network/pulse/pulse-model";
 
 export const PULSE_GLYPH_VIEWBOX = 100;
 const PULSE_GLYPH_CENTER = PULSE_GLYPH_VIEWBOX / 2;
 const PULSE_GLYPH_FIELD_SCALE = 34;
+/** Circular node radius (viewBox units). */
+const PULSE_GLYPH_NODE_RADIUS = 16;
+/** Peak tick start radius (just beyond the node). */
+const PULSE_GLYPH_PEAK_BASE = PULSE_GLYPH_NODE_RADIUS + 5;
+/** Peak tick length range from the base. */
+const PULSE_GLYPH_PEAK_AMPLITUDE = 16;
 const MORPH_DURATION_MS = 320;
 const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
 
@@ -113,6 +124,35 @@ export const PulseGlyph = memo(function PulseGlyph({
     PULSE_PHASE,
   );
   const color = PULSE_CATEGORY_COLORS[field.category];
+  const nodeGroup = (
+    <g>
+      <circle
+        cx={PULSE_GLYPH_CENTER}
+        cy={PULSE_GLYPH_CENTER}
+        r={PULSE_GLYPH_NODE_RADIUS}
+        fill="var(--color-surface-0)"
+      />
+      <circle
+        cx={PULSE_GLYPH_CENTER}
+        cy={PULSE_GLYPH_CENTER}
+        r={PULSE_GLYPH_NODE_RADIUS}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.25}
+        strokeOpacity={field.active ? 0.9 : 0.5}
+      />
+      <text
+        x={PULSE_GLYPH_CENTER}
+        y={PULSE_GLYPH_CENTER + 2.25}
+        textAnchor="middle"
+        fontSize={7}
+        fontFamily="var(--font-mono, ui-monospace, monospace)"
+        fill="var(--color-surface-800)"
+      >
+        {shortEntityLabel(field.label)}
+      </text>
+    </g>
+  );
 
   return (
     <svg
@@ -127,6 +167,7 @@ export const PulseGlyph = memo(function PulseGlyph({
       data-pulse-entity-salience={
         field.salienceAvailable ? String(field.salience) : "unavailable"
       }
+      data-pulse-peaks-count={field.peaks.length}
       className={`h-full w-full transition-opacity duration-300 ${
         dimmed ? "opacity-40" : "opacity-100"
       } ${onSelect ? "cursor-pointer" : ""}`}
@@ -147,7 +188,39 @@ export const PulseGlyph = memo(function PulseGlyph({
         strokeWidth={1}
         strokeOpacity={field.active ? 0.9 : 0.45}
       />
-      <circle cx={PULSE_GLYPH_CENTER} cy={PULSE_GLYPH_CENTER} r={3} fill="var(--color-surface-700)" />
+      {field.peaks.map((peak) => {
+        const innerR = PULSE_GLYPH_PEAK_BASE;
+        const outerR = innerR + peak.magnitude * PULSE_GLYPH_PEAK_AMPLITUDE;
+        const cos = Math.cos(peak.angle);
+        const sin = Math.sin(peak.angle);
+        const peakColor = PULSE_CATEGORY_COLORS[peak.category];
+        return (
+          <g
+            key={`${peak.key}:${peak.category}`}
+            data-pulse-peak
+            data-pulse-peak-label={peak.label}
+            data-pulse-peak-angle={peak.angle.toFixed(3)}
+            data-pulse-peak-magnitude={peak.magnitude.toFixed(3)}
+          >
+            <line
+              x1={PULSE_GLYPH_CENTER + cos * innerR}
+              y1={PULSE_GLYPH_CENTER + sin * innerR}
+              x2={PULSE_GLYPH_CENTER + cos * outerR}
+              y2={PULSE_GLYPH_CENTER + sin * outerR}
+              stroke={peakColor}
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+            <circle
+              cx={PULSE_GLYPH_CENTER + cos * outerR}
+              cy={PULSE_GLYPH_CENTER + sin * outerR}
+              r={1.6}
+              fill={peakColor}
+            />
+          </g>
+        );
+      })}
+      {nodeGroup}
       {selected && (
         <circle
           cx={PULSE_GLYPH_CENTER}

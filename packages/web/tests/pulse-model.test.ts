@@ -1,15 +1,20 @@
 import { describe, it, expect } from "vitest";
 import {
   buildEntityPulseOverview,
+  buildEntityPeaks,
   closedRadialPath,
   observationInTimeRange,
   observationTypeToCategory,
+  placePulseScene,
+  shortEntityLabel,
   PULSE_RADIUS_BASE,
   PULSE_ACTIVITY_AMPLITUDE,
   PULSE_HALO_BASE,
   PULSE_HALO_AMPLITUDE,
   PULSE_SAMPLE_COUNT,
   PULSE_MAX_TOPIC_ENTITIES,
+  PULSE_MAX_PEAKS_PER_ENTITY,
+  PULSE_PEAK_CATEGORY_CODES,
   PULSE_CATEGORIES,
   stableHash,
 } from "@/lib/network/pulse/pulse-model";
@@ -423,3 +428,119 @@ function buildCandidateView(): {
     rightEntity: { id: ENT_VICTOR },
   };
 }
+
+// ────────────────────────── F-PR16 ──────────────────────────────────────────
+// Entity Pulse redesign: temporal perimeter peaks (deterministic, real data)
+// and the spatial-field placement geometry.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe("F-PR16 — temporal perimeter peaks", () => {
+  it("is deterministic and finite for identical inputs", () => {
+    const a = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    const b = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    expect(b.entities.map((e) => e.peaks)).toEqual(a.entities.map((e) => e.peaks));
+    for (const field of a.entities) {
+      for (const peak of field.peaks) {
+        expect(Number.isFinite(peak.angle)).toBe(true);
+        expect(peak.angle).toBeGreaterThanOrEqual(0);
+        expect(peak.angle).toBeLessThan(Math.PI * 2);
+        expect(peak.magnitude).toBeGreaterThanOrEqual(0);
+        expect(peak.magnitude).toBeLessThanOrEqual(1);
+        expect(peak.observationCount).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("derives peaks only from the entity's OWN in-window observations", () => {
+    const jan = buildEntityPulseOverview({ nodes, observations, timeRange: jan2024 });
+    const victorJan = jan.entities.find((e) => e.entityId === ENT_VICTOR)!;
+    // Jan-2024 has no Victor observation → calm ⇒ no peaks to invent.
+    expect(victorJan.active).toBe(false);
+    expect(victorJan.peaks).toHaveLength(0);
+
+    const bankJan = jan.entities.find((e) => e.entityId === ENT_BANK)!;
+    expect(bankJan.active).toBe(true);
+    expect(bankJan.peaks.length).toBeGreaterThanOrEqual(1);
+    for (const peak of bankJan.peaks) {
+      expect(peak.label).toMatch(/^(FIN|COM|LOC|IDN|XCS|OTH)/);
+    }
+  });
+
+  it("labels perimeter peaks with a category code and the real observation day", () => {
+    const overview = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    const bank = overview.entities.find((e) => e.entityId === ENT_BANK)!;
+    const dated = bank.peaks.filter((peak) => peak.timestampMs !== null);
+    expect(dated.length).toBeGreaterThan(0);
+    for (const peak of dated) {
+      expect(peak.label).toMatch(new RegExp(`^${PULSE_PEAK_CATEGORY_CODES[peak.category]} · \\d{2}-[A-Z]{3}$`));
+      expect(peak.detail).toContain(String(peak.observationCount));
+    }
+  });
+
+  it("caps the per-entity perimeter at the documented count and reports the cap", () => {
+    const overview = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    for (const field of overview.entities) {
+      expect(field.peaks.length).toBeLessThanOrEqual(PULSE_MAX_PEAKS_PER_ENTITY);
+      expect(field.peaksCapped).toBe(field.peaksTotal > field.peaks.length);
+    }
+  });
+
+  it("clusters observations that share an observable day into ONE peak", () => {
+    const dayClustered = buildEntityPeaks(ENT_BANK, [
+      objectObservation("a1", ENT_BANK, "FINANCIAL"),
+      objectObservation("a2", ENT_BANK, "FINANCIAL"),
+    ]);
+    expect(dayClustered).toHaveLength(1);
+    expect(dayClustered[0]!.observationCount).toBe(2);
+    expect(dayClustered[0]!.label).toBe("FIN · 05-JAN");
+  });
+
+  it("keeps untimed observations in a single honest fallback peak", () => {
+    const untimed = buildEntityPeaks(ENT_BANK, [
+      { ...objectObservation("b1", ENT_BANK, "FINANCIAL"), observedAt: undefined },
+    ]);
+    expect(untimed).toHaveLength(1);
+    expect(untimed[0]!.timestampMs).toBeNull();
+    expect(untimed[0]!.label).toBe("FIN");
+    expect(untimed[0]!.detail).toContain("1 observation");
+  });
+
+  it("calm entities expose an empty peak list (no fabricated activity)", () => {
+    const overview = buildEntityPulseOverview({ nodes, observations: [], timeRange: fullRange });
+    for (const field of overview.entities) {
+      expect(field.peaks).toHaveLength(0);
+      expect(field.peaksTotal).toBe(0);
+      expect(field.peaksCapped).toBe(false);
+    }
+  });
+});
+
+describe("F-PR16 — spatial field placement geometry", () => {
+  const overview = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+
+  it("is deterministic and stable across recomputes", () => {
+    const again = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    expect(placePulseScene(overview.entities)).toEqual(placePulseScene(again.entities));
+  });
+
+  it("places every displayed entity exactly once with an in-bounds ring factor", () => {
+    const placements = placePulseScene(overview.entities);
+    expect(placements).toHaveLength(overview.entities.length);
+    expect(new Set(placements.map((p) => p.entityId)).size).toBe(placements.length);
+    for (const placement of placements) {
+      expect(placement.radiusFactor).toBeGreaterThan(0);
+      expect(placement.radiusFactor).toBeLessThan(1);
+      expect(Number.isFinite(placement.angle)).toBe(true);
+    }
+  });
+
+  it("returns no placements for an empty field", () => {
+    expect(placePulseScene([])).toEqual([]);
+  });
+
+  it("derives a readable short centre label without inventing words", () => {
+    expect(shortEntityLabel("Intermediary Account 0093")).toBe("Intermediary");
+    expect(shortEntityLabel("A").trim().length).toBeGreaterThan(0);
+    expect(shortEntityLabel("Loremipsumdolorsitamet")).toContain("…");
+  });
+});
