@@ -100,7 +100,7 @@ describe("PR-2 — geometry contract (pure)", () => {
   });
 
   it("defines a clamped, viewport-derived bottom band height", () => {
-    expect(bottomBandHeightClass()).toBe("h-[clamp(14rem,34vh,26rem)]");
+    expect(bottomBandHeightClass()).toBe("h-[clamp(12rem,26vh,16rem)]");
   });
 
   it("ships sane layout/action defaults", () => {

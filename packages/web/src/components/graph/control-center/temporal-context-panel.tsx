@@ -98,10 +98,10 @@ export function TemporalContextPanel({ tab, onTabChange, children, selection: se
         id={TAB_BODY_ID}
         role="tabpanel"
         aria-labelledby={`temporal-tab-${tab}`}
-        className="min-h-0 flex-1 overflow-y-auto px-2 pb-1"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-1"
       >
         {tab === "time" ? (
-          children
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         ) : tab === "activity" ? (
           <PanelErrorBoundary label="Activity feed">
             <TemporalActivityFeed selection={selection} />

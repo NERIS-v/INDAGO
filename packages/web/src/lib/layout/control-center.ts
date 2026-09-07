@@ -95,7 +95,8 @@ export function controlCenterColumns(layout: Pick<ControlCenterLayoutState, "lef
 }
 
 /** Bottom band allocation as a viewport-derived height (clamped), so the two
- *  bottom halves stay legible without hardcoded pixel offsets. */
+ *  bottom halves stay legible without hardcoded pixel offsets. F-PR18: compacted
+ *  to match the reduced internal Timeline height after the fit redesign. */
 export function bottomBandHeightClass(): string {
-  return "h-[clamp(14rem,34vh,26rem)]";
+  return "h-[clamp(12rem,26vh,16rem)]";
 }
