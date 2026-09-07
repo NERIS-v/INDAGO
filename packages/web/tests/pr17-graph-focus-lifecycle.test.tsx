@@ -222,42 +222,41 @@ describe("PR-17 §F focus aura hides during motion and commits at the current po
     expect(ring.getAttribute("data-graph-aura-y")).toBe(bodyCircleIn(group).getAttribute("cy"));
   }, 35000);
 
-  it("a committed selection stays lit while the focused node's aura hides", async () => {
+  it("a committed selection persists through motion while the focused node's ring hides and returns", async () => {
     const { utils } = renderCanvas();
     const container = utils.container;
     await waitFor(() => expect(container.querySelector("[data-graph-motion='settled']")).not.toBeNull(), { timeout: 20000 });
 
-    // Clicking commits a SELECTION — a node state, not an analytical overlay.
+    // Clicking commits a SELECTION — communicated through node body styling, not the ring.
     fireEvent.click(interactionCircleFor(container, GN_BANK));
     await waitFor(() => expect(stateGroupForId(container, GN_BANK).getAttribute("data-graph-selected")).toBe("true"), { timeout: 2000 });
-    expect(auraRingIn(stateGroupForId(container, GN_BANK))!.getAttribute("data-graph-aura")).toBe("selection");
+    // No ring is rendered for a pure selection (ring is focus-only overlay).
+    expect(auraRingIn(stateGroupForId(container, GN_BANK))).toBeNull();
 
-    // Keyboard-focus ANOTHER node: focus-only triggers the wake -> its aura hides.
+    // Keyboard-focus ANOTHER node: focus ring hides during motion.
     fireEvent.focus(interactionCircleFor(container, GN_VICTOR));
     await waitFor(() => expect(container.querySelector("[data-graph-motion='moving']")).not.toBeNull(), { timeout: 10000 });
+    // VICTOR's focus ring is hidden during motion.
     await waitFor(() => expect(auraRingIn(stateGroupForId(container, GN_VICTOR))!.getAttribute("data-graph-aura")).toBe("hidden"), { timeout: 1000 });
-
-    // The committed selection NEVER dims during motion.
-    expect(auraRingIn(stateGroupForId(container, GN_BANK))!.getAttribute("data-graph-aura")).toBe("selection");
+    // BANK's selection persists through motion (body styling, not a ring).
+    expect(stateGroupForId(container, GN_BANK).getAttribute("data-graph-selected")).toBe("true");
 
     await waitFor(() => expect(container.querySelector("[data-graph-motion='settled']")).not.toBeNull(), { timeout: 20000 });
     await waitFor(() => expect(auraRingIn(stateGroupForId(container, GN_VICTOR))!.getAttribute("data-graph-aura")).toBe("focus"), { timeout: 2000 });
   }, 35000);
 
-  it("the rail Focus action (camera dive) commits selection and keeps it lit through motion", async () => {
+  it("the rail Focus action (camera dive) commits selection and focus ring returns after settle", async () => {
     const { utils, controlsRef } = renderCanvas();
     const container = utils.container;
     await waitFor(() => expect(container.querySelector("[data-graph-motion='settled']")).not.toBeNull(), { timeout: 20000 });
     expect(controlsRef.current).not.toBeNull();
 
     act(() => controlsRef.current!.focusNode(GN_BANK));
-    // focusNode sets BOTH the camera target and the committed selection. The
-    // selection is a node state -> lit immediately, even before the settle.
+    // focusNode sets both selection and focus — data-graph-selected persists immediately.
     await waitFor(() => expect(stateGroupForId(container, GN_BANK).getAttribute("data-graph-selected")).toBe("true"), { timeout: 2000 });
-    expect(auraRingIn(stateGroupForId(container, GN_BANK))!.getAttribute("data-graph-aura")).toBe("selection");
-    // And it stays lit through the resulting motion.
+    // During motion, the focus ring is hidden.
     await waitFor(() => expect(container.querySelector("[data-graph-motion='moving']")).not.toBeNull(), { timeout: 10000 });
-    expect(auraRingIn(stateGroupForId(container, GN_BANK))!.getAttribute("data-graph-aura")).toBe("selection");
+    await waitFor(() => expect(auraRingIn(stateGroupForId(container, GN_BANK))!.getAttribute("data-graph-aura")).toBe("hidden"), { timeout: 1000 });
   }, 35000);
 
   it("reduced motion commits the aura instantly — no fade, no hidden phase", async () => {
