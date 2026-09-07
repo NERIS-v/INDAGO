@@ -2,8 +2,8 @@
 
 **Scope:** `packages/web` only · **Series:** corrective pass after F-PR17 across three workstreams
 
-**Validation:** 97 test files / 1056 tests passing · `tsc --noEmit` clean · production build EXIT 0
-**Commits:** (see §10) — pushed to `origin/main` from `packages/web`
+**Validation:** 97 test files / 1067 tests passing · `tsc --noEmit` clean · production build EXIT 0
+**Commits:** `706b218` · `1f796b6` · `16d2798` (+ F-PR19 section §8) — pushed to `origin/main` from `packages/web`
 
 ---
 
@@ -110,6 +110,32 @@ Recommended pass at 1440×900, 1600×900, 1920×1080 (graph route):
 - `706b218` `fix(web): F-PR18 graph focus ring is focus-only; selection is body-persistent`
 - `1f796b6` `feat(web): F-PR18 Entity Pulse redesign — large node, organic aura, category indicators`
 - `16d2798` `fix(web): F-PR18 timeline parent workspace height — no unused vertical gap`
+
+---
+
+## §8 F-PR19 — equal semantic sectors + sector-driven wave
+
+A follow-up corrective pass on the Pulse glyph (contained to `pulse-glyph.tsx` + tests):
+
+### 8.1 Equal sectors
+The field's perimeter is now divided into **equal angular sectors** — one per active activity indicator — `span = 2π / sectorCount`, laid out in stable indicator order. Labels sit at each sector's **arc centre**, so they are **equally spaced** around the field regardless of how clustered the raw observation angles are (Voronoi-by-angle was replaced).
+
+### 8.2 Sector-driven wave
+`buildSectorRadii(sectors)` derives the 96 field radii directly from the sectors: every sample belongs to exactly one equal sector, and its radius grows from the calm baseline by `sector.strength × raised-cosine wave` (0 at the sector edges, peak at its centre). Stronger activity ⇒ a larger local expansion; weaker activity stays near baseline; adjacent sectors meet at the baseline so the whole contour remains **one smooth, closed, organic curve** (Catmull-Rom, no `A` arcs / no circle / no radial bars / no regular ring). Sector hues blend via the same raised-cosine intensity ramp, and each sector's colour+deformation colocate with its own label.
+
+### 8.3 Determinism
+Sector geometry is `useMemo`-keyed on the indicators list, so the morph target stays stable between recomputes: **same data + same timeRange ⇒ identical geometry**. No random breathing, no per-frame noise. Labels are code-only (`FIN`/`COM`/`LOC`/`IDN`/`XCS`/`OTH`) — no dates/calendar positions (the Timeline remains the only temporal display). The Timeline is unchanged.
+
+### 8.4 Validation
+- Full suite: **1067/1067 passing (97 files)** (+11 over F-PR18's 1056).
+- `tsc --noEmit` clean · production build EXIT 0.
+- Locked `pulse-panel`/`pulse-rail`/`pulse-model` contracts preserved; all data attributes untouched.
+- New tests: `pr18-pulse-design.test.tsx` equal-spacing test + `pulse-model.test.ts` F-PR19 determinism block.
+
+### 8.5 Deliverables (this follow-up)
+- `packages/web/src/components/graph/control-center/pulse/pulse-glyph.tsx` — equal sectors, sector-driven radii, arc-centre labels
+- `packages/web/tests/pr18-pulse-design.test.tsx` — equal-spacing / organic-contour / hue-blend tests
+- `packages/web/tests/pulse-model.test.ts` — F-PR19 determinism block
 
 **Report:** `f-pr18-corrective-pass.md` (this file)
 
