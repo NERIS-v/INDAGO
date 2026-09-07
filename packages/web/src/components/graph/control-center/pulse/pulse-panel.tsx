@@ -114,7 +114,7 @@ function PulseCard({
       data-pulse-card-entity={field.entityId}
       data-pulse-card-prominent={String(prominent)}
       data-pulse-card-selected={String(selected)}
-      className={`relative flex flex-col rounded-xl border bg-surface-50/70 p-3 shadow-sm transition-opacity duration-300 ${
+      className={`relative flex flex-col items-center rounded-xl border bg-surface-50/70 p-4 shadow-sm transition-opacity duration-300 ${
         selected
           ? "border-accent-rose/60 ring-1 ring-accent-rose/30"
           : "border-surface-200/60"
@@ -126,12 +126,12 @@ function PulseCard({
         aria-pressed={selected}
         aria-label={ariaLabel}
         data-testid="pulse-entity-card"
-        className="flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-rose"
+        className="flex w-full flex-col items-center gap-3 rounded-lg text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-rose"
       >
-        <span className={`${prominent ? "h-36 w-36 shrink-0" : "h-32 w-32 shrink-0"}`}>
+        <span className={`${prominent ? "h-48 w-48 shrink-0" : "h-36 w-36 shrink-0"}`}>
           <PulseGlyph field={field} dimmed={dimmed} selected={selected} ariaLabel={ariaLabel} />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0">
           <span className="block truncate text-[13px] font-medium text-surface-900" title={field.label}>
             {field.label}
           </span>
@@ -149,7 +149,7 @@ function PulseCard({
 
       {field.peaks.length > 0 && (
         <div
-          className="flex flex-wrap items-center gap-1"
+          className="flex flex-wrap items-center justify-center gap-1"
           data-testid="pulse-peak-chips"
         >
           {chipPeaks.map((peak) => (
@@ -309,7 +309,7 @@ export function PulsePanel({
             onOpenInGraph={onOpenInGraph ? () => onOpenInGraph(focused.entityId) : undefined}
           />
         )}
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {others.map((field) => (
             <PulseCard
               key={field.entityId}

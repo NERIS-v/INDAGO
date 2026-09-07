@@ -1,13 +1,14 @@
 // ============================================================================
-// F-PR6 + F-PR16 — Entity Pulse glyph: one entity's enclosed circular field.
+// F-PR6 + F-PR16 + F-PR18 — Entity Pulse glyph: one entity's enclosed circular
+// field.
 //
-// F-PR16 redesign (circular visual language): the entity is a large circular
-// NODE with its analytical aura (salience halo) and continuous in-window
-// activity contour behind it, its readable short name set at the centre, and
-// its REAL temporal peaks drawn as deterministic ticks around the perimeter
-// (magnitude → tick length, category → colour). Nothing is invented: geometry
-// derives from the entity's own provider-backed observations, salience and
-// peaks — every peak is a real day-cluster inside the shared workspace window.
+// F-PR18 redesign (large radial language): the entity is a large circular NODE
+// with its analytical aura (salience halo) and continuous in-window activity
+// contour behind it. Category indicators sit on the aura boundary — each is a
+// real data-backed observation cluster of one category, placed at that
+// category's strongest observation angle, with its strength mapped to the aura
+// radius. Nothing is invented: geometry derives from the entity's own
+// provider-backed observations, salience and category totals.
 //
 // The outer contour still MORPHS (restrained ease-out, 320 ms) between two
 // deterministic states when the shared workspace timeRange changes.
@@ -29,15 +30,16 @@ import {
 } from "@/lib/network/pulse/pulse-model";
 import type { EntityPulseField } from "@/lib/network/pulse/pulse-model";
 
-export const PULSE_GLYPH_VIEWBOX = 100;
+export const PULSE_GLYPH_VIEWBOX = 200;
 const PULSE_GLYPH_CENTER = PULSE_GLYPH_VIEWBOX / 2;
-const PULSE_GLYPH_FIELD_SCALE = 34;
-/** Circular node radius (viewBox units). */
-const PULSE_GLYPH_NODE_RADIUS = 16;
-/** Peak tick start radius (just beyond the node). */
-const PULSE_GLYPH_PEAK_BASE = PULSE_GLYPH_NODE_RADIUS + 5;
-/** Peak tick length range from the base. */
-const PULSE_GLYPH_PEAK_AMPLITUDE = 16;
+const PULSE_GLYPH_NODE_RADIUS = 34;
+const PULSE_GLYPH_HALO_RADIUS = PULSE_GLYPH_NODE_RADIUS * 1.15;
+const PULSE_GLYPH_AURA_BASE = PULSE_GLYPH_NODE_RADIUS + 30;
+const PULSE_GLYPH_AURA_MAX = PULSE_GLYPH_NODE_RADIUS + 46;
+const PULSE_GLYPH_AURA_SPAN = PULSE_GLYPH_AURA_MAX - PULSE_GLYPH_AURA_BASE;
+const PULSE_GLYPH_INDICATOR_DOT_GAP = 2;
+const PULSE_GLYPH_INDICATOR_LABEL_GAP = 12;
+const PULSE_GLYPH_SELECTED_RING = 95;
 const MORPH_DURATION_MS = 320;
 const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
 
@@ -109,50 +111,19 @@ export const PulseGlyph = memo(function PulseGlyph({
   onSelect,
 }: PulseGlyphProps) {
   const outer = useMorphSamples(field.outerSamples);
+  const mappedOuter = outer.map((sample) => {
+    const t = (sample - 0.22) / 0.78;
+    const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+    return PULSE_GLYPH_AURA_BASE + clamped * PULSE_GLYPH_AURA_SPAN;
+  });
   const outerPath = closedRadialPath(
-    outer,
+    mappedOuter,
     PULSE_GLYPH_CENTER,
     PULSE_GLYPH_CENTER,
-    PULSE_GLYPH_FIELD_SCALE,
-    PULSE_PHASE,
-  );
-  const innerPath = closedRadialPath(
-    field.innerSamples,
-    PULSE_GLYPH_CENTER,
-    PULSE_GLYPH_CENTER,
-    PULSE_GLYPH_FIELD_SCALE,
+    1,
     PULSE_PHASE,
   );
   const color = PULSE_CATEGORY_COLORS[field.category];
-  const nodeGroup = (
-    <g>
-      <circle
-        cx={PULSE_GLYPH_CENTER}
-        cy={PULSE_GLYPH_CENTER}
-        r={PULSE_GLYPH_NODE_RADIUS}
-        fill="var(--color-surface-0)"
-      />
-      <circle
-        cx={PULSE_GLYPH_CENTER}
-        cy={PULSE_GLYPH_CENTER}
-        r={PULSE_GLYPH_NODE_RADIUS}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.25}
-        strokeOpacity={field.active ? 0.9 : 0.5}
-      />
-      <text
-        x={PULSE_GLYPH_CENTER}
-        y={PULSE_GLYPH_CENTER + 2.25}
-        textAnchor="middle"
-        fontSize={7}
-        fontFamily="var(--font-mono, ui-monospace, monospace)"
-        fill="var(--color-surface-800)"
-      >
-        {shortEntityLabel(field.label)}
-      </text>
-    </g>
-  );
 
   return (
     <svg
@@ -167,69 +138,132 @@ export const PulseGlyph = memo(function PulseGlyph({
       data-pulse-entity-salience={
         field.salienceAvailable ? String(field.salience) : "unavailable"
       }
-      data-pulse-peaks-count={field.peaks.length}
+      data-pulse-peaks-count={field.indicators.length}
       className={`h-full w-full transition-opacity duration-300 ${
         dimmed ? "opacity-40" : "opacity-100"
       } ${onSelect ? "cursor-pointer" : ""}`}
     >
       <title>{ariaLabel}</title>
-      <path
-        d={innerPath}
+
+      {/* Halo: faint inner circle at nodeR * 1.15 */}
+      <circle
+        cx={PULSE_GLYPH_CENTER}
+        cy={PULSE_GLYPH_CENTER}
+        r={PULSE_GLYPH_HALO_RADIUS}
         fill="none"
         stroke="var(--color-surface-400)"
-        strokeWidth={0.75}
+        strokeWidth={1}
         strokeOpacity={0.5}
       />
+
+      {/* Aura: continuous contour */}
       <path
         d={outerPath}
         fill={color}
         fillOpacity={field.active ? 0.14 : 0.05}
         stroke={color}
-        strokeWidth={1}
+        strokeWidth={1.5}
         strokeOpacity={field.active ? 0.9 : 0.45}
       />
-      {field.peaks.map((peak) => {
-        const innerR = PULSE_GLYPH_PEAK_BASE;
-        const outerR = innerR + peak.magnitude * PULSE_GLYPH_PEAK_AMPLITUDE;
-        const cos = Math.cos(peak.angle);
-        const sin = Math.sin(peak.angle);
-        const peakColor = PULSE_CATEGORY_COLORS[peak.category];
+
+      {/* Category indicators */}
+      {field.indicators.map((indicator) => {
+        const index =
+          Math.round(
+            (((indicator.angle - PULSE_PHASE) % (Math.PI * 2)) +
+              Math.PI * 2) %
+              (Math.PI * 2) /
+              (Math.PI * 2) *
+              (PULSE_SAMPLE_COUNT - 1),
+          ) % PULSE_SAMPLE_COUNT;
+        const boundaryRadius = mappedOuter[index] ?? PULSE_GLYPH_AURA_BASE;
+        const cos = Math.cos(indicator.angle);
+        const sin = Math.sin(indicator.angle);
+        const dotRadius = boundaryRadius + PULSE_GLYPH_INDICATOR_DOT_GAP;
+        const labelRadius = boundaryRadius + PULSE_GLYPH_INDICATOR_LABEL_GAP;
+        const indicatorColor = PULSE_CATEGORY_COLORS[indicator.category];
+        const description = `${indicator.label}: ${indicator.count} ${indicator.count === 1 ? "observation" : "observations"}, ${(indicator.strength * 100).toFixed(0)}% strength`;
         return (
           <g
-            key={`${peak.key}:${peak.category}`}
+            key={indicator.category}
             data-pulse-peak
-            data-pulse-peak-label={peak.label}
-            data-pulse-peak-angle={peak.angle.toFixed(3)}
-            data-pulse-peak-magnitude={peak.magnitude.toFixed(3)}
+            data-pulse-peak-label={indicator.label}
+            data-pulse-peak-angle={indicator.angle.toFixed(3)}
+            data-pulse-peak-magnitude={indicator.strength.toFixed(3)}
+            data-pulse-indicator-category={indicator.category}
+            data-pulse-indicator-count={indicator.count}
           >
-            <line
-              x1={PULSE_GLYPH_CENTER + cos * innerR}
-              y1={PULSE_GLYPH_CENTER + sin * innerR}
-              x2={PULSE_GLYPH_CENTER + cos * outerR}
-              y2={PULSE_GLYPH_CENTER + sin * outerR}
-              stroke={peakColor}
-              strokeWidth={2}
-              strokeLinecap="round"
-            />
+            <title>{description}</title>
             <circle
-              cx={PULSE_GLYPH_CENTER + cos * outerR}
-              cy={PULSE_GLYPH_CENTER + sin * outerR}
-              r={1.6}
-              fill={peakColor}
+              cx={PULSE_GLYPH_CENTER + cos * dotRadius}
+              cy={PULSE_GLYPH_CENTER + sin * dotRadius}
+              r={3.5}
+              fill={indicatorColor}
             />
+            <line
+              x1={PULSE_GLYPH_CENTER + cos * (dotRadius + 2.5)}
+              y1={PULSE_GLYPH_CENTER + sin * (dotRadius + 2.5)}
+              x2={PULSE_GLYPH_CENTER + cos * (labelRadius - 3)}
+              y2={PULSE_GLYPH_CENTER + sin * (labelRadius - 3)}
+              stroke={indicatorColor}
+              strokeWidth={0.75}
+              strokeOpacity={0.6}
+            />
+            <text
+              x={PULSE_GLYPH_CENTER + cos * labelRadius}
+              y={PULSE_GLYPH_CENTER + sin * labelRadius + 2.5}
+              textAnchor="middle"
+              fontSize={7}
+              fontFamily="var(--font-mono, ui-monospace, monospace)"
+              fontWeight={700}
+              fill={indicatorColor}
+            >
+              {indicator.label}
+            </text>
           </g>
         );
       })}
-      {nodeGroup}
+
+      {/* Center entity node */}
+      <g>
+        <circle
+          cx={PULSE_GLYPH_CENTER}
+          cy={PULSE_GLYPH_CENTER}
+          r={PULSE_GLYPH_NODE_RADIUS}
+          fill="var(--color-surface-0)"
+        />
+        <circle
+          cx={PULSE_GLYPH_CENTER}
+          cy={PULSE_GLYPH_CENTER}
+          r={PULSE_GLYPH_NODE_RADIUS}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeOpacity={field.active ? 0.9 : 0.5}
+        />
+        <text
+          x={PULSE_GLYPH_CENTER}
+          y={PULSE_GLYPH_CENTER + 2.5}
+          textAnchor="middle"
+          fontSize={11}
+          fontWeight={600}
+          fontFamily="var(--font-sans, sans-serif)"
+          fill="var(--color-surface-800)"
+        >
+          {shortEntityLabel(field.label)}
+        </text>
+      </g>
+
+      {/* Selected ring */}
       {selected && (
         <circle
           cx={PULSE_GLYPH_CENTER}
           cy={PULSE_GLYPH_CENTER}
-          r={PULSE_GLYPH_VIEWBOX / 2 - 1.5}
+          r={PULSE_GLYPH_SELECTED_RING}
           fill="none"
           stroke="var(--color-accent-rose)"
-          strokeWidth={1}
-          strokeDasharray="3 3"
+          strokeWidth={1.5}
+          strokeDasharray="4 4"
         />
       )}
     </svg>

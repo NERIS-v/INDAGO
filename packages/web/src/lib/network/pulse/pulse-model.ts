@@ -125,7 +125,7 @@ export const PULSE_MAX_PEAKS_PER_ENTITY = 6;
 /** Peak caption chips shown directly on the entity tile. */
 export const PULSE_PEAK_CHIPS_PER_ENTITY = 3;
 
-/** 3-letter category codes for the perimeter peak labels (FIN · 20 FEB). */
+/** 3-letter category codes for the perimeter peak labels (FIN, COM, LOC, …). */
 export const PULSE_PEAK_CATEGORY_CODES: Record<PulseCategory, string> = {
   communication: "COM",
   financial: "FIN",
@@ -134,21 +134,6 @@ export const PULSE_PEAK_CATEGORY_CODES: Record<PulseCategory, string> = {
   "cross-case": "XCS",
   other: "OTH",
 };
-
-const PULSE_MONTH_ABBREVIATIONS = [
-  "JAN",
-  "FEB",
-  "MAR",
-  "APR",
-  "MAY",
-  "JUN",
-  "JUL",
-  "AUG",
-  "SEP",
-  "OCT",
-  "NOV",
-  "DEC",
-] as const;
 
 /** Deterministic radial-field ring radius, fraction of the scene size. */
 export const PULSE_SCENE_RING_RADIUS = 0.3;
@@ -171,15 +156,23 @@ export interface EntityPulsePeak {
   /** Cluster epoch ms for deterministic ordering; untimed → null. */
   readonly timestampMs: number | null;
   readonly category: PulseCategory;
-  /** Short perimeter label, e.g. "FIN · 20 FEB" / "FIN" when untimed. */
+  /** Short perimeter label, e.g. "FIN". */
   readonly label: string;
-  /** Hover/audio detail: count + category + day. */
+  /** Hover/audio detail: count + category. */
   readonly detail: string;
   /** Deterministic angle on the perimeter [0, 2π). */
   readonly angle: number;
   /** 0..1 — relative to this entity's strongest in-window day cluster. */
   readonly magnitude: number;
   readonly observationCount: number;
+}
+
+export interface EntityPulseIndicator {
+  readonly category: PulseCategory;
+  readonly label: string;
+  readonly count: number;
+  readonly strength: number;
+  readonly angle: number;
 }
 
 /** Deterministic spatial-field placement of one entity. */
@@ -210,14 +203,6 @@ function dayKeyOf(observation: Observation): string | null {
   const iso = raw.slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
   return iso;
-}
-
-/** "20-FEB" style day label from a parsed observation timestamp (UTC). */
-function dayLabelOf(timestampMs: number): string {
-  const date = new Date(timestampMs);
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = PULSE_MONTH_ABBREVIATIONS[date.getUTCMonth()];
-  return `${day}-${month}`;
 }
 
 /**
@@ -258,10 +243,7 @@ export function buildEntityPeaks(
       return Number.isFinite(ms) ? ms : null;
     })();
     const category = dominantCategory(list) ?? "other";
-    const datePart = observedAtMs !== null ? dayLabelOf(observedAtMs) : null;
-    const label = datePart
-      ? `${PULSE_PEAK_CATEGORY_CODES[category]} · ${datePart}`
-      : PULSE_PEAK_CATEGORY_CODES[category];
+    const label = PULSE_PEAK_CATEGORY_CODES[category];
     const angle = Math.PI * 2 * (stableHash(`${entityId}|${dayKey}|${category}`) % 2000) / 2000;
     const magnitude = maxStrength > 0 ? sumStrength(list) / maxStrength : 0;
 
@@ -270,9 +252,7 @@ export function buildEntityPeaks(
       timestampMs: observedAtMs,
       category,
       label,
-      detail: `${list.length} ${list.length === 1 ? "observation" : "observations"} · ${PULSE_CATEGORY_LABELS[category]}${
-        datePart ? ` · ${observedAtMs !== null ? new Date(observedAtMs).toISOString().slice(0, 10) : ""}` : ""
-      }`,
+      detail: `${list.length} ${list.length === 1 ? "observation" : "observations"} · ${PULSE_CATEGORY_LABELS[category]}`,
       angle,
       magnitude: Math.min(1, magnitude),
       observationCount: list.length,
@@ -288,6 +268,81 @@ export function buildEntityPeaks(
         PULSE_CATEGORIES.indexOf(a.category) - PULSE_CATEGORIES.indexOf(b.category),
     )
     .slice(0, PULSE_MAX_PEAKS_PER_ENTITY);
+}
+
+export function buildEntityIndicators(
+  nodeId: string,
+  _entityId: string,
+  inWindowObservations: readonly Observation[],
+): readonly EntityPulseIndicator[] {
+  if (inWindowObservations.length === 0) return [];
+
+  const byCategory = new Map<PulseCategory, Observation[]>();
+  for (const observation of inWindowObservations) {
+    const category = observationTypeToCategory(observation.type);
+    const list = byCategory.get(category);
+    if (list) list.push(observation);
+    else byCategory.set(category, [observation]);
+  }
+
+  const categoryEntries: Array<{
+    category: PulseCategory;
+    observations: Observation[];
+    count: number;
+    totalStrength: number;
+    angle: number;
+  }> = [];
+
+  for (const category of PULSE_CATEGORIES) {
+    const observations = byCategory.get(category);
+    if (!observations || observations.length === 0) continue;
+
+    let totalStrength = 0;
+    let bestStrength = -Infinity;
+    let bestAngle = 0;
+    for (const observation of observations) {
+      if (Number.isFinite(observation.strength)) {
+        totalStrength += observation.strength;
+      }
+      if (Number.isFinite(observation.strength) && observation.strength > bestStrength) {
+        bestStrength = observation.strength;
+        bestAngle =
+          PULSE_PHASE +
+          ((stableHash(`${nodeId}|${observation.id}`) % 2000) / 2000) *
+            Math.PI * 2;
+      }
+    }
+
+    categoryEntries.push({
+      category,
+      observations,
+      count: observations.length,
+      totalStrength,
+      angle: bestAngle,
+    });
+  }
+
+  const maxTotalStrength = Math.max(
+    ...categoryEntries.map((entry) => entry.totalStrength),
+    0,
+  );
+
+  return categoryEntries
+    .map((entry) => ({
+      category: entry.category,
+      label: PULSE_PEAK_CATEGORY_CODES[entry.category],
+      count: entry.count,
+      strength:
+        maxTotalStrength > 0
+          ? clamp01(entry.totalStrength / maxTotalStrength)
+          : 0,
+      angle: entry.angle,
+    }))
+    .sort(
+      (a, b) =>
+        PULSE_CATEGORIES.indexOf(a.category) -
+        PULSE_CATEGORIES.indexOf(b.category),
+    );
 }
 
 /**
@@ -360,6 +415,7 @@ export interface EntityPulseField {
   readonly innerSamples: readonly number[];
   /** F-PR16: deterministic in-window temporal peaks on the perimeter. */
   readonly peaks: readonly EntityPulsePeak[];
+  readonly indicators: readonly EntityPulseIndicator[];
   /** Total in-window day clusters (pre-cap) — "peaks + N more" narration. */
   readonly peaksTotal: number;
   readonly peaksCapped: boolean;
@@ -645,6 +701,7 @@ export function buildEntityPulseOverview(
     const category = dominantCategory(windowObs) ?? "other";
     const strength = sumStrength(windowObs);
     const peaks = buildEntityPeaks(entityId, windowObs);
+    const indicators = buildEntityIndicators(node.id, entityId, windowObs);
     const peaksTotal = (() => {
       if (windowObs.length === 0) return 0;
       const dayKeys = new Set<string>();
@@ -668,6 +725,7 @@ export function buildEntityPulseOverview(
       outerSamples: sampleOuterField(node, windowObs, maxWindowStrength),
       innerSamples: sampleInnerHalo(node),
       peaks,
+      indicators,
       peaksTotal,
       peaksCapped: peaksTotal > peaks.length,
     };

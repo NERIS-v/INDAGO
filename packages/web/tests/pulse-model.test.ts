@@ -466,13 +466,12 @@ describe("F-PR16 — temporal perimeter peaks", () => {
     }
   });
 
-  it("labels perimeter peaks with a category code and the real observation day", () => {
+  it("labels perimeter peaks with a category code (no date in label)", () => {
     const overview = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
     const bank = overview.entities.find((e) => e.entityId === ENT_BANK)!;
-    const dated = bank.peaks.filter((peak) => peak.timestampMs !== null);
-    expect(dated.length).toBeGreaterThan(0);
-    for (const peak of dated) {
-      expect(peak.label).toMatch(new RegExp(`^${PULSE_PEAK_CATEGORY_CODES[peak.category]} · \\d{2}-[A-Z]{3}$`));
+    expect(bank.peaks.length).toBeGreaterThan(0);
+    for (const peak of bank.peaks) {
+      expect(peak.label).toBe(PULSE_PEAK_CATEGORY_CODES[peak.category]);
       expect(peak.detail).toContain(String(peak.observationCount));
     }
   });
@@ -492,7 +491,7 @@ describe("F-PR16 — temporal perimeter peaks", () => {
     ]);
     expect(dayClustered).toHaveLength(1);
     expect(dayClustered[0]!.observationCount).toBe(2);
-    expect(dayClustered[0]!.label).toBe("FIN · 05-JAN");
+    expect(dayClustered[0]!.label).toBe("FIN");
   });
 
   it("keeps untimed observations in a single honest fallback peak", () => {
