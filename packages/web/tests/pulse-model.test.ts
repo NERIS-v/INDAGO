@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildEntityPulseOverview,
   buildEntityPeaks,
+  buildEntityIndicators,
   closedRadialPath,
   observationInTimeRange,
   observationTypeToCategory,
@@ -541,5 +542,44 @@ describe("F-PR16 — spatial field placement geometry", () => {
     expect(shortEntityLabel("Intermediary Account 0093")).toBe("Intermediary");
     expect(shortEntityLabel("A").trim().length).toBeGreaterThan(0);
     expect(shortEntityLabel("Loremipsumdolorsitamet")).toContain("…");
+  });
+});
+
+describe("F-PR19 — sector determinism (no random breathing)", () => {
+  it("produces identical sector indicators for identical data across recomputes", () => {
+    const a = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    const again = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
+    const bankA = a.entities.find((e) => e.entityId === ENT_BANK)!;
+    const bankB = again.entities.find((e) => e.entityId === ENT_BANK)!;
+    expect(bankA.indicators).toEqual(bankB.indicators);
+  });
+
+  it("buildEntityIndicators is a pure function of (nodeId, entityId, observations)", () => {
+    const windowObs = observations.filter(
+      (o) => o.entityIds.includes(ENT_BANK),
+    );
+    const first = buildEntityIndicators("n-bank", ENT_BANK, windowObs);
+    const second = buildEntityIndicators("n-bank", ENT_BANK, windowObs);
+    expect(first).toEqual(second);
+    // Deterministic fields are concrete numbers (never NaN / never random).
+    for (const indicator of first) {
+      expect(Number.isFinite(indicator.angle)).toBe(true);
+      expect(indicator.strength).toBeGreaterThanOrEqual(0);
+      expect(indicator.strength).toBeLessThanOrEqual(1);
+      expect(indicator.count).toBeGreaterThan(0);
+      expect(indicator.label).toMatch(/^(FIN|COM|LOC|IDN|XCS|OTH)$/);
+    }
+  });
+
+  it("visual labels carry no dates or calendar positions", () => {
+    const windowObs = observations.filter(
+      (o) => o.entityIds.includes(ENT_BANK),
+    );
+    const indicators = buildEntityIndicators("n-bank", ENT_BANK, windowObs);
+    for (const indicator of indicators) {
+      // Category code only — never an observation date.
+      expect(indicator.label).toBe(PULSE_PEAK_CATEGORY_CODES[indicator.category]);
+      expect(indicator.label).not.toMatch(/\d{2}-[A-Z]{3}/);
+    }
   });
 });
