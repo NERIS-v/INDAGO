@@ -117,6 +117,29 @@ describe("F-PR18 — Entity Pulse analytical-field redesign", () => {
     }
   });
 
+  it("drifts as a living field: per-entity spin+breathe animation, geometry untouched", () => {
+    renderPanel();
+    const glyphs = Array.from(document.querySelectorAll("[data-pulse-entity]"));
+    expect(glyphs.length).toBeGreaterThan(0);
+    const drifts = Array.from(
+      document.querySelectorAll("[data-pulse-live-drift]"),
+    );
+    expect(drifts.length).toBe(glyphs.length);
+    const durations = new Set<string>();
+    for (const drift of drifts) {
+      // The drift is CSS-only: it never redraws geometry, so the deterministic
+      // at-rest shape and stable data attributes stay intact.
+      expect(drift.getAttribute("class")).toContain("pulse-live-drift");
+      const style = (drift as SVGElement).getAttribute("style") ?? "";
+      const dur = /animation-duration:\s*(\d+ms)/.exec(style)?.[1];
+      expect(dur).toBeTruthy();
+      durations.add(dur!);
+    }
+    // Seeded per-entity periods across the collection (roughly half of entities
+    // also run the spin in reverse direction, so the drift is multi-directional).
+    expect(durations.size).toBeGreaterThan(1);
+  });
+
   it("never renders radial time bars or explicit observation dates anywhere", () => {
     renderPanel();
     expect(document.querySelectorAll("[data-pulse-glyph-bar]").length).toBe(0);

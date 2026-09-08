@@ -293,6 +293,81 @@ describe("PASS 4 — Case-B hypothesis route: real Phase-2 hypotheses as cards",
     );
   });
 
+  it("groups the derived hypotheses into real categories with workspace evidence", async () => {
+    renderWorkspace(createWorkspaceProviders(caseBIdentity(), fastEnv));
+
+    await screen.findByTestId("phase2-hypothesis-surface");
+    // Category sections render once the workspace lists resolve.
+    const security = await screen.findByTestId("phase2-surface-category-security");
+    const link = await screen.findByTestId("phase2-surface-category-link");
+    expect(within(security).getByText(/Security function — who held the access\?/)).toBeInTheDocument();
+    expect(within(link).getByText(/The hidden link — who connects the cases\?/)).toBeInTheDocument();
+
+    // Security function → the derived HYP_B2 pathway, details on click.
+    const secCard = await screen.findByTestId("phase2-surface-category-security-card");
+    expect(within(secCard).getByText(/WJA internal security function/)).toBeInTheDocument();
+    fireEvent.click(within(secCard).getByTestId("phase2-surface-category-security-card-toggle"));
+    await waitFor(
+      () =>
+        expect(within(secCard).getByText(/Supporting observations/)).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+    expect(within(secCard).getByText(/H\. Paul Rico as a security consultant/)).toBeInTheDocument();
+
+    // Hidden link → the HYP_P2_HL capsule: 3 base supporting records (in the
+    // workspace) on the collapsed badge, details on click.
+    const linkCard = await screen.findByTestId("phase2-surface-category-link-card");
+    expect(
+      within(linkCard).getByTestId("phase2-surface-category-link-card-toggle"),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(within(linkCard).getByText("3 obs")).toBeInTheDocument();
+    fireEvent.click(within(linkCard).getByTestId("phase2-surface-category-link-card-toggle"));
+    await waitFor(
+      () =>
+        expect(within(linkCard).getByText(/Supporting observations/)).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+    expect(within(linkCard).getByText(/Wheeler came to suspect the president/)).toBeInTheDocument();
+    expect(within(linkCard).getByText(/H\. Paul Rico as a security consultant/)).toBeInTheDocument();
+    expect(within(linkCard).getByText(/Winter Hill \/ WJA matter/)).toBeInTheDocument();
+    // Nothing is post-ingest on a fresh workspace — corroboration stays absent.
+    expect(within(linkCard).queryByText(/Post-ingest corroboration/)).not.toBeInTheDocument();
+  });
+
+  it("surfaces the hidden-link corroboration only once the live workflow produces it", async () => {
+    const workspaceId = "p4-route-link:b";
+    // Any Case-B submission fires the breakthrough → OBS_B10 and the SOLID
+    // Rico ↔ hitman edge become real workspace records for this workspace.
+    const boot = createWorkspaceProviders(caseBIdentity(workspaceId), fastEnv);
+    const refs = await boot.evidence.prepareUpload(INVESTIGATION_B_ID, [
+      new File([new Uint8Array(512)], "ledger.csv", { type: "text/csv" }),
+    ]);
+    await boot.evidence.submit(INVESTIGATION_B_ID, {
+      sourceName: "Registry export",
+      evidenceType: "FINANCIAL",
+      evidenceTitle: "Ledger rows for shell",
+      files: refs satisfies UploadedFileReference[],
+    });
+
+    renderWorkspace(createWorkspaceProviders(caseBIdentity(workspaceId), fastEnv));
+    await screen.findByTestId("phase2-hypothesis-surface");
+
+    const linkCard = await screen.findByTestId("phase2-surface-category-link-card");
+    // 3 base supporting + OBS_B10 + the now-solid connection observation.
+    expect(within(linkCard).getByText("5 obs")).toBeInTheDocument();
+
+    fireEvent.click(within(linkCard).getByTestId("phase2-surface-category-link-card-toggle"));
+    await waitFor(
+      () =>
+        expect(within(linkCard).getByText(/Post-ingest corroboration/)).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+    expect(within(linkCard).getAllByText(/Exhibit-719 pathway/).length).toBeGreaterThan(0);
+    expect(
+      within(linkCard).getByText(/H\. Paul Rico inside the company's security function/),
+    ).toBeInTheDocument();
+  });
+
   it("exposes the derived gap + next-best-evidence projection", async () => {
     renderWorkspace(createWorkspaceProviders(caseBIdentity(), fastEnv));
 

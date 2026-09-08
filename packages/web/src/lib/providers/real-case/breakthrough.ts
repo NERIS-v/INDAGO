@@ -6,7 +6,7 @@
 //   trigger  → the demo directive lets ANY Case B document upload fire this
 //              package (a submission carrying the EREQ_P2 class routes instead
 //              to the Phase-2 second-evidence flow)
-//   ingest   → source → artifact → evidence → 3 observations → mention
+//   ingest   → source → artifact → evidence → 4 observations → mention
 //              resolution (agents align to the EXISTING FBI Boston entity — no
 //              new entities) → relation hypothesis (WJA ↔ FBI Boston,
 //              financial) → graph edge (GN_B_WJA → GN_B_FBI, financial) →
@@ -120,6 +120,7 @@ import {
   OBS_B7,
   OBS_B8,
   OBS_B9,
+  OBS_B10,
   REL_A_MCGUIGAN_SOCTF,
   REL_A_SOCTF_FBI,
   REL_B_HITMAN_WINTER_HILL,
@@ -145,6 +146,7 @@ export const BREAKTHROUGH_STRENGTH = {
   obsHospitality: 0.7,
   obsRole: 0.7,
   obsScope: 0.6,
+  obsBridge: 0.72,
   structuralImportance: 0.55,
 } as const;
 
@@ -368,6 +370,28 @@ function buildObservationB9(): Observation {
   });
 }
 
+function buildObservationB10(): Observation {
+  return ObservationSchema.parse({
+    id: OBS_B10,
+    evidenceId: EVID_EXHIBIT_719,
+    sourceId: SRC_EXHIBIT_719,
+    type: "RELATIONAL",
+    content:
+      "Exhibit-719 pathway — reading the purchase report against the Case-A network file: the report places H. Paul Rico " +
+      "inside the company's security function, and the Case-A file routes the shooter's circle through the same " +
+      "occupational pairing the report documents. That pairing is the cross-case reading used to tie the shooter to " +
+      "H. Paul Rico. The link is investigative relevance only; the report itself never names the shooter.",
+    entityIds: [ENT_RICO, ENT_HITMAN, ENT_WINTER_HILL],
+    candidateMentions: [],
+    hypothesisIds: [HYP_B2, HYP_B3],
+    strength: BREAKTHROUGH_STRENGTH.obsBridge,
+    provenance: provenanceForBreakthrough([OBS_B7, OBS_B9]),
+    observedAt: CORP_RECORD_EVENT_AT,
+    createdAt: INGEST_AT,
+    updatedAt: INGEST_AT,
+  });
+}
+
 function buildRelation(support: number): RelationHypothesis {
   return RelationHypothesisSchema.parse({
     id: REL_B_WJA_FBI,
@@ -431,7 +455,7 @@ function buildRevealRelations(): readonly RelationHypothesis[] {
       targetEntityId: ENT_HITMAN,
       relationType: "case-link",
       support: REVEAL_STRENGTH.ricoHitman,
-evidenceBasis: [OBS_B7, OBS_B8],
+      evidenceBasis: [OBS_B7, OBS_B8, OBS_B10],
       contradictions: [OBS_B9],
       temporalInterval: {
         validFrom: INGEST_AT,
@@ -441,7 +465,7 @@ evidenceBasis: [OBS_B7, OBS_B8],
       directed: true,
       strength: BREAKTHROUGH_STRENGTH.obsRole,
       status: "PROPOSED",
-      provenance: provenanceForBreakthrough([OBS_B7, OBS_B8]),
+      provenance: provenanceForBreakthrough([OBS_B7, OBS_B8, OBS_B10]),
       createdAt: INGEST_AT,
       updatedAt: INGEST_AT,
     }),
@@ -451,7 +475,7 @@ evidenceBasis: [OBS_B7, OBS_B8],
       targetEntityId: ENT_WINTER_HILL,
       relationType: "case-link",
       support: REVEAL_STRENGTH.hitmanWinterHill,
-evidenceBasis: [OBS_B7],
+      evidenceBasis: [OBS_B7, OBS_B10],
       contradictions: [OBS_B9],
       temporalInterval: {
         validFrom: INGEST_AT,
@@ -461,7 +485,7 @@ evidenceBasis: [OBS_B7],
       directed: true,
       strength: BREAKTHROUGH_STRENGTH.obsRole,
       status: "PROPOSED",
-      provenance: provenanceForBreakthrough([OBS_B7]),
+      provenance: provenanceForBreakthrough([OBS_B7, OBS_B10]),
       createdAt: INGEST_AT,
       updatedAt: INGEST_AT,
     }),
@@ -493,7 +517,7 @@ relationHypothesisId: REL_B_RICO_HITMAN,
         semantics: "inferred",
       },
       status: "ACTIVE",
-      observationCount: 1,
+      observationCount: 2,
       sourceCount: 1,
       createdAt: INGEST_AT,
       updatedAt: INGEST_AT,
@@ -515,7 +539,7 @@ relationHypothesisId: REL_B_RICO_HITMAN,
         semantics: "inferred",
       },
       status: "ACTIVE",
-      observationCount: 1,
+      observationCount: 2,
       sourceCount: 1,
       createdAt: INGEST_AT,
       updatedAt: INGEST_AT,
@@ -675,7 +699,7 @@ function buildDelta(
     investigationId: INVESTIGATION_B_ID,
     appliedAt: INGEST_AT,
     evidenceIngestedIds: [EVID_EXHIBIT_719],
-    observationExtractedIds: [OBS_B7, OBS_B8, OBS_B9],
+    observationExtractedIds: [OBS_B7, OBS_B8, OBS_B9, OBS_B10],
     entityResolvedIds: [ENT_FBIBOSTON, ENT_RICO, ENT_WJA, ENT_HITMAN, ENT_WINTER_HILL],
     relationCreatedIds: [REL_B_WJA_FBI, REL_B_RICO_HITMAN, REL_B_HITMAN_WINTER_HILL],
     graphEdgesAdded: [...edgeIdsAfter],
@@ -702,7 +726,7 @@ function buildRecord(delta: Phase1PostFreezeDelta): BreakthroughRecord {
     evidenceId: EVID_EXHIBIT_719,
     evidenceClass: BREAKTHROUGH_CLASS,
     evidenceStatus: "PROCESSED",
-    extractedObservationIds: [OBS_B7, OBS_B8, OBS_B9],
+    extractedObservationIds: [OBS_B7, OBS_B8, OBS_B9, OBS_B10],
     resolvedEntityIds: [ENT_FBIBOSTON, ENT_RICO, ENT_WJA, ENT_HITMAN, ENT_WINTER_HILL],
     relationId: REL_B_WJA_FBI,
     edgeId: GE_B_WJA_FBI,
@@ -851,7 +875,12 @@ export function buildBreakthroughPackage(
   ),
 ): BreakthroughPackage {
   const support = deriveBreakthroughSupport({});
-  const observations = [buildObservationB7(), buildObservationB8(), buildObservationB9()];
+  const observations = [
+    buildObservationB7(),
+    buildObservationB8(),
+    buildObservationB9(),
+    buildObservationB10(),
+  ];
   const evidence = buildEvidence(observations.map((o) => o.id));
   const source = buildSource();
   const artifact = buildArtifact();

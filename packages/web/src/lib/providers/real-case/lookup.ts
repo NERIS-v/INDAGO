@@ -327,6 +327,7 @@ export const EVID_EXHIBIT_719 = id(NS_BREAKTHROUGH, "evidence:exhibit-719-wja-pu
 export const OBS_B7 = id(NS_CASE_B, "observation:exhibit-719-rico-security-role");
 export const OBS_B8 = id(NS_CASE_B, "observation:exhibit-719-wja-hospitality-fbi");
 export const OBS_B9 = id(NS_CASE_B, "observation:exhibit-719-record-scope");
+export const OBS_B10 = id(NS_CASE_B, "observation:exhibit-719-rico-hitman-read");
 
 // -- Relation / graph edge derived at ingest -----------------------------------
 export const REL_B_WJA_FBI = id(NS_CASE_B, "relation:wja-fbi-boston");
@@ -385,6 +386,7 @@ export const LEAD_P2 = id(NS_CASE_B, "lead:phase2-motive-discriminator");
 export const HYP_P2_H1 = id(NS_CASE_B, "hypothesis:phase2-h1-protect-operation");
 export const HYP_P2_H2 = id(NS_CASE_B, "hypothesis:phase2-h2-regain-control");
 export const HYP_P2_H3 = id(NS_CASE_B, "hypothesis:phase2-h3-personal");
+export const HYP_P2_HL = id(NS_CASE_B, "hypothesis:phase2-hidden-link");
 export const GAP_AG2 = id(NS_CASE_B, "gap:phase2-motive-discrimination");
 export const HOLE_P2_MOTIVE = id(NS_CASE_B, "hole:phase2-motive");
 export const EREQ_P2 = id(NS_CASE_B, "evidence-request:phase2-audit-records-motive");

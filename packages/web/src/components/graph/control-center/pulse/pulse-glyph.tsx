@@ -21,6 +21,12 @@
 //  • Same data + same timeRange ⇒ identical geometry at rest. No random
 //    breathing and no per-frame noise — every sample, angle and opacity is
 //    derived deterministically from the entity's provider-backed observations.
+//  • The contour is a LIVING field: a slow, per-entity CSS drift (a full spin
+//    plus a gentle breathe, ~36–50 s, seeded by a stable hash of the entity id,
+//    reversed for half of all entities) animates the WHOLE organic field so it
+//    reads as real activity over time. The drift never redraws geometry per
+//    frame — every angle/sample/opacity data attribute stays stable — and it
+//    switches off under prefers-reduced-motion.
 //
 // The outer contour still MORPHS (restrained ease-out, 320 ms) between two
 // deterministic states when the shared workspace timeRange changes.
@@ -33,6 +39,7 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   closedRadialPath,
   PULSE_CATEGORY_COLORS,
@@ -61,6 +68,47 @@ const PULSE_GLYPH_SELECTED_RING = 99;
 const TWO_PI = Math.PI * 2;
 const MORPH_DURATION_MS = 320;
 const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
+
+/**
+ * Live-drift animation applied to the WHOLE organic field (never to the node,
+ * halo, or selection ring). A slow spin + breathe makes the contour read as
+ * living activity over time while keeping every data attribute stable. Fully
+ * disabled under prefers-reduced-motion. Inert in test/jsdom environments
+ * (CSS animation is not evaluated), so geometry determinism is preserved.
+ */
+const LIVE_DRIFT_KEYFRAMES = `
+@keyframes pulse-live-drift-spin-breathe {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(90deg) scale(1.015); }
+  50% { transform: rotate(180deg) scale(1); }
+  75% { transform: rotate(270deg) scale(0.985); }
+}
+.pulse-live-drift {
+  animation-name: pulse-live-drift-spin-breathe;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-live-drift { animation: none !important; }
+}
+`;
+
+/** Per-entity drift timing, deterministic from a stable hash of the entity id:
+ *  a 36–50 s period, a phase offset so entities start mid-stream, and a
+ *  clockwise/counter-clockwise direction shared by roughly half of entities. */
+function liveDriftStyle(entityId: string | undefined): CSSProperties {
+  const seed = stableHash(`pulse-live-drift:${entityId ?? ""}`);
+  const period = 36000 + (seed % 14000);
+  const delay = -((seed >> 5) % 70000);
+  const direction = (seed >> 3) % 2 === 1 ? "reverse" : "normal";
+  return {
+    animationDuration: `${period}ms`,
+    animationDelay: `${delay}ms`,
+    animationDirection: direction,
+    transformOrigin: "50% 50%",
+  };
+}
 
 function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -224,17 +272,21 @@ function irregularWave(entityId: string, category: PulseCategory, t: number): nu
   const p4 =
     ((stableHash(`${entityId}|${category}|w4`) % 628) / 628) * Math.PI * 2;
 
-  // 3 incommensurate harmonics (≈2, ≈5, and ≈13 cycles around the face) plus a
-  // slow "lope" — together they read as a genuinely irregular, restless wave.
+  // 4 incommensurate harmonics, ALL ≥ 1.5 cycles around the face (≈1.7, ≈3.1,
+  // ≈5.3, and ≈12.9 cycles). No sub-cycle "lope": a below-one-cycle term biases
+  // the whole bulge to a single hemisphere (the field reads "only in one
+  // direction"). With every term above one cycle, the wave peaks sweep around
+  // the full circumference and the contour stays evenly multi-directional —
+  // whichever way the strongest harmonic sits, opposite sectors still deform.
   const harmonic =
     0.30 * Math.sin(2 * Math.PI * t * 1.7 + p1) +
-    0.22 * Math.sin(2 * Math.PI * t * 5.3 + p2) +
-    0.14 * Math.sin(2 * Math.PI * t * 13.1 + p3) +
-    0.12 * Math.sin(2 * Math.PI * t * 0.8 + p4);
+    0.24 * Math.sin(2 * Math.PI * t * 3.1 + p2) +
+    0.22 * Math.sin(2 * Math.PI * t * 5.3 + p3) +
+    0.14 * Math.sin(2 * Math.PI * t * 12.9 + p4);
 
-  // Map the sum (roughly [-0.78, 0.78]) onto [0, 1], gently compressed at the
+  // Map the sum (roughly [-0.90, 0.90]) onto [0, 1], gently compressed at the
   // extremes so it never spikes into a degenerate circle.
-  return 0.5 + 0.5 * Math.max(-1, Math.min(1, harmonic * 1.15));
+  return 0.5 + 0.5 * Math.max(-1, Math.min(1, harmonic * 1.08));
 }
 
 /**
@@ -452,6 +504,7 @@ export const PulseGlyph = memo(function PulseGlyph({
         dimmed ? "opacity-40" : "opacity-100"
       } ${onSelect ? "cursor-pointer" : ""}`}
     >
+      <style>{LIVE_DRIFT_KEYFRAMES}</style>
       <title>{ariaLabel}</title>
 
       {/* Salience halo: faint inner circle just outside the node. */}
@@ -465,47 +518,56 @@ export const PulseGlyph = memo(function PulseGlyph({
         strokeOpacity={0.4}
       />
 
-      {/* Continuous organic field: shared neutral base wash. */}
-      <path
-        d={outerPath}
-        fill={color}
-        fillOpacity={field.active ? 0.07 : 0.03}
-        stroke="none"
-      />
+      {/* The LIVING organic field: the whole contour (base wash, sectors,
+          labels, crisp boundary) drifts as one per-entity animated group so it
+          reads as activity over time while geometry stays deterministic. */}
+      <g
+        className="pulse-live-drift"
+        style={liveDriftStyle(field.entityId)}
+        data-pulse-live-drift="true"
+      >
+        {/* Continuous organic field: shared neutral base wash. */}
+        <path
+          d={outerPath}
+          fill={color}
+          fillOpacity={field.active ? 0.07 : 0.03}
+          stroke="none"
+        />
 
-      {/* Semantic activity sectors — each a bounded, blended hue lobe. */}
-      {sectorRenders.map((render) => (
-        <g
-          key={render.indicator.category}
-          data-pulse-peak
-          data-pulse-peak-label={render.indicator.label}
-          data-pulse-peak-angle={render.indicator.angle.toFixed(3)}
-          data-pulse-peak-magnitude={render.indicator.strength.toFixed(3)}
-          data-pulse-indicator-category={render.indicator.category}
-          data-pulse-indicator-count={render.indicator.count}
-        >
-          <title>{`${render.indicator.label}: ${render.indicator.count} ${render.indicator.count === 1 ? "observation" : "observations"}, ${(render.indicator.strength * 100).toFixed(0)}% strength`}</title>
-          {render.polygons.map((polygon, p) => (
-            <polygon
-              key={p}
-              points={polygon.points}
-              fill={polygon.color}
-              fillOpacity={polygon.opacity}
-              stroke="none"
-            />
-          ))}
-          {label(render)}
-        </g>
-      ))}
+        {/* Semantic activity sectors — each a bounded, blended hue lobe. */}
+        {sectorRenders.map((render) => (
+          <g
+            key={render.indicator.category}
+            data-pulse-peak
+            data-pulse-peak-label={render.indicator.label}
+            data-pulse-peak-angle={render.indicator.angle.toFixed(3)}
+            data-pulse-peak-magnitude={render.indicator.strength.toFixed(3)}
+            data-pulse-indicator-category={render.indicator.category}
+            data-pulse-indicator-count={render.indicator.count}
+          >
+            <title>{`${render.indicator.label}: ${render.indicator.count} ${render.indicator.count === 1 ? "observation" : "observations"}, ${(render.indicator.strength * 100).toFixed(0)}% strength`}</title>
+            {render.polygons.map((polygon, p) => (
+              <polygon
+                key={p}
+                points={polygon.points}
+                fill={polygon.color}
+                fillOpacity={polygon.opacity}
+                stroke="none"
+              />
+            ))}
+            {label(render)}
+          </g>
+        ))}
 
-      {/* Crisp organic boundary of the continuous field. */}
-      <path
-        d={outerPath}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeOpacity={field.active ? 0.55 : 0.25}
-      />
+        {/* Crisp organic boundary of the continuous field. */}
+        <path
+          d={outerPath}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeOpacity={field.active ? 0.55 : 0.25}
+        />
+      </g>
 
       {/* Centre entity node (large, graph-node-like). */}
       <g>

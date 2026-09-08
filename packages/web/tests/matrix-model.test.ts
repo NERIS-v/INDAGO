@@ -278,6 +278,38 @@ describe("F-PR7 — cross-case comparison, boundary options and authorization ga
     expect(cellFor(meta, ENT_BANK, CROSS_ENTITY_ID)!.state).toBe("empty");
   });
 
+  it("carries a vague (non-direct) hidden-link theory on match-lit cells only", () => {
+    const meta = buildMatrix({
+      ...withinInput,
+      mode: "cross-case",
+      boundaryCaseId: CROSS_CASE_ID,
+      authorizedBoundaries: [CROSS_CASE_ID],
+      candidates: [buildCandidateView()],
+    });
+    const hero = cellFor(meta, ENT_VICTOR, CROSS_ENTITY_ID)!;
+    expect(hero.hiddenLinkTheory).not.toBeNull();
+    expect(hero.hiddenLinkTheory).toContain(meta.rows.find((r) => r.entityId === ENT_VICTOR)!.label);
+    // Vague and honest: it reads as the comparison's suspected link, never a verdict.
+    expect(hero.hiddenLinkTheory).toContain("suspected hidden link");
+    expect(hero.hiddenLinkTheory).toContain("not a finding");
+    expect(hero.hiddenLinkTheory.toLowerCase()).not.toContain("guilty");
+    // Non-match cells carry no theory at all.
+    expect(cellFor(meta, ENT_BANK, CROSS_ENTITY_ID)!.hiddenLinkTheory).toBeNull();
+  });
+
+  it("never exposes the hidden-link theory before authorization (empty cells only)", () => {
+    const meta = buildMatrix({
+      ...withinInput,
+      mode: "cross-case",
+      boundaryCaseId: CROSS_CASE_ID,
+      authorizedBoundaries: [],
+    });
+    expect(meta.hiddenCandidateCount).toBe(1);
+    for (const cell of meta.cells) {
+      expect(cell.hiddenLinkTheory).toBeNull();
+    }
+  });
+
   it("keeps a matchless overlay boundary quiet (no fabricated matches)", () => {
     const crimsonId = "case-f4a910b2";
     const meta = buildMatrix({

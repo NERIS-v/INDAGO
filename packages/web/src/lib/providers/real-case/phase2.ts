@@ -101,6 +101,7 @@ import {
   EREQ_P2,
   EVID_EXHIBIT_719,
   EVID_HR_TULSA,
+  EVID_HR_WJA,
   EVID_S1_AUDIT,
   EVT_P2_01,
   EVT_P2_02,
@@ -132,6 +133,7 @@ import {
   HYP_P2_H1,
   HYP_P2_H2,
   HYP_P2_H3,
+  HYP_P2_HL,
   INVESTIGATION_B_ID,
   LEAD_P2,
   LEDGER_P2,
@@ -539,7 +541,7 @@ export function buildPhase2ConnectionEvidence(): Phase2ConnectionEvidence {
       sourceId: SRC_EXHIBIT_719,
       type: "RELATIONAL",
       content:
-        "PHASE 2 / CROSS-CASE CONNECTION — the Case-A network operation (Exhibit-719 pathway) confirms the case-link " +
+        "CROSS-CASE CONNECTION — the Case-A network operation (Exhibit-719 pathway) confirms the case-link " +
         "between H. Paul Rico and the shooter through the Winter Hill / Boston gang operation: the graph now reads " +
         "Rico → hitman as a solid (ACTIVE) edge instead of the '?' uncertainty the Case-B record alone leaves. The " +
         "connection supports the operation-protection reading (H1) — investigative relevance only, never a guilt statement.",
@@ -586,6 +588,49 @@ function buildPreEvidenceHypothesis(frame: MotiveHypothesisFrame): Hypothesis {
           sourceId: SRC_HR_TULSA_B,
           extractor: EXTRACTOR,
           derivedFrom: isH3 ? [] : [OBS_B4],
+        },
+      ],
+      createdAt: PRE_ANALYSIS_AT,
+    },
+    createdAt: PRE_ANALYSIS_AT,
+    updatedAt: PRE_ANALYSIS_AT,
+  });
+}
+
+/**
+ * The "hidden link" capsule hypothesis — the derived cross-case reading that the
+ * security-connected figure H. Paul Rico is the suspected link joining the
+ * Case-A and Case-B files. Carried under its own category in the Hypothesis
+ * route so the tab groups real evidence together instead of presenting the
+ * derived hypotheses as empty shells. Honest framing: hypothesized — not
+ * established — nothing recorded proves the shooter was sourced, scheduled, or
+ * shielded by the figure. Delivered on the enriched envelope, NOT part of the
+ * derivePhase2 motive comparison.
+ */
+export function buildHiddenLinkHypothesis(): Hypothesis {
+  return HypothesisSchema.parse({
+    id: HYP_P2_HL,
+    investigationId: INVESTIGATION_B_ID,
+    title: "The suspected hidden link behind the shooting",
+    statement:
+      "The comparison keeps surfacing the same person on both sides of the record: the former-FBI security " +
+      "figure the company kept on staff in the Case-A file, and the same security-connected circle the Case-B " +
+      "record keeps routing the shooter's network back toward. It is hypothesized — not established — that " +
+      "this figure, H. Paul Rico, is the hidden link joining the two cases; no record proves the shooter was " +
+      "sourced, scheduled, or shielded by him.",
+    status: "ACTIVE",
+    confidence: 0.42,
+    supportingObservationIds: [OBS_B4, OBS_B5, OBS_B6],
+    contradictingObservationIds: [],
+    supportingEvidenceIds: [EVID_HR_TULSA, EVID_HR_WJA],
+    contradictingEvidenceIds: [],
+    relatedEntityIds: [ENT_RICO, ENT_HITMAN, ENT_WINTER_HILL],
+    provenance: {
+      entries: [
+        {
+          sourceId: SRC_HR_TULSA_B,
+          extractor: EXTRACTOR,
+          derivedFrom: [OBS_B4, OBS_B5, OBS_B6],
         },
       ],
       createdAt: PRE_ANALYSIS_AT,
@@ -956,7 +1001,7 @@ function buildS1Artifact(): Artifact {
     hash: demoContentHash("phase2:wja-audit-account"),
     storagePath: "ingest/phase2/wja-audit-account-house-report.txt",
     extractedText:
-      "PHASE 2 / SECOND EVIDENCE — WJA AUDIT / FINANCIAL DOCUMENT (HOUSE REPORT III.B.5) — PUBLIC ACCOUNT ONLY. " +
+      "SECOND EVIDENCE — WJA AUDIT / FINANCIAL DOCUMENT (HOUSE REPORT III.B.5) — PUBLIC ACCOUNT ONLY. " +
       "The physical corporate audit file is sealed / BLOCKED; the House report narrative records the audit of the company's financial operation " +
       "and its timing relative to the homicide. The extract does not reproduce the sealed document's figures.",
     createdAt: S1_INGEST_AT,
@@ -1038,21 +1083,21 @@ function buildS1Observations(): readonly Observation[] {
       id: OBS_P2_A1,
       type: "FINANCIAL",
       content:
-        "PHASE 2 / SECOND EVIDENCE — the audit Roger Wheeler ordered had begun probing the money skimmed from the company's financial operation; the House report's narrative is the only public account of the audit (the corporate document itself is sealed and BLOCKED).",
+        "SECOND EVIDENCE — the audit Roger Wheeler ordered had begun probing the money skimmed from the company's financial operation; the House report's narrative is the only public account of the audit (the corporate document itself is sealed and BLOCKED).",
       strength: PHASE2_STRENGTH.obsA1,
     }),
     buildS1Observation({
       id: OBS_P2_A2,
       type: "FACTUAL",
       content:
-        "PHASE 2 / SECOND EVIDENCE — Wheeler was murdered shortly after the audit began, while the audit of the company's financial operation was underway; the audit had been ordered months before the murder.",
+        "SECOND EVIDENCE — Wheeler was murdered shortly after the audit began, while the audit of the company's financial operation was underway; the audit had been ordered months before the murder.",
       strength: PHASE2_STRENGTH.obsA2,
     }),
     buildS1Observation({
       id: OBS_P2_A3,
       type: "FACTUAL",
       content:
-        "PHASE 2 / SECOND EVIDENCE LIMITATION — no public record shows the amount skimmed or any written audit finding before the murder; the corporate audit file remains BLOCKED pending research (corporate records and Connecticut Special Revenue files).",
+        "SECOND EVIDENCE LIMITATION — no public record shows the amount skimmed or any written audit finding before the murder; the corporate audit file remains BLOCKED pending research (corporate records and Connecticut Special Revenue files).",
       strength: PHASE2_STRENGTH.obsA3,
     }),
   ];

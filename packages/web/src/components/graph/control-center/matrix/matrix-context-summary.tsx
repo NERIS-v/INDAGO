@@ -176,6 +176,11 @@ export function MatrixContextSummary({
                     {cell.candidateNote}
                   </p>
                 )}
+                {cell.hiddenLinkTheory && (
+                  <p className="type-caption rounded-md border border-brand-500/25 bg-brand-500/5 px-2 py-1.5 text-surface-600" data-testid="matrix-cell-hidden-link-note">
+                    {cell.hiddenLinkTheory}
+                  </p>
+                )}
                 <p className="type-caption text-surface-400" data-testid="matrix-cell-window">
                   Observed window:{" "}
                   {matrixWindowLabel(cell.window) ?? "Not event-timed (comparison record)"}

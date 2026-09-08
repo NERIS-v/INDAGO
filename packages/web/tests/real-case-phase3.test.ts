@@ -63,6 +63,7 @@ import {
   EVT_BT_16,
   GAP_B4,
   GE_B_WJA_FBI,
+  ENT_HITMAN,
   GE_B_RICO_HITMAN,
   GE_B_HITMAN_WINTER_HILL,
   GE_B_SOCTF_FBI,
@@ -77,6 +78,7 @@ import {
   OBS_B7,
   OBS_B8,
   OBS_B9,
+  OBS_B10,
   REL_B_WJA_FBI,
   SRC_EXHIBIT_719,
 } from "@/lib/providers/real-case/lookup";
@@ -191,12 +193,22 @@ describe("PASS 3 — package supply chain (DERIVED, honest, deterministic)", () 
     expect([...pkg.evidence.entityIds].sort()).toEqual([ENT_FBIBOSTON, ENT_RICO, ENT_WJA].sort());
     expect(pkg.evidence.provenance.sourceId).toBe(SRC_EXHIBIT_719);
 
-    expect(pkg.observations.map((o) => o.id)).toEqual([OBS_B7, OBS_B8, OBS_B9]);
-    expect(pkg.observations.every((o) => o.type === "FINANCIAL" && o.sourceId === SRC_EXHIBIT_719)).toBe(true);
+    expect(pkg.observations.map((o) => o.id)).toEqual([OBS_B7, OBS_B8, OBS_B9, OBS_B10]);
+    expect(
+      pkg.observations
+        .filter((o) => o.id !== OBS_B10)
+        .every((o) => o.type === "FINANCIAL" && o.sourceId === SRC_EXHIBIT_719),
+    ).toBe(true);
+    // OBS_B10 is deliberately a RELATIONAL cross-case reading: it states the
+    // Exhibit-719 pathway the system uses to tie the shooter to H. Paul Rico
+    // (investigative relevance only — never a guilt statement).
+    const b10 = pkg.observations.find((o) => o.id === OBS_B10);
+    expect(b10?.type).toBe("RELATIONAL");
+    expect(b10?.entityIds).toEqual(expect.arrayContaining([ENT_RICO, ENT_HITMAN]));
     expect(pkg.observations.every((o) => o.provenance?.sourceId === SRC_EXHIBIT_719)).toBe(true);
     expect(
       pkg.observations.map((o) => o.candidateMentions.join("|")).sort(),
-    ).toEqual(["", "", "FBI Special Agents|Dowd|Forrester"].sort());
+    ).toEqual(["", "", "", "FBI Special Agents|Dowd|Forrester"].sort());
   });
 
   it("derives the relation + graph edge (WJA → FBI Boston, financial)", () => {

@@ -36,6 +36,7 @@ import type {
 } from "@indago/contracts";
 import { Badge } from "@/components/ui/badge";
 import { mergeMotiveRows, ScoreCell } from "./phase2-motive-panel";
+import { HYP_B2, HYP_B3, HYP_P2_HL, OBS_B10 } from "@/lib/providers/real-case/lookup";
 
 interface SurfaceData {
   readonly investigation: Investigation | null;
@@ -58,6 +59,187 @@ async function settleList<T>(
   }
 }
 
+/** One observation row inside a category card (mirrors the motive-card rows). */
+function CategoryCardObsRow({
+  id,
+  obs,
+  positive,
+}: {
+  readonly id: string;
+  readonly obs: Observation | undefined;
+  readonly positive: boolean;
+}) {
+  return (
+    <div
+      className={`space-y-1 rounded border bg-semantic-surface p-3 ${
+        positive ? "border-emerald-500/20" : "border-danger/20"
+      }`}
+    >
+      <div className="flex items-center justify-between font-mono text-[9px] text-semantic-foreground-faint">
+        <span className={`font-bold ${positive ? "text-emerald-700" : "text-danger"}`}>{id}</span>
+        {obs && <span>{obs.type}</span>}
+      </div>
+      <p className="text-xs leading-normal text-semantic-foreground-muted">
+        {obs ? obs.content : "Content unavailable on this workspace."}
+      </p>
+    </div>
+  );
+}
+
+/** Collapsible card for a category hypothesis (the "security function" and
+ *  "hidden link" groups) — real evidence content resolved from the workspace,
+ *  never hardcoded on the page. */ 
+function CategoryHypothesisCard({
+  hypothesis,
+  supportingIds,
+  contradictingIds,
+  corroborationIds,
+  obsById,
+  open,
+  onToggle,
+  testId,
+}: {
+  readonly hypothesis: Hypothesis;
+  readonly supportingIds: readonly string[];
+  readonly contradictingIds: readonly string[];
+  readonly corroborationIds: readonly string[];
+  readonly obsById: ReadonlyMap<string, Observation>;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly testId: string;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className={`overflow-hidden rounded-lg border bg-semantic-surface transition-colors ${
+        open ? "border-accent-blue/40" : "border-semantic-border-subtle hover:border-semantic-border"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        data-testid={`${testId}-toggle`}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left focus-visible:outline-none"
+      >
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-semantic-foreground-muted">
+            {hypothesis.id}
+          </span>
+          <span className="text-sm font-semibold text-semantic-foreground">
+            {hypothesis.title}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <Badge variant="muted">{supportingIds.length + corroborationIds.length} obs</Badge>
+          <span
+            className={`rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest ${
+              hypothesis.status === "SUPPORTED"
+                ? "border-success/30 bg-success/10 text-success"
+                : "border-semantic-border-subtle bg-semantic-surface text-semantic-foreground-faint"
+            }`}
+          >
+            {hypothesis.status}
+          </span>
+          <svg
+            className={`h-4 w-4 text-accent-blue transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div className="animate-fade-in border-t border-semantic-border-subtle px-5 py-4">
+          <p className="text-[0.8125rem] leading-relaxed text-semantic-foreground-muted">
+            {hypothesis.statement}
+          </p>
+
+          {/* Post-ingest corroboration (real activity that surfaces later in the
+              live workflow), blue-highlighted so it is never confused with the
+              base record. */}
+          {corroborationIds.length > 0 && (
+            <div className="mt-4 rounded-lg border border-accent-blue/30 bg-accent-blue/5 p-4">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-accent-blue" />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-accent-blue">
+                  Post-ingest corroboration
+                </span>
+                <Badge className="ml-auto font-mono text-[9px] bg-accent-blue/10 text-accent-blue">
+                  {corroborationIds.length} OBS
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-2.5">
+                {corroborationIds.map((id) => (
+                  <CategoryCardObsRow key={id} id={id} obs={obsById.get(id)} positive />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Supporting observations
+                </span>
+                <Badge className="font-mono text-[9px] bg-emerald-500/10 text-emerald-600">
+                  {supportingIds.length} OBS
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-2.5">
+                {supportingIds.length === 0 && (
+                  <p className="font-mono text-[10px] text-semantic-foreground-faint">None</p>
+                )}
+                {supportingIds.map((id) => (
+                  <CategoryCardObsRow key={id} id={id} obs={obsById.get(id)} positive />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border border-danger/30 bg-danger/5 p-4">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-wider text-danger">
+                  <span className="h-2 w-2 rounded-full bg-danger" />
+                  Contradicting observations
+                </span>
+                <Badge className="font-mono text-[9px] bg-danger/10 text-danger">
+                  {contradictingIds.length} OBS
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-2.5">
+                {contradictingIds.length === 0 && (
+                  <p className="font-mono text-[10px] text-semantic-foreground-faint">None</p>
+                )}
+                {contradictingIds.map((id) => (
+                  <CategoryCardObsRow key={id} id={id} obs={obsById.get(id)} positive={false} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Category section header (mono label + divider, mirrors the motive header). */
+function CategorySectionHeader({ label }: { readonly label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
+    </div>
+  );
+}
+
 export function Phase2HypothesisSurface({
   onRequestChallenge,
 }: {
@@ -69,6 +251,7 @@ export function Phase2HypothesisSurface({
 
   const [data, setData] = useState<SurfaceData | null>(null);
   const [openKey, setOpenKey] = useState<MotiveHypothesisKey | null>(null);
+  const [openCategoryKey, setOpenCategoryKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!freeze) return;
@@ -151,6 +334,24 @@ export function Phase2HypothesisSurface({
     phase2Gap
       ? data?.leads?.find((l) => (l.gapIds ?? []).includes(phase2Gap.id)) ?? null
       : null;
+
+  // PASS 4 — category groups beyond the motive cards. Each group carries REAL
+  // derived hypotheses with evidence resolved from the workspace state, so the
+  // tab never presents an empty shell:
+  //   Security function  → HYP_B2 (base) + HYP_B3 (post-Ingest refinement)
+  //   The hidden link    → HYP_P2_HL with corroboration that appears only after
+  //                        the live workflow actually produces it (OBS_B10 and
+  //                        the connection observation once the solid edge exists).
+  const resolved = (ids: readonly string[] | undefined) =>
+    (ids ?? []).filter((id) => obsById.has(id));
+  const securityCards: Hypothesis[] = [HYP_B2, HYP_B3]
+    .map((id) => hypothesisById.get(id))
+    .filter((h): h is Hypothesis => Boolean(h));
+  const linkHypothesis = hypothesisById.get(HYP_P2_HL) ?? null;
+  const linkCorroborationIds = [
+    ...(obsById.has(OBS_B10) ? [OBS_B10] : []),
+    ...(conn && connectionSolid ? [conn.observation.id] : []),
+  ];
 
   return (
     <div
@@ -366,6 +567,71 @@ export function Phase2HypothesisSurface({
           })}
         </div>
       </section>
+
+      {/* ── Category: Security function (the organizational pathway) ────── */}
+      <section
+        aria-label="Security function hypotheses"
+        data-testid="phase2-surface-category-security"
+        className="flex flex-col gap-5"
+      >
+        <CategorySectionHeader label="Security function — who held the access?" />
+        <p className="max-w-[80ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+          The derived reading that the company's internal security function was the
+          operational pathway between the two files. Evidence below is resolved from
+          the workspace record — never authored on this page.
+        </p>
+        <div className="flex flex-col gap-3">
+          {securityCards.map((h) => (
+            <CategoryHypothesisCard
+              key={h.id}
+              hypothesis={h}
+              supportingIds={resolved(h.supportingObservationIds)}
+              contradictingIds={resolved(h.contradictingObservationIds)}
+              corroborationIds={[]}
+              obsById={obsById}
+              open={openCategoryKey === `security-${h.id}`}
+              onToggle={() =>
+                setOpenCategoryKey((k) =>
+                  k === `security-${h.id}` ? null : `security-${h.id}`,
+                )
+              }
+              testId="phase2-surface-category-security-card"
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* ── Category: The hidden link (the cross-case person) ───────────── */}
+      {linkHypothesis && (
+        <section
+          aria-label="Hidden link hypotheses"
+          data-testid="phase2-surface-category-link"
+          className="flex flex-col gap-5"
+        >
+          <CategorySectionHeader label="The hidden link — who connects the cases?" />
+          <p className="max-w-[80ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+            The capsule reading that a single security-connected person is the link the
+            two records keep routing through. Post-ingest corroboration appears only
+            once the live workflow actually produces it.
+          </p>
+          <div className="flex flex-col gap-3">
+            <CategoryHypothesisCard
+              hypothesis={linkHypothesis}
+              supportingIds={resolved(linkHypothesis.supportingObservationIds)}
+              contradictingIds={resolved(linkHypothesis.contradictingObservationIds)}
+              corroborationIds={linkCorroborationIds}
+              obsById={obsById}
+              open={openCategoryKey === `link-${linkHypothesis.id}`}
+              onToggle={() =>
+                setOpenCategoryKey((k) =>
+                  k === `link-${linkHypothesis.id}` ? null : `link-${linkHypothesis.id}`,
+                )
+              }
+              testId="phase2-surface-category-link-card"
+            />
+          </div>
+        </section>
+      )}
 
       {delta && (
         <div className="flex flex-wrap items-center gap-3">

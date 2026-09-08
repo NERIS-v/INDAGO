@@ -210,6 +210,11 @@ export interface MatrixCell {
   readonly ariaDescription: string;
   /** Cross-case candidate provenance note (match-backed only). */
   readonly candidateNote: string | null;
+  /** Vague (non-direct) reading of why a cross-case cell lights up: the row
+   *  entity is the suspected hidden link between the two files. Never a
+   *  finding — only an investigative lead. Null outside match-lit cross-case
+   *  cells. */
+  readonly hiddenLinkTheory: string | null;
 }
 
 export interface MatrixMeta {
@@ -569,6 +574,7 @@ function buildWithinCaseCells(
           window: null,
           ariaDescription: `${row.label}: self comparison, not a relationship signal.`,
           candidateNote: null,
+          hiddenLinkTheory: null,
         });
         continue;
       }
@@ -691,6 +697,7 @@ function buildWithinCaseCells(
         window,
         ariaDescription: describeCell(row, col, state, contradiction, caveat),
         candidateNote: null,
+        hiddenLinkTheory: null,
       };
       cells.push(cell);
     }
@@ -768,6 +775,26 @@ function buildCrossCaseColumns(
       b.structuralImportance - a.structuralImportance ||
       a.label.localeCompare(b.label) ||
       a.entityId.localeCompare(b.entityId),
+  );
+}
+
+/**
+ * Vague, non-direct explanation of why a cross-case cell lights up: the row
+ * entity is the suspected hidden link between the two files. The language
+ * deliberately stops short of a finding — it states the comparison routes its
+ * reads through the row, and that nothing recorded proves the row directed,
+ * sourced, or shielded anyone.
+ */
+function buildHiddenLinkTheory(
+  row: MatrixEntityColumn,
+  column: MatrixEntityColumn,
+): string {
+  return (
+    `Why this cell lights up: ${row.label} is the figure the cross-case comparison keeps routing its reads ` +
+    `through — ${row.label} appears on both sides of the record, and this cell is where one of those ` +
+    `appearances lands on the ${column.label} column. That places ${row.label} on the comparison's short-list ` +
+    `as the suspected hidden link between the two files. It is a lead the comparison is tracking, not a ` +
+    `finding: nothing recorded in this cell proves ${row.label} directed, sourced, or shielded anyone.`
   );
 }
 
@@ -869,6 +896,7 @@ function buildCrossCaseCells(
         window: null,
         ariaDescription: aria,
         candidateNote: `Provider-backed cross-case comparison candidate (match score ${primaryMatch.matchScore.toFixed(2)}, confidence ${primaryMatch.confidence.toFixed(2)}, shared evidence types only).`,
+        hiddenLinkTheory: buildHiddenLinkTheory(row, column),
       };
       cells.push(cell);
     }
@@ -905,6 +933,7 @@ function crossCaseCell(
     window: null,
     ariaDescription: `${row.label}, Case A, to ${column.label}, ${column.caseLabel}. ${active ? "Candidate relationship." : "No relationship signal."}`,
     candidateNote: null,
+    hiddenLinkTheory: null,
   };
 }
 

@@ -18,7 +18,7 @@ import { ENTITY_LINK_BY_CANDIDATE_A } from "./case-a";
 import { deriveRealCaseDiscoveryCandidates } from "./discovery";
 import { deriveRealCasePhase1, type RealCasePhase1Derivation } from "./phase1";
 import { buildBreakthroughPackage } from "./breakthrough";
-import { buildPhase2S1Package, buildPhase2HistoricalValidation, buildPhase2EvidenceReadout, buildPhase2ConnectionEvidence, derivePhase2 } from "./phase2";
+import { buildPhase2S1Package, buildPhase2HistoricalValidation, buildPhase2EvidenceReadout, buildPhase2ConnectionEvidence, derivePhase2, buildHiddenLinkHypothesis } from "./phase2";
 import { CASE_A_ID, CASE_B_ID, HOLE_P2_MOTIVE, ENT_RICO } from "./lookup";
 
 // ============================================================================
@@ -162,6 +162,10 @@ function enrichedCaseB(): DemoFixtureSet {
       ...caseBFixtureSet.hypotheses,
       ...(d.hypothesis ? [d.hypothesis] : []),
       ...REAL_CASE_PHASE2.hypotheses,
+      // PASS 4 — the "hidden link" capsule: a derived cross-case reading with
+      // its own evidentiary grounding on the Case-B workspace (never part of the
+      // derivePhase2 motive comparison).
+      buildHiddenLinkHypothesis(),
     ],
     gaps: [
       ...caseBFixtureSet.gaps,
