@@ -328,6 +328,8 @@ export const OBS_B7 = id(NS_CASE_B, "observation:exhibit-719-rico-security-role"
 export const OBS_B8 = id(NS_CASE_B, "observation:exhibit-719-wja-hospitality-fbi");
 export const OBS_B9 = id(NS_CASE_B, "observation:exhibit-719-record-scope");
 export const OBS_B10 = id(NS_CASE_B, "observation:exhibit-719-rico-hitman-read");
+export const OBS_B11 = id(NS_CASE_B, "observation:rico-coordination-callahan");
+export const OBS_B12 = id(NS_CASE_B, "observation:rico-consulting-stipend");
 
 // -- Relation / graph edge derived at ingest -----------------------------------
 export const REL_B_WJA_FBI = id(NS_CASE_B, "relation:wja-fbi-boston");

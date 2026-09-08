@@ -773,7 +773,7 @@ function breakthroughEvent(
     targetId,
     description,
     timestamp: breakthroughTimestamp(minute),
-    delayMs: 350 * index,
+    delayMs: 240 * index,
   };
 }
 

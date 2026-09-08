@@ -62,18 +62,29 @@ const ICON_PATHS = {
   LOCATION: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
   ACCOUNT: "M3 21h18 M3 10h18 M5 6l7-3 7 3 M4 10v11 M20 10v11 M8 14v3 M12 14v3 M16 14v3",
   COMPANY: "M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16",
+  ORGANIZATION: "M18 10h-2m2-4h-2m4 8h-2m2-4h-6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z M8 6V4H3v16a2 2 0 0 0 2 2h4",
+  AGENCY: "M9 12l2 2 4-4 M7.5 2h9L19 5l-1 2.5-.5 9.5L17 19l-2 3H9l-2-3 .5-2-.5-9.5L6 5l1.5-3z",
   DOCUMENT: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
   DEFAULT: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z",
 };
 
+const PERSON_KEYWORDS = ["PERSON", "VICTOR", "WITNESS", "CASTELLAN", "ALDRIDGE", "RICO", "CALLAHAN", "MCGUIGAN", "HITMAN", "MARIA", "DOWD", "FORRESTER", "WHEELER"];
+const ACCOUNT_KEYWORDS = ["BANK", "ACCOUNT", "VAULT", "WALLET", "EXCHANGE", "MIXING", "OFFSHORE"];
+const AGENCY_KEYWORDS = ["FBI", "SOCTF", "TASK FORCE", "POLICE", "STATE", "AUTHORITY"];
+const COMPANY_KEYWORDS = ["COMPANY", "LTD", "TRANSIT", "HOLDINGS", "JAI ALAI", "CORP"];
+const ORG_KEYWORDS = ["GANG", "SYNDICATE", "RING", "ASSOCIATION", "CONSORTIUM"];
+
 export function getNodeIconPath(node: LayoutNode): string {
-  const typeStr = (node.label || "").toUpperCase();
-  if (typeStr.includes("PERSON") || typeStr.includes("VICTOR") || typeStr.includes("WITNESS") || typeStr.includes("CASTELLAN") || typeStr.includes("ALDRIDGE")) return ICON_PATHS.PERSON;
-  if (typeStr.includes("PHONE") || typeStr.includes("SIM") || typeStr.includes("+91")) return ICON_PATHS.PHONE;
-  if (typeStr.includes("ACCOUNT") || typeStr.includes("BANK")) return ICON_PATHS.ACCOUNT;
-  if (typeStr.includes("LOCATION") || typeStr.includes("ADDRESS")) return ICON_PATHS.LOCATION;
-  if (typeStr.includes("COMPANY") || typeStr.includes("LTD") || typeStr.includes("TRANSIT") || typeStr.includes("HOLDINGS")) return ICON_PATHS.COMPANY;
-  if (typeStr.includes("DOCUMENT") || typeStr.includes("FIR") || typeStr.includes("RECORD") || typeStr.includes("FILING")) return ICON_PATHS.DOCUMENT;
+  if (node.type !== "ENTITY") return ICON_PATHS.DOCUMENT;
+  const t = (node.label || "").toUpperCase();
+  if (PERSON_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.PERSON;
+  if (t.includes("PHONE") || t.includes("SIM") || t.includes("+91")) return ICON_PATHS.PHONE;
+  if (t.includes("LOCATION") || t.includes("ADDRESS") || t.includes("SOUTHERN HILLS") || t.includes("COUNTRY CLUB")) return ICON_PATHS.LOCATION;
+  if (ACCOUNT_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.ACCOUNT;
+  if (AGENCY_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.AGENCY;
+  if (COMPANY_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.COMPANY;
+  if (ORG_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.ORGANIZATION;
+  if (["DOCUMENT", "FIR", "RECORD", "FILING"].some((k) => t.includes(k))) return ICON_PATHS.DOCUMENT;
   return ICON_PATHS.DEFAULT;
 }
 

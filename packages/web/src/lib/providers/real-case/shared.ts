@@ -22,6 +22,8 @@ import {
   OBS_B3,
   OBS_B4,
   OBS_B5,
+  OBS_B11,
+  OBS_B12,
   EVID_HR_CT,
   EVID_JAN76,
   EVID_SURV,
@@ -40,15 +42,15 @@ import { obs } from "./times";
 // ============================================================================
 // Former FBI agent; WJA security director; subject of CT SOCTF request.
 // Case A observations: OBS_A1, OBS_A2, OBS_A3, OBS_A4, OBS_A5
-// Case B observations: OBS_B5 (employment facts)
-// Union = [OBS_A1, OBS_A2, OBS_A3, OBS_A4, OBS_A5, OBS_B5]
+// Case B observations: OBS_B5 (employment facts), OBS_B11 (coordination)
+// Union = [OBS_A1, OBS_A2, OBS_A3, OBS_A4, OBS_A5, OBS_B5, OBS_B11]
 export const SHARED_CALLAHAN: Entity = {
   id: ENT_CALLAHAN,
   caseId: CASE_A_ID,
   investigationId: INVESTIGATION_A_ID,
   canonicalName: "John \"Jack\" Callahan",
   status: "ACTIVE",
-  observationIds: [OBS_A1, OBS_A2, OBS_A3, OBS_A4, OBS_A5, OBS_B5],
+  observationIds: [OBS_A1, OBS_A2, OBS_A3, OBS_A4, OBS_A5, OBS_B5, OBS_B11],
   evidenceIds: [EVID_HR_CT, EVID_JAN76, EVID_SURV, EVID_HEARING, EVID_BAHAMAS],
   hypothesisIds: [],
   roleHypothesisIds: [],
@@ -65,15 +67,15 @@ export const SHARED_CALLAHAN: Entity = {
 // ============================================================================
 // Former FBI agent; WJA security consultant; entertained FBI SAs in Bahamas.
 // Case A observations: OBS_A4, OBS_A5, OBS_A6
-// Case B observations: OBS_B5 (employment facts)
-// Union = [OBS_A4, OBS_A5, OBS_A6, OBS_B5]
+// Case B observations: OBS_B5 (employment facts), OBS_B11 (coordination), OBS_B12 (retainer)
+// Union = [OBS_A4, OBS_A5, OBS_A6, OBS_B5, OBS_B11, OBS_B12]
 export const SHARED_RICO: Entity = {
   id: ENT_RICO,
   caseId: CASE_A_ID,
   investigationId: INVESTIGATION_A_ID,
   canonicalName: "H. Paul Rico",
   status: "ACTIVE",
-  observationIds: [OBS_A4, OBS_A5, OBS_A6, OBS_B5],
+  observationIds: [OBS_A4, OBS_A5, OBS_A6, OBS_B5, OBS_B11, OBS_B12],
   evidenceIds: [EVID_HR_CT, EVID_BAHAMAS],
   hypothesisIds: [],
   roleHypothesisIds: [],

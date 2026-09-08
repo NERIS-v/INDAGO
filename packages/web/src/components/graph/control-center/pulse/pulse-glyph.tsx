@@ -21,12 +21,13 @@
 //  • Same data + same timeRange ⇒ identical geometry at rest. No random
 //    breathing and no per-frame noise — every sample, angle and opacity is
 //    derived deterministically from the entity's provider-backed observations.
-//  • The contour is a LIVING field: a slow, per-entity CSS drift (a full spin
-//    plus a gentle breathe, ~36–50 s, seeded by a stable hash of the entity id,
-//    reversed for half of all entities) animates the WHOLE organic field so it
-//    reads as real activity over time. The drift never redraws geometry per
-//    frame — every angle/sample/opacity data attribute stays stable — and it
-//    switches off under prefers-reduced-motion.
+//  • The contour is a LIVING field: a slow, per-entity radial breathe
+//    (~36–50 s, seeded by a stable hash of the entity id, phase-offset per
+//    entity) animates the WHOLE organic field so it reads as real activity
+//    over time. The field NEVER rotates — waves pulse outward but the contour
+//    stays anchored at rest. The drift never redraws geometry per frame —
+//    every angle/sample/opacity data attribute stays stable — and it switches
+//    off under prefers-reduced-motion.
 //
 // The outer contour still MORPHS (restrained ease-out, 320 ms) between two
 // deterministic states when the shared workspace timeRange changes.
@@ -71,17 +72,19 @@ const EASE_OUT_CUBIC = (t: number) => 1 - Math.pow(1 - t, 3);
 
 /**
  * Live-drift animation applied to the WHOLE organic field (never to the node,
- * halo, or selection ring). A slow spin + breathe makes the contour read as
- * living activity over time while keeping every data attribute stable. Fully
- * disabled under prefers-reduced-motion. Inert in test/jsdom environments
- * (CSS animation is not evaluated), so geometry determinism is preserved.
+ * halo, or selection ring). A gentle radial breathe makes the contour read as
+ * living activity over time while keeping every data attribute stable. The
+ * field NEVER rotates — the waves pulse outward from the entity, but the
+ * contour stays anchored (no spinning circle). Fully disabled under
+ * prefers-reduced-motion. Inert in test/jsdom environments (CSS animation is
+ * not evaluated), so geometry determinism is preserved.
  */
 const LIVE_DRIFT_KEYFRAMES = `
 @keyframes pulse-live-drift-spin-breathe {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  25% { transform: rotate(90deg) scale(1.015); }
-  50% { transform: rotate(180deg) scale(1); }
-  75% { transform: rotate(270deg) scale(0.985); }
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.015); }
+  50% { transform: scale(1); }
+  75% { transform: scale(0.985); }
 }
 .pulse-live-drift {
   animation-name: pulse-live-drift-spin-breathe;
@@ -95,8 +98,9 @@ const LIVE_DRIFT_KEYFRAMES = `
 `;
 
 /** Per-entity drift timing, deterministic from a stable hash of the entity id:
- *  a 36–50 s period, a phase offset so entities start mid-stream, and a
- *  clockwise/counter-clockwise direction shared by roughly half of entities. */
+ *  a 36–50 s breathe period, a phase offset so entities start mid-stream, and a
+ *  direction (which half of the breathe cycle comes first) shared by roughly
+ *  half of entities. This only ever scales the field — it never rotates it. */
 function liveDriftStyle(entityId: string | undefined): CSSProperties {
   const seed = stableHash(`pulse-live-drift:${entityId ?? ""}`);
   const period = 36000 + (seed % 14000);
@@ -519,8 +523,9 @@ export const PulseGlyph = memo(function PulseGlyph({
       />
 
       {/* The LIVING organic field: the whole contour (base wash, sectors,
-          labels, crisp boundary) drifts as one per-entity animated group so it
-          reads as activity over time while geometry stays deterministic. */}
+          labels, crisp boundary) breathes as one per-entity animated group so
+          it reads as activity over time while geometry stays deterministic.
+          The breathe scales the field radially only — it never rotates. */}
       <g
         className="pulse-live-drift"
         style={liveDriftStyle(field.entityId)}

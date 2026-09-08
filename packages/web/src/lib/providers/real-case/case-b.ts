@@ -76,6 +76,8 @@ import {
   OBS_B4,
   OBS_B5,
   OBS_B6,
+  OBS_B11,
+  OBS_B12,
   ENT_WHEELER,
   ENT_SOUTHERN_HILLS,
   ENT_CALLAHAN,
@@ -286,7 +288,7 @@ const evidenceB = [
   }),
 ];
 
-// ── Observations (6) ────────────────────────────────────────────────────────
+// ── Observations (8) ────────────────────────────────────────────────────────
 
 const observationsB = [
   ObservationSchema.parse({
@@ -353,6 +355,28 @@ const observationsB = [
     strength: 0.65,
     provenance: { sourceId: SRC_HR_TULSA_B, extractor: "govinfo.extractor.v1" },
     observedAt: evt("1981-07-01", "approximate"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
+  ObservationSchema.parse({
+    id: OBS_B11, evidenceId: EVID_HR_WJA, sourceId: SRC_HR_WJA_B,
+    type: "COMMUNICATION",
+    content: "The congressional review records H. Paul Rico coordinating World Jai Alai protection coverage with John 'Jack' Callahan, the consultant and the function's director operating on the same scope.",
+    entityIds: [ENT_RICO, ENT_CALLAHAN],
+    candidateMentions: ["H. Paul Rico", "Jack Callahan"],
+    strength: 0.6,
+    provenance: { sourceId: SRC_HR_WJA_B, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1983-01-01", "day"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
+  ObservationSchema.parse({
+    id: OBS_B12, evidenceId: EVID_HR_WJA, sourceId: SRC_HR_WJA_B,
+    type: "FINANCIAL",
+    content: "The congressional review records the World Jai Alai consulting retainer for H. Paul Rico in its internal payroll — compensation tied to his retained consultant role.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.6,
+    provenance: { sourceId: SRC_HR_WJA_B, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1983-01-01", "day"),
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
 ];
@@ -458,8 +482,8 @@ const graphVersionB = GraphVersionSchema.parse({
 // silo: the congressional report references FBI stonewalling but provides no
 // direct structural link to the Tulsa graph beyond the reference.
 const graphNodesB = [
-  GraphNodeSchema.parse({ id: GN_B_CALLAHAN, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_CALLAHAN, label: "John \"Jack\" Callahan", structuralImportance: 0.7, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
-  GraphNodeSchema.parse({ id: GN_B_RICO, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.65, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
+  GraphNodeSchema.parse({ id: GN_B_CALLAHAN, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_CALLAHAN, label: "John \"Jack\" Callahan", structuralImportance: 0.7, observationCount: 2, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
+  GraphNodeSchema.parse({ id: GN_B_RICO, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.65, observationCount: 3, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_WJA, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_WJA, label: "World Jai Alai", structuralImportance: 0.9, observationCount: 3, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_FBI, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_FBIBOSTON, label: "FBI Boston Field Office", structuralImportance: 0.5, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_WHEELER, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_WHEELER, label: "Roger Wheeler, Sr.", structuralImportance: 0.85, observationCount: 4, sourceCount: 3, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
@@ -747,6 +771,8 @@ const timelineB: InvestigationTimeline = {
     bandItem(BAND_OBS, "tl-ob-b3", "1983-01-01T12:00:00.000Z", "HR documents Wheeler as WJA owner / Telex chairman", { observationId: OBS_B3, entityIds: [ENT_WHEELER, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-b4", "1983-01-01T12:00:00.000Z", "HR: Wheeler suspected skimming, fired president, began audit", { observationId: OBS_B4, entityIds: [ENT_WHEELER, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-b5", "1983-01-01T12:00:00.000Z", "HR: Callahan = WJA security director, Rico = consultant", { observationId: OBS_B5, entityIds: [ENT_WJA, ENT_CALLAHAN, ENT_RICO] }),
+    bandItem(BAND_OBS, "tl-ob-b11", "1983-01-01T12:00:00.000Z", "HR: Rico coordinating WJA protection coverage with Callahan", { observationId: OBS_B11, entityIds: [ENT_RICO, ENT_CALLAHAN] }),
+    bandItem(BAND_OBS, "tl-ob-b12", "1983-01-01T12:00:00.000Z", "HR: WJA consulting retainer for Rico in internal payroll", { observationId: OBS_B12, entityIds: [ENT_RICO] }),
     bandItem(BAND_EVID, "tl-ev-b1", "1983-01-01T12:00:00.000Z", "HR108-414 Vol 1 extract (Tulsa)", { evidenceId: EVID_HR_TULSA }),
     bandItem(BAND_EVID, "tl-ev-b2", "1981-05-28T12:00:00.000Z", "Tulsa news extract", { evidenceId: EVID_NEWS_TULSA }),
     bandItem(BAND_EVID, "tl-ev-b3", "1983-01-01T12:00:00.000Z", "HR108-414 Vol 1 extract (WJA ownership)", { evidenceId: EVID_HR_WJA }),
