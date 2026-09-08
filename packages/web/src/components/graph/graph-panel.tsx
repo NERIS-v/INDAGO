@@ -14,7 +14,7 @@ import { StatChip } from "@/components/ui/stat-chip";
 import { useGraphLiveOverlay, triggerOrQueueUploadSequence } from "./graph-live";
 import { DiscoveryPanel } from "@/components/intelligence/discovery-panel";
 import { EvidenceIntake } from "@/components/evidence/evidence-intake";
-import type { GraphNode, GraphEdge, GraphHole, GraphVersion } from "@indago/contracts";
+import type { GraphNode, GraphEdge, GraphHole, GraphVersion, Observation } from "@indago/contracts";
 import type { InvestigativeGap } from "@indago/contracts";
 import type { GraphRealtimeCatalog, ForeignCaseOverlay } from "@/lib/providers/types";
 import { mapInvestigativeGapToGapMock } from "@/lib/intel/gap-adapter";
@@ -164,6 +164,24 @@ export function GraphPanel({
     return () => { isMounted = false; };
   }, [workspace]);
 
+  // P4: the graph's TEMPORAL semantics come from entity OBSERVATION dates (the
+  // activity corridor), not from node createdAt. Nodes whose entity has no
+  // dated observation stay visible (conservative). Observing the same corpus
+  // the timeline + pulse use keeps every zone consistent about what "activity"
+  // means in a window.
+  const [investigativeObservations, setInvestigativeObservations] = useState<Observation[]>([]);
+  useEffect(() => {
+    let isMounted = true;
+    workspace.observations
+      .listByInvestigation(workspace.investigationId, { pageSize: 500 })
+      .then((page) => page.items)
+      .catch(() => [] as Observation[])
+      .then((items) => {
+        if (isMounted) setInvestigativeObservations(items);
+      });
+    return () => { isMounted = false; };
+  }, [workspace]);
+
   // Only fetch foreign overlays when the control center shell is NOT already
   // providing them (judge/standalone rendering).
   useEffect(() => {
@@ -264,18 +282,96 @@ export function GraphPanel({
 
       injectedNodes.push(...(foreignCase.nodes as unknown as GraphNode[]));
       injectedEdges.push(bridgeEdge, ...(foreignCase.edges as unknown as GraphEdge[]));
+
+      // Cross-case connection resolves the local Rico ↔ hitman "?" hole into a
+      // real case-link: the foreign island's bridge confirms the security
+      // consultant↔shooter link, so the edge materializes as a solid line
+      // (never as a foreign bridge) and the hole is suppressed below.
+      const localRico = baseNodes.find(
+        (n) => (n.label ?? "").toUpperCase().includes("RICO") && !(n as { isForeign?: boolean }).isForeign,
+      );
+      const localHitman = baseNodes.find(
+        (n) => (n.label ?? "").toUpperCase().includes("HITMAN") && !(n as { isForeign?: boolean }).isForeign,
+      );
+      const ricoHitmanExists =
+        localRico && localHitman
+          ? injectedEdges.some(
+              (e) =>
+                (e.sourceNodeId === localRico.id && e.targetNodeId === localHitman.id) ||
+                (e.sourceNodeId === localHitman.id && e.targetNodeId === localRico.id),
+            )
+          : true;
+      if (localRico && localHitman && !ricoHitmanExists) {
+        injectedEdges.push({
+          id: `cross-case-rico-hitman-${caseRef}`,
+          sourceNodeId: localRico.id,
+          targetNodeId: localHitman.id,
+          support: 0.9,
+          relationType: "case-link",
+          status: "ACTIVE",
+          directed: true,
+        } as unknown as GraphEdge);
+      }
     });
 
     return { finalNodes: injectedNodes, finalEdges: injectedEdges };
   }, [data, overlayNodes, overlayEdges, casesToRender, foreignOverlays]);
+
+  // P4 temporal source: entity activity corridors derived from REAL observation
+  // dates. `entityActivityBounds` feeds the PR-6 presentation context; the
+  // nodeId-keyed `nodeTemporalBounds` feeds the canvas window filter so both
+  // surfaces agree on what is in/out of range.
+  const entityActivityBounds = useMemo(() => {
+    const byEntity = new Map<string, { min: number; max: number }>();
+    for (const observation of investigativeObservations) {
+      const ms = observation.observedAt?.value
+        ? Date.parse(observation.observedAt.value)
+        : NaN;
+      if (!Number.isFinite(ms)) continue;
+      for (const entityId of observation.entityIds) {
+        const current = byEntity.get(entityId);
+        if (!current) {
+          byEntity.set(entityId, { min: ms, max: ms });
+          continue;
+        }
+        if (ms < current.min) current.min = ms;
+        if (ms > current.max) current.max = ms;
+      }
+    }
+    return byEntity;
+  }, [investigativeObservations]);
+
+  const nodeTemporalBounds = useMemo(() => {
+    const byNode = new Map<string, { min: number; max: number } | null>();
+    for (const node of finalNodes) {
+      const entityId = node.entityId;
+      byNode.set(
+        node.id,
+        entityId ? entityActivityBounds.get(entityId) ?? null : null,
+      );
+    }
+    return byNode;
+  }, [finalNodes, entityActivityBounds]);
 
   const mergedHoles = useMemo(() => {
     if (!data) return [];
     const holeKey = (h: GraphHole) => h.investigationGapId ?? h.nodeIds.join("-");
     const seen = new Set(data.holes.map(holeKey));
     const additions = overlayHoles.filter((h) => !seen.has(holeKey(h)));
-    return [...data.holes, ...additions];
-  }, [data, overlayHoles]);
+    const all = [...data.holes, ...additions];
+    // A hole whose node pair is now connected by a real edge is RESOLVED: the
+    // "?" between those nodes disappears exactly when the solid line exists
+    // (e.g. the cross-case Rico↔hitman case-link below).
+    const connectedPairs = new Set<string>();
+    for (const e of finalEdges) {
+      connectedPairs.add([e.sourceNodeId, e.targetNodeId].sort().join("::"));
+    }
+    return all.filter((h) => {
+      if (h.nodeIds.length !== 2) return true;
+      const pair = [...h.nodeIds].sort().join("::");
+      return !connectedPairs.has(pair);
+    });
+  }, [data, overlayHoles, finalEdges]);
 
   // PR-4: readability filter changes ONLY the rendered edges — the force
   // simulation still runs on the FULL topology (no physics restart on filter
@@ -424,8 +520,9 @@ export function GraphPanel({
         foreignNodeIds,
         foreignEdgeIds,
         focusSeed,
+        activityBounds: entityActivityBounds,
       }),
-    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, foreignNodeIds, foreignEdgeIds, focusSeed],
+    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, foreignNodeIds, foreignEdgeIds, focusSeed, entityActivityBounds],
   );
 
   // PR-3: graph selection is an INTENT. The shell owns canonical selection
@@ -702,6 +799,7 @@ export function GraphPanel({
             activeTimeRange={activeTimeRange}
             controlsRef={controlsRef}
             visualContext={visualContext}
+            nodeTemporalBounds={nodeTemporalBounds}
           />
         </div>
 

@@ -170,10 +170,10 @@ describe("F-PR6 — category semantics", () => {
     expect(observationTypeToCategory("FINANCIAL")).toBe("financial");
     expect(observationTypeToCategory("SPATIAL")).toBe("location");
     expect(observationTypeToCategory("IDENTITY")).toBe("identity");
-    expect(observationTypeToCategory("RELATIONAL")).toBe("other");
-    expect(observationTypeToCategory("BEHAVIORAL")).toBe("other");
+    expect(observationTypeToCategory("RELATIONAL")).toBe("relational");
+    expect(observationTypeToCategory("BEHAVIORAL")).toBe("behavioral");
     expect(observationTypeToCategory("TEMPORAL")).toBe("other");
-    expect(observationTypeToCategory("FACTUAL")).toBe("other");
+    expect(observationTypeToCategory("FACTUAL")).toBe("factual");
     expect(observationTypeToCategory("OTHER")).toBe("other");
     for (const c of PULSE_CATEGORIES) {
       expect(observationTypeToCategory(c as never) ?? c).toBeTruthy();
@@ -183,9 +183,9 @@ describe("F-PR6 — category semantics", () => {
   it("tags each entity's field with its dominant (most frequent) category", () => {
     const overview = buildEntityPulseOverview({ nodes, observations, timeRange: fullRange });
     const victor = overview.entities.find((e) => e.entityId === ENT_VICTOR)!;
-    // Victor takes OBS_6 (COMMUNICATION), OBS_8 (RELATIONAL->other),
-    // OBS_9 (RELATIONAL->other): two 'other', one communication.
-    expect(victor.category).toBe("other");
+    // Victor takes OBS_6 (COMMUNICATION), OBS_8 (RELATIONAL),
+    // OBS_9 (RELATIONAL): two relational, one communication.
+    expect(victor.category).toBe("relational");
     const bank = overview.entities.find((e) => e.entityId === ENT_BANK)!;
     // Bank takes OBS_2/3/4 (FINANCIAL) + OBS_7 (COMMUNICATION) → financial.
     expect(bank.category).toBe("financial");

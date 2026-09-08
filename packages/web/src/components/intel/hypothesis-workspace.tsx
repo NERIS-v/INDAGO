@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { HypothesisEngine } from "./hypothesis-engine";
 import { ReverseHypothesisEngine } from "./reverse-hypothesis-engine";
+import { Phase2HypothesisSurface } from "./phase2-hypothesis-surface";
 
 type Mode = "generated" | "reverse";
 
@@ -16,9 +17,16 @@ export function HypothesisWorkspace() {
   const workspace = useWorkspace();
   const [mode, setMode] = useState<Mode>("generated");
 
+  // PASS 4 — the real Case-B workspace genuinely carries the derived Phase-2
+  // seams, so the "generated" tab projects the real H1/H2/H3 motion reading
+  // instead of the generic OFS pipeline. OFS and live workspaces keep the
+  // existing experience unchanged (no fabricated phase-2).
+  const isRealCasePhase2 =
+    workspace.mode === "demo" && Boolean(workspace.phase2AssessmentFreeze);
+
   return (
     <div className="flex w-full flex-col gap-5">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex w-full justify-center">
         <div
           role="tablist"
           aria-label="Hypothesis modes"
@@ -45,7 +53,11 @@ export function HypothesisWorkspace() {
       </div>
 
       {mode === "generated" ? (
-        <HypothesisEngine investigationId={workspace.investigationId} />
+        isRealCasePhase2 ? (
+          <Phase2HypothesisSurface onRequestChallenge={() => setMode("reverse")} />
+        ) : (
+          <HypothesisEngine investigationId={workspace.investigationId} />
+        )
       ) : (
         <ReverseHypothesisEngine />
       )}

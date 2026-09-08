@@ -18,6 +18,20 @@ import {
   GN_SHELL_TWO,
   GN_WITNESS,
 } from "@/lib/providers/demo/demo-fixtures/lookup";
+import {
+  GN_A_CALLAHAN,
+  GN_A_RICO,
+  GN_A_WJA,
+  GN_A_FBI,
+  GN_A_SOCTF,
+  GN_A_MCGUIGAN,
+  GN_B_CALLAHAN,
+  GN_B_RICO,
+  GN_B_WJA,
+  GN_B_FBI,
+  GN_B_WHEELER,
+  GN_B_SHC,
+} from "@/lib/providers/real-case/lookup";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -85,9 +99,13 @@ interface CaseCardProps {
   readonly disabled: boolean;
   readonly onToggle: (id: string) => void;
   readonly featured?: boolean;
+  /** Per-case real graph projection for the mini topology preview (present
+   *  only when the workspace can genuinely serve one). */
+  readonly nodes?: readonly GraphNode[];
+  readonly edges?: readonly GraphEdge[];
 }
 
-function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured }: CaseCardProps) {
+function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured, nodes, edges }: CaseCardProps) {
   const badge = statusBadge(caseItem.status);
   const primaryInvestigation = caseItem.investigationIds[0];
 
@@ -236,6 +254,16 @@ function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured }: Ca
         </span>
       </div>
 
+      {nodes && nodes.length > 0 && (
+        <div className="mt-3 rounded-xl border border-semantic-border-subtle bg-semantic-background p-4">
+          <NetworkMiniMap nodes={nodes} edges={edges ?? []} />
+          <div className="mt-3 flex items-center justify-between border-t border-semantic-border-subtle pt-3 font-mono text-[9px] uppercase tracking-widest text-semantic-foreground-faint">
+            <span>Topology · {nodes.length} nodes</span>
+            <span>{edges?.length ?? 0} edges</span>
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 pt-3 border-t border-semantic-border-subtle">
         {primaryInvestigation ? (
           <Link
@@ -275,12 +303,28 @@ function SectionOverline({ label, className }: { label: string; className?: stri
 // ============================================================================
 
 const MINI_LAYOUT: Record<string, [number, number]> = {
+  // Operation Financial Shadow (hub-and-spoke around the intermediary account)
   [GN_BANK]: [170, 56],
   [GN_VICTOR]: [46, 132],
   [GN_MARIA]: [36, 240],
   [GN_SHELL_ONE]: [294, 132],
   [GN_SHELL_TWO]: [304, 240],
   [GN_WITNESS]: [96, 348],
+  // Real Case A (Connecticut) — World Jai Alai hub with the security/LE network
+  [GN_A_WJA]: [170, 60],
+  [GN_A_CALLAHAN]: [60, 148],
+  [GN_A_RICO]: [280, 148],
+  [GN_A_SOCTF]: [60, 290],
+  [GN_A_FBI]: [280, 290],
+  [GN_A_MCGUIGAN]: [170, 356],
+  // Real Case B (Tulsa) — WJA hub with Wheeler's ownership line; FBI is
+  // deliberately alone (isolated node in the real graph, no edges).
+  [GN_B_WJA]: [170, 60],
+  [GN_B_CALLAHAN]: [60, 148],
+  [GN_B_RICO]: [280, 148],
+  [GN_B_WHEELER]: [60, 290],
+  [GN_B_FBI]: [280, 290],
+  [GN_B_SHC]: [170, 356],
 };
 
 function collapseLabel(label: string): string {
@@ -982,9 +1026,12 @@ interface CaseListProps {
   readonly cases: CaseProvider;
   readonly mode: AppDataMode;
   readonly enrichment?: DashboardEnrichment;
+  /** Per-case real graph projection for mini topology previews (demo mode
+   *  only; genuinely derived from the same fixtures the cases are served from). */
+  readonly topology?: Readonly<Record<string, { readonly nodes: readonly GraphNode[]; readonly edges: readonly GraphEdge[] }>>;
 }
 
-export function CaseList({ cases, mode, enrichment }: CaseListProps) {
+export function CaseList({ cases, mode, enrichment, topology }: CaseListProps) {
   const [items, setItems] = useState<Case[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1268,6 +1315,8 @@ export function CaseList({ cases, mode, enrichment }: CaseListProps) {
                     disabled={deleting}
                     onToggle={toggleSelected}
                     featured
+                    nodes={enrichment?.graphNodes}
+                    edges={enrichment?.graphEdges}
                   />
                 </ul>
               ) : (
@@ -1280,6 +1329,8 @@ export function CaseList({ cases, mode, enrichment }: CaseListProps) {
                       selected={selected.includes(c.id)}
                       disabled={deleting}
                       onToggle={toggleSelected}
+                      nodes={topology?.[c.id]?.nodes ?? enrichment?.graphNodes}
+                      edges={topology?.[c.id]?.edges ?? enrichment?.graphEdges}
                     />
                   ))}
                 </ul>

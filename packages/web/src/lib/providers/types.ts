@@ -20,6 +20,7 @@ import type {
   Case,
   Investigation,
   Observation,
+  Evidence,
   Entity,
   Lead,
   InvestigativeGap,
@@ -50,6 +51,7 @@ import type {
   HypothesisDecisionInput,
   HypothesisDecisionRecord,
   HypothesisTestInput,
+  AssessmentStatus,
 } from "@/lib/intel/reverse-hypothesis/hypothesis-model";
 
 // ============================================================================
@@ -363,6 +365,399 @@ export interface DiscoveryCandidate {
 }
 
 // ============================================================================
+// Phase-1 intelligence projections (documented local, PASS 2)
+//
+// OPTIONAL, read-only projections a demo/real-case workspace may attach to its
+// provider bundle. Live/OFS workspaces simply omit them. Every score is an
+// investigative-relevance estimate produced by the deterministic Phase-1
+// derivation — never a probability of guilt or truth.
+// ============================================================================
+
+export interface Phase1Alternative {
+  readonly key: string;
+  readonly label: string;
+  readonly statement: string;
+  readonly basisObservationIds: readonly string[];
+}
+
+export interface BridgeCandidateRanking {
+  readonly candidateId: string;
+  readonly entityId: string;
+  readonly label: string;
+  readonly roleLabel?: string;
+  readonly temporalCompatibility: boolean;
+  readonly score: number;
+  readonly rank: number;
+  readonly status: "CANDIDATE" | "SELECTED" | "REJECTED";
+  readonly supportingObservationIds: readonly string[];
+  readonly contradictingObservationIds: readonly string[];
+  readonly alternativeExplanation: string;
+  readonly scoreLabel: "DERIVED_BY_DEMO_LOGIC";
+}
+
+export interface CrossCaseSignal {
+  readonly analysisId: string;
+  readonly sourceCaseId: string;
+  readonly targetCaseId: string;
+  readonly startedAt: { readonly value: string; readonly precision: "exact" };
+  readonly signal: string;
+  readonly rationale: string;
+  readonly supportingEntityIds: readonly string[];
+  readonly supportingObservationIds: readonly string[];
+  readonly candidateRanking: readonly BridgeCandidateRanking[];
+  readonly scoreLabel: "DERIVED_BY_DEMO_LOGIC";
+}
+
+export interface PredictionFreeze {
+  readonly id: string;
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly frozenAt: { readonly value: string; readonly precision: "exact" };
+  readonly runId: string;
+  readonly stage: "PHASE_1_PREDICTION_FREEZE";
+  readonly rankedLead: {
+    readonly rank: number;
+    readonly candidateScore: number;
+    readonly roleLabel: string;
+    readonly entityId: string;
+    readonly entityLabel: string;
+    readonly leadId: string;
+    readonly selectedBy: readonly string[];
+  };
+  readonly hypothesisId?: string;
+  readonly graphHoleId?: string;
+  readonly evidenceRequestId?: string;
+  readonly supportingObservationIds: readonly string[];
+  readonly contradictingObservationIds: readonly string[];
+  readonly alternatives: readonly Phase1Alternative[];
+  readonly candidateRanking: readonly BridgeCandidateRanking[];
+  readonly nodeIds: readonly string[];
+  readonly edgeIds: readonly string[];
+  readonly fingerprint: string;
+  readonly scoreLabel: "DERIVED_BY_DEMO_LOGIC";
+}
+
+// ============================================================================
+// PASS 3 — Live Breakthrough Ingestion projections (documented local)
+//
+// OPTIONAL, read-only projections describing a deterministic live-ingest run of
+// the fenced Exhibit-719 material (WORLD JAI ALAI PURCHASE REPORT (May 11,
+// 1981)) into the enriched Case-B workspace. Attached to the provider bundle
+// ONLY on workspaces that carry the breakthrough; absent everywhere else (never
+// fabricated). Scores remain DERIVED_BY_DEMO_LOGIC investigative-relevance
+// estimates — never guilt statements.
+// ============================================================================
+
+/** Status of a graph-hole reassessment after partial/full resolution. */
+export type GraphHoleResolutionStatus = "PARTIALLY_RESOLVED" | "RESOLVED";
+
+/** One graph-hole reassessment inside a Phase1PostFreezeDelta. */
+export interface Phase1GraphHoleResolution {
+  readonly graphHoleId: string;
+  readonly status: GraphHoleResolutionStatus;
+  readonly derivedFromEvidenceIds: readonly string[];
+}
+
+/** One gap status transition inside a Phase1PostFreezeDelta. */
+export interface Phase1GapStatusChange {
+  readonly gapId: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** Post-freeze comparison delta produced by an Exhibit-719 breakthrough run. */
+export interface Phase1PostFreezeDelta {
+  readonly caseId: string;
+  readonly investigationId: string;
+  readonly appliedAt: { readonly value: string; readonly precision: "exact" };
+  readonly evidenceIngestedIds: readonly string[];
+  readonly observationExtractedIds: readonly string[];
+  readonly entityResolvedIds: readonly string[];
+  readonly relationCreatedIds: readonly string[];
+  readonly graphEdgesAdded: readonly string[];
+  readonly graphHolesResolved: readonly Phase1GraphHoleResolution[];
+  readonly hypothesisRefinement: string | null;
+  readonly evidenceRequestIdsCompleted: readonly string[];
+  readonly gapStatusChanges: readonly Phase1GapStatusChange[];
+  readonly freezeFingerprintBefore: string;
+  readonly freezeFingerprintAfter: string;
+  readonly leakSafeClass: string;
+}
+
+/** Deterministic record of one Exhibit-719 breakthrough ingestion run. */
+export interface BreakthroughRecord {
+  readonly determinismLabel: string;
+  readonly ingestedAt: { readonly value: string; readonly precision: "exact" };
+  readonly evidenceId: string;
+  readonly evidenceClass: string;
+  readonly evidenceStatus: string;
+  readonly extractedObservationIds: readonly string[];
+  readonly resolvedEntityIds: readonly string[];
+  readonly relationId: string;
+  readonly edgeId: string;
+  readonly hypothesisId: string;
+  readonly gapId: string;
+  readonly gapStatus: string;
+  readonly evidenceRequestId: string;
+  readonly evidenceRequestStatus: string;
+  readonly freezeFingerprintBefore: string;
+  readonly freezeFingerprintAfter: string;
+  readonly summary: string;
+}
+
+/** One reassessed InvestigativeGap carried by a BreakthroughStatePatch. */
+export interface BreakthroughGapReassessment {
+  readonly id: string;
+  readonly record: InvestigativeGap;
+}
+
+/** One completed EvidenceRequest carried by a BreakthroughStatePatch. */
+export interface BreakthroughEvidenceRequestCompletion {
+  readonly id: string;
+  readonly record: EvidenceRequest;
+}
+
+/** Patch of canonical records a breakthrough run inserts or reassesses. */
+export interface BreakthroughStatePatch {
+  readonly sources: readonly Source[];
+  readonly artifacts: readonly Artifact[];
+  readonly evidence: readonly Evidence[];
+  readonly observations: readonly Observation[];
+  readonly relations: readonly RelationHypothesis[];
+  readonly graphEdges: readonly GraphEdge[];
+  readonly hypotheses: readonly Hypothesis[];
+  readonly gapReassessments: readonly BreakthroughGapReassessment[];
+  readonly evidenceRequestCompletions: readonly BreakthroughEvidenceRequestCompletion[];
+}
+
+/** Everything a breakthrough run produces (patch + projections + delta). */
+export interface BreakthroughRunResult {
+  readonly patch: BreakthroughStatePatch;
+  readonly record: BreakthroughRecord;
+  readonly delta: Phase1PostFreezeDelta;
+}
+
+// ============================================================================
+// PASS 4 — Phase 2 Motive / Causal-Hypothesis projections (documented local)
+//
+// OPTIONAL, read-only projections describing the Phase-2 causal-hypothesis
+// investigation ("why was Roger Wheeler killed?") in the enriched Case-B
+// workspace: three canonical competing hypotheses (H1/H2/H3, §17 exact
+// wording), a deterministic motive-scoring comparison, a pre-evidence freeze,
+// a Reasoning Ledger, and (for the live S1 ingestion) a Phase-2 delta/record.
+// Attached ONLY on workspaces that carry the derivation; absent everywhere
+// else (never fabricated). Scores are DERIVED_BY_DEMO_LOGIC investigative-
+// relevance estimates — never guilt/probability statements.
+// ============================================================================
+
+export type MotiveHypothesisKey = "H1" | "H2" | "H3";
+
+/** The canonical competing hypothesis frame (title + §17 exact wording). */
+export interface MotiveHypothesisFrame {
+  readonly key: MotiveHypothesisKey;
+  readonly hypothesisId: string;
+  readonly title: string;
+  readonly statement: string;
+  readonly summary: string;
+}
+
+/** Display-only FOR/AGAINST grouping for ONE hypothesis card — the demo §14
+ *  narrative readout. Purely presentational: it never feeds the score-driving
+ *  rows (scores stay derived from the pool lexicons in the data layer). Each id
+ *  resolves against the workspace observation provider. */
+export interface Phase2EvidenceReadoutRow {
+  readonly supporting: readonly string[];
+  readonly contradicting: readonly string[];
+}
+
+/** PASS 4 — per-key evidence readout for the Hypothesis-route surface
+ *  (optional, real Case-B demo only; absent ⇒ the surface falls back to the
+ *  score rows' supporting/contradicting sets). */
+export type Phase2EvidenceReadout = Readonly<
+  Record<MotiveHypothesisKey, Phase2EvidenceReadoutRow>
+>;
+
+/** One hypothesis row inside a Phase-2 score comparison. */
+export interface MotiveHypothesisScoreRow {
+  readonly hypothesisId: string;
+  readonly key: MotiveHypothesisKey;
+  readonly title: string;
+  /** Deterministic investigative-relevance score (DERIVED_BY_DEMO_LOGIC). */
+  readonly score: number;
+  readonly rank: number;
+  /** Reverse-hypothesis-style classification status from the observation sets. */
+  readonly assessmentStatus: AssessmentStatus;
+  /** Canonical Hypothesis row status carried at this point in time. */
+  readonly canonicalStatus: string;
+  readonly supportingObservationIds: readonly string[];
+  readonly contradictingObservationIds: readonly string[];
+  readonly exclusiveObservationIds: readonly string[];
+  readonly poolSize: number;
+  readonly scoreLabel: "DERIVED_BY_DEMO_LOGIC";
+}
+
+/** A scored H1/H2/H3 comparison at one point in time (pre/post evidence). */
+export interface MotiveHypothesisComparison {
+  readonly stage: "PRE_EVIDENCE" | "POST_EVIDENCE";
+  readonly rows: readonly MotiveHypothesisScoreRow[];
+}
+
+/** Deterministic frozen snapshot of the pre-evidence H1/H2/H3 comparison. */
+export interface Phase2AssessmentFreeze {
+  readonly id: string;
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly frozenAt: { readonly value: string; readonly precision: "exact" };
+  readonly runId: string;
+  readonly stage: "PHASE_2_PRE_EVIDENCE_FREEZE";
+  readonly hypothesisIds: readonly string[];
+  readonly rows: readonly MotiveHypothesisScoreRow[];
+  readonly supportingObservationIds: readonly string[];
+  readonly contradictingObservationIds: readonly string[];
+  readonly nodeIds: readonly string[];
+  readonly edgeIds: readonly string[];
+  readonly fingerprint: string;
+  readonly scoreLabel: "DERIVED_BY_DEMO_LOGIC";
+  readonly caveat: string;
+}
+
+/** Action vocabulary of the Reasoning Ledger — from the platform's existing
+ *  action set; the ledger NEVER returns a guilt/proven verdict. */
+export type ReasoningLedgerAction =
+  | "REQUEST_RECORDS"
+  | "REVIEW_RELATIONSHIP"
+  | "ESCALATE_FOR_HUMAN_REVIEW"
+  | "PRESERVE_EVIDENCE"
+  | "OPEN_NEW_LEAD"
+  | "RECORD_REASONING";
+
+export interface ReasoningLedgerEntry {
+  readonly id: string;
+  readonly ledgerId: string;
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly ordering: number;
+  readonly kind: string;
+  readonly title: string;
+  readonly detail: string;
+  readonly action: ReasoningLedgerAction;
+  readonly derivedFrom: readonly string[];
+  readonly at: { readonly value: string; readonly precision: "exact" };
+}
+
+/** Deterministic reasoning ledger spanning Phase 1 + Phase 2 decision trail. */
+export interface ReasoningLedger {
+  readonly id: string;
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly entries: readonly ReasoningLedgerEntry[];
+}
+
+export interface Phase2ScoreState {
+  readonly stage: "PRE_EVIDENCE" | "POST_EVIDENCE";
+  readonly rows: readonly MotiveHypothesisScoreRow[];
+  readonly observationIds: readonly string[];
+  readonly fingerprint: string;
+}
+
+export interface Phase2HoleStatusChange {
+  readonly graphHoleId: string;
+  readonly status: GraphHoleResolutionStatus;
+  readonly derivedFromEvidenceIds: readonly string[];
+}
+
+/** Post-S1 comparison delta produced by the Phase-2 second-evidence ingestion. */
+export interface Phase2EvidenceDelta {
+  readonly caseId: string;
+  readonly investigationId: string;
+  readonly appliedAt: { readonly value: string; readonly precision: "exact" };
+  readonly evidenceIngestedIds: readonly string[];
+  readonly observationExtractedIds: readonly string[];
+  readonly relationCreatedIds: readonly string[];
+  readonly graphNodesAdded: readonly string[];
+  readonly graphEdgesAdded: readonly string[];
+  readonly hypothesisPromotedIds: readonly string[];
+  readonly evidenceRequestIdsCompleted: readonly string[];
+  readonly gapStatusChanges: readonly Phase1GapStatusChange[];
+  readonly holeStatusChanges: readonly Phase2HoleStatusChange[];
+  readonly before: Phase2ScoreState;
+  readonly after: Phase2ScoreState;
+  readonly rankingChanged: boolean;
+  readonly leakSafeClass: string;
+}
+
+/** Deterministic record of one Phase-2 second-evidence (S1) ingestion run. */
+export interface Phase2S1Record {
+  readonly determinismLabel: string;
+  readonly ingestedAt: { readonly value: string; readonly precision: "exact" };
+  readonly evidenceId: string;
+  readonly evidenceClass: string;
+  readonly evidenceStatus: string;
+  /** The physical corporate audit document is honestly BLOCKED (research
+   *  required); the ingested fallback is the House-report public account. */
+  readonly physicalDocStatus: "BLOCKED";
+  readonly fallback: "REPORT_TEXT_ACCOUNT";
+  readonly extractedObservationIds: readonly string[];
+  readonly relationId: string;
+  readonly nodeId: string;
+  readonly edgeId: string;
+  readonly hypothesesPromoted: readonly string[];
+  readonly gapId: string;
+  readonly gapStatus: string;
+  readonly evidenceRequestId: string;
+  readonly evidenceRequestStatus: string;
+  readonly freezeFingerprintBefore: string;
+  readonly freezeFingerprintAfter: string;
+  readonly summary: string;
+}
+
+/** Patch of canonical records a Phase-2 S1 run inserts or reassesses. */
+export interface Phase2StatePatch {
+  readonly sources: readonly Source[];
+  readonly artifacts: readonly Artifact[];
+  readonly evidence: readonly Evidence[];
+  readonly observations: readonly Observation[];
+  readonly relations: readonly RelationHypothesis[];
+  readonly graphNodes: readonly GraphNode[];
+  readonly graphEdges: readonly GraphEdge[];
+  readonly hypotheses: readonly Hypothesis[];
+  readonly gapReassessments: readonly BreakthroughGapReassessment[];
+  readonly evidenceRequestCompletions: readonly BreakthroughEvidenceRequestCompletion[];
+}
+
+/** Everything a Phase-2 S1 run produces (patch + record + delta). */
+export interface Phase2RunResult {
+  readonly patch: Phase2StatePatch;
+  readonly record: Phase2S1Record;
+  readonly delta: Phase2EvidenceDelta;
+  readonly ledgerEntries: readonly ReasoningLedgerEntry[];
+}
+
+/** One hop of the later-historical hearsay chain (the validation overlay). */
+export interface Phase2HearsayChainHop {
+  readonly hopLabel: string;
+  readonly entityId: string;
+  readonly note: string;
+}
+
+/** Later-historical validation layer (class-5 timing): the House-report
+ *  testimony surfaced LONG after the Phase-2 analysis, hearsay-attributed to a
+ *  witness who never met the security chief directly. Single-source hearsay is
+ *  rendered as LATER_HISTORICAL_KNOWLEDGE and NEVER PROVEN/CONFIRMED. */
+export interface Phase2HistoricalValidation {
+  readonly hypothesisIds: readonly string[];
+  readonly classification: "LATER_HISTORICAL_KNOWLEDGE";
+  readonly verdict: "CORROBORATED" | "PARTIALLY_CORROBORATED" | "NOT_CORROBORATED" | "UNRESOLVED";
+  readonly witnessEntityId: string;
+  readonly hearsayChain: readonly Phase2HearsayChainHop[];
+  readonly nonMeeting: string;
+  readonly stance: "SOURCE_CREDIBILITY";
+  readonly mannerOfProof: "UNRESOLVED";
+  readonly derivedFrom: readonly string[];
+  readonly at: { readonly value: string; readonly precision: "exact" };
+}
+
+// ============================================================================
 // Realtime domain types (canonical contract SSE is SseEvent; the realtime
 // seam adds normalization + deduplication on top of that transport).
 // ============================================================================
@@ -642,4 +1037,43 @@ export interface WorkspaceProviders extends WorkspaceIdentity {
   readonly hypotheses: HypothesisProvider;
   readonly crossCase: CrossCaseProvider;
   readonly realtime: RealtimeProvider;
+  /** PASS 2 — OPTIONAL read-only Phase-1 intelligence projections. Demo/real-case
+   *  workspaces attach them; live/OFS workspaces omit them (never fabricated). */
+  readonly crossCaseSignal?: CrossCaseSignal;
+  readonly predictionFreeze?: PredictionFreeze;
+  /** PASS 3 — OPTIONAL read-only breakthrough projections (post-freeze delta +
+   *  breakthrough record), present only on workspaces carrying the Exhibit-719
+   *  live ingestion. Live/OFS workspaces omit them (never fabricated). */
+  readonly postFreezeDelta?: Phase1PostFreezeDelta;
+  readonly breakthroughRecord?: BreakthroughRecord;
+  /** PASS 4 — OPTIONAL read-only Phase-2 motive-investigation projections
+   *  (pre-evidence freeze, post-evidence delta, reasoning ledger, and the
+   *  later-historical validation overlay), present only on enriched real-case
+   *  workspaces. Live/OFS workspaces omit them (never fabricated). */
+  readonly phase2AssessmentFreeze?: Phase2AssessmentFreeze;
+  readonly phase2EvidenceDelta?: Phase2EvidenceDelta;
+  readonly phase2HistoricalValidation?: Phase2HistoricalValidation;
+  readonly phase2Ledger?: ReasoningLedger;
+  /** PASS 4 — display-only FOR/AGAINST readout (demo §14) for the route surface. */
+  readonly phase2EvidenceReadout?: Phase2EvidenceReadout;
+  /** PASS 4 — the second-evidence (S1) observation records resolved through the
+   *  phase-2 seam so the route surface can render their content. Delivered as a
+   *  projection, never as base-envelope records (the pre-ingest fixture arrays
+   *  stay clean and pre-evidence scoring is unaffected). */
+  readonly phase2SecondEvidence?: readonly Observation[];
+  /** PASS 4 — the cross-case connection evidence (H. Paul Rico ↔ hitman /
+   *  Boston-gang link revealed by the Case-A network operation). The route
+   *  surface surfaces its observation in H1's supporting set ONLY when the
+   *  workspace graph carries the SOLID (ACTIVE) edge between the two nodes —
+   *  the "?" graph hole alone never unlocks it. */
+  readonly phase2ConnectionEvidence?: {
+    readonly observation: Observation;
+    readonly sourceNodeId: string;
+    readonly targetNodeId: string;
+  };
+  /** PASS 4 — Phase-2 PROGRESSION gate. Even a workspace whose envelope carries
+   *  the derived Phase-2 data keeps it HIDDEN until the session-level Phase-2
+   *  kickoff has actually happened (the deterministic demo transition). Absent
+   *  (live/OFS) → the Phase-2 surfaces never render. */
+  readonly phase2Ready?: boolean;
 }

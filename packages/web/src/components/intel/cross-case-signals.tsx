@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CrossCaseMatch } from "@indago/contracts";
+import type { CrossCaseSignal as Phase1Signal } from "@/lib/providers/types";
 
 type AuthState = "idle" | "confirming" | "authorized";
 
@@ -37,6 +38,63 @@ function formatDate(iso: string): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return iso;
   return new Date(t).toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" }).toUpperCase();
+}
+
+/** PASS 2 — Phase-1 cross-case analysis banner. Renders ONLY when the workspace
+ *  carries a derived crossCaseSignal projection (real cases); OFS/live workspaces
+ *  render nothing. All scores are DERIVED_BY_DEMO_LOGIC. */
+function Phase1SignalBanner({ signal }: { signal?: Phase1Signal }) {
+  if (!signal) return null;
+  return (
+    <div className="glass-panel rounded-xl px-6 py-4 border-l-4 border-l-accent-blue/70 bg-accent-blue/5">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-mono text-accent-blue uppercase tracking-widest font-bold">
+              Phase-1 Cross-Case Analysis
+            </span>
+            <span className="text-[9px] font-mono text-surface-700 uppercase tracking-widest">
+              DERIVED_BY_DEMO_LOGIC · deterministic structural comparison
+            </span>
+          </div>
+          <Badge variant="info" className="bg-info/10 border-info/30 font-mono text-[9px] uppercase tracking-widest text-surface-900">
+            {signal.supportingEntityIds.length} SHARED ORG MEMBERS
+          </Badge>
+        </div>
+
+        <p className="text-sm leading-relaxed text-surface-900">{signal.signal}</p>
+        <p className="text-[10px] font-mono text-surface-700 leading-relaxed uppercase tracking-widest">
+          {signal.rationale}
+        </p>
+
+        {signal.candidateRanking.length > 0 && (
+          <div className="mt-1 border-t border-surface-200/50 pt-3 flex flex-col gap-1.5">
+            {signal.candidateRanking.map((candidate) => (
+              <div key={candidate.candidateId} className="flex items-center justify-between gap-4 text-[11px] font-mono">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-surface-700 w-5 shrink-0 tabular-nums">#{candidate.rank}</span>
+                  <span className="text-surface-900 font-medium truncate">{candidate.label}</span>
+                  {candidate.roleLabel && (
+                    <span className="text-surface-700 truncate hidden sm:inline">· {candidate.roleLabel}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {candidate.status === "SELECTED" && (
+                    <Badge variant="success" dot className="bg-success/10 border-success/30 text-surface-900 font-mono text-[9px] uppercase tracking-widest">
+                      Selected
+                    </Badge>
+                  )}
+                  <span className={`tabular-nums text-xs font-bold ${candidate.status === "SELECTED" ? "text-accent-blue" : "text-surface-700"}`}>
+                    {candidate.score.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function CrossCaseSignals() {
@@ -127,26 +185,34 @@ export function CrossCaseSignals() {
 
   if (!resolved) {
     return (
-      <div className="w-full py-20 flex flex-col gap-4 items-center justify-center glass-panel rounded-xl">
-        <LoadingSpinner size="lg" />
-        <span className="text-[10px] font-mono text-surface-700 uppercase tracking-widest animate-pulse">Scanning global boundaries...</span>
+      <div className="flex flex-col gap-4 w-full">
+        <Phase1SignalBanner signal={workspace.crossCaseSignal} />
+        <div className="w-full py-20 flex flex-col gap-4 items-center justify-center glass-panel rounded-xl">
+          <LoadingSpinner size="lg" />
+          <span className="text-[10px] font-mono text-surface-700 uppercase tracking-widest animate-pulse">Scanning global boundaries...</span>
+        </div>
       </div>
     );
   }
 
   if (resolved.length === 0) {
     return (
-      <div className="glass-panel rounded-xl p-8">
-        <EmptyState
-          title="No cross-case signals yet"
-          description="INDAGO checks new entities, infrastructure, and patterns against other cases as evidence comes in. Nothing has matched so far."
-        />
+      <div className="flex flex-col gap-4 w-full">
+        <Phase1SignalBanner signal={workspace.crossCaseSignal} />
+        <div className="glass-panel rounded-xl p-8">
+          <EmptyState
+            title="No cross-case signals yet"
+            description="INDAGO checks new entities, infrastructure, and patterns against other cases as evidence comes in. Nothing has matched so far."
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-slide-up">
+
+      <Phase1SignalBanner signal={workspace.crossCaseSignal} />
       
       <div className="flex items-center justify-between gap-4 px-2">
         <div className="flex flex-col gap-1">

@@ -46,7 +46,7 @@ import { createDemoWorkspaceState, logDemoEvent } from "./state";
 import type { DemoWorkspaceState } from "./state";
 import { createDemoRealtimeProvider } from "./realtime";
 import { baseLatency, heavyLatency, deterministicSleep } from "./latency";
-import { demoFixtures } from "./demo-fixtures";
+import type { DemoFixtureSet } from "./demo-fixtures";
 import { uploadDemoCatalog } from "./demo-fixtures/upload-demo-sequence";
 import { MOCK_FOREIGN_CASES, FOREIGN_ENTITIES_DB } from "./demo-fixtures/cross-case";
 import { ENTITY_LINK_BY_CANDIDATE } from "./demo-fixtures/entity-resolution";
@@ -73,16 +73,33 @@ import type {
   ForeignCaseOverlay,
   ForeignGraphNode,
   ForeignGraphEdge,
+  BreakthroughRunResult,
+  Phase2RunResult,
 } from "../types";
 import {
   addDemoSessionEvidence,
   listDemoSessionEvidence,
+  addDemoSessionBreakthrough,
+  listDemoSessionBreakthrough,
+  addDemoSessionPhase2,
+  listDemoSessionPhase2,
 } from "./session";
 import {
   deterministicUuid,
   demoSubmissionIds,
   buildDemoEvidence,
 } from "./submit";
+import type { DemoSubmissionIds } from "./submit";
+import {
+  runBreakthroughIngestion,
+  applyBreakthroughRunToState,
+} from "../real-case/breakthrough";
+import { CASE_B_ID, EVID_EXHIBIT_719, EVID_S1_AUDIT } from "../real-case/lookup";
+import {
+  matchesPhase2Class,
+  runPhase2S1Ingestion,
+  applyPhase2RunToState,
+} from "../real-case/phase2";
 
 function paginate<T>(
   items: T[],
@@ -107,6 +124,65 @@ function resolveSignal(query?: ProviderQuery): AbortSignal | undefined {
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw ProviderError.cancelled();
+}
+
+/**
+ * PASS 3 — deterministic Exhibit-719 breakthrough gate (demo directive). ANY
+ * Case B submission fires the live ingestion + Case-A network reveal with the
+ * SAME outcome — the analyst does not need to upload the exact Exhibit-719
+ * ledger. The single carve-out: a submission carrying the EREQ_P2 target class
+ * routes instead to the Phase-2 second-evidence flow (checked next). A
+ * non-Case-B submission silently falls through to the generic session-evidence
+ * path.
+ */
+function tryBuildBreakthroughRun(
+  state: DemoWorkspaceState,
+  full: EvidenceSubmissionRequest,
+  _ids: DemoSubmissionIds,
+): { run: BreakthroughRunResult } | null {
+  if (state.case?.id !== CASE_B_ID) return null;
+  const fileNames = (full.files ?? []).map((f) => f.fileName);
+  if (matchesPhase2Class(full.evidenceTitle, fileNames)) return null;
+  return { run: runBreakthroughIngestion(state) };
+}
+
+/**
+ * PASS 4 — deterministic Phase-2 S1 gate. Only a Case B submission carrying the
+ * EREQ_P2 target class (WJA AUDIT / FINANCIAL DOCUMENT (HOUSE REPORT III.B.5))
+ * triggers the Phase-2 second-evidence ingestion; any other submission silently
+ * falls through to the generic session-evidence path.
+ */
+function tryBuildPhase2Run(
+  state: DemoWorkspaceState,
+  full: EvidenceSubmissionRequest,
+): { run: Phase2RunResult } | null {
+  if (state.case?.id !== CASE_B_ID) return null;
+  const fileNames = (full.files ?? []).map((f) => f.fileName);
+  if (!matchesPhase2Class(full.evidenceTitle, fileNames)) return null;
+  return { run: runPhase2S1Ingestion(state) };
+}
+
+/**
+ * PASS 3 — hydrate any session-recorded breakthrough runs into a FRESH store so
+ * per-navigation provider bundles reflect live-ingested evidence exactly once
+ * (breakthrough evidence is never double-listed as generic session evidence).
+ */
+export function hydrateDemoSessionBreakthroughs(state: DemoWorkspaceState): void {
+  for (const run of listDemoSessionBreakthrough(state.investigation.id)) {
+    applyBreakthroughRunToState(state, run);
+  }
+}
+
+/**
+ * PASS 4 — hydrate any session-recorded Phase-2 S1 runs into a FRESH store so
+ * per-navigation provider bundles reflect the live-ingested Phase-2 evidence
+ * exactly once (the WJA audit evidence is never double-listed as generic
+ * session evidence).
+ */
+export function hydrateDemoSessionPhase2(state: DemoWorkspaceState): void {
+  for (const run of listDemoSessionPhase2(state.investigation.id)) {
+    applyPhase2RunToState(state, run);
+  }
 }
 
 /** PR-1 T4: global ascending timeline sort (stable; unknown precision last). */
@@ -291,6 +367,66 @@ export class DemoEvidenceProvider implements EvidenceProvider {
       full.files,
       full.sourceName,
     );
+
+    // PASS 3 — Exhibit-719 breakthrough gate (demo directive). ANY Case B
+    // submission triggers the deterministic live ingestion + Case-A network
+    // reveal INSTEAD of the generic session-evidence path (except a submission
+    // carrying the EREQ_P2 class, which routes to Phase-2 below): the fenced
+    // material is derived into canonical records, applied to the workspace
+    // state, and recorded in the session breakthrough registry so fresh bundles
+    // hydrate it exactly once.
+    const breakthrough = tryBuildBreakthroughRun(this.state, full, ids);
+    if (breakthrough) {
+      applyBreakthroughRunToState(this.state, breakthrough.run);
+      addDemoSessionBreakthrough(investigationId, breakthrough.run);
+      logDemoEvent(this.state, {
+        id: deterministicUuid(`event:${investigationId}:${ids.operationId}`),
+        investigationId,
+        action: "evidence.uploaded",
+        actor: "analyst",
+        targetType: "EVIDENCE",
+        targetId: EVID_EXHIBIT_719,
+        description: `Evidence submitted: ${full.evidenceTitle} (${full.files.length} file(s)) — breakthrough ingestion + Case-A network reveal started`,
+        timestamp: "2024-07-01T12:00:00.000Z",
+      });
+      return {
+        message: "Evidence submission accepted — breakthrough ingestion started",
+        operationId: ids.operationId,
+        correlationId: ids.correlationId,
+        jobsEnqueued: full.files.length,
+        fileCount: full.files.length,
+      };
+    }
+
+    // PASS 4 — Phase-2 second-evidence (S1) gate. A Case B submission carrying
+    // the EREQ_P2 target class (WJA AUDIT / FINANCIAL DOCUMENT (HOUSE REPORT
+    // III.B.5)) triggers the deterministic Phase-2 live ingestion INSTEAD of the
+    // generic session-evidence path: the fenced audit account is derived into
+    // canonical records, applied to the workspace state, and recorded in the
+    // session phase2 registry so fresh bundles hydrate it exactly once.
+    const phase2 = tryBuildPhase2Run(this.state, full);
+    if (phase2) {
+      applyPhase2RunToState(this.state, phase2.run);
+      addDemoSessionPhase2(investigationId, phase2.run);
+      logDemoEvent(this.state, {
+        id: deterministicUuid(`event:${investigationId}:${ids.operationId}`),
+        investigationId,
+        action: "evidence.uploaded",
+        actor: "analyst",
+        targetType: "EVIDENCE",
+        targetId: EVID_S1_AUDIT,
+        description: `Evidence submitted: ${full.evidenceTitle} (${full.files.length} file(s)) — matched the EREQ_P2 target class; Phase-2 second-evidence ingestion started`,
+        timestamp: "2024-07-02T09:00:00.000Z",
+      });
+      return {
+        message: "Evidence submission accepted — Phase-2 second-evidence ingestion started",
+        operationId: ids.operationId,
+        correlationId: ids.correlationId,
+        jobsEnqueued: full.files.length,
+        fileCount: full.files.length,
+      };
+    }
+
     const evidence = buildDemoEvidence(
       full,
       this.state.case.id,
@@ -382,7 +518,7 @@ export class DemoEntityProvider implements EntityProvider {
     // Foreign-island entities (cross-case boundary) are canonical Entity-shaped
     // records owned by the cross-case fixture. The UI resolves them through this
     // provider seam so it never imports the foreign DB directly.
-    const foreign = FOREIGN_ENTITIES_DB[id];
+    const foreign = this.state.fixtures.foreignEntityDb?.[id] ?? FOREIGN_ENTITIES_DB[id];
     if (foreign) {
       return {
         ...(foreign as Entity),
@@ -407,7 +543,7 @@ export class DemoGraphProvider implements GraphProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    return demoFixtures.graphVersion;
+    return this.state.fixtures.graphVersion;
   }
 
   async listVersions(
@@ -419,7 +555,7 @@ export class DemoGraphProvider implements GraphProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    return paginate([...demoFixtures.graphVersions], query);
+    return paginate([...this.state.fixtures.graphVersions], query);
   }
 
   async getVersionById(
@@ -430,7 +566,7 @@ export class DemoGraphProvider implements GraphProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    const version = demoFixtures.graphVersions.find((v) => v.id === graphVersionId);
+    const version = this.state.fixtures.graphVersions.find((v) => v.id === graphVersionId);
     if (!version) {
       throw ProviderError.notFound("Graph version not found.");
     }
@@ -464,11 +600,11 @@ export class DemoGraphProvider implements GraphProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    return paginate([], query);
+    return paginate(this.state.fixtures.graphHoles ?? [], query);
   }
 
   async getOverlayCatalog(): Promise<GraphRealtimeCatalog> {
-    return uploadDemoCatalog;
+    return this.state.fixtures.graphRealtimeCatalog ?? uploadDemoCatalog;
   }
 }
 
@@ -582,10 +718,10 @@ export class DemoRobustnessProvider implements RobustnessProvider {
     if (investigationId !== this.state.investigation.id) {
       throw ProviderError.notFound("Investigation not found.");
     }
-    if (demoFixtures.robustness.hypothesisId !== hypothesisId) {
+    if (this.state.fixtures.robustness.hypothesisId !== hypothesisId) {
       throw ProviderError.notFound("No robustness result for this hypothesis.");
     }
-    return demoFixtures.robustness;
+    return this.state.fixtures.robustness;
   }
 }
 
@@ -627,12 +763,13 @@ export class DemoCrossCaseProvider implements CrossCaseProvider {
     if (!this.state.case || caseId !== this.state.case.id) {
       return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
     }
-    return paginate(demoFixtures.crossCase, query);
+    return paginate(this.state.fixtures.crossCase, query);
   }
 
-  /** PR-1 T2: the foreign-island overlays the graph UI draws. Demo serves its
-   *  deterministic cobalt/crimson islands through this seam (keyed by ref); the
-   *  UI no longer imports them from the fixture module. */
+  /** PR-1 T2: the foreign-island overlays the graph UI draws. Real cases serve
+   *  their fixture-provided overlay (single cross-case island); the demo serves
+   *  its deterministic cobalt/crimson islands. Both through this seam (keyed by
+   *  ref) — the UI never imports fixture modules. */
   async listForeignOverlays(
     caseId: string,
     query?: ProviderQuery,
@@ -642,16 +779,19 @@ export class DemoCrossCaseProvider implements CrossCaseProvider {
     if (!this.state.case || caseId !== this.state.case.id) {
       return { items: [], page: 1, pageSize: 20, totalItems: 0, hasMore: false };
     }
-    const overlays: ForeignCaseOverlay[] = Object.entries(MOCK_FOREIGN_CASES).map(([ref, m]) => ({
-      ref,
-      caseId: m.id,
-      title: m.title,
-      summary: m.summary,
-      localTargetMatch: m.localTargetMatch,
-      bridgeSupport: m.bridgeSupport,
-      nodes: m.nodes as ForeignGraphNode[],
-      edges: m.edges as ForeignGraphEdge[],
-    }));
+    const fixtureOverlays = this.state.fixtures.foreignCaseOverlays;
+    const overlays: ForeignCaseOverlay[] = fixtureOverlays
+      ? fixtureOverlays
+      : Object.entries(MOCK_FOREIGN_CASES).map(([ref, m]) => ({
+          ref,
+          caseId: m.id,
+          title: m.title,
+          summary: m.summary,
+          localTargetMatch: m.localTargetMatch,
+          bridgeSupport: m.bridgeSupport,
+          nodes: m.nodes as ForeignGraphNode[],
+          edges: m.edges as ForeignGraphEdge[],
+        }));
     return paginate(overlays, query);
   }
 }
@@ -819,8 +959,9 @@ export class DemoIntelligenceProvider implements IntelligenceProvider {
     const left = this.state.candidateById.get(pair.leftCandidateId);
     const right = this.state.candidateById.get(pair.rightCandidateId);
     if (!comparison || !left || !right) return null;
-    const leftEntityId = ENTITY_LINK_BY_CANDIDATE[left.id];
-    const rightEntityId = ENTITY_LINK_BY_CANDIDATE[right.id];
+    const link = this.state.fixtures.entityLinkByCandidate ?? ENTITY_LINK_BY_CANDIDATE;
+    const leftEntityId = link[left.id];
+    const rightEntityId = link[right.id];
     return {
       resolutionId: hypothesis.id,
       pair,
@@ -954,7 +1095,7 @@ export class DemoIntelligenceProvider implements IntelligenceProvider {
     await deterministicSleep(baseLatency(this.config), resolveSignal(query));
     throwIfAborted(resolveSignal(query));
     this.assertInvestigation(investigationId);
-    return paginate(demoFixtures.discoveryCandidates, query);
+    return paginate(this.state.fixtures.discoveryCandidates, query);
   }
 
   async getSource(id: string): Promise<Source> {
@@ -1079,8 +1220,11 @@ export class DemoIntelligenceProvider implements IntelligenceProvider {
 export function createWorkspaceDemoProviders(
   identity: WorkspaceIdentity,
   config: DataModeConfig,
+  fixtureSet?: DemoFixtureSet,
 ): WorkspaceProviders {
-  const state = createDemoWorkspaceState(identity.workspaceId);
+  const state = createDemoWorkspaceState(identity.workspaceId, fixtureSet);
+  hydrateDemoSessionBreakthroughs(state);
+  hydrateDemoSessionPhase2(state);
   const realtime = createDemoRealtimeProvider(state, config);
   const cases = new DemoCaseProvider(state, config);
   const investigations = new DemoInvestigationProvider(state, config);
@@ -1120,5 +1264,24 @@ export function createWorkspaceDemoProviders(
     relations,
     intelligence,
     realtime,
+    // PASS 2 — Phase-1 intelligence projections (optional, read-only). Real-case
+    // fixture sets carry them in `fixtureSet.phase1`; OFS/live-bundles leave
+    // them unset (never fabricated).
+    crossCaseSignal: fixtureSet?.phase1?.crossCaseSignal,
+    predictionFreeze: fixtureSet?.phase1?.predictionFreeze,
+    // PASS 3 — breakthrough projections (optional, read-only; enriched Case-B
+    // only). Live/OFS bundles leave them unset (never fabricated).
+    postFreezeDelta: fixtureSet?.phase1?.postFreezeDelta,
+    breakthroughRecord: fixtureSet?.phase1?.breakthroughRecord,
+    // PASS 4 — Phase-2 motive-investigation projections (optional, read-only;
+    // enriched Case-B only). Live/OFS bundles leave them unset (never
+    // fabricated).
+    phase2AssessmentFreeze: fixtureSet?.phase2?.assessmentFreeze,
+    phase2EvidenceDelta: fixtureSet?.phase2?.evidenceDelta,
+    phase2HistoricalValidation: fixtureSet?.phase2?.historicalValidation,
+    phase2Ledger: fixtureSet?.phase2?.ledger,
+    phase2EvidenceReadout: fixtureSet?.phase2?.evidenceReadout,
+    phase2SecondEvidence: fixtureSet?.phase2?.secondEvidence,
+    phase2ConnectionEvidence: fixtureSet?.phase2?.connectionEvidence,
   };
 }

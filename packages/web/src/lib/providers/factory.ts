@@ -40,7 +40,10 @@ import type {
   EvidenceProvider,
   InvestigationProvider,
   ObservationContradiction,
+  ProviderQuery,
+  Paginated,
 } from "./types";
+import { ProviderError } from "./types";
 import type {
   Investigation,
   Lead,
@@ -50,12 +53,14 @@ import type {
   Source,
   Evidence,
   Observation,
+  Case,
 } from "@indago/contracts";
-import { createWorkspaceDemoProviders } from "./demo/providers";
+import { createWorkspaceDemoProviders, hydrateDemoSessionBreakthroughs } from "./demo/providers";
 import { createLiveWorkspaceProviders } from "./live/providers";
-import { DemoCaseProvider, DemoEvidenceProvider, DemoInvestigationProvider } from "./demo/providers";
+import { DemoEvidenceProvider, DemoInvestigationProvider } from "./demo/providers";
 import { createDemoWorkspaceState, type DemoWorkspaceState } from "./demo/state";
 import { LiveCaseProvider, LiveEvidenceProvider, LiveInvestigationProvider } from "./live/providers";
+import { REAL_CASE_IDS, getRealCaseFixtureSet } from "./real-case/index";
 
 /**
  * Resolve the concrete app data mode for the given case.
@@ -86,7 +91,13 @@ export function createWorkspaceProviders(
   const mode = resolveDataModeForWorkspace(identity.caseId, env);
 
   if (mode === "demo") {
-    return createWorkspaceDemoProviders(identity, config);
+    return createWorkspaceDemoProviders(
+      identity,
+      config,
+      // Real cases inject their deterministic fixture set; the demo case uses
+      // the default OFS fixtures.
+      getRealCaseFixtureSet(identity.caseId),
+    );
   }
   if (config.mode === "auto") {
     return createAutoWorkspaceProviders(identity, config);
@@ -113,7 +124,11 @@ export function createAutoWorkspaceProviders(
   identity: WorkspaceIdentity,
   config: DataModeConfig,
 ): WorkspaceProviders {
-  const demo = createWorkspaceDemoProviders(identity, config);
+  const demo = createWorkspaceDemoProviders(
+    identity,
+    config,
+    getRealCaseFixtureSet(identity.caseId),
+  );
   const live = createLiveWorkspaceProviders(identity, config);
   const liveServes = (capability: CapabilityKey): boolean =>
     resolveCapabilityStatus(capability, config, "live") === "live";
@@ -150,6 +165,25 @@ export function createAutoWorkspaceProviders(
       : demo.hypotheses,
     crossCase: liveServes("crossCase") ? live.crossCase : demo.crossCase,
     realtime: liveServes("realtime") ? live.realtime : demo.realtime,
+    // PASS 2 — OPTIONAL Phase-1 intelligence projections, forwarded from the
+    // demo bundle only when the fixture set carries them (real cases). Live/OFS
+    // workspaces leave them unset.
+    crossCaseSignal: demo.crossCaseSignal,
+    predictionFreeze: demo.predictionFreeze,
+    // PASS 3 — OPTIONAL breakthrough projections, forwarded from the demo
+    // bundle only when present (enriched Case B). Live/OFS leave them unset.
+    postFreezeDelta: demo.postFreezeDelta,
+    breakthroughRecord: demo.breakthroughRecord,
+    // PASS 4 — OPTIONAL Phase-2 motive-investigation projections, forwarded
+    // from the demo bundle only when present (enriched Case B). Live/OFS leave
+    // them unset.
+    phase2AssessmentFreeze: demo.phase2AssessmentFreeze,
+    phase2EvidenceDelta: demo.phase2EvidenceDelta,
+    phase2HistoricalValidation: demo.phase2HistoricalValidation,
+    phase2Ledger: demo.phase2Ledger,
+    phase2EvidenceReadout: demo.phase2EvidenceReadout,
+    phase2SecondEvidence: demo.phase2SecondEvidence,
+    phase2ConnectionEvidence: demo.phase2ConnectionEvidence,
   };
 }
 
@@ -181,6 +215,10 @@ export interface CaseListProviders {
    *  graph/recency state. Absent in live mode — the dashboard never fabricates
    *  enrichments the platform cannot serve. */
   readonly enrichment?: DashboardEnrichment;
+  /** Per-case real graph topology (graphNodes + graphEdges) keyed by case id.
+   *  Genuine fixture projections so each case card's mini topology preview
+   *  renders its own structure. Absent in live mode. */
+  readonly topology?: Readonly<Record<string, { readonly nodes: readonly GraphNode[]; readonly edges: readonly GraphEdge[] }>>;
 }
 
 /**
@@ -221,16 +259,65 @@ export function createCaseListProviders(
   env: NodeJS.ProcessEnv = getEffectiveEnv(),
 ): CaseListProviders {
   const mode = resolveCaseListMode(env);
-  const config = getDataModeConfig(env);
   if (mode === "demo") {
-    const state = createDemoWorkspaceState("case-list");
-    return {
-      mode,
-      cases: new DemoCaseProvider(state, config),
-      enrichment: toDashboardEnrichment(state),
-    };
+    // PASS 1 real-case dashboard: serve BOTH case boundaries as a 2-card grid
+    // (no OFS). Each real case gets its own fixture-backed provider; the
+    // enrichment projects the FIRST real case's workspace state so the
+    // dashboard renders genuine lead/gap/graph state without inventing data.
+    const realCaseIds = [...REAL_CASE_IDS];
+    const firstCaseId = realCaseIds[0];
+    const firstCase = firstCaseId ? getRealCaseFixtureSet(firstCaseId) : undefined;
+    if (firstCase) {
+      const state = createDemoWorkspaceState("case-list", firstCase);
+      const topo: Record<string, { nodes: readonly GraphNode[]; edges: readonly GraphEdge[] }> = {};
+      for (const id of realCaseIds) {
+        const set = getRealCaseFixtureSet(id);
+        if (set) topo[id] = { nodes: set.graphNodes, edges: set.graphEdges };
+      }
+      return {
+        mode,
+        cases: new CaseListCaseProvider(realCaseIds),
+        enrichment: toDashboardEnrichment(state),
+        topology: topo,
+      };
+    }
   }
   return { mode, cases: new LiveCaseProvider() };
+}
+
+/** Case provider that serves the full real-case catalogue (2 cases) for the
+ *  Case List dashboard. Each case is read from its deterministic fixture set. */
+class CaseListCaseProvider implements CaseProvider {
+  constructor(private readonly caseIds: readonly string[]) {}
+
+  async list(query?: ProviderQuery): Promise<Paginated<Case>> {
+    const page = query?.page ?? 1;
+    const pageSize = query?.pageSize ?? 20;
+    const cases = this.caseIds
+      .map((id) => getRealCaseFixtureSet(id)?.case)
+      .filter((c): c is Case => Boolean(c));
+    const start = (page - 1) * pageSize;
+    const slice = cases.slice(start, start + pageSize);
+    return {
+      items: slice,
+      page,
+      pageSize,
+      totalItems: cases.length,
+      hasMore: start + pageSize < cases.length,
+    };
+  }
+
+  async get(id: string): Promise<Case> {
+    const c = getRealCaseFixtureSet(id)?.case;
+    if (!c) throw ProviderError.notFound();
+    return c;
+  }
+
+  async remove(): Promise<void> {
+    // Real cases are immutable fixtures for PASS 1; removal is unsupported and
+    // surfaced honestly (no fabrication of a replacement state).
+    throw ProviderError.unsupported("Repository cases cannot be removed.");
+  }
 }
 
 // ============================================================================
@@ -254,7 +341,11 @@ export function createIntakeProviders(
   const mode = resolveDataModeForWorkspace(caseId, env);
   const config = getDataModeConfig(env);
   if (mode === "demo") {
-    const state = createDemoWorkspaceState(`intake:${caseId}`);
+    const state = createDemoWorkspaceState(
+      `intake:${caseId}`,
+      getRealCaseFixtureSet(caseId),
+    );
+    hydrateDemoSessionBreakthroughs(state);
     return {
       mode,
       evidence: new DemoEvidenceProvider(state, config),

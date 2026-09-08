@@ -137,8 +137,28 @@ export function deriveEvidencePostureForNode(
   return "unknown";
 }
 
-export function nodeInTimeRange(node: GraphNode, range: [number, number] | null): TemporalState {
+/** Activity corridor of one NODE's observations: the [min,max] epoch span of
+ *  its dated observations. Entities with no dated observation yield `null`
+ *  (conservative: a missing timestamp is not evidence of absence). Keyed by
+ *  entityId — the panel derives it once from the observation provider. */
+export interface NodeActivityBounds {
+  readonly min: number;
+  readonly max: number;
+}
+
+export function nodeInTimeRange(
+  node: GraphNode,
+  range: [number, number] | null,
+  activityBounds?: NodeActivityBounds | null,
+): TemporalState {
   if (!range) return "in-range";
+  if (activityBounds) {
+    // In-range iff >=1 dated observation falls inside the window.
+    if (activityBounds.max < range[0] || activityBounds.min > range[1]) {
+      return "out-of-range";
+    }
+    return "in-range";
+  }
   if (!node.createdAt?.value) return "uncertain";
   const t = new Date(node.createdAt.value).getTime();
   return t >= range[0] && t <= range[1] ? "in-range" : "out-of-range";
@@ -173,6 +193,7 @@ export interface NodeVisualStateInput {
   readonly focusedNodeId: string | null;
   readonly hoveredNodeId: string | null;
   readonly activeTimeRange: [number, number] | null;
+  readonly activityBounds?: NodeActivityBounds | null;
   readonly isForeign: boolean;
   readonly isBridge: boolean;
   readonly degree: number;
@@ -187,7 +208,7 @@ export function deriveNodeVisualState(input: NodeVisualStateInput): GraphNodeVis
   const selected = input.selectedNodeId === input.node.id;
   const focused = input.focusedNodeId === input.node.id;
   const hovered = input.hoveredNodeId === input.node.id;
-  const temporal = nodeInTimeRange(input.node, input.activeTimeRange);
+  const temporal = nodeInTimeRange(input.node, input.activeTimeRange, input.activityBounds);
 
   let attentionLevel: AttentionLevel = 0;
   if (selected || focused) attentionLevel = 3;
@@ -221,6 +242,8 @@ export interface EdgeVisualStateInput {
   readonly focusedNodeId: string | null;
   readonly hoveredNodeId: string | null;
   readonly activeTimeRange: [number, number] | null;
+  readonly sourceActivityBounds?: NodeActivityBounds | null;
+  readonly targetActivityBounds?: NodeActivityBounds | null;
   readonly isForeign: boolean;
   readonly hypothesisRelevance: HypothesisRelevance | null;
   readonly evidenceInScope: boolean;
@@ -229,8 +252,16 @@ export interface EdgeVisualStateInput {
 }
 
 export function deriveEdgeVisualState(input: EdgeVisualStateInput): GraphEdgeVisualState {
-  const sourceTemporal = nodeInTimeRange(input.sourceNode, input.activeTimeRange);
-  const targetTemporal = nodeInTimeRange(input.targetNode, input.activeTimeRange);
+  const sourceTemporal = nodeInTimeRange(
+    input.sourceNode,
+    input.activeTimeRange,
+    input.sourceActivityBounds,
+  );
+  const targetTemporal = nodeInTimeRange(
+    input.targetNode,
+    input.activeTimeRange,
+    input.targetActivityBounds,
+  );
   const incidentToSelection =
     input.selectedNodeId === input.edge.sourceNodeId ||
     input.selectedNodeId === input.edge.targetNodeId ||
@@ -405,6 +436,10 @@ export interface GraphVisualContextInput {
   readonly foreignNodeIds?: ReadonlySet<string>;
   readonly foreignEdgeIds?: ReadonlySet<string>;
   readonly focusSeed?: GraphFocusSeed | null;
+  /** PR-8/P4: entity activity corridors (per entityId) used as the TEMPORAL
+   *  source for nodes that carry dated observations. Absent → nodes fall back
+   *  to createdAt (leaf-function behavior unchanged). */
+  readonly activityBounds?: ReadonlyMap<string, NodeActivityBounds>;
 }
 
 /**
@@ -536,6 +571,9 @@ export function deriveGraphVisualContext(
         focusedNodeId: null,
         hoveredNodeId: null,
         activeTimeRange: input.activeTimeRange,
+        activityBounds: node.entityId
+          ? input.activityBounds?.get(node.entityId) ?? null
+          : null,
         isForeign: foreignNodeIds.has(node.id),
         isBridge: bridgeNodeIds.has(node.id),
         degree: degree.get(node.id) ?? 0,
@@ -567,6 +605,12 @@ export function deriveGraphVisualContext(
         focusedNodeId: null,
         hoveredNodeId: null,
         activeTimeRange: input.activeTimeRange,
+        sourceActivityBounds: sourceNode.entityId
+          ? input.activityBounds?.get(sourceNode.entityId) ?? null
+          : null,
+        targetActivityBounds: targetNode.entityId
+          ? input.activityBounds?.get(targetNode.entityId) ?? null
+          : null,
         isForeign: foreignEdgeIds.has(edge.id),
         hypothesisRelevance: relevance,
         evidenceInScope: input.focusSeed?.kind === "evidence" && edgeIsGrounded(edge),

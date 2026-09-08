@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
+import { Phase2MotivePanel } from "@/components/intel/phase2-motive-panel";
 
 // F6: Import the visual feedback components
 import { ProcessingFilament, RecoveryRing } from "@/components/feedback/shell-animations";
@@ -224,6 +225,16 @@ export function InvestigationOverview({
                 </Badge>
                 <Badge variant="info">{investigation.status}</Badge>
                 <Badge variant="accent">{investigation.priority}</Badge>
+                {workspace.predictionFreeze &&
+                  investigation.caseId === workspace.predictionFreeze.caseId && (
+                    <Badge variant="accent">Phase-1 frozen</Badge>
+                  )}
+                {workspace.phase2AssessmentFreeze &&
+                  investigation.caseId === workspace.phase2AssessmentFreeze.caseId && (
+                    <Badge variant="accent" dot>
+                      Phase-2 motive assessment
+                    </Badge>
+                  )}
                 {investigation.owner && (
                   <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
                     Owner {investigation.owner}
@@ -262,6 +273,10 @@ export function InvestigationOverview({
             </p>
           )}
         </section>
+
+        {/* PASS 4 — Phase-2 motive investigation (rendered only when the
+            workspace carries the derived analysis; live/OFS render nothing). */}
+        <Phase2MotivePanel />
 
         {/* ── INVESTIGATIVE STATE ───────────────────────────────────── */}
         <section className="mt-10">

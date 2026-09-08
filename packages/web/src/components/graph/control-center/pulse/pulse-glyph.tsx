@@ -39,10 +39,12 @@ import {
   PULSE_PHASE,
   PULSE_SAMPLE_COUNT,
   shortEntityLabel,
+  stableHash,
 } from "@/lib/network/pulse/pulse-model";
 import type {
   EntityPulseField,
   EntityPulseIndicator,
+  PulseCategory,
 } from "@/lib/network/pulse/pulse-model";
 
 export const PULSE_GLYPH_VIEWBOX = 200;
@@ -196,35 +198,81 @@ function sectorIntensity(
 }
 
 /**
+ * Deterministic, entity-specific irregular wave distortion of the outer aura.
+ *
+ * A realistic "pulse wave" is never a single smooth raised-cosine blob — it is
+ * the superposition of several incommensurate sine harmonics with per-entity,
+ * per-category phase offsets, so the contour looks organic and alive rather
+ * than a uniform balloon. Everything is derived from a stable hash of the
+ * entity id + the indicator category, so:
+ *  • every Case B entity gets its OWN distinct, irregular wave signature, and
+ *  • identical (entity, observation set, timeRange) ⇒ identical geometry
+ *    (no Math.random, no Date.now, no per-frame noise — the determinism
+ *    contract in the model header is preserved).
+ *
+ * `t` is the normalised angular position [0, 1) around the circumference; the
+ * result is a multiplier already scaled to sit inside [0, 1].
+ */
+function irregularWave(entityId: string, category: PulseCategory, t: number): number {
+  // Per-cell phase offsets so adjacent cells break symmetry (no repeating band).
+  const p1 =
+    ((stableHash(`${entityId}|${category}|w1`) % 628) / 628) * Math.PI * 2;
+  const p2 =
+    ((stableHash(`${entityId}|${category}|w2`) % 628) / 628) * Math.PI * 2;
+  const p3 =
+    ((stableHash(`${entityId}|${category}|w3`) % 628) / 628) * Math.PI * 2;
+  const p4 =
+    ((stableHash(`${entityId}|${category}|w4`) % 628) / 628) * Math.PI * 2;
+
+  // 3 incommensurate harmonics (≈2, ≈5, and ≈13 cycles around the face) plus a
+  // slow "lope" — together they read as a genuinely irregular, restless wave.
+  const harmonic =
+    0.30 * Math.sin(2 * Math.PI * t * 1.7 + p1) +
+    0.22 * Math.sin(2 * Math.PI * t * 5.3 + p2) +
+    0.14 * Math.sin(2 * Math.PI * t * 13.1 + p3) +
+    0.12 * Math.sin(2 * Math.PI * t * 0.8 + p4);
+
+  // Map the sum (roughly [-0.78, 0.78]) onto [0, 1], gently compressed at the
+  // extremes so it never spikes into a degenerate circle.
+  return 0.5 + 0.5 * Math.max(-1, Math.min(1, harmonic * 1.15));
+}
+
+/**
  * Sector-driven organic field: 96 radii, one per sample angle. Every sample
  * belongs to exactly one equal sector; the radius there grows from the calm
- * baseline by that sector's strength times a raised-cosine wave (0 at the
- * sector edges, peak at its centre). Stronger activity ⇒ a larger local
- * expansion; weaker activity stays near the baseline. Adjacent sectors meet
- * at the baseline, so the whole contour stays one smooth closed curve.
- * Deterministic: a pure function of the indicators.
+ * baseline by that sector's strength times an entity-specific irregular wave
+ * (see irregularWave). Stronger activity ⇒ a larger local wave/expansion;
+ * weaker activity stays near the calm baseline. The superposed harmonics make
+ * the contour genuinely irregular (never a perfect circle and never a
+ * repeating smooth lobe), while staying a pure, deterministic function of the
+ * indicators + entity id — identical inputs ⇒ identical geometry.
  */
 function buildSectorRadii(
   sectors: readonly SectorGeometry[],
+  entityId: string,
 ): number[] {
   const radii: number[] = [];
   const single = sectors.length === 1;
   for (let i = 0; i < PULSE_SAMPLE_COUNT; i += 1) {
     const angle = normalizeAngle(PULSE_PHASE + (i / PULSE_SAMPLE_COUNT) * TWO_PI);
+    const t = i / PULSE_SAMPLE_COUNT;
     let radius = PULSE_GLYPH_AURA_BASE;
     if (sectors.length > 0) {
       if (single) {
         const sector = sectors[0]!;
+        const wave = irregularWave(entityId, sector.indicator.category, t);
         radius =
-          PULSE_GLYPH_AURA_BASE + sector.indicator.strength * PULSE_GLYPH_AURA_SPAN;
+          PULSE_GLYPH_AURA_BASE + sector.indicator.strength * wave * PULSE_GLYPH_AURA_SPAN;
       } else {
         for (let s = 0; s < sectors.length; s += 1) {
           if (cwDist(sectors[s]!.start, angle) < sectors[s]!.span) {
-            const t = cwDist(sectors[s]!.start, angle) / sectors[s]!.span;
-            const wave = Math.pow(Math.sin(Math.PI * t), 0.9);
+            const local = cwDist(sectors[s]!.start, angle) / sectors[s]!.span;
+            const wave = irregularWave(entityId, sectors[s]!.indicator.category, t);
+            const sectorWave =
+              wave * (0.7 + 0.3 * Math.pow(Math.sin(Math.PI * local), 0.9));
             radius =
               PULSE_GLYPH_AURA_BASE +
-              sectors[s]!.indicator.strength * wave * PULSE_GLYPH_AURA_SPAN;
+              sectors[s]!.indicator.strength * sectorWave * PULSE_GLYPH_AURA_SPAN;
             break;
           }
         }
@@ -268,9 +316,9 @@ export const PulseGlyph = memo(function PulseGlyph({
   // the morph target stays stable between recomputes (same data ⇒ same
   // geometry; no per-frame re-animation).
   const sectorRadii = useMemo(
-    () => buildSectorRadii(sectors),
+    () => buildSectorRadii(sectors, field.entityId),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [field.indicators],
+    [field.indicators, field.entityId],
   );
   const mappedOuter = useMorphSamples(sectorRadii);
   const outerPath = closedRadialPath(

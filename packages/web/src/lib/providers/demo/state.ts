@@ -32,12 +32,14 @@ import type {
   EntityHypothesis,
   Hypothesis,
 } from "@indago/contracts";
-import { demoFixtures } from "./demo-fixtures";
+import { demoFixtures, type DemoFixtureSet } from "./demo-fixtures";
 import type { InvestigationTimeline, ObservationContradiction } from "../types";
 import type { HypothesisDecisionRecord } from "@/lib/intel/reverse-hypothesis/hypothesis-model";
 
 export interface DemoWorkspaceState {
   readonly workspaceId: string;
+  /** The fixture set powering this workspace. Defaults to demoFixtures (OFS). */
+  readonly fixtures: DemoFixtureSet;
   /** Nullable so listCaseProviders can hard-delete its single demo case. */
   case: Case | null;
   investigation: Investigation;
@@ -92,32 +94,36 @@ function toMap<T extends { id: string }>(items: T[]): Map<string, T> {
 }
 
 /** Create a fresh, canonical store instance for one workspace. */
-export function createDemoWorkspaceState(workspaceId: string): DemoWorkspaceState {
+export function createDemoWorkspaceState(
+  workspaceId: string,
+  fixtureSet: DemoFixtureSet = demoFixtures,
+): DemoWorkspaceState {
   const s: DemoWorkspaceState = {
     workspaceId,
-    case: demoFixtures.case,
-    investigation: demoFixtures.investigation,
-    evidenceById: toMap(demoFixtures.evidence),
-    observationById: toMap(demoFixtures.observations),
-    entityById: toMap(demoFixtures.entities),
-    leadById: toMap(demoFixtures.leads),
-    gapById: toMap(demoFixtures.gaps),
-    evidenceRequestById: toMap(demoFixtures.evidenceRequests),
-    reviewTaskById: toMap(demoFixtures.reviewTasks),
-    graphNodeById: toMap(demoFixtures.graphNodes),
-    graphEdgeById: toMap(demoFixtures.graphEdges),
-    sourceById: toMap(demoFixtures.sources),
-    artifactById: toMap(demoFixtures.artifacts),
-    relationById: toMap(demoFixtures.relations),
-    hypothesisById: toMap(demoFixtures.hypotheses),
-    timeline: demoFixtures.timeline,
-    contradictions: demoFixtures.contradictions,
-    candidateById: toMap(demoFixtures.candidates),
-    candidatePairById: toMap(demoFixtures.candidatePairs),
+    fixtures: fixtureSet,
+    case: fixtureSet.case,
+    investigation: fixtureSet.investigation,
+    evidenceById: toMap(fixtureSet.evidence),
+    observationById: toMap(fixtureSet.observations),
+    entityById: toMap(fixtureSet.entities),
+    leadById: toMap(fixtureSet.leads),
+    gapById: toMap(fixtureSet.gaps),
+    evidenceRequestById: toMap(fixtureSet.evidenceRequests),
+    reviewTaskById: toMap(fixtureSet.reviewTasks),
+    graphNodeById: toMap(fixtureSet.graphNodes),
+    graphEdgeById: toMap(fixtureSet.graphEdges),
+    sourceById: toMap(fixtureSet.sources),
+    artifactById: toMap(fixtureSet.artifacts),
+    relationById: toMap(fixtureSet.relations),
+    hypothesisById: toMap(fixtureSet.hypotheses),
+    timeline: fixtureSet.timeline,
+    contradictions: fixtureSet.contradictions,
+    candidateById: toMap(fixtureSet.candidates),
+    candidatePairById: toMap(fixtureSet.candidatePairs),
     candidateResolutionById: new Map(
-      demoFixtures.resolutions.map((r) => [r.candidatePairId, r]),
+      fixtureSet.resolutions.map((r) => [r.candidatePairId, r]),
     ),
-    entityHypothesisById: toMap(demoFixtures.entityHypotheses),
+    entityHypothesisById: toMap(fixtureSet.entityHypotheses),
     erAuditById: new Map(),
     relationAuthorityAuditById: new Map(),
     reverseHypothesisDecisions: new Map(),
@@ -128,29 +134,30 @@ export function createDemoWorkspaceState(workspaceId: string): DemoWorkspaceStat
 
 /** Immutable-reset the store back to the canonical fixture values. */
 export function resetDemoWorkspaceState(state: DemoWorkspaceState): void {
-  state.case = demoFixtures.case;
-  state.investigation = demoFixtures.investigation;
-  state.evidenceById = toMap(demoFixtures.evidence);
-  state.observationById = toMap(demoFixtures.observations);
-  state.entityById = toMap(demoFixtures.entities);
-  state.leadById = toMap(demoFixtures.leads);
-  state.gapById = toMap(demoFixtures.gaps);
-  state.evidenceRequestById = toMap(demoFixtures.evidenceRequests);
-  state.reviewTaskById = toMap(demoFixtures.reviewTasks);
-  state.graphNodeById = toMap(demoFixtures.graphNodes);
-  state.graphEdgeById = toMap(demoFixtures.graphEdges);
-  state.sourceById = toMap(demoFixtures.sources);
-  state.artifactById = toMap(demoFixtures.artifacts);
-  state.relationById = toMap(demoFixtures.relations);
-  state.hypothesisById = toMap(demoFixtures.hypotheses);
-  state.timeline = demoFixtures.timeline;
-  state.contradictions = demoFixtures.contradictions;
-  state.candidateById = toMap(demoFixtures.candidates);
-  state.candidatePairById = toMap(demoFixtures.candidatePairs);
+  const f = state.fixtures;
+  state.case = f.case;
+  state.investigation = f.investigation;
+  state.evidenceById = toMap(f.evidence);
+  state.observationById = toMap(f.observations);
+  state.entityById = toMap(f.entities);
+  state.leadById = toMap(f.leads);
+  state.gapById = toMap(f.gaps);
+  state.evidenceRequestById = toMap(f.evidenceRequests);
+  state.reviewTaskById = toMap(f.reviewTasks);
+  state.graphNodeById = toMap(f.graphNodes);
+  state.graphEdgeById = toMap(f.graphEdges);
+  state.sourceById = toMap(f.sources);
+  state.artifactById = toMap(f.artifacts);
+  state.relationById = toMap(f.relations);
+  state.hypothesisById = toMap(f.hypotheses);
+  state.timeline = f.timeline;
+  state.contradictions = f.contradictions;
+  state.candidateById = toMap(f.candidates);
+  state.candidatePairById = toMap(f.candidatePairs);
   state.candidateResolutionById = new Map(
-    demoFixtures.resolutions.map((r) => [r.candidatePairId, r]),
+    f.resolutions.map((r) => [r.candidatePairId, r]),
   );
-  state.entityHypothesisById = toMap(demoFixtures.entityHypotheses);
+  state.entityHypothesisById = toMap(f.entityHypotheses);
   state.erAuditById = new Map();
   state.relationAuthorityAuditById = new Map();
   state.reverseHypothesisDecisions = new Map();

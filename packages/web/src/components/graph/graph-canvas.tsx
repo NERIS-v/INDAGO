@@ -22,6 +22,12 @@ interface GraphCanvasProps {
   holes: GraphHole[];
   onNodeClick: (nodeId: string) => void;
   activeTimeRange: [number, number] | null;
+  /** P4: per-node observation activity corridor (nodeId → [min,max] epoch or
+   *  null when the node has no dated observations). When present it is the
+   *  TEMPORAL source for the window filter — a node is in-range iff >=1 dated
+   *  observation falls inside the window; nodes without dated observations stay
+   *  visible (conservative). Absent → createdAt-based (leaf behavior). */
+  nodeTemporalBounds?: ReadonlyMap<string, { min: number; max: number } | null>;
   selectedNodeId?: string | null;
   controlsRef?: React.MutableRefObject<{ zoomIn: () => void; zoomOut: () => void; fit: () => void; focusNode: (id: string) => void; focusPair: (aId: string, bId: string, durationMs?: number) => void; } | null>;
   /** PR-3: fired when the user presses on empty canvas (not a node). Lets the
@@ -43,6 +49,12 @@ const OFF_CANVAS_GAP = 60;
 const AURA_FADE_OUT_MS = 150;
 const AURA_FADE_IN_MS = 250;
 const AURA_SETTLE_DELAY_MS = 160;
+
+// P4: out-of-window objects are DIMMED, never hidden — the analyst must be able
+// to see where the timeline's activity sits relative to the rest of the graph.
+const OUT_OF_RANGE_NODE_OPACITY = 0.22;
+const OUT_OF_RANGE_EDGE_OPACITY = 0.15;
+const OUT_OF_RANGE_LABEL_OPACITY = 0.35;
 
 const ICON_PATHS = {
   PERSON: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
@@ -77,7 +89,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
   // PR-10: the physics topology defaults to the rendered edges for standalone
   // callers and is the FULL merged topology when the panel supplies it — so
   // readability-filter interactions never restart the simulation.
@@ -206,10 +218,14 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
 
   const isNodeInTimeRange = useCallback((nodeId: string) => {
     if (!activeTimeRange) return true;
+    const bounds = nodeTemporalBounds?.get(nodeId);
+    if (bounds) {
+      return bounds.min <= activeTimeRange[1] && bounds.max >= activeTimeRange[0];
+    }
     const nodeTime = nodeTimeById.get(nodeId);
     if (nodeTime === undefined) return true;
     return nodeTime >= activeTimeRange[0] && nodeTime <= activeTimeRange[1];
-  }, [activeTimeRange, nodeTimeById]);
+  }, [activeTimeRange, nodeTimeById, nodeTemporalBounds]);
 
   const enterRef = useRef<Map<string, { t0: number; fromX: number; fromY: number }>>(new Map());
   const enterAnimRef = useRef<number | null>(null);
@@ -685,7 +701,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   edgeDashArray = `${drawLen} ${drawLen}`; edgeDashOffset = drawLen * (1 - progress); edgeMarkerEnd = undefined;
                 }
 
-                const baseOpacity = isOutOfBounds ? 0 : isForeignBridge ? 1 : isContradicted ? 0.6 : isConnected ? 1 : isLowConfidence ? 0.28 : support * 0.34 + 0.14;
+                const baseOpacity = isOutOfBounds ? OUT_OF_RANGE_EDGE_OPACITY : isForeignBridge ? 1 : isContradicted ? 0.6 : isConnected ? 1 : isLowConfidence ? 0.28 : support * 0.34 + 0.14;
                 const showTrace = (isConnected || isForeignBridge) && !isContradicted && !isLowConfidence && !reducedMotion;
 
                 const edgeOpacity = baseOpacity * entranceAlpha * (focusRecede ? 0.4 : 1);
@@ -812,7 +828,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   data-graph-case-scope={vs.caseScope}
                   data-graph-attention-level={String(vs.attentionLevel)}
                   data-graph-node-posture={vs.evidencePosture}
-                  style={{ opacity: (!inTimeRange ? 0 : bloom ? stateDim : 0) * (pos ? pos.alpha : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
+                  style={{ opacity: (!inTimeRange ? OUT_OF_RANGE_NODE_OPACITY : bloom ? stateDim : 0) * (pos ? pos.alpha : 1), transform: bloom ? "scale(1)" : "scale(0.01)", transformOrigin: `${nx}px ${ny}px`, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${nodeDelay}ms, transform ${EASE_SPRING} ${nodeDelay}ms` }}
                 >
                   {/* F-PR17 analytical focus aura: a thin dashed ring rendered at
                       the node's CURRENT live position. SELECTION (a committed
@@ -902,7 +918,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   <text
                     x={lx} y={ly} textAnchor={textAnchor} paintOrder="stroke fill"
                     className={`font-mono text-[9px] uppercase tracking-widest pointer-events-none transition-colors duration-fast ${bodyEmphasis && inTimeRange ? "fill-semantic-selection font-bold" : isForeign ? "fill-semantic-foreign font-bold drop-shadow-[0_0_4px_var(--color-semantic-foreign)]" : "fill-semantic-foreground-muted font-medium"}`}
-                    style={{ opacity: (!inTimeRange ? 0 : hoveredNode !== null && !isActive ? 0.3 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
+                    style={{ opacity: (!inTimeRange ? OUT_OF_RANGE_LABEL_OPACITY : hoveredNode !== null && !isActive ? 0.3 : bloom ? (isActive ? 1 : 0.9) : 0) * (pos ? pos.alpha : 1), stroke: "var(--color-surface-0)", strokeWidth: 2, transition: reducedMotion || (pos ? pos.active : false) ? "none" : `opacity ${EASE_NORMAL} ${labelDelay}ms` }}
                   >
                     {node.label}
                   </text>

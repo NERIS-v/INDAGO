@@ -53,6 +53,7 @@ export default function DashboardPage() {
           cases={providers.cases}
           mode={providers.mode}
           enrichment={providers.enrichment}
+          topology={providers.topology}
         />
       </main>
     </div>

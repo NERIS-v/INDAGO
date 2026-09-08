@@ -16,6 +16,7 @@
 // ============================================================================
 
 import type { DataModeConfig, DataMode } from "./types";
+import { REAL_CASE_IDS } from "./real-case/lookup";
 
 export const DEMO_CASE_ID_ENV = "NEXT_PUBLIC_DEMO_CASE_ID";
 export const DATA_MODE_ENV = "NEXT_PUBLIC_DATA_MODE";
@@ -60,6 +61,10 @@ export function parseTimingScale(raw: string | undefined): number {
 /**
  * Resolve the effective mode for a given workspace (caseId).
  *
+ * Demo-served cases: the configured `NEXT_PUBLIC_DEMO_CASE_ID` (OFS) OR any of
+ * the canonical real-case ids (REAL_CASE_IDS). All resolve to "demo" in
+ * demo/auto mode; all other cases are live.
+ *
  * Throws if the environment is configured in a way that would allow a silent
  * live -> mock fallback (i.e. "auto" or "demo" in production with NO demo case
  * configured).
@@ -84,6 +89,9 @@ export function resolveDataModeForWorkspace(
   if (mode === "live") return "live";
 
   if (mode === "demo") {
+    // Canonical real-case ids are always demo-served regardless of the
+    // configured DEMO_CASE_ID (which covers the OFS demo case).
+    if (REAL_CASE_IDS.includes(caseId)) return "demo";
     if (!demoCaseId) {
       throw new Error(
         `${DEMO_CASE_ID_ENV} must be set when ${DATA_MODE_ENV}=demo`,
@@ -91,7 +99,7 @@ export function resolveDataModeForWorkspace(
     }
     if (caseId !== demoCaseId) {
       throw new Error(
-        `${DATA_MODE_ENV}=demo only permits the configured demo case (${DEMO_CASE_ID_ENV}=${demoCaseId}); requested case "${caseId}" cannot use the demo data mode. Configure ${DEMO_CASE_ID_ENV} to match or set ${DATA_MODE_ENV}=live.`,
+        `${DATA_MODE_ENV}=demo only permits the configured demo case (${DEMO_CASE_ID_ENV}=${demoCaseId}) or a canonical real case; requested case "${caseId}" cannot use the demo data mode. Configure ${DEMO_CASE_ID_ENV} to match, use a real case id, or set ${DATA_MODE_ENV}=live.`,
       );
     }
     return "demo";
@@ -99,7 +107,7 @@ export function resolveDataModeForWorkspace(
 
   // mode === "auto"
   if (!dev) return "live";
-  if (demoCaseId && caseId === demoCaseId) return "demo";
+  if (demoCaseId === caseId || REAL_CASE_IDS.includes(caseId)) return "demo";
   return "live";
 }
 

@@ -36,6 +36,9 @@ export type PulseCategory =
   | "location"
   | "identity"
   | "cross-case"
+  | "factual"
+  | "relational"
+  | "behavioral"
   | "other";
 
 export const PULSE_CATEGORIES: readonly PulseCategory[] = [
@@ -44,6 +47,9 @@ export const PULSE_CATEGORIES: readonly PulseCategory[] = [
   "location",
   "identity",
   "cross-case",
+  "factual",
+  "relational",
+  "behavioral",
   "other",
 ] as const;
 
@@ -53,6 +59,9 @@ export const PULSE_CATEGORY_LABELS: Record<PulseCategory, string> = {
   location: "Location",
   identity: "Identity",
   "cross-case": "Cross-case",
+  factual: "Factual",
+  relational: "Relational",
+  behavioral: "Behavioral",
   other: "Other",
 };
 
@@ -62,13 +71,17 @@ export const PULSE_CATEGORY_COLORS: Record<PulseCategory, string> = {
   location: "var(--color-success)",
   identity: "var(--color-info)",
   "cross-case": "var(--color-warning)",
-  other: "var(--color-surface-500)",
+  factual: "var(--color-surface-500)",
+  relational: "var(--color-success)",
+  behavioral: "var(--color-accent-rose)",
+  other: "var(--color-surface-450)",
 };
 
 /**
- * Maps a canonical observation type onto a pulse category. RELATIONAL is an
- * entity→entity relationship rather than a location or identity signal, so it
- * is grouped under "other" — never conflated with a semantic it is not.
+ * Maps a canonical observation type onto a pulse category. The real-case
+ * observation corpus carries FACTUAL / RELATIONAL / BEHAVIORAL types, so they
+ * are surfaced as their own semantic categories — never collapsed into a
+ * blanket "other". TEMPORAL / OTHER and any un-declared types stay "other".
  */
 export function observationTypeToCategory(
   type: Observation["type"],
@@ -82,6 +95,12 @@ export function observationTypeToCategory(
       return "location";
     case "IDENTITY":
       return "identity";
+    case "RELATIONAL":
+      return "relational";
+    case "BEHAVIORAL":
+      return "behavioral";
+    case "FACTUAL":
+      return "factual";
     default:
       return "other";
   }
@@ -132,6 +151,9 @@ export const PULSE_PEAK_CATEGORY_CODES: Record<PulseCategory, string> = {
   location: "LOC",
   identity: "IDN",
   "cross-case": "XCS",
+  factual: "FCT",
+  relational: "REL",
+  behavioral: "BEH",
   other: "OTH",
 };
 

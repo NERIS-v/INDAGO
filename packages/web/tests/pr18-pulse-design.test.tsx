@@ -96,7 +96,7 @@ describe("F-PR18 — Entity Pulse analytical-field redesign", () => {
       expect(ind.querySelector("text")).not.toBeNull();
       // Labels are category codes only — never contain a date.
       expect(ind.getAttribute("data-pulse-peak-label")).toMatch(
-        /^(FIN|COM|LOC|IDN|XCS|OTH)$/,
+        /^(FIN|COM|LOC|IDN|XCS|FCT|REL|BEH|OTH)$/,
       );
     }
   });
@@ -110,7 +110,7 @@ describe("F-PR18 — Entity Pulse analytical-field redesign", () => {
     expect(ticks.length).toBeGreaterThan(0);
     for (const tick of ticks) {
       expect(tick.getAttribute("data-pulse-peak-label")).toMatch(
-        /^(FIN|COM|LOC|IDN|XCS|OTH)$/,
+        /^(FIN|COM|LOC|IDN|XCS|FCT|REL|BEH|OTH)$/,
       );
       expect(tick.getAttribute("data-pulse-peak-angle")).not.toBeNull();
       expect(tick.getAttribute("data-pulse-peak-magnitude")).not.toBeNull();
@@ -228,7 +228,7 @@ describe("F-PR19 — fully organic sector field", () => {
     renderPanel();
     const glyph = bankGlyph();
     const labels = Array.from(glyph.querySelectorAll("text")).filter((t) =>
-      /^(FIN|COM|LOC|IDN|XCS|OTH)$/.test(t.textContent ?? ""),
+      /^(FIN|COM|LOC|IDN|XCS|FCT|REL|BEH|OTH)$/.test(t.textContent ?? ""),
     );
     expect(labels.length).toBeGreaterThan(0);
     for (const label of labels) {
@@ -236,7 +236,7 @@ describe("F-PR19 — fully organic sector field", () => {
       const group = label.closest("[data-pulse-indicator-category]")!;
       expect(group.querySelector("line")).not.toBeNull();
       // Labels are codes only — never a date.
-      expect(label.textContent).toMatch(/^(FIN|COM|LOC|IDN|XCS|OTH)$/);
+      expect(label.textContent).toMatch(/^(FIN|COM|LOC|IDN|XCS|FCT|REL|BEH|OTH)$/);
     }
   });
 

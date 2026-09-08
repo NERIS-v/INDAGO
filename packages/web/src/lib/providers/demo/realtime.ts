@@ -7,10 +7,6 @@ import { uploadDemoSequence, getSetupEvents } from "./demo-fixtures/upload-demo-
 import { INVESTIGATION_ID } from "./demo-fixtures/lookup";
 import type { DemoStreamEvent } from "./demo-fixtures/events";
 
-const NAMED_SEQUENCES: Record<string, DemoStreamEvent[]> = {
-  upload: uploadDemoSequence,
-};
-
 export class DemoRealtimeProvider implements RealtimeProvider {
   private readonly listeners = new Set<(event: ProviderEvent) => void>();
   private status: RealtimeStatus = "disconnected";
@@ -28,6 +24,21 @@ export class DemoRealtimeProvider implements RealtimeProvider {
     private readonly config: DataModeConfig,
   ) {}
 
+  /** The fixture-driven stream for this workspace. Real-case fixture sets carry
+   *  an empty stream (real cases = no choreographed demo playback); demo serves
+   *  its deterministic OFS sequence. */
+  private eventsOf(): DemoStreamEvent[] {
+    return this.state.fixtures.events ?? operationFinancialShadowEvents;
+  }
+
+  private namedSequencesOf(): Record<string, DemoStreamEvent[]> {
+    return this.state.fixtures.namedSequences ?? { upload: uploadDemoSequence };
+  }
+
+  private setupEventsOf(): DemoStreamEvent[] {
+    return this.state.fixtures.setupEvents ?? getSetupEvents();
+  }
+
   connect(investigationId: string): void {
     if (this.status === "connecting" || this.status === "connected") {
       if (this.connectedInvestigationId === investigationId) return;
@@ -37,7 +48,7 @@ export class DemoRealtimeProvider implements RealtimeProvider {
     this.status = "connecting";
     
     // PRE-LOAD the memory bank with the Courier Firm and the Hole immediately!
-    this.history = getSetupEvents();
+    this.history = this.setupEventsOf();
 
     this.timeouts.push(
       setTimeout(() => {
@@ -53,7 +64,7 @@ export class DemoRealtimeProvider implements RealtimeProvider {
   }
 
   triggerSequence(key: string): void {
-    const sequence = NAMED_SEQUENCES[key];
+    const sequence = this.namedSequencesOf()[key];
     if (!sequence || sequence.length === 0) return;
     this.queuedSequences.push(sequence);
     
@@ -64,7 +75,8 @@ export class DemoRealtimeProvider implements RealtimeProvider {
 
   private scheduleNext(): void {
     if (this.status !== "connected") return;
-    const next = operationFinancialShadowEvents[this.emitted];
+    const stream = this.eventsOf();
+    const next = stream[this.emitted];
     if (!next) {
       if (this.listeners.size > 0) this.drainQueue();
       return;
