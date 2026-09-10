@@ -654,13 +654,12 @@ auditable, and compatible with future semantic intelligence.
 - **Dependencies:** PR1 + PR2.
 - **Non-goals:** semantic retrieval / embeddings / LLM / reblocking.
 - **Acceptance:** §17 + §19 matrix green end-to-end.
-- **Status:** ✅ IMPLEMENTED (unit-verified; real-Postgres integration BLOCKED).
+- **Status:** ✅ IMPLEMENTED (unit-verified; real-Postgres integration green).
 - **Deliverables:** case-scoped `GET /cases/:caseId/graph/current`,
   `GET /cases/:caseId/graph/versions`, `GET /cases/:caseId/graph/versions/:vid`,
   `GET /cases/:caseId/graph/as-of` (501 deferred); D7 checkpoint↔version
   mapping via `associateCheckpoint`/`resolveVersionByCheckpoint` on existing
-  `GraphVersion.checkpointId` field; non-DB unit suite (16 green); gated
-  integration suite (7, BLOCKED).
+  `GraphVersion.checkpointId` field; integration suite (8, green on real Postgres).
 
 ---
 
@@ -669,9 +668,10 @@ auditable, and compatible with future semantic intelligence.
 > This section records the **implemented** PR2 runtime behaviour. It does not
 > rewrite the locked PR0 decisions in the body above ($3, $7, $8, $12, $16, $18) —
 > it documents how those decisions were carried out in code and the precise
-> guarantees actually delivered. **Real-Postgres integration verification is
-> BLOCKED** (TEST_DATABASE_URL unreachable); the statements below describe the
-> implemented + unit-verified behaviour.
+> guarantees actually delivered. **All DB-backed suites verified green against
+> real PostgreSQL** (migrated `TEST_DATABASE_URL` via `prisma migrate deploy` /
+> `migrate reset`, same schema path CI uses); the statements below describe the
+> implemented + verified behaviour.
 
 ### B.1.1 GraphVersion runtime model
 - `GraphVersion` persisted on PostgreSQL (Prisma model, `packages/platform/prisma/schema.prisma`).
@@ -706,6 +706,12 @@ auditable, and compatible with future semantic intelligence.
 - Legal transitions (enforced, locked matrix): `DRAFT→ACTIVE`, `ACTIVE→SUPERSEDED`,
   `SUPERSEDED→ARCHIVED`; `ARCHIVED` terminal. Anything else throws
   `GraphVersionLifecycleError("ILLEGAL_TRANSITION")`.
+- **WS-7 auto-activation:** `createVersion(input, tx?)` takes `activate?: boolean` (default `true`).
+  When activating, the SAME transaction demotes any prior ACTIVE version for the case to SUPERSEDED
+  (projectionStatus → STALE only when it was COMPLETE) and promotes the new version to ACTIVE —
+  exactly one ACTIVE version per case is guaranteed by construction. `activate: false` leaves the
+  version at its requested status (e.g. a manual pipeline). The old DRAFT→ACTIVE manual promotion
+  path remains available for such versions but is vestigial for the authority (which auto-activates).
 - Parent validation (`createVersion` with explicit `parentGraphVersionId`): parent exists
   (`PARENT_NOT_FOUND`), parent is same case (`PARENT_CROSS_CASE`), ancestor / positive
   (`PARENT_NOT_ANCESTOR`). Auto-lineage yields a linear, non-branching chain to the immediate
@@ -716,13 +722,14 @@ auditable, and compatible with future semantic intelligence.
   the same `relStore.transaction`** as the canonical mutation (via injected `tx`) ⇒
   "canonical changed but no version" and "version but canonical rolled back" are both impossible.
 - **Accept** (canonical ACTIVE relation newly materialized, `!reusedExisting`): creates a version,
-  `reason`/`metadata` `RELATION_ACCEPTED:<relationId>`. Reusing an already-materialized relation
-  (`reusedExisting=true`, retry) does **not** duplicate a version.
+  `reason`/`metadata` `RELATION_ACCEPTED:<relationId>`, and records a `RELATION:ACCEPTED` row in
+  the append-only `TemporalStateChange` history in the SAME transaction. Reusing an already-materialized
+  relation (`reusedExisting=true`, retry) does **not** duplicate a version or history row.
 - **Reverse** (an ACTIVE canonical actually flips to `REVERSED`, `canonical !== null`): creates a
-  version, `reason`/`metadata` `RELATION_REVERSED:<relationId>`. Already-reversed (retry) creates
-  none.
+  version, `reason`/`metadata` `RELATION_REVERSED:<relationId>`, and records `RELATION:REVERSED` in
+  the same transaction. Already-reversed (retry) creates none.
 - **Reject**: creates **no** version.
-- Created versions are `status: DRAFT`, `projectionStatus: PENDING`.
+- Created versions are `status: ACTIVE` (WS-7 auto-activation; see B.1.3), `projectionStatus: PENDING`.
 
 ### B.1.5 Projection-status semantics
 - Vocabulary: `PENDING` (exists, projection not started = not part of contract enum),
@@ -731,6 +738,8 @@ auditable, and compatible with future semantic intelligence.
   bookkeeping seam. `COMPLETE` + counts are set **only after a valid projection has been materialized**.
 - **Retry idempotency:** projecting a version again does not create a second GraphVersion — it only
   (re)updates `projectionStatus`/counts on the existing row.
+- **STALE invariant under auto-activation:** a COMPLETE version that is superseded by a newer ACTIVE
+  version is demoted to STALE (its counts are the last-materialized, its content is no longer current).
 
 ### B.1.6 Current graph model
 - `GraphProjectionService.projectCurrentGraph({ investigationId, caseId })`:
@@ -743,14 +752,39 @@ auditable, and compatible with future semantic intelligence.
 - `GraphProjectionService.projectGraphVersion(caseId, { versionNumber } | { graphVersionId })`.
 - **Historical-selection mechanism (dimension A — revision order only):** replay the persisted
   `GraphVersion` chain for the case ascending, up to and including the target version, tracking each
-  accepted / reversed canonical relation from `reason`+`metadata` (`RELATION_ACCEPTED:<rid>` /
-  `RELATION_REVERSED:<rid>`). An edge is included iff its accept version ≤ target AND (if reversed) its
-  reverse version > target (not yet reversed by the target). This preserves ACTIVE/REJECTED/REVERSED
-  history without deleting rows and without turning a reversal into "never existed". It never reads or
-  reuses current Graphology.
-- Edges are loaded from the authoritative `Relation` store, carrying persisted `validityInterval` →
-  `temporalRange` + persisted `provenance`. Entity nodes = canonical non-ARCHIVED universe (consistent).
+  accepted / reversed / amended canonical relation from `reason`+`metadata`
+  (`RELATION_ACCEPTED:<rid>` / `RELATION_REVERSED:<rid>` / `RELATION_AMENDED:<rid>`) AND each entity
+  creation / archive (`ENTITY_CREATED:<eid>` / `ENTITY_ARCHIVED:<eid>`). An edge is included iff its
+  accept version ≤ target AND (if reversed) its reverse version > target (not yet reversed by the
+  target). A node is included iff (if lifecycle-revisioned) `createdAtVersion ≤ target` AND
+  `archivedAtVersion` absent or `> target`; legacy chains (no entity revisions) keep the full
+  universe. This preserves ACTIVE/REJECTED/REVERSED history without deleting rows and without turning
+  a reversal into "never existed". It never reads or reuses current Graphology.
+- **Strict replay (WS-8):** `decodeChange` treats a KNOWN graph change (any of the five typed events)
+  with a missing/empty id as a corrupt revision — `GraphRevisionCorruptError` (500), never a silent
+  skip into a wrong-shaped graph. Unknown / non-graph change types remain silently skippable,
+  preserving replay-contract compatibility. Legacy reason-string formats are still parsed for all five
+  events so historical chains written before the typed-metadata change replay identically.
+- **Amendment-aware interval resolution (item A):** each revision-carrying assertion
+  (`temporalAssertions`) is resolved as-of the target revision — the projected `temporalRange` is the
+  last assertion with `revisionAtVersionNumber ≤ target`, so a later amendment never leaks into older
+  snapshots (as-of v1 shows the ORIGINAL interval; v2+ shows the amended one). Edges/entities are
+  loaded from the authoritative `Relation`/`Entity` stores; `temporalRange` is that resolved interval,
+  `provenance` is carried verbatim.
 - Marks the projected version `projectionStatus=COMPLETE` with counts.
+
+### B.1.7b Valid-at graph model (WS-10, dimension B)
+- `GraphProjectionService.projectGraphValidAt({ investigationId, caseId }, at)` returns the graph of
+  ACTIVE canonical relations whose persisted `validityInterval` **contains** the domain instant `at`
+  (`containsTime` in `interval-validation.ts`). This is dimension B — domain validity in time — and is
+  explicitly NOT a revision-order query.
+- `containsTime` only answers for **concrete instant-grade bounds** (`exact|minute|hour` precision,
+  parseable finite value): coarse bounds (month/year/range/approximate/unknown), unparseable values,
+  and relations with no interval at all yield `false` — the relation is excluded, never guessed.
+  Closed semantics: `validTo` inclusive when present; open-ended toward the future when absent.
+- Nodes = ACTIVE entity universe; marks the latest ACTIVE version COMPLETE with counts (mirrors
+  `projectCurrentGraph`). Exposed as `GET /cases/:caseId/graph/valid-at?at=<ISO>` (400 when `at` is
+  absent or not a parseable instant; 501 stays for `as-of`).
 
 ### B.1.8 The two independent dimensions (D: A vs B)
 - **A — GraphVersion order** ("which canonical revision") drives edge **inclusion** in a historical projection.
@@ -787,31 +821,95 @@ auditable, and compatible with future semantic intelligence.
 - `@@unique([caseId, versionNumber])`, `@@index([caseId, versionNumber])`, `@@index([caseId, status])`,
   `@@index([caseId, projectionStatus])`, `@@index([parentGraphVersionId])`. No Prisma FK (repo NO-FK
   decoupling convention).
+- **Partial unique ACTIVE index (item D):** migration `20240103000000_graph_version_unique_active_per_case`
+  adds `CREATE UNIQUE INDEX "GraphVersion_unique_active_per_case" ON "GraphVersion" ("caseId")
+  WHERE status = 'ACTIVE'` — at most one ACTIVE version per case is now guaranteed at the DB layer,
+  independent of application logic. Advisory-lock allocation remains the primary mechanism; the
+  partial unique index is the fail-closed backstop.
 
 ### B.1.14 Files
-- `packages/platform/prisma/schema.prisma` (GraphVersion model; no migration created — schema push BLOCKED).
-- `packages/platform/src/persistence/graph-version-store.ts` (advisory-lock allocation, lifecycle, parent, projection status; PR3 adds `associateCheckpoint`, `resolveVersionByCheckpoint`, `listByCasePaginated`).
-- `packages/platform/src/relations/relation-materialization.ts` (accept/reverse → version in same tx; reject → none).
-- `packages/platform/src/relations/graph-version-service.ts` (current + historical projection, replay, normalize).
-- `packages/platform/src/api/routes.ts` (PR3 adds case-scoped `/cases/:caseId/graph/*` endpoints).
+- `packages/platform/prisma/schema.prisma` (GraphVersion model; + `month`/`year` precision,
+  `TemporalStateChange.logicalKey String? @unique`, `temporalAssertions Json?` on Relation/RelationHypothesis).
+- `packages/platform/prisma/migrations/20240101000000_init/migration.sql` (baseline — full migrated schema).
+- `packages/platform/prisma/migrations/20240103000000_graph_version_unique_active_per_case/migration.sql`
+  (partial unique ACTIVE index — item D).
+- `packages/platform/prisma/migrations/20240102000000_append_only_temporal_state_change/migration.sql`
+  (DB trigger `temporal_state_change_append_only` — BEFORE UPDATE/DELETE on `TemporalStateChange` is
+  rejected; TRUNCATE deliberately unblocked as the sanctioned test-reset seam).
+- `packages/platform/src/persistence/graph-version-store.ts` (advisory-lock allocation, WS-7 auto-activation,
+  lifecycle, parent, projection status; `associateCheckpoint`, `resolveVersionByCheckpoint`, `listByCasePaginated`, `listByCase`).
+- `packages/platform/src/persistence/temporal-state-change-store.ts` (WS-13: `logicalKey` idempotency,
+  `eventRef`, `ENTITY` entity type, `recordChange` P2002-safe no-op).
+- `packages/platform/src/persistence/relation-store.ts` (`seedOriginalAssertion` / `amendValidity` —
+  append-only ORIGINAL→AMENDMENT temporal-assertion family, item A).
+- `packages/platform/src/relations/relation-materialization.ts` (accept/reverse/amend → version + TSC row in same tx; reject → none;
+  `amendRelationValidity` authority).
+- `packages/platform/src/entities/entity-materialization.ts` (WS-13 + item B: entity accept/materialize/ENTITY_CREATED,
+  `transitionEntityStatus`/ENTITY_ARCHIVED — version + TSC in one tx).
+- `packages/platform/src/persistence/entity-store.ts` (`updateStatus` via injected tx).
+- `packages/platform/src/relations/graph-version-service.ts` (current + historical + valid-at projection, typed
+  `GraphRevisionEvent` decoding, entity-lifecycle + amendment-as-of resolution, strict replay, normalize).
+- `packages/platform/src/temporal/interval-validation.ts` (validators + `containsTime`),
+  `packages/platform/src/temporal/interval-aggregation.ts` (WS-3 `deriveValidityInterval`).
+- `packages/platform/src/queue/ingest-evidence.ts` (WS-2 boundary validation in completeMA06; WS-3 interval producer in completeMA10).
+- `packages/platform/src/api/routes.ts` (case-scoped `/cases/:caseId/graph/*` incl. `valid-at`).
 - `packages/intelligence/graphology-projection/src/types.ts` + `build-graph.ts` (optional `temporalRange` threading).
-- Tests: `tests/m-a12-pr2-graph-projection.test.ts` (pure, 16 green),
-  `tests/m-a12-pr3-temporal-apis.test.ts` (pure, 16 green),
-  `tests/integration/m-a12-pr2-versioning.integration.test.ts` (real Postgres, gated, **BLOCKED**),
-  `tests/integration/m-a12-pr3-apis.integration.test.ts` (real Postgres, gated, **BLOCKED**).
+- `.github/workflows/ci.yml` (Postgres service + TEST_DATABASE_URL + `prisma migrate deploy` + full DB suites).
+- Tests: `tests/m-a12-pr2-graph-projection.test.ts` (pure, 21 green), `tests/m-a12-pr3-temporal-apis.test.ts` (pure, 18 green),
+  `tests/m-a12-revision-events.test.ts` (pure, 18 green — typed events, entity-lifecycle replay, as-of amendment resolution),
+  `tests/interval-aggregation.test.ts` (pure, WS-3), `tests/temporal-interval-validation.test.ts` (pure + `containsTime`, 21 green),
+  `tests/integration/m-a12-pr2-versioning.integration.test.ts`, `tests/integration/m-a12-pr3-apis.integration.test.ts`,
+  `tests/integration/m-a12-temporal-history.test.ts`, `tests/integration/m-a12-hardening.integration.test.ts`
+  (amendments/entity-versioning/concurrency/DB-ACTIVE/append-only — **43/43 green on real Postgres**).
 
 ### B.1.15 Known limitations / deferred (documented, not COMPLETE green)
-- **Real Postgres verification BLOCKED** — TEST_DATABASE_URL unreachable; schema push + all DB suites cannot execute.
-- **GraphVersion table not live on prod** — schema absent on prod and unreachable on test DB ⇒ coupling is
-  "implemented but not yet activated" (authority tolerates absent `graphVersionStore` in isolated M-A10 tests;
-  production `DEFAULT_STORES` always supplies it).
-- **`as-of` temporal query deferred** — PR0 §17 lists as-of as a candidate endpoint but does not define
-  sufficient temporal-boundary semantics. The endpoint returns 501 with a clear message. Version-based
-  retrieval via `/versions/:vid` is the authoritative historical surface.
-- Historical entity-node selection uses the canonical non-ARCHIVED universe (entity-mutation version triggers
-  are not wired in PR2; only relation accept/reverse trigger versions).
+- **WS-14 rename DEFERRED (decision correction):** renaming the contract `temporalInterval` field to
+  `validityInterval` was approved but then deferred because it breaks demo-mode fixtures
+  (`packages/web/src/lib/providers/demo/demo-fixtures/relations.ts`, `real-case/{phase2,breakthrough}.ts`,
+  `flow-model.ts`). Platform persists `validityInterval` at the Relation layer while the legacy contract
+  field name remains on web. No silent drift: the two are reconciled in the projection seam.
+- **WS-14 rename DEFERRED (decision correction):** renaming the contract `temporalInterval` field to
+  `validityInterval` was approved but then deferred because it breaks demo-mode fixtures
+  (`packages/web/src/lib/providers/demo/demo-fixtures/relations.ts`, `real-case/{phase2,breakthrough}.ts`,
+  `flow-model.ts`). Platform persists `validityInterval` at the Relation layer while the legacy contract
+  field name remains on web. No silent drift: the two are reconciled in the projection seam.
+- **WS-1 (ingestion temporal extractor) DEFERRED:** completeMA10 consumes the DURABLE MA06 `eventTime`
+  exactly as extracted today; enhancing the extractor itself was de-scoped to avoid churn on extractor
+  tests. D1 (never fabricate) is enforced at the boundary (WS-2).
+- **`as-of` temporal query deferred (unchanged):** PR0 §17 lists as-of as a candidate endpoint but does
+  not define sufficient temporal-boundary semantics. The endpoint returns 501 with a clear message.
+  `valid-at` (dimension B, domain-time) and `/versions/:vid` (dimension A, revision-time) are the
+  authoritative query surface; revision-time `as-of` remains undefined and 501. Note the revision-time
+  *query surface* (B.1.7) DOES resolve intervals/entity-universe as-of a version; what stays 501 is an
+  HTTP `as-of` endpoint, unchanged from PR3.
+- **Entity lifecycle transitions beyond ACTIVE→ARCHIVED DEFERRED (item B):** `transitionEntityStatus`
+  implements only ACTIVE→ARCHIVED (idempotent, version+TSC). MERGED/SPLIT transitions and
+  CANDIDATE→ACTIVE promotion are explicitly deferred pending operational semantics — they require
+  authority decisions that do not yet exist. The versioning machinery (ENTITY_CREATED/ENTITY_ARCHIVED
+  replay + projection filtering) is fully wired for the supported subset.
+- **Analytics-over-history slice DEFERRED (items M/N):** the M-A13 analytics (traversal/centrality/
+  communities) operate over the CURRENT projection only; running them against an arbitrary historical
+  version is not wired (no endpoint projects a historical graph into the analytics runtime). The
+  projection service exposes the exact `BuiltGraph` input the analytics consume, so this is a routing
+  concern, not a semantics gap — deferred to avoid churning the M-A13 runtime in this pass.
+- **Performance/invariants review (items V/W):** reviewed, no change required. Version replay loads the
+  relation universe ONCE per projection (`listByCase`) and resolves assertions per-relation in
+  O(assertions) — no N+1 over the version chain. Entity-universe filtering is a single Set lookup per
+  entity. The partial unique ACTIVE index, `@@unique([caseId, versionNumber])`, advisory-lock
+  allocation, and the append-only TSC trigger give the DB-layer invariant set; the concurrency
+  guarantees (unique versionNumbers, single ACTIVE, idempotent TSC) are enforced in the hardening
+  integration suite.
 
-### B.1.16 PR3 — Public Temporal APIs + D7 Checkpoint Mapping (implemented)
+**Resolved since PR2/PR3 (previously blocked):**
+- Real Postgres verification is no longer blocked: CI starts a Postgres 16 service, sets
+  `TEST_DATABASE_URL`, and runs `prisma migrate deploy` (baseline + append-only trigger) before the
+  DB-backed suites. Locally the suites now also run (verified green: 43/43) against a migrated
+  `TEST_DATABASE_URL` — see the verification record under "Test coverage" below.
+- Baseline migration created (`20240101000000_init`) so `migrate deploy` yields a fully migrated schema
+  on a fresh DB — no more "schema push BLOCKED".
+- TSC append-only is enforced at the DB layer via a trigger, not just application discipline.
+
+### B.1.16 PR3+ — Public Temporal APIs + D7 Checkpoint Mapping + valid-at (implemented)
 
 > PR3 delivers the minimal public API surface (§17) and the D7 checkpoint↔version reverse mapping.
 > All endpoints are case-scoped, fail-closed, bounded/paginated. Historical graph delegates to
@@ -829,6 +927,9 @@ auditable, and compatible with future semantic intelligence.
   `:vid` accepts a positive integer (versionNumber) or a UUID (version id). Delegates to
   `projectGraphVersion()`. 404 on unresolvable target (no silent fallback to current graph).
   Returns version metadata + normalized graph snapshot.
+- `GET /api/v1/cases/:caseId/graph/valid-at?at=<ISO>` — **WS-10.** Domain-valid graph at a point in
+  time (dimension B): ACTIVE canonical relations whose persisted `validityInterval` contains `at`.
+  400 when `at` is missing/unparseable; relations without a usable interval are excluded (never guessed).
 - `GET /api/v1/cases/:caseId/graph/as-of` — **DEFERRED** (501). PR0 lacks sufficient
   temporal-boundary semantics (STOP condition #6).
 
@@ -836,6 +937,20 @@ auditable, and compatible with future semantic intelligence.
 (fail-closed). Case boundary derived from URL path param, never client-supplied. Follows existing
 `DELETE /cases/:caseId` pattern. Backward-compat: existing `/investigations/:id/graph` endpoint
 is untouched.
+
+**Temporal integrity (DB layer + producer):**
+- **Append-only TSC (WS-13):** `TemporalStateChange` rows are immutable by DB trigger; the store writes
+  a `logicalKey` (`caseId:entityType:entityId:stateType[:eventRef]`) for idempotent replay and dedupes on
+  P2002 (re-read by id, then by `{logicalKey, caseId}` → no-op). Relation accepts/reverses and entity
+  creates record `RELATION:ACCEPTED/REVERSED` and `ENTITY:CREATED` rows **in the same transaction** as
+  the canonical write (`relation-materialization.ts`, `entity-materialization.ts`).
+- **WS-2 boundary validation (completeMA06):** freshly finalized observations are validated
+  (`validateEventTime`, `validateTemporalInterval`) and invalid values throw `TemporalValidationError` —
+  a malformed temporal value can never reach a proposal or the canonical graph.
+- **WS-3 interval producer (completeMA10):** `deriveValidityInterval(supportingObservations)` builds the
+  closed min..max `validityInterval` for each proposal from the REAL parseable `eventTime` instants of
+  its evidence basis. No contributing instant → no interval (truthful omission, never fabricated);
+  `semantics: inferred`; `precision: exact` only when every bound is exact.
 
 **D7 Checkpoint↔Version mapping** (in `graph-version-store.ts`):
 - `associateCheckpoint(versionId, checkpointId, {caseId})` — explicit write setting the existing
@@ -850,20 +965,50 @@ is untouched.
   no step↔version inference, no AgentCheckpoint redesign.
 
 **Test coverage:**
-- `tests/m-a12-pr3-temporal-apis.test.ts` — 16 pure unit tests (green):
+- `tests/m-a12-pr3-temporal-apis.test.ts` — 18 pure unit tests (green):
   - `replayLifecycle` multi-relation + checkpoint-relevant scenarios (4 tests)
-  - `GraphProjectionService` mock-store historical projection (5 tests)
+  - `GraphProjectionService` mock-store historical projection (7 tests, incl. `projectGraphValidAt` containment + no-fabrication)
   - D7 checkpoint↔version semantic rules (4 tests)
   - `normalizeBuiltGraph` determinism (1 test)
   - Lifecycle transition matrix (1 test)
   - as-of deferral documentation (1 test)
-- `tests/integration/m-a12-pr3-apis.integration.test.ts` — 7 gated integration tests (BLOCKED):
-  - Version listing + pagination
-  - Historical graph projection via versionNumber and UUID
-  - Checkpoint association + resolution
-  - Cross-case isolation for checkpoint mapping
-  - Deterministic replay after checkpoint association
-  - Jan10→Mar10 worked example with version listing
+- `tests/m-a12-pr2-graph-projection.test.ts` — 21 pure unit tests (green), incl. strict `decodeChange`
+  (GraphRevisionCorruptError) and replay-skip contract preservation.
+- `tests/interval-aggregation.test.ts` — 7 pure tests (WS-3): single/all-exact/range/no-fabrication/empty.
+- `tests/temporal-interval-validation.test.ts` — 21 pure tests, incl. `containsTime` closed-interval and
+  never-fabricate coarse-bound semantics.
+- `tests/integration/m-a12-pr3-apis.integration.test.ts` — 8 real-Postgres integration tests (green):
+  - Version listing + pagination; Historical projection via versionNumber and UUID
+  - Checkpoint association + resolution; Cross-case isolation for checkpoint mapping
+  - Deterministic replay after checkpoint association; Jan10→Mar10 worked example with version listing
+  - `projectGraphValidAt` round trip (domain-time containment)
+- `tests/integration/m-a12-pr2-versioning.integration.test.ts` — 10 real-Postgres integration tests (green):
+  auto-activation + demotion (WS-7), lifecycle/illegal transitions, parent validation, reject/reverse
+  atomicity + TSC ACCEPTED/REVERSED same-tx history, Jan10→Mar10 historical reconstruction, deterministic
+  replay, COMPLETE/STALE projection status, current-graph exclusion, case isolation, valid-at round trip.
+- `tests/integration/m-a12-temporal-history.test.ts` — 7 real-Postgres integration tests (green):
+  append-only + sequence + idempotency + isolation (TRUNCATE teardown).
+- `tests/integration/m-a12-hardening.integration.test.ts` — 11 real-Postgres integration tests (green):
+  item A amendment authority + ORIGINAL→AMENDMENT assertions + as-of projection; item B real authority
+  ENTITY_CREATED + `transitionEntityStatus`/ENTITY_ARCHIVED + idempotency; item D DB unique-ACTIVE; item E
+  concurrent unique versionNumbers; item F concurrent idempotent TSC; item G append-only trigger.
+- `tests/integration/m-a12-graph-http.security.test.ts` — 7 real-Postgres integration tests (green):
+  M-A12 hardening item O: HTTP-level auth + role + case-isolation over the REAL express routes
+  (`current`/`versions`/`versions/:vid`/`valid-at`/`as-of`): 200 granted case, 401 no token,
+  404 unknown version (no silent fallback), 501 as-of deferred, 403 fail-closed foreign case,
+  400 malformed `at`.
+
+**Real-Postgres verification record** (all against a migrated Neon/Postgres `TEST_DATABASE_URL`,
+`prisma migrate deploy`-equivalent schema path): PR3 8/8, PR2 10/10, temporal-history 7/7,
+hardening 11/11, HTTP-security 7/7 = **43/43 DB-backed tests green**, plus 186 pure tests
+(85 M-A12 pure) and clean typechecks/builds. Two genuine concurrency bugs were found and fixed
+during this verification: (1) `GraphVersionStore.createVersion` inserted the new ACTIVE row BEFORE
+demoting the prior ACTIVE — the partial unique index rejected the second ACTIVE; fixed by demoting
+first, then creating with `status: finalStatus`; (2) `TemporalStateChangeStore.recordChange` caught
+P2002 then re-read inside the same aborted transaction (25P02); fixed with `createMany(
+skipDuplicates)` (ON CONFLICT DO NOTHING) + re-read of the winner by id then `{logicalKey, caseId}`.
+Interactive-transaction `maxWait`/`timeout` were raised to 30 s/60 s for the 8-way concurrency
+tests under the Neon pooler.
 
 ---
 
