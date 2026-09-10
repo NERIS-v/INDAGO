@@ -1447,6 +1447,54 @@ apiRouter.get(
   },
 );
 
+// PR3-3b. GET /cases/:caseId/graph/valid-at?at=<ISO> — the graph of ACTIVE
+// canonical relations whose persisted validityInterval contains the given
+// domain instant `at` (dimension B — domain validity in time, never revision
+// order). `at` must be a concrete parseable ISO 8601 instant; relations with
+// no usable interval are excluded (never guessed). as-of below stays deferred.
+apiRouter.get(
+  "/cases/:caseId/graph/valid-at",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const caseId = await resolveCaseBoundary(req, res);
+      if (!caseId) return;
+
+      const atRaw = req.query.at;
+      if (typeof atRaw !== "string" || atRaw.trim().length === 0) {
+        return res.status(400).json({ error: "at query parameter is required" });
+      }
+      const at = atRaw.trim();
+      if (!Number.isFinite(Date.parse(at))) {
+        return res.status(400).json({
+          error: "at must be a valid ISO 8601 instant",
+        });
+      }
+
+      const investigationId = await resolveInvestigationIdForCase(caseId);
+      const built = await graphProjectionService.projectGraphValidAt(
+        { caseId, investigationId: investigationId ?? "" },
+        at,
+      );
+      const snap = (
+        await import("../relations/graph-version-service.js")
+      ).normalizeBuiltGraph(built.graph, caseId);
+
+      return res.status(200).json({
+        caseId,
+        at,
+        nodeCount: snap.nodes.length,
+        edgeCount: snap.edges.length,
+        graph: snap,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve valid-at graph:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 // PR3-4. GET /cases/:caseId/graph/as-of — DEFERRED (501).
 //
 // PR0 §17 lists as-of as a candidate endpoint but does not define sufficient
