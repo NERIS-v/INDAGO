@@ -149,7 +149,10 @@ describe("GraphProjectionService — mock-store historical projection", () => {
     };
   }
 
-  function buildMockStores(versionChain: ReturnType<typeof mockVersion>[]) {
+  function buildMockStores(
+    versionChain: ReturnType<typeof mockVersion>[],
+    relationsOverride?: typeof relations,
+  ) {
     const mockGraphVersions = {
       findByVersionNumber: vi.fn(async (_caseId: string, vn: number) =>
         versionChain.find((v) => v.versionNumber === vn) ?? null,
@@ -201,8 +204,8 @@ describe("GraphProjectionService — mock-store historical projection", () => {
       listByCase: vi.fn(async () => entities),
     };
     const mockRelations = {
-      listByCase: vi.fn(async () => relations),
-      listActiveByCase: vi.fn(async () => relations),
+      listByCase: vi.fn(async () => relationsOverride ?? relations),
+      listActiveByCase: vi.fn(async () => relationsOverride ?? relations),
     };
 
     return {
@@ -299,6 +302,81 @@ describe("GraphProjectionService — mock-store historical projection", () => {
 
     expect(snap.edges).toHaveLength(1);
     expect(stores.graphVersions.findById).toHaveBeenCalledWith(v1.id, { caseId });
+  });
+
+  it("projectGraphValidAt keeps only relations whose interval contains the instant (dimension B)", async () => {
+    const chain = [
+      mockVersion({ versionNumber: 1, reason: `RELATION_ACCEPTED:${r1}`, status: "ACTIVE" }),
+    ];
+    const stores = buildMockStores(chain);
+    const svc = new GraphProjectionService(stores);
+
+    // JAN10 starts 2026-01-10T12:00:00.000Z and is open-ended (no validTo):
+    // exactly at/after the start → contained; before it → excluded.
+    const inside = await svc.projectGraphValidAt(
+      { investigationId, caseId },
+      "2026-01-10T12:00:00.000Z",
+    );
+    expect(normalizeBuiltGraph(inside.graph, caseId).edges).toHaveLength(1);
+
+    const before = await svc.projectGraphValidAt(
+      { investigationId, caseId },
+      "2026-01-10T11:59:59.999Z",
+    );
+    expect(normalizeBuiltGraph(before.graph, caseId).edges).toHaveLength(0);
+
+    // COMPLETE mark mirrors projectCurrentGraph.
+    expect(stores.graphVersions.setProjectionStatus).toHaveBeenCalled();
+  });
+
+  it("projectGraphValidAt never fabricates for unparseable instants or unintervaled relations", async () => {
+    const chain = [
+      mockVersion({ versionNumber: 1, reason: `RELATION_ACCEPTED:${r1}`, status: "ACTIVE" }),
+    ];
+    // A relation with NO validityInterval (null) — its presence in the ACTIVE
+    // set must never make it answer a valid-at query.
+    const unintervaled: typeof relations = [
+      {
+        id: r1,
+        caseId,
+        investigationId,
+        relationType: "communication",
+        sourceEntityId: e1,
+        targetEntityId: e2,
+        directed: true,
+        status: "ACTIVE",
+        support: 0.8,
+        evidenceBasis: [],
+        contradictions: [],
+        scoreModelVersion: "v1",
+        evidenceCount: 1,
+        evidenceStrength: 0.8,
+        sourceCoverage: 1,
+        temporalCoverage: 1,
+        provenance: { extractor: "test" },
+        validityInterval: null,
+        hypothesisId: null,
+        relationKey: "key",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+    const stores = buildMockStores(chain, unintervaled);
+    const svc = new GraphProjectionService(stores);
+
+    // Well-formed instant but the relation has no domain-validity boundary.
+    const at = await svc.projectGraphValidAt(
+      { investigationId, caseId },
+      "2026-01-10T12:00:00.000Z",
+    );
+    expect(normalizeBuiltGraph(at.graph, caseId).edges).toHaveLength(0);
+
+    // Malformed "at" → empty graph, never a guess.
+    const bogus = await svc.projectGraphValidAt(
+      { investigationId, caseId },
+      "not-a-date",
+    );
+    expect(normalizeBuiltGraph(bogus.graph, caseId).edges).toHaveLength(0);
   });
 });
 
