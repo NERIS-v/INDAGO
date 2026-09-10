@@ -54,6 +54,14 @@ export const TRAVERSAL_BOUNDS = {
   maxHops: 4,
   /** Hard cap on distinct paths returned per traversal. */
   maxPaths: 1_000,
+  /**
+   * Hard cap on WALKS materialized while expanding a single level. `maxPaths`
+   * bounds the OUTPUT; this bounds the transient WORK/MEMORY so a
+   * pathological dense graph cannot explode intermediate state before the
+   * output bound triggers. Deterministic: expansion order is fixed (sorted
+   * neighbors), so the first walks accepted in that order are kept.
+   */
+  maxExpandedWalksPerLevel: 100_000,
 } as const;
 
 export interface TraversalOptions {
@@ -131,9 +139,14 @@ export function traverseBounded(
 
     if (level === hops) break;
 
-    // Expand one more hop.
+    // Expand one more hop. Bounded by maxExpandedWalksPerLevel — a work/memory
+    // cap in ADDITION to the output-path cap, so pathological dense graphs
+    // cannot explode transient frontier state (the frontier is fully built
+    // only for the current level; the output cap triggers on the NEXT level's
+    // emission). Deterministic: both the walk order and each walk's sorted
+    // neighbor order are fixed, so the accepted subset is stable.
     const next: Walk[] = [];
-    for (const walk of frontier) {
+    expandLevel: for (const walk of frontier) {
       const currentNode = walk.nodes[walk.nodes.length - 1]!.nodeId;
       const neighbors = graph.neighbors(currentNode).sort();
       for (const nb of neighbors) {
@@ -167,6 +180,9 @@ export function traverseBounded(
             ],
             visited: nextVisited,
           });
+          if (next.length >= TRAVERSAL_BOUNDS.maxExpandedWalksPerLevel) {
+            break expandLevel;
+          }
         }
       }
     }

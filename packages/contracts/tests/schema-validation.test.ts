@@ -179,10 +179,17 @@ describe('B: GraphAnalysisType vs StructuralMetricType Separation', () => {
     }
   });
 
-  it('StructuralMetricType accepts only graph-theoretic metrics', () => {
-    const metrics = ['degree', 'weighted_degree', 'betweenness', 'closeness', 'pagerank', 'bridge_impact', 'community_membership', 'connectivity', 'anomaly', 'path_score'];
+  it('StructuralMetricType accepts only implemented graph-theoretic metrics', () => {
+    const metrics = ['degree', 'community_membership'];
     for (const m of metrics) {
       expect(StructuralMetricTypeSchema.safeParse(m).success).toBe(true);
+    }
+  });
+
+  it('StructuralMetricType rejects unimplemented metric names', () => {
+    const unimplemented = ['weighted_degree', 'betweenness', 'closeness', 'pagerank', 'bridge_impact', 'connectivity', 'anomaly', 'path_score'];
+    for (const m of unimplemented) {
+      expect(StructuralMetricTypeSchema.safeParse(m).success).toBe(false);
     }
   });
 
@@ -194,11 +201,8 @@ describe('B: GraphAnalysisType vs StructuralMetricType Separation', () => {
 
   it('valid documented pairings exist', () => {
     const validPairings = [
-      { analysis: 'CENTRALITY', metric: 'betweenness' },
-      { analysis: 'CENTRALITY', metric: 'pagerank' },
+      { analysis: 'CENTRALITY', metric: 'degree' },
       { analysis: 'COMMUNITY', metric: 'community_membership' },
-      { analysis: 'BRIDGE', metric: 'bridge_impact' },
-      { analysis: 'PATH', metric: 'path_score' },
     ];
     for (const pairing of validPairings) {
       expect(GraphAnalysisTypeSchema.safeParse(pairing.analysis).success).toBe(true);

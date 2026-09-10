@@ -19,9 +19,14 @@ import louvain from 'graphology-communities-louvain';
 export interface CommunityResult {
   /** Community index. */
   readonly communityId: number;
-  /** Canonical EntityIds in this community, sorted for determinism. */
+  /** Canonical EntityIds in this community, sorted for determinism, bounded by
+   * COMMUNITY_BOUNDS.maxMembersPerCommunity. */
   readonly memberNodeIds: readonly string[];
+  /** ACTUAL size of the community BEFORE the member-list bound was applied.
+   * When `size > memberNodeIds.length`, `truncated` is true. */
   readonly size: number;
+  /** Whether the member list was truncated by the reporting bound. */
+  readonly truncated: boolean;
 }
 
 export const COMMUNITY_BOUNDS = {
@@ -99,7 +104,8 @@ export function detectCommunities(
     result.push({
       communityId,
       memberNodeIds: bounded,
-      size: bounded.length,
+      size: members.length,
+      truncated: members.length > COMMUNITY_BOUNDS.maxMembersPerCommunity,
     });
   }
   result.sort((a, b) => a.communityId - b.communityId);

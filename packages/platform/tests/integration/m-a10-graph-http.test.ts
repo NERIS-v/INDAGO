@@ -160,13 +160,23 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const body = (await res.json()) as {
         nodeCount: number;
         edgeCount: number;
-        graph: { nodes: string[]; edges: { id: string; source: string; target: string; directed: boolean }[] };
+        graph: {
+          nodes: { id: string; entityType: string | null; canonicalName: string }[];
+          edges: { id: string; source: string; target: string; directed: boolean }[];
+          nodeCount: number;
+          edgeCount: number;
+          truncated: { nodes: boolean; edges: boolean };
+        };
       };
       expect(body.nodeCount).toBe(3);
       expect(body.edgeCount).toBe(2);
-      expect(body.graph.nodes).toContain(entityA);
-      expect(body.graph.nodes).toContain(entityB);
-      expect(body.graph.nodes).toContain(entityC);
+      expect(body.graph.nodes.map((n) => n.id)).toContain(entityA);
+      expect(body.graph.nodes.map((n) => n.id)).toContain(entityB);
+      expect(body.graph.nodes.map((n) => n.id)).toContain(entityC);
+      expect(body.graph.nodeCount).toBe(3);
+      expect(body.graph.edgeCount).toBe(2);
+      expect(body.graph.truncated.nodes).toBe(false);
+      expect(body.graph.truncated.edges).toBe(false);
     });
 
     it("GET traversal returns bounded N-hop paths from a canonical entity", async () => {
@@ -202,6 +212,19 @@ describe.skipIf(!TEST_DATABASE_URL)(
         );
         expect(res.status).toBe(400);
       }
+
+      // startEntityId must be a real UUID (not a non-UUID string, and not absent).
+      const nonUuid = await fetch(
+        `${baseUrl}/api/v1/investigations/${investigationId}/graph/traversal?startEntityId=${encodeURIComponent("entity-A")}`,
+        { headers: authHeader("demo-token") },
+      );
+      expect(nonUuid.status).toBe(400);
+
+      const missing = await fetch(
+        `${baseUrl}/api/v1/investigations/${investigationId}/graph/traversal?hops=1`,
+        { headers: authHeader("demo-token") },
+      );
+      expect(missing.status).toBe(400);
     });
 
     it("GET centrality rejects malformed / out-of-range maxResults (400)", async () => {

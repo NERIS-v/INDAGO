@@ -40,7 +40,12 @@
 //   become canonical edges (they have no canonical Relation row at all).
 // ============================================================================
 
-import { buildGraph, type BuiltGraph, type Graph } from "@indago/graphology-projection";
+import {
+  buildGraph,
+  GRAPH_PROJECTION_BOUNDS,
+  type BuiltGraph,
+  type Graph,
+} from "@indago/graphology-projection";
 import { containsTime } from "../temporal/interval-validation.js";
 import { GraphVersionStore } from "../persistence/graph-version-store.js";
 import { graphVersionStore } from "../persistence/graph-version-store.js";
@@ -407,12 +412,27 @@ export class GraphProjectionService {
     const built = buildGraph(input);
 
     if (activeVersions) {
-      await this.stores.graphVersions.setProjectionStatus(
-        activeVersions.id,
-        { caseId },
-        "COMPLETE",
-        { nodeCount: built.nodeCount, edgeCount: built.edgeCount },
-      );
+      // EXPLICIT MATERIALIZATION SEAM — not a lazy read side effect. The
+      // current projection IS the ACTIVE version's projection (identical
+      // selection), so converging its COMPLETE status + counts onto the
+      // ACTIVE version is semantically consistent — never a corruption of
+      // another version's metadata. Convergent: a repeated current query is a
+      // no-op once the values already match, so an idle read path never
+      // churns the DB. `projectGraphVersion` uses the same seam for the
+      // queried historical version; `projectGraphValidAt` NEVER writes (a
+      // valid-at SUBSET must not overwrite the ACTIVE version's counts).
+      if (
+        activeVersions.projectionStatus !== "COMPLETE" ||
+        activeVersions.nodeCount !== built.nodeCount ||
+        activeVersions.edgeCount !== built.edgeCount
+      ) {
+        await this.stores.graphVersions.setProjectionStatus(
+          activeVersions.id,
+          { caseId },
+          "COMPLETE",
+          { nodeCount: built.nodeCount, edgeCount: built.edgeCount },
+        );
+      }
     }
 
     return built;
@@ -423,8 +443,13 @@ export class GraphProjectionService {
    * CONTAINS the given domain instant `at` (dimension B — domain validity in
    * time, NOT revision order; the two are never conflated). Relations with no
    * usable interval are excluded, never guessed (containsTime → false). The
-   * authoritative ACTIVE canonical entity universe + a version COMPLETE mark
-   * mirror projectCurrentGraph.
+   * entity universe is the authoritative ACTIVE canonical set (lifecycle-
+   * filtered like the current graph).
+   *
+   * PURE READ (M-A13, P2-04): a valid-at projection is a TEMPORAL SUBSET of
+   * the current graph. It NEVER writes projection metadata — its subset counts
+   * must not overwrite the ACTIVE version's authoritative counts, and a
+   * read-only graph query must not mutate canonical projection metadata.
    */
   async projectGraphValidAt(
     scope: {
@@ -453,18 +478,7 @@ export class GraphProjectionService {
 
     const containing = relations.filter((r) => containsTime(r.validityInterval, at));
     const input = makeProjectionInput(caseId, presentEntities, containing);
-    const built = buildGraph(input);
-
-    if (activeVersions) {
-      await this.stores.graphVersions.setProjectionStatus(
-        activeVersions.id,
-        { caseId },
-        "COMPLETE",
-        { nodeCount: built.nodeCount, edgeCount: built.edgeCount },
-      );
-    }
-
-    return built;
+    return buildGraph(input);
   }
 
   /**
@@ -551,12 +565,22 @@ export class GraphProjectionService {
     const input = makeProjectionInput(caseId, presentEntities, includedRelations.map(atVersion));
     const built = buildGraph(input);
 
-    await this.stores.graphVersions.setProjectionStatus(
-      version.id,
-      { caseId },
-      "COMPLETE",
-      { nodeCount: built.nodeCount, edgeCount: built.edgeCount },
-    );
+    // Explicit materialization of the QUERIED version (same convergent seam as
+    // projectCurrentGraph): COMPLETE + counts are recorded once, on the
+    // version this projection actually reconstructed. A re-query with matching
+    // values is a no-op.
+    if (
+      version.projectionStatus !== "COMPLETE" ||
+      version.nodeCount !== built.nodeCount ||
+      version.edgeCount !== built.edgeCount
+    ) {
+      await this.stores.graphVersions.setProjectionStatus(
+        version.id,
+        { caseId },
+        "COMPLETE",
+        { nodeCount: built.nodeCount, edgeCount: built.edgeCount },
+      );
+    }
 
     return built;
   }
@@ -622,10 +646,13 @@ export const graphProjectionService = new GraphProjectionService();
 
 /**
  * A normalized, order-independent view of a projected graph snapshot. This is
- * the DETERMINISTIC-REPLAY comparison shape: it reads a Graphology graph back
- * into plain sorted structures so two independently built graphs (after the
- * first Graphology instance is discarded) can be compared for equality WITHOUT
- * relying on Graphology object identity or insertion order.
+ * the DETERMINISTIC-REPLAY comparison shape AND the canonical response shape:
+ * it reads a Graphology graph back into plain sorted structures so two
+ * independently built graphs (after the first Graphology instance is
+ * discarded) can be compared for equality WITHOUT relying on Graphology object
+ * identity or insertion order. The truncation/count metadata matches the
+ * canonical ProjectedGraph contract (@indago/contracts) so a snapshot can be
+ * validated at the HTTP boundary without reshaping.
  */
 export interface NormalizedGraphSnapshot {
   readonly caseId: string;
@@ -644,15 +671,51 @@ export interface NormalizedGraphSnapshot {
     readonly temporalRange?: unknown;
     readonly provenance: unknown;
   }>;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly nodeLimit: number;
+  readonly edgeLimit: number;
+  readonly sourceNodeCount: number;
+  readonly sourceEdgeCount: number;
+  readonly truncated: { readonly nodes: boolean; readonly edges: boolean };
 }
 
+/** Truncation/count metadata a caller can attach from its BuiltGraph. */
+export type NormalizedGraphMeta = Pick<
+  BuiltGraph,
+  | "nodeCount"
+  | "edgeCount"
+  | "nodeLimit"
+  | "edgeLimit"
+  | "sourceNodeCount"
+  | "sourceEdgeCount"
+  | "truncated"
+>;
+
 /**
- * Read a built Graphology graph back into a deterministic normalized snapshot.
- * Endpoint pairs are sorted lexically for ordering independence; node and edge
- * lists are sorted by id. `temporalRange` / `provenance` are carried through
- * verbatim where present (never fabricated, never dropped).
+ * Read a built Graphology graph back into a deterministic normalized snapshot
+ * (the canonical ProjectedGraph shape). Endpoint pairs are sorted lexically
+ * for ordering independence; node and edge lists are sorted by id.
+ * `temporalRange` / `provenance` are carried through verbatim where present.
+ *
+ * When `meta` is supplied (from the BuiltGraph), truncation is reported
+ * truthfully (source counts + limits + explicit truncated flags). When omitted,
+ * the snapshot assumes an untruncated build: returned counts equal source
+ * counts and the default projection bounds apply.
  */
-export function normalizeBuiltGraph(graph: Graph, caseId: string): NormalizedGraphSnapshot {
+export function normalizeBuiltGraph(
+  graph: Graph,
+  caseId: string,
+  meta?: NormalizedGraphMeta,
+): NormalizedGraphSnapshot {
+  const nodeCount = meta?.nodeCount ?? graph.order;
+  const edgeCount = meta?.edgeCount ?? graph.size;
+  const nodeLimit = meta?.nodeLimit ?? GRAPH_PROJECTION_BOUNDS.maxNodes;
+  const edgeLimit = meta?.edgeLimit ?? GRAPH_PROJECTION_BOUNDS.maxEdges;
+  const sourceNodeCount = meta?.sourceNodeCount ?? nodeCount;
+  const sourceEdgeCount = meta?.sourceEdgeCount ?? edgeCount;
+  const truncated = meta?.truncated ?? { nodes: false, edges: false };
+
   const nodes = graph
     .nodes()
     .map((id) => {
@@ -696,5 +759,16 @@ export function normalizeBuiltGraph(graph: Graph, caseId: string): NormalizedGra
     })
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  return { caseId, nodes, edges };
+  return {
+    caseId,
+    nodes,
+    edges,
+    nodeCount,
+    edgeCount,
+    nodeLimit,
+    edgeLimit,
+    sourceNodeCount,
+    sourceEdgeCount,
+    truncated,
+  };
 }

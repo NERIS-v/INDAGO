@@ -383,18 +383,26 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const body = (await res.json()) as {
         nodeCount: number;
         edgeCount: number;
-        graph: { nodes: string[]; edges: { source: string; target: string }[] };
+        graph: { nodes: { id: string }[]; edges: { source: string; target: string }[] };
       };
       // The three canonical entities are all nodes.
       expect(body.nodeCount).toBe(3);
-      expect(body.graph.nodes).toContain(entityA);
-      expect(body.graph.nodes).toContain(entityB);
-      expect(body.graph.nodes).toContain(entityC);
+      expect(body.graph.nodes.map((n) => n.id)).toContain(entityA);
+      expect(body.graph.nodes.map((n) => n.id)).toContain(entityB);
+      expect(body.graph.nodes.map((n) => n.id)).toContain(entityC);
       // Only ONE ACTIVE edge remains (A—B association). The reject (C→A) never
       // created a canonical relation, and the reverse (B→C) flipped it to
-      // REVERSED, so edgeCount must be 1 — not 2.
+      // REVERSED, so edgeCount must be 1 — not 2. The A—B edge is UNDIRECTED
+      // (association), so the canonical projection sorts its endpoints
+      // lexically — assert the endpoint SET, not a persisted direction.
       expect(body.edgeCount).toBe(1);
-      expect(body.graph.edges.some((e) => e.source === entityA && e.target === entityB)).toBe(true);
+      expect(
+        body.graph.edges.some(
+          (e) =>
+            (e.source === entityA && e.target === entityB) ||
+            (e.source === entityB && e.target === entityA),
+        ),
+      ).toBe(true);
     });
 
     it("GET traversal / centrality / communities respond 200 from the accepted relation", async () => {

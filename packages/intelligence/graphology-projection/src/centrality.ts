@@ -6,6 +6,12 @@
 // accepted-relation edges incident to each canonical entity — reported as a
 // rank ordering (highest first) with a bounded result size.
 //
+// MULTI-EDGE SEMANTICS: the projection is a multi-graph (graphology multi:
+// true), and `degree` = graph.edges(nodeId).length counts EVERY accepted
+// relation edge incident to the node — parallel relations between the same two
+// entities are each counted individually. Degree is therefore a measure of
+// relation VOLUME, not distinct-partner count.
+//
 // READ-ONLY: centrality never mutates the graph or any domain record (§40,
 // §69). Output is purely derived from the in-memory projection.
 // ============================================================================

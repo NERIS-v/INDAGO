@@ -18,12 +18,12 @@ import { RelationTypeSchema } from '../domain/relation.js';
 //   GraphAnalysisType = the CATEGORY of analysis being performed
 //   StructuralMetricType = the specific METRIC computed within that category
 //
-// Example valid combinations:
-//   CENTRALITY + betweenness
-//   CENTRALITY + pagerank
+// StructuralMetricType is intentionally NARROW: it enumerates ONLY the metrics
+// the backend currently computes. Unimplemented metric ideas must NOT appear in
+// this enum — the contract stays truthful to what is actually served.
+//
+//   CENTRALITY + degree
 //   COMMUNITY + community_membership
-//   BRIDGE + bridge_impact
-//   PATH + path_score
 //
 // The two enums must not semantically overlap.
 // GraphAnalysisType answers WHAT question we're asking.
@@ -45,7 +45,10 @@ export type GraphAnalysisType = z.infer<typeof GraphAnalysisTypeSchema>;
 /**
  * StructuralMetricType = the specific metric computed within an analysis category.
  *
- * This enum is intentionally restricted to graph-theoretic metrics.
+ * This enum enumerates ONLY the metrics the backend is actually implemented
+ * to produce. A metric that is not implemented must not be listed here — a
+ * truthful contract never advertises computation that does not exist.
+ *
  * It must NOT include values that encode:
  *   - criminality
  *   - guilt
@@ -57,17 +60,9 @@ export type GraphAnalysisType = z.infer<typeof GraphAnalysisTypeSchema>;
  */
 export const StructuralMetricTypeSchema = z.enum([
   'degree',
-  'weighted_degree',
-  'betweenness',
-  'closeness',
-  'pagerank',
-  'bridge_impact',
   'community_membership',
-  'connectivity',
-  'anomaly',
-  'path_score',
 ]).describe(
-  'Graph-theoretic metric type. Must NOT include criminality/guilt/suspect values.'
+  'Graph-theoretic metric type. Restricted to the metrics the backend currently computes; must NOT include criminality/guilt/suspect values.'
 );
 export type StructuralMetricType = z.infer<typeof StructuralMetricTypeSchema>;
 

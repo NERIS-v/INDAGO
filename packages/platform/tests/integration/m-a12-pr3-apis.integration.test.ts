@@ -494,5 +494,59 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(snap.edges[0].relationType).toBe("communication");
       expect(snap.edges[0].temporalRange).toEqual(JAN10_INTERVAL);
     });
+
+    // -----------------------------------------------------------------------
+    // 8. M-A13 P2-04 regression: a valid-at projection is a temporal SUBSET of
+    // the current graph and MUST NOT overwrite the ACTIVE version's projection
+    // metadata. projectGraphValidAt is a pure read — its subset counts must
+    // never clobber the ACTIVE version's authoritative nodeCount/edgeCount.
+    // -----------------------------------------------------------------------
+    it("projectGraphValidAt does NOT overwrite the ACTIVE version's projection counts (P2-04)", async () => {
+      const caseId = randomUUID();
+      const eA = await materializeEntity(caseId, "va-p204-a@example.org", "PERSON");
+      const eB = await materializeEntity(caseId, "va-p204-b@example.org", "PERSON");
+
+      const hyp = await upsertHypothesis({
+        caseId,
+        sourceEntityId: eA.id,
+        targetEntityId: eB.id,
+        relationType: "communication",
+        validityInterval: JAN10_INTERVAL,
+      });
+      await materializeCanonicalRelationFromAcceptedHypothesis(
+        { caseId, hypothesisId: hyp, actor: "test@indago" },
+        materializationStores(),
+      );
+
+      // Materialize the CURRENT graph first: this marks the latest ACTIVE
+      // version COMPLETE with the authoritative full-graph counts (2 nodes,
+      // 1 edge).
+      const current = await projectionService.projectCurrentGraph({ caseId, investigationId });
+      expect(current.nodeCount).toBe(2);
+      expect(current.edgeCount).toBe(1);
+
+      const latestAfterCurrent = await graphVersionStore.latestActiveByCase(caseId, {
+        investigationId,
+      });
+      expect(latestAfterCurrent?.projectionStatus).toBe("COMPLETE");
+      expect(latestAfterCurrent?.nodeCount).toBe(2);
+      expect(latestAfterCurrent?.edgeCount).toBe(1);
+
+      // A valid-at query BEFORE the interval start returns ZERO edges — a true
+      // subset of the current graph. P2-04: this pure read must NOT rewrite the
+      // ACTIVE version's projection metadata to the subset counts.
+      const subset = await projectionService.projectGraphValidAt(
+        { caseId, investigationId },
+        "2026-01-10T11:59:59.999Z",
+      );
+      expect(normalizeBuiltGraph(subset.graph, caseId).edges).toHaveLength(0);
+
+      const latestAfterValidAt = await graphVersionStore.latestActiveByCase(caseId, {
+        investigationId,
+      });
+      expect(latestAfterValidAt?.projectionStatus).toBe("COMPLETE");
+      expect(latestAfterValidAt?.nodeCount).toBe(2);
+      expect(latestAfterValidAt?.edgeCount).toBe(1);
+    });
   },
 );
