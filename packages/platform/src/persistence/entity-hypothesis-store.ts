@@ -166,7 +166,8 @@ export class EntityHypothesisStore {
 
     const now = new Date();
 
-    return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(
+      async (tx) => {
       let existing = await tx.entityHypothesis.findUnique({
         where: { identityKey },
       });
@@ -252,7 +253,9 @@ export class EntityHypothesisStore {
         reusedExisting: true,
         hypothesis: rowToHypothesis(updated),
       };
-    });
+      },
+      { maxWait: 30_000, timeout: 60_000 },
+    );
   }
 
   /**
@@ -273,14 +276,16 @@ export class EntityHypothesisStore {
     id: string,
     filter: { caseId: string },
     entityId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<EntityHypothesis | null> {
-    const existing = await this.prisma.entityHypothesis.findFirst({
+    const client = tx ?? this.prisma;
+    const existing = await client.entityHypothesis.findFirst({
       where: { id, caseId: filter.caseId },
     });
     if (!existing) return null;
     if (existing.status !== "PROPOSED") return null;
 
-    const updated = await this.prisma.entityHypothesis.update({
+    const updated = await client.entityHypothesis.update({
       where: { id },
       data: {
         status: "ACCEPTED",
