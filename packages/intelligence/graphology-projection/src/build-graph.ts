@@ -29,6 +29,16 @@ export interface BuiltGraph {
   readonly graph: Graph;
   readonly nodeCount: number;
   readonly edgeCount: number;
+  /** Authoritative node input cardinality BEFORE any projection bound. */
+  readonly sourceNodeCount: number;
+  /** Authoritative edge input cardinality BEFORE any projection bound. */
+  readonly sourceEdgeCount: number;
+  /** Hard projection bound applied to node input. */
+  readonly nodeLimit: number;
+  /** Hard projection bound applied to edge input. */
+  readonly edgeLimit: number;
+  /** Whether a projection bound truncated the returned node/edge lists. */
+  readonly truncated: { readonly nodes: boolean; readonly edges: boolean };
 }
 
 /**
@@ -65,6 +75,12 @@ export const GRAPH_PROJECTION_BOUNDS = {
  * metadata attribute on an undirected edge to fake direction.
  */
 export function buildGraph(input: GraphProjectionInputLike): BuiltGraph {
+  const sourceNodeCount = input.nodes.length;
+  const sourceEdgeCount = input.edges.length;
+  const truncated = {
+    nodes: sourceNodeCount > GRAPH_PROJECTION_BOUNDS.maxNodes,
+    edges: sourceEdgeCount > GRAPH_PROJECTION_BOUNDS.maxEdges,
+  };
   const nodes = input.nodes.slice(0, GRAPH_PROJECTION_BOUNDS.maxNodes);
   const edges = input.edges.slice(0, GRAPH_PROJECTION_BOUNDS.maxEdges);
 
@@ -140,6 +156,11 @@ export function buildGraph(input: GraphProjectionInputLike): BuiltGraph {
     graph,
     nodeCount: graph.order,
     edgeCount: graph.size,
+    sourceNodeCount,
+    sourceEdgeCount,
+    nodeLimit: GRAPH_PROJECTION_BOUNDS.maxNodes,
+    edgeLimit: GRAPH_PROJECTION_BOUNDS.maxEdges,
+    truncated,
   };
 }
 

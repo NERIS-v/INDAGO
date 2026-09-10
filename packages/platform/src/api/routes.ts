@@ -14,7 +14,7 @@ import { entityStore } from "../persistence/entity-store.js";
 import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
 import { relationStore } from "../persistence/relation-store.js";
 import { graphRuntime } from "../relations/graph-runtime.js";
-import { graphProjectionService } from "../relations/graph-version-service.js";
+import { graphProjectionService, normalizeBuiltGraph } from "../relations/graph-version-service.js";
 import { graphVersionStore } from "../persistence/graph-version-store.js";
 import { materializeCanonicalEntityFromAcceptedHypothesis, EntityMaterializationError } from "../entities/entity-materialization.js";
 import {
@@ -28,6 +28,7 @@ import {
   EvidenceSubmissionRequestSchema,
   SourceCatalogSchema,
   CaseIdSchema,
+  ProjectedGraphSchema,
 } from "@indago/contracts";
 
 export const apiRouter: Router = Router();
@@ -583,9 +584,12 @@ apiRouter.get(
 // 1g-2b. Graph Projection (M-A10) — the DERIVED Graphology graph for the case,
 // rebuilt on demand from canonical entities + ACTIVE canonical relations.
 // Case-isolated (server-side caseId) and bounded by graphology-projection caps.
+// M-A13: serializes to the canonical ProjectedGraph response contract (node/edge
+// objects + explicit truncation metadata), validated at this boundary.
 apiRouter.get(
   "/investigations/:investigationId/graph",
   requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
   async (req, res) => {
     try {
       const investigationId = String(req.params.investigationId);
@@ -607,16 +611,20 @@ apiRouter.get(
       }
 
       const view = await graphRuntime.graph({ investigationId, caseId });
+      const snap = normalizeBuiltGraph(view.graph, caseId, view);
+      const contract = ProjectedGraphSchema.safeParse(snap);
+      if (!contract.success) {
+        console.error("Projected graph contract violation:", contract.error.issues);
+        return res.status(500).json({
+          error: "Projected graph response failed contract validation",
+        });
+      }
       return res.status(200).json({
         investigationId,
         caseId,
-        nodeCount: view.nodeCount,
-        edgeCount: view.edgeCount,
-        graph: {
-          caseId: view.caseId,
-          nodes: view.graph.nodes(),
-          edges: view.edges,
-        },
+        nodeCount: contract.data.nodeCount,
+        edgeCount: contract.data.edgeCount,
+        graph: contract.data,
       });
     } catch (error: unknown) {
       console.error("Failed to serve case graph:", error);
@@ -638,6 +646,9 @@ apiRouter.get(
       }
       if (!startEntityId) {
         return res.status(400).json({ error: "startEntityId query parameter is required" });
+      }
+      if (!z.string().uuid().safeParse(startEntityId).success) {
+        return res.status(400).json({ error: "startEntityId must be a valid UUID" });
       }
       const run = await db.investigationRun.findFirst({
         where: { investigationId },
@@ -1291,15 +1302,20 @@ apiRouter.get(
         caseId,
         investigationId: investigationId ?? "",
       });
-      const snap = (
-        await import("../relations/graph-version-service.js")
-      ).normalizeBuiltGraph(built.graph, caseId);
+      const snap = normalizeBuiltGraph(built.graph, caseId, built);
+      const contract = ProjectedGraphSchema.safeParse(snap);
+      if (!contract.success) {
+        console.error("Projected graph contract violation:", contract.error.issues);
+        return res.status(500).json({
+          error: "Projected graph response failed contract validation",
+        });
+      }
 
       return res.status(200).json({
         caseId,
-        nodeCount: snap.nodes.length,
-        edgeCount: snap.edges.length,
-        graph: snap,
+        nodeCount: contract.data.nodeCount,
+        edgeCount: contract.data.edgeCount,
+        graph: contract.data,
       });
     } catch (error: unknown) {
       console.error("Failed to serve case current graph:", error);
@@ -1403,9 +1419,14 @@ apiRouter.get(
 
       await resolveInvestigationIdForCase(caseId);
       const built = await graphProjectionService.projectGraphVersion(caseId, target);
-      const snap = (
-        await import("../relations/graph-version-service.js")
-      ).normalizeBuiltGraph(built.graph, caseId);
+      const snap = normalizeBuiltGraph(built.graph, caseId, built);
+      const contract = ProjectedGraphSchema.safeParse(snap);
+      if (!contract.success) {
+        console.error("Projected graph contract violation:", contract.error.issues);
+        return res.status(500).json({
+          error: "Projected graph response failed contract validation",
+        });
+      }
 
       // Resolve the version metadata for the response.
       const version =
@@ -1423,14 +1444,14 @@ apiRouter.get(
               projectionStatus: version.projectionStatus,
               parentGraphVersionId: version.parentGraphVersionId,
               checkpointId: version.checkpointId,
-              nodeCount: snap.nodes.length,
-              edgeCount: snap.edges.length,
+              nodeCount: contract.data.nodeCount,
+              edgeCount: contract.data.edgeCount,
               reason: version.reason,
               createdAt: version.createdAt.toISOString(),
               updatedAt: version.updatedAt.toISOString(),
             }
           : null,
-        graph: snap,
+        graph: contract.data,
       });
     } catch (error: unknown) {
       // projectGraphVersion throws when the version cannot be resolved —
@@ -1477,16 +1498,21 @@ apiRouter.get(
         { caseId, investigationId: investigationId ?? "" },
         at,
       );
-      const snap = (
-        await import("../relations/graph-version-service.js")
-      ).normalizeBuiltGraph(built.graph, caseId);
+      const snap = normalizeBuiltGraph(built.graph, caseId, built);
+      const contract = ProjectedGraphSchema.safeParse(snap);
+      if (!contract.success) {
+        console.error("Projected graph contract violation:", contract.error.issues);
+        return res.status(500).json({
+          error: "Projected graph response failed contract validation",
+        });
+      }
 
       return res.status(200).json({
         caseId,
         at,
-        nodeCount: snap.nodes.length,
-        edgeCount: snap.edges.length,
-        graph: snap,
+        nodeCount: contract.data.nodeCount,
+        edgeCount: contract.data.edgeCount,
+        graph: contract.data,
       });
     } catch (error: unknown) {
       console.error("Failed to serve valid-at graph:", error);

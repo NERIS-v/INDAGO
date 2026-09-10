@@ -4,6 +4,9 @@ import {
   traverseBounded,
   degreeCentrality,
   detectCommunities,
+  GRAPH_PROJECTION_BOUNDS,
+  TRAVERSAL_BOUNDS,
+  COMMUNITY_BOUNDS,
   Graph,
   type GraphProjectionInput,
 } from '../src/index.js';
@@ -209,5 +212,164 @@ describe('M-A10 graph projection — analytics read-only', () => {
     graph.forEachEdge((e) => void edgeSnapshotAfter.add(e));
     expect(edgeSnapshotAfter.size).toBe(edgeSnapshotBefore.size);
     for (const e of edgeSnapshotBefore) expect(edgeSnapshotAfter.has(e)).toBe(true);
+  });
+});
+
+describe('M-A13 — buildGraph truncation metadata', () => {
+  it('reports accurate source counts and truncated flags when bounds are exceeded', () => {
+    // Over-maxNodes input: GRAPH_PROJECTION_BOUNDS.maxNodes + 10 nodes.
+    const N = GRAPH_PROJECTION_BOUNDS.maxNodes + 10;
+    const input: GraphProjectionInput = {
+      caseId: 'trunc-case',
+      nodes: Array.from({ length: N }, (_, i) => ({
+        id: ENT(i + 1),
+        entityType: 'PERSON',
+        canonicalName: `node-${i}`,
+      })),
+      edges: [],
+    };
+    const built = buildGraph(input);
+    expect(built.sourceNodeCount).toBe(N);
+    expect(built.nodeCount).toBe(GRAPH_PROJECTION_BOUNDS.maxNodes);
+    expect(built.truncated.nodes).toBe(true);
+    expect(built.truncated.edges).toBe(false);
+  });
+
+  it('reports accurate edge truncation independently of node truncation', () => {
+    // 3 nodes, but E > maxEdges edges — some duplicated to avoid self-loops.
+    // create 3 nodes, maxEdges+5 edges using multi-edges (different IDs, same endpoints).
+    const E = GRAPH_PROJECTION_BOUNDS.maxEdges + 5;
+    const input: GraphProjectionInput = {
+      caseId: 'edge-trunc-case',
+      nodes: [
+        { id: ENT(1), entityType: 'PERSON', canonicalName: 'A' },
+        { id: ENT(2), entityType: 'PERSON', canonicalName: 'B' },
+      ],
+      edges: Array.from({ length: E }, (_, i) => ({
+        id: REL(i + 1),
+        relationType: 'communication',
+        source: ENT(1),
+        target: ENT(2),
+        provenance: {},
+      })),
+    };
+    const built = buildGraph(input);
+    expect(built.sourceNodeCount).toBe(2);
+    expect(built.sourceEdgeCount).toBe(E);
+    expect(built.nodeCount).toBe(2);
+    expect(built.edgeCount).toBe(GRAPH_PROJECTION_BOUNDS.maxEdges);
+    expect(built.truncated.nodes).toBe(false);
+    expect(built.truncated.edges).toBe(true);
+  });
+
+  it('untruncated input yields source === returned counts and truncated = false', () => {
+    const built = buildGraph(makeInput());
+    expect(built.sourceNodeCount).toBe(built.nodeCount);
+    expect(built.sourceEdgeCount).toBe(built.edgeCount);
+    expect(built.truncated.nodes).toBe(false);
+    expect(built.truncated.edges).toBe(false);
+  });
+});
+
+describe('M-A13 — communities actual size and truncation', () => {
+  it('reports the true community size even when the member list is bounded', () => {
+    // Build a graph with > COMMUNITY_BOUNDS.maxMembersPerCommunity nodes in a
+    // single community. A dense core (small clique) with periphery nodes each
+    // connected to every core node forces Louvain to keep the whole component
+    // as one community: all periphery edges go to the core, so there is no
+    // modularity gain from splitting.
+    const CORE_SIZE = 10;
+    const PERIPHERY_SIZE = COMMUNITY_BOUNDS.maxMembersPerCommunity + 100 - CORE_SIZE; // 5090
+    const TOTAL = CORE_SIZE + PERIPHERY_SIZE; // 5100
+
+    const nodes: GraphProjectionInput['nodes'] = [];
+    for (let i = 0; i < TOTAL; i++) {
+      nodes.push({ id: ENT(i), entityType: 'PERSON', canonicalName: `n${i}` });
+    }
+    const edges: GraphProjectionInput['edges'] = [];
+    let relIdx = 0;
+    // Core clique (CORE_SIZE nodes, fully connected)
+    for (let i = 0; i < CORE_SIZE; i++) {
+      for (let j = i + 1; j < CORE_SIZE; j++) {
+        edges.push({
+          id: REL(relIdx++),
+          relationType: 'communication',
+          source: ENT(i),
+          target: ENT(j),
+          provenance: {},
+        });
+      }
+    }
+    // Periphery: each periphery node connects to EVERY core node.
+    for (let p = CORE_SIZE; p < TOTAL; p++) {
+      for (let c = 0; c < CORE_SIZE; c++) {
+        edges.push({
+          id: REL(relIdx++),
+          relationType: 'communication',
+          source: ENT(p),
+          target: ENT(c),
+          provenance: {},
+        });
+      }
+    }
+
+    const { graph } = buildGraph({ caseId: 'comm-trunc', nodes, edges });
+    const communities = detectCommunities(graph);
+
+    // Find the community containing ENT(0) (a core node) — it should contain
+    // the full graph.
+    const bigCommunity = communities.find((c) => c.memberNodeIds.includes(ENT(0)));
+    expect(bigCommunity).toBeDefined();
+    expect(bigCommunity!.size).toBe(TOTAL);
+    expect(bigCommunity!.memberNodeIds.length).toBe(COMMUNITY_BOUNDS.maxMembersPerCommunity);
+    expect(bigCommunity!.truncated).toBe(true);
+  });
+
+  it('small communities report size === memberNodeIds.length with truncated = false', () => {
+    const { graph } = buildGraph(makeInput()); // 3 nodes, 2 edges
+    const communities = detectCommunities(graph);
+    for (const c of communities) {
+      expect(c.size).toBe(c.memberNodeIds.length);
+      expect(c.truncated).toBe(false);
+    }
+  });
+});
+
+describe('M-A13 — traversal work cap (pathological dense graph)', () => {
+  it('completes within a reasonable time on a dense graph without exploding', () => {
+    // A 30-node clique: 30×29/2 = 435 edges. 4-hop BFS from node 0 would
+    // produce exponentially many walks — but the work cap (maxExpandedWalksPerLevel)
+    // bounds transient frontier state and the output (maxPaths) limits paths.
+    const N = 30;
+    const nodes: GraphProjectionInput['nodes'] = [];
+    for (let i = 0; i < N; i++) {
+      nodes.push({ id: ENT(i), entityType: 'PERSON', canonicalName: `n${i}` });
+    }
+    const edges: GraphProjectionInput['edges'] = [];
+    let relIdx = 0;
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        edges.push({
+          id: REL(relIdx++),
+          relationType: 'communication',
+          source: ENT(i),
+          target: ENT(j),
+          provenance: {},
+        });
+      }
+    }
+    const { graph } = buildGraph({ caseId: 'dense-case', nodes, edges });
+
+    const start = Date.now();
+    const paths = traverseBounded(graph, ENT(0), {
+      hops: TRAVERSAL_BOUNDS.maxHops,
+      maxPaths: TRAVERSAL_BOUNDS.maxPaths,
+    });
+    const elapsedMs = Date.now() - start;
+
+    // Must complete and return at most maxPaths paths.
+    expect(paths.length).toBeLessThanOrEqual(TRAVERSAL_BOUNDS.maxPaths);
+    // Must complete in well under 5 seconds — the work cap prevents explosion.
+    expect(elapsedMs).toBeLessThan(5_000);
   });
 });

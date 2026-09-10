@@ -278,7 +278,10 @@ describe.skipIf(!TEST_DATABASE_URL)(
       canonRelationStore = new RelationStore(prisma);
 
       await prisma.graphVersion.deleteMany({});
-      await prisma.temporalStateChange.deleteMany({});
+      // TemporalStateChange is append-only by DB trigger (M-A12): DELETE is
+      // forbidden. TRUNCATE is the sanctioned test-reset seam — row-level
+      // BEFORE triggers do not fire on TRUNCATE.
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "TemporalStateChange"');
       await prisma.relation.deleteMany({});
       await prisma.relationHypothesis.deleteMany({});
       await prisma.entity.deleteMany({});
@@ -318,7 +321,10 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
     afterAll(async () => {
       await prisma.graphVersion.deleteMany({});
-      await prisma.temporalStateChange.deleteMany({});
+      // TemporalStateChange is append-only by DB trigger (M-A12): DELETE is
+      // forbidden. TRUNCATE is the sanctioned test-reset seam — row-level
+      // BEFORE triggers do not fire on TRUNCATE.
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "TemporalStateChange"');
       await prisma.relation.deleteMany({});
       await prisma.relationHypothesis.deleteMany({});
       await prisma.entity.deleteMany({});

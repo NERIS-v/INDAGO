@@ -646,7 +646,9 @@ describe("PR-3 — graph → context bridge (end-to-end)", () => {
     await screen.findByTestId("graph-canvas");
     await selectEntityNode("Victor Aldridge");
     await waitResolved("Victor Aldridge", "entity");
-    // Baseline AFTER the graph settles (the mount may legitimately fit once).
+    // Give the deferred mount/reveal fit a chance to land FIRST so it cannot
+    // pollute the baseline (the mount may legitimately fit once).
+    await new Promise((r) => setTimeout(r, 500));
     const before = graphMocks.fitCalls ?? 0;
 
     fireEvent.click(screen.getByRole("button", { name: "Victor Aldridge" }));

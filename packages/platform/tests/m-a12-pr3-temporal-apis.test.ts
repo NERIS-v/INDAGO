@@ -325,8 +325,8 @@ describe("GraphProjectionService — mock-store historical projection", () => {
     );
     expect(normalizeBuiltGraph(before.graph, caseId).edges).toHaveLength(0);
 
-    // COMPLETE mark mirrors projectCurrentGraph.
-    expect(stores.graphVersions.setProjectionStatus).toHaveBeenCalled();
+    // P2-04: valid-at is a pure read — it must NOT mutate projection metadata on the ACTIVE version.
+    expect(stores.graphVersions.setProjectionStatus).not.toHaveBeenCalled();
   });
 
   it("projectGraphValidAt never fabricates for unparseable instants or unintervaled relations", async () => {

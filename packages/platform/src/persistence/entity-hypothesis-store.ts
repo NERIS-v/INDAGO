@@ -103,12 +103,8 @@ function rowToHypothesis(row: EntityHypothesisRow): EntityHypothesis {
     comparisonStatus: row.comparisonStatus,
     score: row.score,
     scoreModelVersion: row.scoreModelVersion,
-    ...(supportingObservationIds.length > 0
-      ? { supportingObservationIds }
-      : {}),
-    ...(contradictingObservationIds.length > 0
-      ? { contradictingObservationIds }
-      : {}),
+    supportingObservationIds,
+    contradictingObservationIds,
     status: row.status,
     provenance: row.provenance,
     ...(row.metadata !== null ? { metadata: row.metadata } : {}),
