@@ -184,3 +184,36 @@ export class TemporalValidationError extends Error {
     this.name = "TemporalValidationError";
   }
 }
+
+const INSTANT_GRADE_PRECISIONS = new Set(["exact", "minute", "hour"]);
+
+/**
+ * Point-in-time containment: does the interval contain the instant `atIso`?
+ *
+ * The D5 closed-interval semantics apply (validTo inclusive when present;
+ * open-ended toward the future when absent). Containment is only decided for
+ * CONCRETE instant bounds — a bound that is not instant-grade (month/year/range/
+ * approximate/unknown precision) or that does not parse to a finite instant
+ * yields `false` rather than a fabricated answer. An absent interval yields
+ * `false` (a relation with no domain validity never answers a valid-at query).
+ */
+export function containsTime(interval: unknown, atIso: string): boolean {
+  const at = Date.parse(atIso);
+  if (!Number.isFinite(at)) return false;
+  if (interval === undefined || interval === null || typeof interval !== "object") {
+    return false;
+  }
+  const parsed = TemporalIntervalSchema.safeParse(interval);
+  if (!parsed.success) return false;
+
+  const { validFrom, validTo } = parsed.data;
+  if (!INSTANT_GRADE_PRECISIONS.has(validFrom.precision)) return false;
+  const from = Date.parse(validFrom.value);
+  if (!Number.isFinite(from)) return false;
+  if (validTo === undefined) return at >= from;
+
+  if (!INSTANT_GRADE_PRECISIONS.has(validTo.precision)) return false;
+  const to = Date.parse(validTo.value);
+  if (!Number.isFinite(to)) return false;
+  return at >= from && at <= to;
+}
