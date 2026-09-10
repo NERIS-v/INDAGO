@@ -31,6 +31,20 @@ import {
 import { entityStore } from "../persistence/entity-store.js";
 import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
 import { entityMentionStore } from "../persistence/entity-mention-store.js";
+import {
+  temporalStateChangeStore,
+  type TemporalStateChangeStore,
+} from "../persistence/temporal-state-change-store.js";
+import {
+  graphVersionStore,
+  type GraphVersionStore,
+} from "../persistence/graph-version-store.js";
+import {
+  GRAPH_CHANGE_ENTITY_CREATED,
+  GRAPH_CHANGE_ENTITY_ARCHIVED,
+  type GraphRevisionEvent,
+  toGraphRevisionMetadata,
+} from "../relations/graph-version-service.js";
 
 /**
  * Entity types that carry a canonical name usable as the Entity.canonicalName.
@@ -109,13 +123,34 @@ export interface EntityMaterializationStores {
     "findById" | "markAccepted"
   >;
   readonly entityMentionStore: Pick<typeof entityMentionStore, "findByIds">;
-  readonly entityStore: Pick<typeof entityStore, "materializeEntity">;
+  readonly entityStore: Pick<
+    typeof entityStore,
+    "transaction" | "materializeEntity" | "updateStatus" | "findById"
+  >;
+  /**
+   * Optional — when supplied, an ENTITY_CREATED graph version is created
+   * (atomically, in the same transaction) whenever a genuinely fresh canonical
+   * entity is materialized (M-A12 entity versioning / item B). The production
+   * default always supplies it; tests that target the authority in isolation
+   * may omit it to keep the seam version-agnostic.
+   */
+  readonly graphVersionStore?: GraphVersionStore;
+  /**
+   * Optional — when supplied, the authoritative ENTITY_CREATED canonical
+   * transition is appended to the TemporalStateChange history in the SAME
+   * transaction as the canonical entity creation (M-A12-D6). The production
+   * default (DEFAULT_STORES) always supplies it; tests that target the
+   * authority in isolation may omit it.
+   */
+  readonly temporalStateChange?: Pick<TemporalStateChangeStore, "recordChange">;
 }
 
 const DEFAULT_STORES: EntityMaterializationStores = {
   entityHypothesisStore,
   entityMentionStore,
   entityStore,
+  graphVersionStore,
+  temporalStateChange: temporalStateChangeStore,
 };
 
 /**
@@ -186,41 +221,97 @@ export async function materializeCanonicalEntityFromAcceptedHypothesis(
     extractionMethod: actor,
   };
 
-  // Durable-state-first: persist the authoritative decision THEN materialize.
-  const updatedHypothesis = await hypStore.markAccepted(
-    hypothesisId,
-    { caseId },
-    entityId,
-  );
-  if (!updatedHypothesis) {
-    // The hypothesis passed the PROPOSED guard above, so this is an
-    // unexpected invariant break (e.g. a concurrent authority transitioned it
-    // between our read and write). Refuse rather than materialize an entity
-    // for a hypothesis whose decision the durable store no longer honors.
-    throw new EntityMaterializationError("HYPOTHESIS_NOT_PROPOSED", hypothesisId);
-  }
+  // ONE atomic boundary (M-A12-D6): the hypothesis ACCEPT decision, the
+  // canonical entity materialization, AND the ENTITY_CREATED temporal record
+  // commit together or not at all. No partial accept, no canonical entity
+  // without an accepted hypothesis, no temporal history claiming an entity
+  // that does not exist. The audit event is emitted by the caller AFTER this
+  // transaction commits.
+  return entStore.transaction<MaterializeFromAcceptedHypothesisResult>(
+    async (tx) => {
+      const updatedHypothesis = await hypStore.markAccepted(
+        hypothesisId,
+        { caseId },
+        entityId,
+        tx,
+      );
+      if (!updatedHypothesis) {
+        // The hypothesis passed the PROPOSED guard above, so this is an
+        // unexpected invariant break (e.g. a concurrent authority transitioned
+        // it between our read and write). Refuse rather than materialize an
+        // entity for a hypothesis whose decision the durable store no longer
+        // honors.
+        throw new EntityMaterializationError("HYPOTHESIS_NOT_PROPOSED", hypothesisId);
+      }
 
-  const result = await entStore.materializeEntity({
-    identityKey,
-    entity: {
-      id: entityId,
-      caseId,
-      investigationId,
-      canonicalName,
-      ...(entityType !== undefined ? { entityType } : {}),
-      status: "ACTIVE",
-      observationIds,
-      hypothesisIds: [hypothesisId],
-      provenance,
+      const result = await entStore.materializeEntity(
+        {
+          identityKey,
+          entity: {
+            id: entityId,
+            caseId,
+            investigationId,
+            canonicalName,
+            ...(entityType !== undefined ? { entityType } : {}),
+            status: "ACTIVE",
+            observationIds,
+            hypothesisIds: [hypothesisId],
+            provenance,
+          },
+        },
+        tx,
+      );
+
+      // Append the authoritative ENTITY_CREATED canonical transition in the
+      // SAME transaction. Idempotent via the deterministic id + logicalKey;
+      // only a genuinely fresh canonical entity creation is recorded
+      // (reusedExisting → no new canonical state).
+      if (!result.reusedExisting && stores.temporalStateChange) {
+        await stores.temporalStateChange.recordChange(
+          {
+            caseId,
+            investigationId,
+            entityType: "ENTITY",
+            entityId: result.entity.id,
+            stateType: "CREATED",
+            provenance,
+            note: `entity authority materialized canonical entity ${entityId} from hypothesis ${hypothesisId}`,
+          },
+          tx,
+        );
+      }
+
+      // M-A12 entity versioning (item B): a genuinely fresh canonical entity
+      // materialization is a graph-affecting event — record an ENTITY_CREATED
+      // graph version in the SAME transaction (atomic with the canonical write).
+      // The graph-projection service replays these to filter the entity universe
+      // at any historical version.
+      if (!result.reusedExisting && stores.graphVersionStore) {
+        await stores.graphVersionStore.createVersion(
+          {
+            caseId,
+            investigationId,
+            status: "DRAFT",
+            reason: `ENTITY_CREATED:${entityId}`,
+            metadata: {
+              ...toGraphRevisionMetadata({
+                type: GRAPH_CHANGE_ENTITY_CREATED,
+                entityId,
+              } satisfies GraphRevisionEvent),
+            },
+          },
+          tx,
+        );
+      }
+
+      return {
+        entityId,
+        hypothesis: updatedHypothesis,
+        materialized: true,
+        reused: result.reusedExisting,
+      };
     },
-  });
-
-  return {
-    entityId,
-    hypothesis: updatedHypothesis,
-    materialized: true,
-    reused: result.reusedExisting,
-  };
+  );
 }
 
 export class EntityMaterializationError extends Error {
@@ -231,4 +322,125 @@ export class EntityMaterializationError extends Error {
     super(`Entity materialization refused (${code}) for hypothesis ${hypothesisId}`);
     this.name = "EntityMaterializationError";
   }
+}
+
+// ============================================================================
+// M-A12 Item B: Entity status transition authority
+//
+// The explicit authority boundary that changes a canonical entity's status.
+// Currently only ARCHIVED is supported (the other transitions are deferred
+// pending clearer operational requirements — MERGED/SPLIT need authority
+// semantics that don't yet exist).
+//
+// Same-transaction atomicity:
+//   1. EntityStore.updateStatus — flips the durable status.
+//   2. GraphVersionStore.createVersion — ENTITY_ARCHIVED revision.
+//   3. TemporalStateChangeStore.recordChange — ENTITY:ARCHIVED TSC entry.
+//
+// Idempotent: second ARCHIVED on an already-ARCHIVED entity → no-op.
+// ============================================================================
+
+export interface TransitionEntityResult {
+  readonly entityId: string;
+  readonly previousStatus: string;
+  readonly versionCreated: boolean;
+}
+
+/**
+ * Seam for `transitionEntityStatus` — narrower than EntityMaterializationStores
+ * because a status transition needs no hypothesis/mention boundaries.
+ */
+export interface TransitionEntityStores {
+  readonly entityStore: Pick<
+    typeof entityStore,
+    "transaction" | "findById" | "updateStatus"
+  >;
+  readonly graphVersionStore?: GraphVersionStore;
+  readonly temporalStateChange?: Pick<TemporalStateChangeStore, "recordChange">;
+}
+
+/**
+ * Transition a canonical entity's status (M-A12 item B). Currently only
+ * ACTIVE → ARCHIVED is supported.
+ *
+ * Pre-conditions:
+ *   - Entity exists, is in the given case, and is in a transitable status
+ *     (currently only ACTIVE → ARCHIVED).
+ */
+export async function transitionEntityStatus(
+  params: {
+    caseId: string;
+    entityId: string;
+    newStatus: string;
+    actor: string;
+    investigationId?: string;
+  },
+  stores: TransitionEntityStores = DEFAULT_STORES,
+): Promise<TransitionEntityResult> {
+  const { caseId, entityId, newStatus, actor, investigationId } = params;
+  const { entityStore: entStore } = stores;
+
+  return entStore.transaction<TransitionEntityResult>(async (tx) => {
+    const current = await entStore.findById(entityId, { caseId });
+    if (!current) {
+      throw new EntityMaterializationError("ENTITY_NOT_FOUND", entityId);
+    }
+
+    // Idempotency: already in target status → no-op.
+    if (current.status === newStatus) {
+      return { entityId, previousStatus: current.status, versionCreated: false };
+    }
+
+    // Guard: only ACTIVE → ARCHIVED is legal (other transitions deferred).
+    if (current.status !== "ACTIVE" || newStatus !== "ARCHIVED") {
+      throw new EntityMaterializationError(
+        `INVALID_TRANSITION:${current.status}→${newStatus}`,
+        entityId,
+      );
+    }
+
+    const updated = await entStore.updateStatus(entityId, { caseId }, newStatus, tx);
+    if (!updated) {
+      throw new EntityMaterializationError("ENTITY_NOT_FOUND", entityId);
+    }
+
+    // Graph version: ENTITY_ARCHIVED revision (same tx — atomic with the status flip).
+    let versionCreated = false;
+    if (stores.graphVersionStore) {
+      await stores.graphVersionStore.createVersion(
+        {
+          caseId,
+          investigationId: investigationId ?? current.investigationId ?? undefined,
+          status: "DRAFT",
+          reason: `ENTITY_ARCHIVED:${entityId}`,
+          metadata: {
+            ...toGraphRevisionMetadata({
+              type: GRAPH_CHANGE_ENTITY_ARCHIVED,
+              entityId,
+            } satisfies GraphRevisionEvent),
+          },
+        },
+        tx,
+      );
+      versionCreated = true;
+    }
+
+    // TSC: same-tx canonical transition (M-A12-D6).
+    if (stores.temporalStateChange) {
+      await stores.temporalStateChange.recordChange(
+        {
+          caseId,
+          investigationId: investigationId ?? current.investigationId ?? undefined,
+          entityType: "ENTITY",
+          entityId,
+          stateType: "ARCHIVED",
+          provenance: current.provenance,
+          note: `entity authority ${actor} transitioned ${entityId} to ${newStatus}`,
+        },
+        tx,
+      );
+    }
+
+    return { entityId, previousStatus: current.status, versionCreated };
+  });
 }
