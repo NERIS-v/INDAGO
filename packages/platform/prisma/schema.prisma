@@ -535,6 +535,7 @@ model RelationHypothesis {
   temporalCoverage  Float    @default(0)
   directed          Boolean  @default(true)
   validityInterval  Json? // M-A12-D5: proposed closed [validFrom, validTo] TemporalInterval
+  temporalAssertions Json? // M-A12: assertion records for future interval amendments (RELATION_AMENDED)
   provenance        Json     // ProvenanceSchema
   metadata          Json?
   createdAt         DateTime @default(now())
@@ -589,6 +590,7 @@ model Relation {
   provenance        Json    // ProvenanceSchema — links back to the accepted hypothesis
   hypothesisId      String  // the source RelationHypothesis that was accepted
   validityInterval  Json? // M-A12-D5: closed [validFrom, validTo] TemporalInterval (inherited from accepted hypothesis)
+  temporalAssertions Json? // M-A12: assertion records for future interval amendments (RELATION_AMENDED)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   reversedAt        DateTime?
@@ -633,9 +635,10 @@ model Relation {
 // ============================================================================
 model TemporalStateChange {
   id                String   @id // deterministic UUID (SHA-256 of caseId:entityType:entityId:sequence)
+  logicalKey        String?  @unique // exact-duplicate guard: caseId:entityType:entityId:stateType[:eventRef]
   caseId            String
   investigationId   String?
-  entityType        String // canonical entity kind: OBSERVATION | RELATION | RELATION_HYPOTHESIS | ...
+  entityType        String // canonical entity kind: OBSERVATION | ENTITY | RELATION | RELATION_HYPOTHESIS | ...
   entityId          String // the canonical entity's deterministic id
   stateType         String // lifecycle transition (CREATED / ACCEPTED / REVERSED / UPDATED / ...)
   sequence          Int      // monotonic per (caseId, entityType, entityId)

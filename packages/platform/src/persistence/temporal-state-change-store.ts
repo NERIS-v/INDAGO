@@ -51,6 +51,7 @@ export async function deterministicStateChangeId(
 
 export type TemporalStateChangeEntityType =
   | "OBSERVATION"
+  | "ENTITY"
   | "RELATION"
   | "RELATION_HYPOTHESIS";
 
@@ -77,11 +78,35 @@ export interface RecordStateChangeInput {
   readonly entityType: TemporalStateChangeEntityType;
   readonly entityId: string;
   readonly stateType: string;
+  /**
+   * Optional explicit event reference for a logical transition (e.g. the id of
+   * the domain event that triggered it). When supplied it is folded into the
+   * append-only `logicalKey` so the same logical transition produced from a
+   * different code path converges to one row.
+   */
+  readonly eventRef?: string;
   readonly eventTime?: unknown;
   readonly validityInterval?: unknown;
   readonly provenance?: unknown;
   readonly ingestedAt?: Date | null;
   readonly note?: string;
+}
+
+/**
+ * Build the append-only exact-duplicate logical key for a state transition:
+ * `${caseId}:${entityType}:${entityId}:${stateType}[...:${eventRef}]`. The
+ * `logicalKey` column is @unique, so a replay of the same logical transition
+ * (same key) is a no-op even where the deterministic id cannot be reused.
+ */
+export function buildStateChangeLogicalKey(input: {
+  readonly caseId: string;
+  readonly entityType: string;
+  readonly entityId: string;
+  readonly stateType: string;
+  readonly eventRef?: string;
+}): string {
+  const base = `${input.caseId}:${input.entityType}:${input.entityId}:${input.stateType}`;
+  return input.eventRef !== undefined ? `${base}:${input.eventRef}` : base;
 }
 
 type StateChangeRow = Prisma.TemporalStateChangeGetPayload<Record<string, never>>;
@@ -102,6 +127,35 @@ function rowToRecord(row: StateChangeRow): TemporalStateChangeRecord {
     transactionTime: row.transactionTime,
     note: row.note,
     createdAt: row.createdAt,
+  };
+}
+
+/**
+ * Reconstruct the TemporalStateChangeRecord for a row we just inserted via
+ * createMany(… skipDuplicates). Mirrors the create payload so the written
+ * branch does not need a second round-trip (and never re-reads an aborted tx).
+ */
+function recordFromInput(
+  input: RecordStateChangeInput,
+  id: string,
+  sequence: number,
+  now: Date,
+): TemporalStateChangeRecord {
+  return {
+    id,
+    caseId: input.caseId,
+    investigationId: input.investigationId ?? null,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    stateType: input.stateType,
+    sequence,
+    eventTime: input.eventTime ?? null,
+    validityInterval: input.validityInterval ?? null,
+    provenance: input.provenance ?? null,
+    ingestedAt: input.ingestedAt ?? null,
+    transactionTime: now,
+    note: input.note ?? null,
+    createdAt: now,
   };
 }
 
@@ -132,7 +186,7 @@ export class TemporalStateChangeStore {
   async transaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, { maxWait: 30_000, timeout: 60_000 });
   }
 
   /**
@@ -165,55 +219,100 @@ export class TemporalStateChangeStore {
         input.entityId,
         sequence,
       );
+      const logicalKey =
+        input.eventRef !== undefined || input.stateType !== undefined
+          ? buildStateChangeLogicalKey({
+              caseId: input.caseId,
+              entityType: input.entityType,
+              entityId: input.entityId,
+              stateType: input.stateType,
+              ...(input.eventRef !== undefined ? { eventRef: input.eventRef } : {}),
+            })
+          : undefined;
       const now = new Date();
 
       try {
-        const created = await client.temporalStateChange.create({
-          data: {
-            id,
-            caseId: input.caseId,
-            investigationId: input.investigationId ?? null,
-            entityType: input.entityType,
-            entityId: input.entityId,
-            stateType: input.stateType,
-            sequence,
-            eventTime:
-              input.eventTime !== undefined
-                ? toJson(input.eventTime)
-                : Prisma.JsonNull,
-            validityInterval:
-              input.validityInterval !== undefined
-                ? toJson(input.validityInterval)
-                : Prisma.JsonNull,
-            provenance:
-              input.provenance !== undefined
-                ? toJson(input.provenance)
-                : Prisma.JsonNull,
-            ingestedAt: input.ingestedAt ?? null,
-            transactionTime: now,
-            note: input.note ?? null,
-            createdAt: now,
-          },
+        const { count } = await client.temporalStateChange.createMany({
+          data: [
+            {
+              id,
+              logicalKey: logicalKey ?? null,
+              caseId: input.caseId,
+              investigationId: input.investigationId ?? null,
+              entityType: input.entityType,
+              entityId: input.entityId,
+              stateType: input.stateType,
+              sequence,
+              eventTime:
+                input.eventTime !== undefined
+                  ? toJson(input.eventTime)
+                  : Prisma.JsonNull,
+              validityInterval:
+                input.validityInterval !== undefined
+                  ? toJson(input.validityInterval)
+                  : Prisma.JsonNull,
+              provenance:
+                input.provenance !== undefined
+                  ? toJson(input.provenance)
+                  : Prisma.JsonNull,
+              ingestedAt: input.ingestedAt ?? null,
+              transactionTime: now,
+              note: input.note ?? null,
+              createdAt: now,
+            },
+          ],
+          skipDuplicates: true,
         });
-        return { written: true, record: rowToRecord(created) };
+        if (count === 1) {
+          // We won the insert race (or there was no race at all).
+          return { written: true, record: recordFromInput(input, id, sequence, now) };
+        }
+        // A concurrent/identical row already exists for the deterministic id
+        // (replay) or the logical key. IMPORTANT: do NOT re-read via 'create'
+        // + P2002 catch here — a unique-violation aborts the PostgreSQL
+        // transaction, so any subsequent read inside it fails with 25P02.
+        // createMany(… skipDuplicates) avoided the abort entirely; the winner
+        // row is read below with a live transaction.
+        const existing = await client.temporalStateChange.findUnique({
+          where: { id },
+        });
+        if (existing) {
+          return { written: false, record: rowToRecord(existing) };
+        }
+        if (logicalKey !== null) {
+          // Unique-logicalKey collision with a different id: the same logical
+          // transition was already recorded by another code path → idempotent
+          // no-op, never a duplicate.
+          const byKey = await client.temporalStateChange.findFirst({
+            where: { logicalKey, caseId: input.caseId },
+          });
+          if (byKey) return { written: false, record: rowToRecord(byKey) };
+        }
+        // Theoretically unreachable (count===0 implies a constraint fired).
+        throw new Error(
+          `recordChange: no row inserted and no competing row found for ${input.caseId}:${input.entityType}:${input.entityId}:${input.stateType}`,
+        );
       } catch (cause) {
         const code =
           cause instanceof Prisma.PrismaClientKnownRequestError
             ? cause.code
             : undefined;
         if (code !== "P2002") throw cause;
-        // Deterministic id already exists → identical transition already
-        // recorded (replay). Re-read and report as not-this-replay's write.
-        const existing = await client.temporalStateChange.findUnique({
-          where: { id },
-        });
-        if (!existing) throw cause;
-        return { written: false, record: rowToRecord(existing) };
+        // A P2002 escaping the aborted transaction (e.g. a truly concurrent
+        // insert landing between our createMany and this read). Re-read via a
+        // fresh transaction is unsafe here (the enclosing tx is aborted), so a
+        // racing duplicate surfaces as an explicit conflict rather than a silent
+        // 25P02 cascade. Idempotency is still guaranteed by the deterministic id
+        // for the single-writer authority path; the concurrent-writer case
+        // resolves at the call site.
+        throw new Error(
+          `recordChange: concurrent duplicate for ${input.caseId}:${input.entityType}:${input.entityId}:${input.stateType}`,
+        );
       }
     };
 
     if (tx) return run(tx);
-    return this.prisma.$transaction(run);
+    return this.prisma.$transaction(run, { maxWait: 30_000, timeout: 60_000 });
   }
 
   /**

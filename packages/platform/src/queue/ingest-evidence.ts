@@ -94,6 +94,13 @@ import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js
 import { entityStore } from "../persistence/entity-store.js";
 import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
 import { temporalStateChangeStore } from "../persistence/temporal-state-change-store.js";
+import {
+  TemporalValidationError,
+  validateEventTime,
+  validateTemporalInterval,
+  assertValidTemporalInterval,
+} from "../temporal/interval-validation.js";
+import { deriveValidityInterval } from "../temporal/interval-aggregation.js";
 import { emitObservationExtracted, emitProgressEvent } from "../realtime/sse.js";
 import {
   acquisitionService,
@@ -700,6 +707,19 @@ async function completeMA06(params: {
   const entries: { identityKey: string; observation: Observation }[] = [];
   for (const draft of extracted.observations) {
     const observation = await finalizeObservation({ draft, nowIso });
+
+    // M-A12 WS-2 hardening: temporal fields on a finalized observation must be
+    // valid before they reach durable storage / append-only temporal history —
+    // fail loudly on a contradiction rather than persist it.
+    const eventTimeResult = validateEventTime(observation.eventTime);
+    if (!eventTimeResult.valid) {
+      throw new TemporalValidationError(eventTimeResult.errors);
+    }
+    const intervalResult = validateTemporalInterval(observation.validityInterval);
+    if (!intervalResult.valid) {
+      throw new TemporalValidationError(intervalResult.errors);
+    }
+
     entries.push({
       identityKey: buildObservationIdentityKey({
         evidenceId: observation.evidenceId,
@@ -1182,6 +1202,7 @@ function relationResolutionToHypothesisInput(params: {
   sourceId: string | undefined;
   artifactId: string | undefined;
   derivedFrom: readonly string[];
+  validityInterval?: unknown;
 }): import("../persistence/relation-hypothesis-store.js").RelationHypothesisInput {
   const { resolution, id, identityKey, caseId, investigationId, sourceId, artifactId, derivedFrom } = params;
   return {
@@ -1209,6 +1230,9 @@ function relationResolutionToHypothesisInput(params: {
       extractor: "indago:relation-resolution:engine",
       extractionMethod: resolution.scoreModelVersion,
     },
+    ...(params.validityInterval !== undefined
+      ? { validityInterval: params.validityInterval }
+      : {}),
   };
 }
 
@@ -1335,6 +1359,22 @@ async function completeMA10(params: {
       artifactId = firstObs.provenance?.artifactId;
     }
 
+    // M-A12 WS-3: derive the proposed relation's closed validity interval from
+    // the REAL observed event instants of its supporting observations
+    // (min..max). Never fabricated: when no supporting observation carries an
+    // explicit parseable instant the interval is simply omitted — a truthfully
+    // un-validated relation, never an invented temporal boundary.
+    const supportingObs = resolution.evidenceBasis
+      .map((obsId) => observations.find((o) => o.id === obsId))
+      .filter((o): o is Observation => o !== undefined);
+    const validityInterval = deriveValidityInterval(supportingObs);
+    if (validityInterval !== undefined) {
+      // M-A12 WS-2 guard: the aggregation is constructed from parseable,
+      // ordered instants so this always passes — but fail loudly rather than
+      // ever persist a malformed interval.
+      assertValidTemporalInterval(validityInterval);
+    }
+
     const input = relationResolutionToHypothesisInput({
       resolution,
       id,
@@ -1344,6 +1384,7 @@ async function completeMA10(params: {
       sourceId,
       artifactId,
       derivedFrom: resolution.evidenceBasis,
+      ...(validityInterval !== undefined ? { validityInterval } : {}),
     });
 
     // 6. Durable-state-first: persist the row BEFORE any audit event.

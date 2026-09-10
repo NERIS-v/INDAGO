@@ -901,9 +901,9 @@ M-A12 and lands in Phase 6/8.
 
 M-A12 is implemented as three PRs. PR0 locks the design; **PR1 (temporal history
 + intervals), PR2 (graph versioning + historical projection), and PR3 (APIs +
-checkpoints + verification) are implemented** (unit-verified; real-Postgres
-integration verification is **BLOCKED** because TEST_DATABASE_URL is temporarily
-unavailable). The locked decisions (D1–D7) and semantics are recorded in the
+checkpoints + verification) are implemented and verified end-to-end** (pure unit
+suites green + real-Postgres integration suites green 43/43 against a migrated
+`TEST_DATABASE_URL`). The locked decisions (D1–D7) and semantics are recorded in the
 design doc and must not be re-interpreted by downstream PRs.
 
 #### Locked decisions (summary — see design doc for full detail)
@@ -937,9 +937,9 @@ design doc and must not be re-interpreted by downstream PRs.
 | PR | Scope | Status |
 | --- | --- | --- |
 | M-A12-PR0 | Temporal architecture + design lock (this) + dev-plan/tracker updates | 🔵 DESIGN / LOCK (complete as a design PR) |
-| M-A12-PR1 | Temporal history + intervals: persist domain event-time, validity intervals, immutable temporal history for reconstruction; event-time propagation where confident; runtime validation; indexes; deterministic reconstruction primitives; tests | ✅ IMPLEMENTED (`Observation.eventTime/sourceContextId/validityInterval` + `Relation`/`RelationHypothesis.validityInterval`; `temporal/interval-validation.ts` D5 rules; `TemporalStateChange` append-only store; MA06 event-time/source-context propagation + D6 history wiring; PR1 unit suite green; real-Postgres PR1 integration suite written — run deferred until TEST_DATABASE_URL reachable) |
-| M-A12-PR2 | Graph versions + historical graph projection: `GraphVersion`, version creation on canonical change, historical projection via node/edge `temporalRange`, current-vs-historical semantics | ✅ IMPLEMENTED (`GraphVersion` model + store with per-case transaction-scoped advisory-lock serialization of `versionNumber`; enable-on-canonical-change coupling in `relation-materialization.ts` — accept/reverse in the same tx, reject none; `relation/graph-version-service.ts` current + historical projection via revision-order replay, `REJECTED`/`REVERSED` preserve history, dimension A (revision) vs B (domain validity) kept distinct, `normalizeBuiltGraph` deterministic replay; PR2 pure unit suite green (16 tests); real-Postgres PR2 integration suite written — **BLOCKED** until TEST_DATABASE_URL reachable) |
-| M-A12-PR3 | APIs + checkpoints + verification: minimal API surface (`current`, `versions`, `versions/:vid`, `as-of`), checkpoint↔version coupling, full test matrix | ✅ IMPLEMENTED (case-scoped `GET /cases/:caseId/graph/{current,versions,versions/:vid,as-of}` routes with fail-closed auth; D7 `associateCheckpoint`/`resolveVersionByCheckpoint` via existing `GraphVersion.checkpointId` field — no schema migration; `listByCasePaginated` with total count; `as-of` deferred as 501 — PR0 lacks temporal-boundary semantics; PR3 pure unit suite green (16 tests); real-Postgres PR3 integration suite written — **BLOCKED** until TEST_DATABASE_URL reachable; `m-a12-temporal-architecture.md` B.1.16 updated) |
+| M-A12-PR1 | Temporal history + intervals: persist domain event-time, validity intervals, immutable temporal history for reconstruction; event-time propagation where confident; runtime validation; indexes; deterministic reconstruction primitives; tests | ✅ IMPLEMENTED (`Observation.eventTime/sourceContextId/validityInterval` + `Relation`/`RelationHypothesis.validityInterval`; `temporal/interval-validation.ts` D5 rules + `containsTime`; `TemporalStateChange` append-only store + logicalKey idempotency + WS-2 boundary validation in completeMA06; MA06 event-time/source-context propagation + D6 history wiring; PR1 unit suite green; real-Postgres PR1 integration suite green (7) — verified against a migrated `TEST_DATABASE_URL`, same path as CI Postgres service) |
+| M-A12-PR2 | Graph versions + historical graph projection: `GraphVersion`, version creation on canonical change, historical projection via node/edge `temporalRange`, current-vs-historical semantics | ✅ IMPLEMENTED (`GraphVersion` model + store with per-case transaction-scoped advisory-lock serialization of `versionNumber`; WS-7 auto-activation on create + ACTIVE→SUPERSEDED demotion in the same tx; WS-8 strict `decodeChange` (`GraphRevisionCorruptError` on corrupt known changes, unknown types still skippable); enable-on-canonical-change coupling in `relation-materialization.ts` — accept/reverse in the same tx, reject none; `relation/graph-version-service.ts` current + historical projection via revision-order replay + WS-10 `projectGraphValidAt`; PR2 pure unit suite green (21 tests); real-Postgres PR2 integration suite green (10) against migrated `TEST_DATABASE_URL` — verified WS-7 demote-before-create is genuinely ACID-correct on real Postgres) |
+| M-A12-PR3 | APIs + checkpoints + verification: minimal API surface (`current`, `versions`, `versions/:vid`, `valid-at`, `as-of`), checkpoint↔version coupling, full test matrix | ✅ IMPLEMENTED (case-scoped `GET /cases/:caseId/graph/{current,versions,versions/:vid,valid-at,as-of}` routes with fail-closed auth; D7 `associateCheckpoint`/`resolveVersionByCheckpoint` via existing `GraphVersion.checkpointId` field — no schema migration; `listByCasePaginated` with total count; `valid-at` = dimension-B domain-time containment (400 on unparseable `at`); `as-of` deferred as 501 — PR0 lacks revision-boundary semantics; WS-13 same-tx TSC writers (RELATION ACCEPTED/REVERSED, ENTITY CREATED); WS-3 `deriveValidityInterval` producer wired into completeMA10; PR3 pure unit suite green (18 tests); real-Postgres PR3 integration suite green (8) against migrated `TEST_DATABASE_URL`; `m-a12-temporal-architecture.md` B.1.15/B.1.16 updated) |
 
 #### Temporal model rules (locked; enforced from PR1)
 
@@ -953,3 +953,40 @@ design doc and must not be re-interpreted by downstream PRs.
 
 embeddings · semantic retrieval · LLM judge · targeted reblocking · graph-hole
 intelligence · cross-observation semantic intelligence (Phase 4/5, 6/8).
+
+#### Live-mode delivery (M-A12 post-PR3 hardening)
+
+Semantics reference: `docs/platform/temporal-semantics.md`. Runtime model + API: `docs/platform/m-a12-temporal-architecture.md` (B.1.3–B.1.16).
+
+Delivered (live mode only; demo mode/web flow-model untouched):
+- **WS-2** boundary validation — completeMA06 validates `eventTime`/`validityInterval` of freshly finalized
+  observations; malformed values throw `TemporalValidationError` instead of reaching a proposal.
+- **WS-3** interval producer — completeMA10 derives each proposal's closed `validityInterval` via
+  `deriveValidityInterval` from the REAL parseable `eventTime` instants of its evidence basis; no
+  contribution → no interval (never fabricated); `semantics: inferred`, `precision: exact` iff all-exact.
+- **WS-7** auto-activation — `createVersion` creates ACTIVE by default and demotes the prior ACTIVE to
+  SUPERSEDED (STALE when COMPLETE) in the same transaction; exactly one ACTIVE version per case.
+- **WS-8** strict typed replay — `decodeChange` throws `GraphRevisionCorruptError` on known-prefix
+  malformed revisions; unknown/non-graph change types stay skippable (replay contract preserved).
+- **WS-10** `GET /cases/:caseId/graph/valid-at?at=<ISO>` — dimension-B domain-time containment via
+  `containsTime` (instant-grade bounds only; closed intervals; never guessed). as-of remains 501.
+- **WS-13** TSC hardening — `logicalKey` idempotency + `eventRef` + `ENTITY` type; RELATION ACCEPTED/REVERSED/AMENDED
+  and ENTITY CREATED/ARCHIVED recorded in the SAME transaction as the canonical write; DB trigger makes the history
+  append-only (TRUNCATE unblocked as the sanctioned test-reset seam).
+- **DB-backed CI** — Postgres 16 service + `TEST_DATABASE_URL` + `prisma migrate deploy` (baseline +
+  append-only trigger + unique-ACTIVE index). Verified locally against a migrated `TEST_DATABASE_URL`
+  (Neon/Postgres): all 5 M-A12 DB suites green (43/43 — PR2 10, PR3 8, temporal-history 7,
+  hardening 11, HTTP-security 7), which surfaced + fixed two genuine concurrency bugs
+  (`createVersion` insert-before-demote vs. partial unique ACTIVE index; `recordChange` P2002
+  re-read inside an aborted tx → `createMany(skipDuplicates)` + winner re-read) — see
+  `m-a12-temporal-architecture.md` B.1.15 verification record.
+- **M-A12 hardening (second pass)** — amendment authority + assertion family (item A), entity mutation
+  versioning (item B), typed `GraphRevisionEvent`s (item C), DB-level unique ACTIVE per case (item D),
+  concurrency/idempotency guarantees (items E/F/G), HTTP security + case-isolation over the graph
+  endpoints (item O). See `docs/platform/temporal-semantics.md` §§6–8 and
+  `m-a12-temporal-architecture.md` B.1.7/B.1.13–B.1.16.
+- **Deferred (documented):** WS-14 contract-field rename (breaks demo fixtures), WS-1 extractor change
+  (D1/D2 enforced at the boundary instead), entity transitions beyond ACTIVE→ARCHIVED (MERGED/SPLIT/CANDIDATE
+  need authority semantics), HTTP `as-of` endpoint (501 — revision-time resolution is available via the
+  projection service, the endpoint stays undefined). Baseline + trigger + unique-ACTIVE migrations created;
+  `prisma migrate deploy` verified path.

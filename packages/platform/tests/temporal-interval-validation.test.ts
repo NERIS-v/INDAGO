@@ -3,6 +3,7 @@ import {
   validateEventTime,
   validateTemporalInterval,
   assertValidTemporalInterval,
+  containsTime,
   TemporalValidationError,
 } from "../src/temporal/interval-validation.js";
 
@@ -154,5 +155,56 @@ describe("validateTemporalInterval (D5 closed intervals)", () => {
         semantics: "observed",
       }),
     ).toThrow(TemporalValidationError);
+  });
+});
+
+describe("containsTime (M-A12 valid-at dynamics)", () => {
+  const interval = {
+    validFrom: { value: "2026-08-10T00:00:00.000Z", precision: "exact" as const },
+    precision: "exact" as const,
+    semantics: "inferred" as const,
+  };
+  const ended = {
+    validFrom: { value: "2026-08-01T00:00:00.000Z", precision: "exact" as const },
+    validTo: { value: "2026-08-10T12:00:00.000Z", precision: "exact" as const },
+    precision: "exact" as const,
+    semantics: "inferred" as const,
+  };
+
+  it("open-ended interval: contains any instant at/after validFrom", () => {
+    expect(containsTime(interval, "2026-08-10T00:00:00.000Z")).toBe(true);
+    expect(containsTime(interval, "2026-09-01T00:00:00.000Z")).toBe(true);
+  });
+
+  it("open-ended interval: excludes instants before validFrom", () => {
+    expect(containsTime(interval, "2026-08-09T23:59:59.999Z")).toBe(false);
+  });
+
+  it("ended interval: closed semantics — boundaries are inclusive", () => {
+    expect(containsTime(ended, "2026-08-01T00:00:00.000Z")).toBe(true);
+    expect(containsTime(ended, "2026-08-10T12:00:00.000Z")).toBe(true);
+    expect(containsTime(ended, "2026-08-10T12:00:00.001Z")).toBe(false);
+  });
+
+  it("never fabricates: vague/absent intervals do not contain anything", () => {
+    expect(containsTime(undefined, "2026-08-10T00:00:00.000Z")).toBe(false);
+    expect(containsTime(null, "2026-08-10T00:00:00.000Z")).toBe(false);
+  });
+
+  it("never fabricates: coarse bounds (month/year/range) do not contain instants", () => {
+    expect(
+      containsTime(
+        {
+          validFrom: { value: "2026-08", precision: "month" },
+          precision: "month",
+          semantics: "inferred",
+        },
+        "2026-08-15T00:00:00.000Z",
+      ),
+    ).toBe(false);
+  });
+
+  it("unparseable at is never contained, even by a valid concrete interval", () => {
+    expect(containsTime(interval, "not-a-date")).toBe(false);
   });
 });

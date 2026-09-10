@@ -22,6 +22,27 @@ import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import { db } from "../db/prisma.js";
 import { computeContentHash, bytesToUuid4 } from "@indago/ingestion";
+import {
+  TemporalAssertionSchema,
+  type TemporalAssertion,
+  type TemporalInterval,
+} from "@indago/contracts";
+
+/**
+ * Parse the bounded `temporalAssertions` JSON column into a typed,
+ * chronologically ordered assertion array. Empty / malformed payloads are
+ * treated as zero assertions (pre-amendment rows).
+ */
+export function parseTemporalAssertions(raw: unknown): readonly TemporalAssertion[] {
+  if (!Array.isArray(raw)) return [];
+  const parsed = raw.map((entry) => TemporalAssertionSchema.safeParse(entry));
+  // Drop any malformed assertion entries rather than throwing — an
+  // assertion recorded by an older code revision may carry fields that
+  // later schemas tightened.  Only valid assertions contribute.
+  return parsed
+    .filter((r): r is { success: true; data: TemporalAssertion } => r.success)
+    .map((r) => r.data);
+}
 
 /**
  * Versioned canonical identity namespace for Canonical Relations. Deliberately
@@ -109,6 +130,8 @@ export interface DurableRelation {
   readonly provenance: unknown;
   readonly hypothesisId: string;
   readonly validityInterval: unknown | null;
+  /** Structured temporal assertion family (append-only; amendments never overwrite). */
+  readonly temporalAssertions: readonly TemporalAssertion[];
   readonly createdAt: Date;
   readonly reversedAt: Date | null;
 }
@@ -133,6 +156,7 @@ function rowToRelation(row: RelationRow): DurableRelation {
     provenance: row.provenance,
     hypothesisId: row.hypothesisId,
     validityInterval: row.validityInterval,
+    temporalAssertions: parseTemporalAssertions(row.temporalAssertions),
     createdAt: row.createdAt,
     reversedAt: row.reversedAt,
   };
@@ -182,7 +206,10 @@ export class RelationStore {
   async transaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    return this.prisma.$transaction(fn, { timeout: 15_000 });
+    return this.prisma.$transaction(fn, {
+      maxWait: 30_000,
+      timeout: 60_000,
+    });
   }
 
   async materializeRelation(
@@ -255,7 +282,10 @@ export class RelationStore {
     // When the caller supplied a transaction client we operate directly inside
     // it (no nested $transaction). Otherwise we open our own interactive tx.
     if (tx) return run(tx);
-    return this.prisma.$transaction(run);
+    return this.prisma.$transaction(run, {
+      maxWait: 30_000,
+      timeout: 60_000,
+    });
   }
 
   /**
@@ -329,6 +359,96 @@ export class RelationStore {
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return rows.map((row) => rowToRelation(row));
+  }
+
+  /**
+   * Seed the initial ORIGINAL assertion on a freshly materialized canonical
+   * relation (M-A12 item A). Called in the same transaction as createVersion
+   * so `revisionAtVersionNumber` is the version that first materialized this
+   * relation. Idempotent — if assertions are already populated (reused), no-op.
+   */
+  async seedOriginalAssertion(
+    id: string,
+    filter: { caseId: string },
+    validityInterval: TemporalInterval,
+    context: { readonly revisionAtVersionNumber: number },
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx ?? this.prisma;
+    const row = await client.relation.findFirst({
+      where: { id, caseId: filter.caseId },
+    });
+    if (!row) return;
+    const existing = parseTemporalAssertions(row.temporalAssertions);
+    if (existing.length > 0) return; // already seeded (reused path)
+
+    const assertion: TemporalAssertion = {
+      id: `assertion:${id}:1`,
+      relationId: id,
+      kind: "ORIGINAL",
+      validityInterval,
+      revisionAtVersionNumber: context.revisionAtVersionNumber,
+    };
+    await client.relation.update({
+      where: { id },
+      data: { temporalAssertions: toJson([assertion]) },
+    });
+  }
+
+  /**
+   * Amended-validity authority boundary for a canonical relation (M-A12 item A).
+   *
+   * APPENDS a new AMENDMENT assertion to `temporalAssertions` (never overwrites
+   * or deletes the original). Overwrites the persisted `validityInterval` column
+   * with the correction's domain interval (current-valid interval, so ActiveMQ
+   * consumers and graph projection don't need to compute it). The ORIGINAL
+   * assertion is preserved in `temporalAssertions` for historical reconstruction.
+   *
+   * `revisionAtVersionNumber` MUST be provided by the caller (it is the graph
+   * revision where this correction became known — always part of a same-tx
+   * createVersion call).
+   *
+   * Case-scoped; returns null when not found / not ACTIVE.
+   */
+  async amendValidity(
+    id: string,
+    filter: { caseId: string },
+    newInterval: TemporalInterval,
+    context: {
+      readonly revisionAtVersionNumber: number;
+      readonly supersedesAssertionId: string;
+      readonly provenance?: Record<string, unknown>;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<DurableRelation | null> {
+    const client = tx ?? this.prisma;
+    const row = await client.relation.findFirst({
+      where: { id, caseId: filter.caseId },
+    });
+    if (!row || row.status !== "ACTIVE") return null;
+
+    const existing = parseTemporalAssertions(row.temporalAssertions);
+    const amendmentAssertion: TemporalAssertion = {
+      id: `assertion:${id}:${existing.length + 1}`,
+      relationId: id,
+      kind: "AMENDMENT",
+      validityInterval: newInterval,
+      provenance: context.provenance,
+      supersedesAssertionId: context.supersedesAssertionId,
+      revisionAtVersionNumber: context.revisionAtVersionNumber,
+    };
+    const updatedAssertions = [...existing, amendmentAssertion];
+
+    const now = new Date();
+    const updated = await client.relation.update({
+      where: { id },
+      data: {
+        validityInterval: toJson(newInterval),
+        temporalAssertions: toJson(updatedAssertions),
+        updatedAt: now,
+      },
+    });
+    return rowToRelation(updated);
   }
 }
 

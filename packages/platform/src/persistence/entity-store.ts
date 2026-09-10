@@ -113,6 +113,19 @@ export class EntityStore {
   constructor(private readonly prisma: PrismaClient = db) {}
 
   /**
+   * Interactive transaction runner bound to THIS store's Prisma client (so an
+   * injected test-DB store opens its transaction against the test database,
+   * not the global `db`). The authority layer uses this to co-locate the
+   * hypothesis ACCEPT decision + canonical entity materialization + the
+   * ENTITY_CREATED temporal record in one atomic boundary.
+   */
+  async transaction<T>(
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(fn, { maxWait: 30_000, timeout: 60_000 });
+  }
+
+  /**
    * Idempotent, lifecycle-preserving canonical Entity write.
    *
    * identityKey @unique ensures the same case+name+type converges to one
@@ -124,32 +137,37 @@ export class EntityStore {
    * The observationIds and hypothesisIds arrays are MERGED with any existing
    * values — a retry / concurrent pass never loses previously linked data.
    */
-  async materializeEntity(input: {
-    readonly identityKey: string;
-    readonly entity: {
-      readonly id: string;
-      readonly caseId: string;
-      readonly investigationId?: string;
-      readonly canonicalName: string;
-      readonly entityType?: string;
-      readonly status: string;
-      readonly observationIds: readonly string[];
-      readonly hypothesisIds: readonly string[];
-      readonly provenance: unknown;
-      readonly metadata?: unknown;
-    };
-  }): Promise<MaterializeEntityResult> {
+  async materializeEntity(
+    input: {
+      readonly identityKey: string;
+      readonly entity: {
+        readonly id: string;
+        readonly caseId: string;
+        readonly investigationId?: string;
+        readonly canonicalName: string;
+        readonly entityType?: string;
+        readonly status: string;
+        readonly observationIds: readonly string[];
+        readonly hypothesisIds: readonly string[];
+        readonly provenance: unknown;
+        readonly metadata?: unknown;
+      };
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<MaterializeEntityResult> {
     const { identityKey, entity } = input;
-    const now = new Date();
 
-    return await this.prisma.$transaction(async (tx) => {
-      let existing = await tx.entity.findUnique({
+    const run = async (
+      client: Prisma.TransactionClient,
+    ): Promise<MaterializeEntityResult> => {
+      const now = new Date();
+      let existing = await client.entity.findUnique({
         where: { identityKey },
       });
 
       if (!existing) {
         try {
-          const created = await tx.entity.create({
+          const created = await client.entity.create({
             data: {
               id: entity.id,
               identityKey,
@@ -178,7 +196,7 @@ export class EntityStore {
               ? cause.code
               : undefined;
           if (code !== "P2002") throw cause;
-          existing = await tx.entity.findUnique({
+          existing = await client.entity.findUnique({
             where: { identityKey },
           });
           if (!existing) throw cause;
@@ -198,7 +216,7 @@ export class EntityStore {
         ...entity.hypothesisIds,
       ]));
 
-      const updated = await tx.entity.update({
+      const updated = await client.entity.update({
         where: { id: existing.id },
         data: {
           ...(preservedExisting
@@ -228,7 +246,12 @@ export class EntityStore {
         reusedExisting: true,
         entity: rowToEntity(updated),
       };
-    });
+    };
+
+    // When the caller supplied a transaction client we operate directly inside
+    // it (no nested $transaction). Otherwise we open our own interactive tx.
+    if (tx) return run(tx);
+    return this.prisma.$transaction(run, { maxWait: 30_000, timeout: 60_000 });
   }
 
   /**
@@ -295,13 +318,15 @@ export class EntityStore {
     id: string,
     filter: { caseId: string },
     newStatus: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<CanonicalEntity | null> {
-    const row = await this.prisma.entity.findFirst({
+    const client = tx ?? this.prisma;
+    const row = await client.entity.findFirst({
       where: { id, caseId: filter.caseId },
     });
     if (!row) return null;
 
-    const updated = await this.prisma.entity.update({
+    const updated = await client.entity.update({
       where: { id },
       data: { status: newStatus, updatedAt: new Date() },
     });

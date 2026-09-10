@@ -68,7 +68,7 @@ this `docs/` tree):
 | Entity / candidate / hypothesis contracts | `IMPLEMENTED` | `packages/contracts/src/domain/entity.ts`, `intelligence/entity-resolution.ts`; M-A07 EntityMentionCandidate + M-A08 CandidatePair + M-A09 EntityHypothesis persisted stores |
 | Entity resolution / canonical entities | `IMPLEMENTED` | M-A09 canonical Entity authority (identity key, reversible EntityHypothesis, worker, audit); backend-verified |
 | Relations / hypotheses / graph | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring, reversal); M-A11 Graphology projection; M-A13 graph query APIs — backend-verified |
-| Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3, unit-verified) | PR0 design locked; **PR1 implemented** (temporal fields, D5 validation, `TemporalStateChange` history store, event-time/source-context propagation); **PR2 implemented** (`GraphVersion` model+store, advisory-lock versioning, canonical-change coupling, internal current/historical projection service, deterministic replay); **PR3 implemented** (case-scoped temporal APIs: `current`, `versions`, `versions/:vid`; D7 checkpoint↔version coupling; `as-of` deferred 501) — real-Postgres integration verification **BLOCKED** (TEST_DATABASE_URL temporarily unavailable) — `docs/platform/m-a12-temporal-architecture.md` |
+| Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3) | PR0 design locked; **PR1 implemented** (temporal fields, D5 validation, `TemporalStateChange` history store, event-time/source-context propagation); **PR2 implemented** (`GraphVersion` model+store, advisory-lock versioning, canonical-change coupling, internal current/historical projection service, deterministic replay); **PR3 implemented** (case-scoped temporal APIs: `current`, `versions`, `versions/:vid`; D7 checkpoint↔version coupling; `as-of` deferred 501); **hardening pass done** (amendments, ENTITY versioning, typed revision events, concurrency) — **real-Postgres integration verified green (43/43)** incl. HTTP security (7) — `docs/platform/m-a12-temporal-architecture.md` |
 | Corroboration / semantic grouping | `NOT_FOUND` | not contracted; see `observation-corroboration.md`; cross-observation semantic intelligence deferred post-M-A12 |
 | Leads / gaps / robustness | `NOT_FOUND` in backend | phases exist on the tracker; only narrative/UI scaffolds exist |
 
@@ -242,7 +242,7 @@ Priorities are derived from the repository's own phase ordering and documented
 dependencies, not from feature preference.
 
 ### P0 — required for core next milestones / correctness
-- M-A12 Temporal projection (PR1 intervals/history **implemented**; PR2 graph versions **implemented** unit-verified; PR3 APIs + checkpoints **implemented** unit-verified; real-Postgres integration **BLOCKED**) — **next foundation milestone**; PR0 design locked. M-A12 implementation complete; full verification BLOCKED on TEST_DATABASE_URL.
+- M-A12 Temporal projection (PR1 intervals/history **implemented**; PR2 graph versions **implemented**; PR3 APIs + checkpoints **implemented**; real-Postgres integration **verified green 43/43**) — **next foundation milestone**; PR0 design locked. M-A12 implementation + DB verification COMPLETE; remaining gate: G1–G8 entry-gate audits.
 - Realtime replay endpoint decision (activity-feed replay vs PR open) — pending decision, potentially P0 for the frontend realtime story.
 
 ### P1 — important production/product capability
@@ -292,7 +292,7 @@ Only nodes supported by repository roadmap or current architecture are included.
 - Production identity (JWT/OIDC) — single-function swap ready, not implemented.
 - Corroboration / claim grouping — future, must not replace evidence identity.
 - Cross-observation semantic intelligence, targeted reblocking, graph-hole intelligence — post-M-A12 (Phase 4/5).
-- Temporal runtime (M-A12-PR1 + PR2 + PR3 implemented, unit-verified) — PR1 history/intervals done; PR2 graph versions + internal historical projection done; PR3 case-scoped temporal APIs + D7 checkpoint coupling done (real-Postgres integration BLOCKED on TEST_DATABASE_URL); `as-of` deferred (501).
+- Temporal runtime (M-A12-PR1 + PR2 + PR3 implemented, real-Postgres integration **verified green 43/43**) — PR1 history/intervals done; PR2 graph versions + internal historical projection done; PR3 case-scoped temporal APIs + D7 checkpoint coupling done; `as-of` deferred (501).
 - Frontend graph/timeline/leads/gaps/review renderers — deferred tracker phases.
 
 ## Unknown / Needs Decision

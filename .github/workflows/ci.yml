@@ -11,6 +11,28 @@ jobs:
     name: Build, Typecheck & Test
     runs-on: ubuntu-latest
 
+    # Real Postgres for the DB-backed suites (the M-A12 comparisons, D4/D5/D7
+    # invariants, advisory-lock version allocation, and the TSC append-only
+    # trigger only hold against a live server).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: indago
+          POSTGRES_PASSWORD: indago
+          POSTGRES_DB: indago_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U indago -d indago_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://indago:indago@localhost:5432/indago_test
+      TEST_DATABASE_URL: postgres://indago:indago@localhost:5432/indago_test
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -33,6 +55,14 @@ jobs:
         # Ensures the database client is generated before typechecking
         run: cd packages/platform && pnpm exec prisma generate
 
+      - name: Apply Migrations (baseline + append-only trigger)
+        # Deploys the baseline schema AND the TSC append-only trigger migration
+        # to the throwaway Postgres service first; the DB integration suites
+        # then run against a fully migrated schema.
+        run: cd packages/platform && pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+
       - name: Build
         # Compiles the code across all workspaces
         run: pnpm --recursive run build
@@ -42,5 +72,9 @@ jobs:
         run: pnpm --recursive run typecheck
 
       - name: Run Tests (Vitest)
-        # Runs the test suites only if the build and types are perfectly valid
+        # Runs the test suites only if the build and types are perfectly valid.
+        # TEST_DATABASE_URL is set so the gated Postgres integration suites run.
         run: pnpm --recursive test
+        env:
+          TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}

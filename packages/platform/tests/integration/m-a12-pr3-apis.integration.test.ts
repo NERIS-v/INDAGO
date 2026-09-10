@@ -13,6 +13,7 @@ import {
 import { EntityStore } from "../../src/persistence/entity-store.js";
 import { RelationHypothesisStore } from "../../src/persistence/relation-hypothesis-store.js";
 import { RelationStore } from "../../src/persistence/relation-store.js";
+import { TemporalStateChangeStore } from "../../src/persistence/temporal-state-change-store.js";
 import {
   materializeCanonicalRelationFromAcceptedHypothesis,
   reverseRelationHypothesis,
@@ -38,7 +39,8 @@ import {
 //   4. Cross-case isolation for checkpoint mapping.
 //   5. Deterministic replay after checkpoint association.
 //   6. Jan10→Mar10 worked example with version listing round-trip.
-//   7. as-of endpoint returns 501.
+//   7. WS-10 valid-at round trip (dimension B — domain-time containment).
+//   8. as-of endpoint returns 501.
 // ============================================================================
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -51,6 +53,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
     let hypothesisStore: RelationHypothesisStore;
     let relationStore: RelationStore;
     let graphVersionStore: GraphVersionStore;
+    let temporalStateChangeStore: TemporalStateChangeStore;
     let projectionService: GraphProjectionService;
 
     const investigationId = randomUUID();
@@ -134,6 +137,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       relationHypothesisStore: hypothesisStore,
       relationStore,
       graphVersionStore,
+      temporalStateChange: temporalStateChangeStore,
     });
 
     beforeAll(async () => {
@@ -142,6 +146,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       hypothesisStore = new RelationHypothesisStore(prisma);
       relationStore = new RelationStore(prisma);
       graphVersionStore = new GraphVersionStore(prisma);
+      temporalStateChangeStore = new TemporalStateChangeStore(prisma);
       projectionService = new GraphProjectionService({
         graphVersions: graphVersionStore,
         entities: entityStore,
@@ -152,6 +157,9 @@ describe.skipIf(!TEST_DATABASE_URL)(
       await prisma.relation.deleteMany({});
       await prisma.relationHypothesis.deleteMany({});
       await prisma.entity.deleteMany({});
+      // TemporalStateChange is append-only by DB trigger — TRUNCATE (which row
+      // triggers do not intercept) is the sanctioned test-reset seam.
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "TemporalStateChange"');
     });
 
     afterAll(async () => {
@@ -446,6 +454,45 @@ describe.skipIf(!TEST_DATABASE_URL)(
         caseId,
       );
       expect(snap2.edges).toHaveLength(0);
+    });
+
+    // -----------------------------------------------------------------------
+    // 7. WS-10 valid-at round trip.
+    // -----------------------------------------------------------------------
+    it("projectGraphValidAt returns the domain-valid graph at a point in time", async () => {
+      const caseId = randomUUID();
+      const eA = await materializeEntity(caseId, "va-a@example.org", "PERSON");
+      const eB = await materializeEntity(caseId, "va-b@example.org", "PERSON");
+
+      const hyp = await upsertHypothesis({
+        caseId,
+        sourceEntityId: eA.id,
+        targetEntityId: eB.id,
+        relationType: "communication",
+        validityInterval: JAN10_INTERVAL,
+      });
+      await materializeCanonicalRelationFromAcceptedHypothesis(
+        { caseId, hypothesisId: hyp, actor: "test@indago" },
+        materializationStores(),
+      );
+
+      // Just before the interval start → no edge (excluded, not guessed).
+      const before = await projectionService.projectGraphValidAt(
+        { caseId, investigationId },
+        "2026-01-10T11:59:59.999Z",
+      );
+      expect(normalizeBuiltGraph(before.graph, caseId).edges).toHaveLength(0);
+
+      // Exactly at the (closed) start → the edge is present with its persisted
+      // temporalRange.
+      const at = await projectionService.projectGraphValidAt(
+        { caseId, investigationId },
+        JAN10,
+      );
+      const snap = normalizeBuiltGraph(at.graph, caseId);
+      expect(snap.edges).toHaveLength(1);
+      expect(snap.edges[0].relationType).toBe("communication");
+      expect(snap.edges[0].temporalRange).toEqual(JAN10_INTERVAL);
     });
   },
 );

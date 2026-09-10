@@ -13,6 +13,7 @@ import {
 import { EntityStore } from "../../src/persistence/entity-store.js";
 import { RelationHypothesisStore } from "../../src/persistence/relation-hypothesis-store.js";
 import { RelationStore } from "../../src/persistence/relation-store.js";
+import { TemporalStateChangeStore } from "../../src/persistence/temporal-state-change-store.js";
 import {
   materializeCanonicalRelationFromAcceptedHypothesis,
   rejectRelationHypothesis,
@@ -43,8 +44,9 @@ import {
 //      canonical change (new ACCEPTED relation, ACTIVE→REVERSED flip) creates
 //      a GraphVersion in the SAME transaction, with a case-scoped, monotonically
 //      increasing, never-reused versionNumber and linear auto-parent lineage.
-//   2. Lifecycle transitions (DRAFT→ACTIVE→SUPERSEDED) are guarded; illegal
-//      transitions throw GraphVersionLifecycleError.
+//   2. Lifecycle transitions (WS-7 AUTO-ACTIVATION on create; then only
+//      ACTIVE→SUPERSEDED→ARCHIVED) are guarded; illegal transitions throw
+//      GraphVersionLifecycleError; a create with activate:false stays DRAFT.
 //   3. Parent validation: a missing parent → PARENT_NOT_FOUND; a cross-case
 //      parent → PARENT_CROSS_CASE.
 //   4. Canonical mutation + version atomicity: REJECT creates NO version; a
@@ -62,6 +64,9 @@ import {
 //      COMPLETE.
 //   8. Current graph excludes REJECTED/REVERSED relations.
 //   9. Case isolation: version numbering restarts at 1 per case; no bleed.
+//   10. WS-13: RELATION ACCEPTED/REVERSED transitions land in the append-only
+//       TemporalStateChange history in the same transaction as the canonical.
+//   11. WS-10 valid-at: domain-time containment (dimension B) round trip.
 // ============================================================================
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -74,6 +79,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
     let hypothesisStore: RelationHypothesisStore;
     let relationStore: RelationStore;
     let graphVersionStore: GraphVersionStore;
+    let temporalStateChangeStore: TemporalStateChangeStore;
     let projectionService: GraphProjectionService;
 
     const investigationId = randomUUID();
@@ -152,6 +158,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       relationHypothesisStore: hypothesisStore,
       relationStore,
       graphVersionStore,
+      temporalStateChange: temporalStateChangeStore,
     });
 
     beforeAll(async () => {
@@ -160,6 +167,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       hypothesisStore = new RelationHypothesisStore(prisma);
       relationStore = new RelationStore(prisma);
       graphVersionStore = new GraphVersionStore(prisma);
+      temporalStateChangeStore = new TemporalStateChangeStore(prisma);
       projectionService = new GraphProjectionService({
         graphVersions: graphVersionStore,
         entities: entityStore,
@@ -170,6 +178,9 @@ describe.skipIf(!TEST_DATABASE_URL)(
       await prisma.relation.deleteMany({});
       await prisma.relationHypothesis.deleteMany({});
       await prisma.entity.deleteMany({});
+      // TemporalStateChange is append-only by DB trigger — row triggers do not
+      // fire on TRUNCATE, which is the sanctioned test-reset seam.
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "TemporalStateChange"');
     });
 
     afterAll(async () => {
@@ -215,7 +226,10 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
       const versions = await graphVersionStore.listByCase(caseId);
       expect(versions.map((v) => v.versionNumber)).toEqual([1, 2]);
-      expect(versions.map((v) => v.status).sort()).toEqual(["DRAFT", "DRAFT"]);
+      // WS-7 auto-activation: the freshly created version is immediately ACTIVE
+      // and demotes the prior ACTIVE to SUPERSEDED — exactly one ACTIVE version
+      // per case, by construction.
+      expect(versions.map((v) => v.status).sort()).toEqual(["ACTIVE", "SUPERSEDED"]);
       expect(versions.map((v) => v.projectionStatus).sort()).toEqual(["PENDING", "PENDING"]);
 
       const [v1, v2] = versions;
@@ -229,7 +243,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
     // -----------------------------------------------------------------------
     // 2. Lifecycle transitions.
     // -----------------------------------------------------------------------
-    it("enforces DRAFT→ACTIVE→SUPERSEDED lifecycle and refuses illegal transitions", async () => {
+    it("auto-activates on create and enforces ACTIVE→SUPERSEDED→ARCHIVED lifecycle", async () => {
       const caseId = randomUUID();
       const entityA = await materializeEntity(caseId, "lc-a@example.org");
       const entityB = await materializeEntity(caseId, "lc-b@example.org");
@@ -246,12 +260,10 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
       const versions = await graphVersionStore.listByCase(caseId);
       const v1 = versions[0]!;
-      expect(v1.status).toBe("DRAFT");
+      // WS-7: no manual promotion needed — the version arrives ACTIVE.
+      expect(v1.status).toBe("ACTIVE");
 
-      await graphVersionStore.transitionStatus(v1.id, { caseId }, "ACTIVE");
-      const active = await graphVersionStore.findById(v1.id, { caseId });
-      expect(active!.status).toBe("ACTIVE");
-
+      // ACTIVE→ACTIVE stays illegal (the manual promotion path is now vestigial).
       await expect(
         graphVersionStore.transitionStatus(v1.id, { caseId }, "ACTIVE"),
       ).rejects.toBeInstanceOf(GraphVersionLifecycleError);
@@ -263,6 +275,24 @@ describe.skipIf(!TEST_DATABASE_URL)(
       await expect(
         graphVersionStore.transitionStatus(v1.id, { caseId }, "DRAFT"),
       ).rejects.toBeInstanceOf(GraphVersionLifecycleError);
+
+      await graphVersionStore.transitionStatus(v1.id, { caseId }, "ARCHIVED");
+      const archived = await graphVersionStore.findById(v1.id, { caseId });
+      expect(archived!.status).toBe("ARCHIVED");
+
+      // A version created with activate:false stays DRAFT until manually promoted.
+      const manual = await graphVersionStore.createVersion({
+        caseId,
+        investigationId,
+        activate: false,
+      });
+      expect(manual.status).toBe("DRAFT");
+      const promoted = await graphVersionStore.transitionStatus(
+        manual.id,
+        { caseId },
+        "ACTIVE",
+      );
+      expect(promoted!.status).toBe("ACTIVE");
     });
 
     // -----------------------------------------------------------------------
@@ -352,6 +382,16 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
       const reversedCanonical = await relationStore.findById(canonicalRelationId, { caseId });
       expect(reversedCanonical!.status).toBe("REVERSED");
+
+      // M-A12 WS-13: acceptance and reversal are each recorded in the same
+      // transaction as the canonical write — a true append-only history of the
+      // relation's temporal state.
+      const changes = await temporalStateChangeStore.listForEntity(
+        caseId,
+        "RELATION",
+        canonicalRelationId,
+      );
+      expect(changes.map((c) => c.stateType)).toEqual(["ACCEPTED", "REVERSED"]);
 
       const versions = await graphVersionStore.listByCase(caseId);
       const v2 = versions[1]!;
@@ -507,12 +547,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(v!.nodeCount).toBeGreaterThan(0);
       expect(v!.edgeCount).toBeGreaterThan(0);
 
-      // projectCurrentGraph marks the latest ACTIVE version COMPLETE.
-      const gv = await graphVersionStore.findById(
-        (await graphVersionStore.listByCase(caseId))[0]!.id,
-        { caseId },
-      );
-      await graphVersionStore.transitionStatus(gv!.id, { caseId }, "ACTIVE");
+      // projectCurrentGraph marks the latest ACTIVE (auto-activated) version COMPLETE.
       await projectionService.projectCurrentGraph({ caseId, investigationId });
       const latest = await graphVersionStore.latestActiveByCase(caseId);
       expect(latest).not.toBeNull();
@@ -626,6 +661,60 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const listB2 = await graphVersionStore.listByCase(caseB);
       expect(listA2).toHaveLength(1);
       expect(listB2.map((v) => v.versionNumber)).toEqual([1, 2]);
+    });
+
+    // -----------------------------------------------------------------------
+    // 11. WS-10 valid-at round trip (dimension B — domain-valid graph).
+    // -----------------------------------------------------------------------
+    it("projectGraphValidAt keeps only relations whose persisted interval contains the instant", async () => {
+      const caseId = randomUUID();
+      const entityA = await materializeEntity(caseId, "va-a@example.org", "PERSON");
+      const entityB = await materializeEntity(caseId, "va-b@example.org", "PERSON");
+
+      // Accepted relation with an open-ended Jan 10 interval.
+      const hypWith = await upsertHypothesis({
+        caseId,
+        sourceEntityId: entityA.id,
+        targetEntityId: entityB.id,
+        relationType: "communication",
+        validityInterval: JAN10_INTERVAL,
+      });
+      await materializeCanonicalRelationFromAcceptedHypothesis(
+        { caseId, hypothesisId: hypWith, actor: "test@indago" },
+        materializationStores(),
+      );
+
+      // Accepted relation with NO interval — present as ACTIVE but must never
+      // answer a valid-at query (never guessed).
+      const hypWithout = await upsertHypothesis({
+        caseId,
+        sourceEntityId: entityA.id,
+        targetEntityId: entityB.id,
+        relationType: "association",
+      });
+      await materializeCanonicalRelationFromAcceptedHypothesis(
+        { caseId, hypothesisId: hypWithout, actor: "test@indago" },
+        materializationStores(),
+      );
+
+      // Before the interval start → only the unintervaled relation's domain is
+      // not answerable, so the graph is empty.
+      const before = await projectionService.projectGraphValidAt(
+        { caseId, investigationId },
+        "2026-01-10T11:59:59.999Z",
+      );
+      expect(normalizeBuiltGraph(before.graph, caseId).edges).toHaveLength(0);
+
+      // Exactly at (closed) / after the start → the intervaled edge appears
+      // with its persisted temporalRange; the unintervaled one stays out.
+      const inside = await projectionService.projectGraphValidAt(
+        { caseId, investigationId },
+        JAN10,
+      );
+      const snap = normalizeBuiltGraph(inside.graph, caseId);
+      expect(snap.edges).toHaveLength(1);
+      expect(snap.edges[0].relationType).toBe("communication");
+      expect(snap.edges[0].temporalRange).toEqual(JAN10_INTERVAL);
     });
   },
 );

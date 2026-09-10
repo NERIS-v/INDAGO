@@ -55,7 +55,9 @@ describe.skipIf(!TEST_DATABASE_URL)(
       prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL! } } });
       obsStore = new ObservationStore(prisma);
       histStore = new TemporalStateChangeStore(prisma);
-      await prisma.temporalStateChange.deleteMany({});
+      // TemporalStateChange is append-only by DB trigger (row triggers do not
+      // fire on TRUNCATE) — TRUNCATE is the sanctioned test-reset seam.
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "TemporalStateChange"');
       await prisma.observation.deleteMany({});
       await prisma.evidence.deleteMany({});
       await prisma.source.deleteMany({});

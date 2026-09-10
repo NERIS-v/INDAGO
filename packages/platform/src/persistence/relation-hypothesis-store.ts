@@ -206,7 +206,8 @@ export class RelationHypothesisStore {
     const { identityKey, id } = input;
     const now = new Date();
 
-    return await this.prisma.$transaction(async (tx) => {
+    return await this.prisma.$transaction(
+      async (tx) => {
       let existing = await tx.relationHypothesis.findUnique({
         where: { identityKey },
       });
@@ -301,7 +302,9 @@ export class RelationHypothesisStore {
         reusedExisting: true,
         hypothesis: rowToRelationHypothesis(updated),
       };
-    });
+      },
+      { maxWait: 30_000, timeout: 60_000 },
+    );
   }
 
   /**
@@ -405,7 +408,7 @@ export class RelationHypothesisStore {
   async transaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
-    return this.prisma.$transaction(fn);
+    return this.prisma.$transaction(fn, { maxWait: 30_000, timeout: 60_000 });
   }
 
   async updateStatus(

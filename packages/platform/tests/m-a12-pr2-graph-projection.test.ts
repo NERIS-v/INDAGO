@@ -5,6 +5,7 @@ import {
   makeProjectionInput,
   normalizeBuiltGraph,
   GraphProjectionService,
+  GraphRevisionCorruptError,
   GRAPH_CHANGE_ACCEPTED,
   GRAPH_CHANGE_REVERSED,
 } from "../src/relations/graph-version-service.js";
@@ -102,6 +103,60 @@ describe("replayLifecycle (dimension A — revision-order selection)", () => {
     const state = replayLifecycle(chain, 2);
     expect(state.has(r1)).toBe(true);
     expect(state.size).toBe(1);
+  });
+});
+
+describe("strict replay decoding (M-A12 WS-8)", () => {
+  it("throws GraphRevisionCorruptError when a KNOWN graph change carries no relationId", () => {
+    const corrupt = {
+      versionNumber: 3,
+      reason: "RELATION_ACCEPTED:",
+      metadata: { change: "RELATION_ACCEPTED" },
+    };
+    expect(() => replayLifecycle([corrupt], 3)).toThrow(GraphRevisionCorruptError);
+  });
+
+  it("throws on a structured RELATION_REVERSED with an empty relationId", () => {
+    const corrupt = {
+      versionNumber: 2,
+      reason: null,
+      metadata: { change: GRAPH_CHANGE_REVERSED, relationId: "" },
+    };
+    expect(() => replayLifecycle([corrupt], 2)).toThrow(GraphRevisionCorruptError);
+  });
+
+  it("a corrupt middle version poisons the whole replay (never silently skipped)", () => {
+    const r1 = randomUUID();
+    const chain = [
+      version(1, GRAPH_CHANGE_ACCEPTED, r1),
+      { versionNumber: 2, reason: "RELATION_ACCEPTED:", metadata: {} },
+    ];
+    expect(() => replayLifecycle(chain, 2)).toThrow(GraphRevisionCorruptError);
+  });
+
+  it("still silently skips unknown/non-graph change types (replay contract preserved)", () => {
+    const r1 = randomUUID();
+    const chain = [
+      version(1, GRAPH_CHANGE_ACCEPTED, r1),
+      {
+        versionNumber: 2,
+        reason: "ENTITY_STATE_CHANGED:ent1",
+        metadata: { change: "ENTITY_STATE_CHANGED", relationId: "ent1" },
+      },
+      { versionNumber: 3, reason: null, metadata: null },
+    ];
+    const state = replayLifecycle(chain, 3);
+    expect(state.has(r1)).toBe(true);
+    expect(state.size).toBe(1);
+  });
+
+  it("completely unknown reason prefixes are not fabrications and remain skippable", () => {
+    const r1 = randomUUID();
+    const chain = [
+      version(1, GRAPH_CHANGE_ACCEPTED, r1),
+      { versionNumber: 2, reason: "UNKNOWN_CHANGE:something", metadata: {} },
+    ];
+    expect(replayLifecycle(chain, 2).size).toBe(1);
   });
 });
 

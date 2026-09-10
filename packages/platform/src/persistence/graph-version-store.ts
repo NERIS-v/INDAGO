@@ -138,6 +138,13 @@ export interface CreateGraphVersionInput {
   /** Immediate parent version id in the same case (validated). */
   readonly parentGraphVersionId?: string;
   readonly status?: GraphVersionStatus;
+  /**
+   * When true (default), the created version immediately becomes the case's
+   * ACTIVE version in the SAME transaction: any prior ACTIVE version is
+   * demoted to SUPERSEDED (STALE when it was COMPLETE). Pass `false` to leave
+   * the new version at its requested status (e.g. a manual DRAFT pipeline).
+   */
+  readonly activate?: boolean;
   readonly checkpointId?: string;
   /** Optional human/audit reason — the canonical mutation that created this version. */
   readonly reason?: string;
@@ -172,7 +179,7 @@ export class GraphVersionStore {
    * canonical mutation + version creation in one atomic boundary.
    */
   async transaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction(fn, { timeout: 15_000 });
+    return this.prisma.$transaction(fn, { maxWait: 30_000, timeout: 60_000 });
   }
 
   /**
@@ -256,6 +263,32 @@ export class GraphVersionStore {
         parentGraphVersionId = prev?.id ?? null;
       }
 
+      // M-A12 WS-7 auto-activation (unless explicitly opted out) + item D.
+      // The DB-level partial unique index admits AT MOST ONE ACTIVE GraphVersion
+      // per case, so when auto-activating we demote the prior ACTIVE BEFORE
+      // inserting the new row — never after, because the second ACTIVE insert
+      // would already be rejected by the index before any demotion ran. In the
+      // SAME transaction the prior ACTIVE is demoted (to SUPERSEDED — STALE when
+      // COMPLETE, per the projection-status contract) and the brand-new version
+      // is created ACTIVE. Exactly one ACTIVE version per case is therefore
+      // guaranteed by construction, and the whole canonical change + version +
+      // activation commits atomically under the case-level advisory lock.
+      const finalStatus = input.activate !== false ? "ACTIVE" : status;
+      if (finalStatus === "ACTIVE") {
+        await client.$executeRaw`
+          UPDATE "GraphVersion"
+          SET
+            status = 'SUPERSEDED',
+            "projectionStatus" = CASE
+              WHEN "projectionStatus" = 'COMPLETE' THEN 'STALE'
+              ELSE "projectionStatus"
+            END,
+            "updatedAt" = ${now}
+          WHERE "caseId" = ${caseId}
+            AND status = 'ACTIVE'
+        `;
+      }
+
       // With the advisory lock held, no concurrent same-case writer can land on
       // this versionNumber, so a P2002 here indicates a genuine invariant bug;
       // it propagates (aborting this transaction with the canonical mutation),
@@ -266,7 +299,7 @@ export class GraphVersionStore {
           caseId,
           investigationId: input.investigationId ?? null,
           versionNumber,
-          status,
+          status: finalStatus,
           parentGraphVersionId,
           projectionStatus: "PENDING",
           nodeCount: 0,
@@ -279,11 +312,12 @@ export class GraphVersionStore {
           updatedAt: now,
         },
       });
+
       return rowToGraphVersion(created);
     };
 
     if (tx) return run(tx);
-    return this.prisma.$transaction(run);
+    return this.prisma.$transaction(run, { maxWait: 30_000, timeout: 60_000 });
   }
 
   /**
