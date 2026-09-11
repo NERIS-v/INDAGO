@@ -13,6 +13,9 @@ architectural extensions. It consolidates intent already present in the
 repository — code comments, contracts, phase trackers, plans, and
 implementation reports — into one factual roadmap.
 
+Reconciled **12 Sep 2026** against `phase-tracker.md` (see the tracker's
+"Tracker Reconciliation" section).
+
 It does **not** change application behavior, and it does **not** invent
 milestones, schemas, or algorithms that the repository does not define.
 
@@ -59,8 +62,8 @@ this `docs/` tree):
 | Observation read API | `IMPLEMENTED` | `GET /investigations/:id/observations`; `observation-store.ts` |
 | SSE realtime | `IMPLEMENTED` | `realtime/sse.ts` + `EventBus`; live frames incl. `OBSERVATION_EXTRACTED` (metadata only) |
 | Case store + deletion | `IMPLEMENTED` | `case-store` (SQLite), `DELETE /investigations/:id` |
-| Auth | `PARTIALLY_IMPLEMENTED` (dev-grade) | `verifyToken` seam; `demo-token` dev bypass; production JWT/OIDC is a documented migration path |
-| Postgres persistence | `IMPLEMENTED` | Prisma schema, 12 models, migrations via `prisma generate` (DB is schema-sourced) |
+| Auth / RBAC / case-scope | `IMPLEMENTED` (auth + case-scope) · `PARTIALLY_IMPLEMENTED` (RBAC) | `api/auth.ts` `requireAuth` + `requireCaseAccess` (fail-closed allow-list) + `requireRole`; `demo-token` dev bypass (rejected in production); role gate never exercised by tests (tracker reconciliation); production JWT/OIDC is a documented migration path |
+| Postgres persistence | `IMPLEMENTED` | Prisma schema, 20 models (incl. Artifact/Evidence/Observation/Entity/Relation/GraphVersion/TemporalStateChange), migrations via `prisma migrate deploy` (Postgres 16 CI; DB is schema-sourced) |
 
 ### Intelligence artifacts
 | Capability | Status | Evidence |
@@ -70,7 +73,7 @@ this `docs/` tree):
 | Relations / hypotheses / graph | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring, reversal); M-A11 Graphology projection; M-A13 graph query APIs + second-pass hardening (canonical `ProjectedGraph` contract, truthful truncation metadata, P2-04 pure-read valid-at) — backend-verified |
 | Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3) | PR0 design locked; **PR1 implemented** (temporal fields, D5 validation, `TemporalStateChange` history store, event-time/source-context propagation); **PR2 implemented** (`GraphVersion` model+store, advisory-lock versioning, canonical-change coupling, internal current/historical projection service, deterministic replay); **PR3 implemented** (case-scoped temporal APIs: `current`, `versions`, `versions/:vid`; D7 checkpoint↔version coupling; `as-of` deferred 501); **hardening pass done** (amendments, ENTITY versioning, typed revision events, concurrency) — **real-Postgres integration verified green (43/43)** incl. HTTP security (7) — `docs/platform/m-a12-temporal-architecture.md` |
 | Corroboration / semantic grouping | `NOT_FOUND` | not contracted; see `observation-corroboration.md`; cross-observation semantic intelligence deferred post-M-A12 |
-| Leads / gaps / robustness | `NOT_FOUND` in backend | phases exist on the tracker; only narrative/UI scaffolds exist |
+| Leads / gaps / robustness | `CONTRACT_ONLY` (Leads/Gaps) · `IMPLEMENTED` (claim-grounding, tracker 6B) · `NOT_FOUND` (backend robustness 6A) | `LeadSchema`/`InvestigativeGapSchema`/`EvidenceRequestSchema`/`ReviewTaskSchema` exist (`packages/contracts/src/domain/*`, no store/model); claim-grounding in `packages/platform/src/security/grounding.ts` + `agent/grounding.ts` (tested); phases on the tracker |
 
 ### Frontend (`packages/web`)
 | Capability | Status | Evidence |
@@ -117,9 +120,9 @@ flowchart TD
 | 10 | Relation extraction / resolution | `IMPLEMENTED` | M-A10 relation resolution + canonical Relation (source-grounded scoring v1); backend-verified |
 | 11 | Hypothesis generation | `PARTIALLY_IMPLEMENTED` | EntityHypothesis + RelationHypothesis lifecycle stores exist; full hypothesis UI surfacing deferred |
 | 12 | Graph projection | `IMPLEMENTED` (backend) / `PARTIALLY_IMPLEMENTED` (UI) | M-A11 Graphology projection + M-A13 graph query APIs; broad live-mode UI surfacing still stub (`UnsupportedGraphProvider`) |
-| 12b | Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3, unit-verified) | PR1 temporal history + intervals done; PR2 graph versions + internal historical projection done; PR3 case-scoped temporal APIs + D7 checkpoint coupling done (real-Postgres integration BLOCKED) |
-| 13 | Leads | `NOT_FOUND` | tracker Phase 4 |
-| 14 | Claim grounding | `NOT_FOUND` | tracker Phase 6A |
+| 12b | Temporal projection (M-A12) | `IMPLEMENTED` (PR1 + PR2 + PR3 + hardening, unit + real-Postgres verified) | PR1 temporal history + intervals done; PR2 graph versions + internal historical projection done; PR3 case-scoped temporal APIs + D7 checkpoint coupling done; hardening pass (amendments, entity versioning, typed revision events, concurrency) done — real-Postgres integration **verified green 43/43** (incl. HTTP security 7) |
+| 13 | Leads | `CONTRACT_ONLY` | `LeadSchema` etc. in `packages/contracts/src/domain/lead.ts`; no Lead store/model/runtime (tracker Phase 4) |
+| 14 | Claim grounding | `IMPLEMENTED` | `packages/platform/src/security/grounding.ts` + `agent/grounding.ts` + `tests/recovery.test.ts` (tracker 6B complete) |
 | 15 | Robustness / counter-evidence | `PARTIALLY_IMPLEMENTED` (tracker 6B complete; UI narrative) | tracker Phase 6 |
 
 ## Entity / Resolution Roadmap
@@ -167,7 +170,7 @@ future richer workflows. No milestones are fixed for these.
 - Backend: graph projection, query, and analysis are **IMPLEMENTED** via M-A11 (Graphology projection: build-graph/centrality/communities) and M-A13 (typed graph service APIs + express routes `graph`, `graph/traversal`, `graph/centrality`, `graph/communities`). `GraphNode`/`GraphEdge`/`GraphVersion` contracts are `packages/contracts/src/graph/*`.
 - Graphology is a **derived, disposable** projection; Postgres is the authoritative domain state. No Graphology-based historical/temporal history (temporal projection is M-A12; PR1 history/intervals implemented, graph-version history is PR2/PR3).
 - Frontend: graph presentation scaffolds exist in demo fixtures; live-mode rendering is future UI phase (F-PR4+ per `docs/frontend/frontend-development-plan.md`); live providers are stub (`UnsupportedGraphProvider`).
-- Temporal graph (current vs historical versions) is M-A12; **PR2 internal current/historical projection implemented** (unit-verified; real-Postgres integration BLOCKED); **PR3 public version/current/as-of query APIs implemented** (unit-verified; real-Postgres integration BLOCKED; `as-of` deferred as 501).
+- Temporal graph (current vs historical versions) is M-A12; **PR2 internal current/historical projection implemented** (unit + real-Postgres verified green 43/43); **PR3 public version/current/as-of query APIs implemented** (real-Postgres verified green 43/43; `as-of` deferred as 501).
 
 ## Frontend Capability Progression
 
@@ -249,7 +252,7 @@ dependencies, not from feature preference.
 - Production auth (JWT/OIDC behind `verifyToken`).
 - Production DB migration mechanism.
 - Graph UI + entity-resolution review UI (live-mode providers are stub: `UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider`).
-- M-A12 temporal/graph version APIs (PR3) — **implemented** (unit-verified; real-Postgres integration BLOCKED).
+- M-A12 temporal/graph version APIs (PR3) — **implemented** (unit + real-Postgres verified green 43/43).
 - Production observability / queue monitoring / secrets management.
 
 ### P2 — later enhancement
