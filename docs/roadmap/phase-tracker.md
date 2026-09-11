@@ -24,7 +24,7 @@ Advanced items are tagged with their status symbol in front of the checkbox. Bac
 
 ## Tracker Reconciliation — 12 Sep 2026
 
-Read-only audit of this tracker against repo evidence (implementation + test suites). **No checkboxes toggled — the 97-done count remains unchanged** (partials stay `[ ]`, downgrades keep `[x]`).
+Read-only audit of this tracker against repo evidence (implementation + test suites). **No checkboxes toggled — the 103-done count remains unchanged** (partials stay `[ ]`, downgrades keep `[x]`).
 
 **Downgraded to `🟡 [x]` (6) — marked done but only partially verified:**
 - Phase 3 "Show graph-ready state in UI shell" — run state renders; graph/entity/relation live providers are `Unsupported*` stubs.
@@ -40,7 +40,7 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 
 **🔵 policy:** 🔵 retained only where a task is genuinely planned/future work (cross-observation relation retrieval, targeted reblocking, semantic retrieval, source/context visualization, provenance UX, semantic benchmark, model versioning); 🔵 is never combined with a 🟡 status marker.
 
-**Second-pass audit (same date).** Full sweep of **every** unchecked tracker item against the repo. Same discipline: no checkboxes toggled, **97-done count unchanged**, every new flag is `🟡 [ ]` — a real subset exists but the milestone/surfacing is **not** complete, and nothing is upgraded to ✅.
+**Second-pass audit (same date).** Full sweep of **every** unchecked tracker item against the repo. Same discipline: no checkboxes toggled, **103-done count unchanged**, every new flag is `🟡 [ ]` — a real subset exists but the milestone/surfacing is **not** complete, and nothing is upgraded to ✅.
 
 - **Real algorithm / persisted runtime (3):** M-A03 CDR CSV ingestion + M-A04 Financial CSV ingestion (generic CSV pipeline converts CDR/financial rows → observations, integration-tested); P4 "Attach evidence FOR / AGAINST" (supporting/contradicting observation sets persisted on `EntityHypothesis`/`RelationHypothesis`).
 - **Demo/UI surfacing (12):** P5A-1 graph-hole detection + P5A-6 evidence-request lifecycle at the web/demo layer; P7 workspace shell, graph visualization, timeline visualization, evidence FOR/AGAINST panels, gap/graph-hole visualization, reasoning ledger, review/approval UI, premium states; P10 Discovery Mode (detection-logic demo + workflow/UI demo).
@@ -529,22 +529,22 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ## Summary
 
-| Phase | Total Tasks | Done | Mayur | Gurashish | Both |
-|---|---|---|---|---|---|
-| 0 | 10 | 10 | 0 | 0 | 10 |
-| 1 | 40 | 40 | 20 | 6 | 14 |
-| 2A | 30 | 19 | 22 | 0 | 8 |
-| 2B | 12 | 12 | 0 | 12 | 0 |
-| 3 | 12 | 10 | 5 | 6 | 1 |
-| 4 | 17 | 0 | 10 | 6 | 1 |
-| 5 | 18 | 0 | 9 | 8 | 1 |
-| 6 | 21 | 8 | 9 | 8 | 4 |
-| 7 | 20 | 0 | 9 | 11 | 0 |
-| 8 | 24 | 0 | 9 | 6 | 9 |
-| 9 | 17 | 4 | 7 | 10 | 0 |
-| 10 | 10 | 0 | 5 | 5 | 0 |
-| 11 | 30 | 0 | 10 | 10 | 10 |
-| 12 | 16 | 0 | 7 | 8 | 1 |
-| **Total** | **277** | **103** | **122** | **96** | **59** |
+| Phase | Tasks | Done | Open | Mayur | Gurashish | Both | Done % |
+|:------|------:|-----:|-----:|------:|-----------:|-----:|-------:|
+| 0 | 10 | 10 | 0 | 0 | 0 | 10 | 100% |
+| 1 | 40 | 40 | 0 | 20 | 6 | 14 | 100% |
+| 2A | 30 | 19 | 11 | 22 | 0 | 8 | 63% |
+| 2B | 12 | 12 | 0 | 0 | 12 | 0 | 100% |
+| 3 | 12 | 10 | 2 | 5 | 6 | 1 | 83% |
+| 4 | 17 | 0 | 17 | 10 | 6 | 1 | 0% |
+| 5 | 18 | 0 | 18 | 9 | 8 | 1 | 0% |
+| 6 | 21 | 8 | 13 | 9 | 8 | 4 | 38% |
+| 7 | 20 | 0 | 20 | 9 | 11 | 0 | 0% |
+| 8 | 24 | 0 | 24 | 9 | 6 | 9 | 0% |
+| 9 | 17 | 4 | 13 | 7 | 10 | 0 | 24% |
+| 10 | 10 | 0 | 10 | 5 | 5 | 0 | 0% |
+| 11 | 30 | 0 | 30 | 10 | 10 | 10 | 0% |
+| 12 | 16 | 0 | 16 | 7 | 8 | 1 | 0% |
+| **Total** | **277** | **103** | **174** | **122** | **96** | **59** | **37%** |
 
-> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). Phase 2A total includes the 13 un-done M-A12 entry-gate (G1–G8, `[Both]`) and temporal (T1–T5, `[Mayur]`) sub-task rows added by the V7 tracker reconciliation.
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 13 M-A12 sub-task rows added by the V7 tracker reconciliation: 8 **open** gate audits (G1–G8, `[Both]`) + 5 **implemented** temporal deep-dives (T1–T5, `[Mayur]`).
