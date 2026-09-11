@@ -40,6 +40,13 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 
 **🔵 policy:** 🔵 retained only where a task is genuinely planned/future work (cross-observation relation retrieval, targeted reblocking, semantic retrieval, source/context visualization, provenance UX, semantic benchmark, model versioning); 🔵 is never combined with a 🟡 status marker.
 
+**Second-pass audit (same date).** Full sweep of **every** unchecked tracker item against the repo. Same discipline: no checkboxes toggled, **97-done count unchanged**, every new flag is `🟡 [ ]` — a real subset exists but the milestone/surfacing is **not** complete, and nothing is upgraded to ✅.
+
+- **Real algorithm / persisted runtime (3):** M-A03 CDR CSV ingestion + M-A04 Financial CSV ingestion (generic CSV pipeline converts CDR/financial rows → observations, integration-tested); P4 "Attach evidence FOR / AGAINST" (supporting/contradicting observation sets persisted on `EntityHypothesis`/`RelationHypothesis`).
+- **Demo/UI surfacing (12):** P5A-1 graph-hole detection + P5A-6 evidence-request lifecycle at the web/demo layer; P7 workspace shell, graph visualization, timeline visualization, evidence FOR/AGAINST panels, gap/graph-hole visualization, reasoning ledger, review/approval UI, premium states; P10 Discovery Mode (detection-logic demo + workflow/UI demo).
+- **Partial / shared-pipeline, explicitly NOT milestone completion (11):** M-A02 FIR (generic narrative path only, catalog never consumed as a processing switch); P3 seed messy case (test/demo fixtures only, no product seed path); P4 bridge/connector candidates (web-only), Create InvestigativeLead structure (contract + demo builders), Stream analysis progress to UI (SSE infra + run-status projection; analysis events absent); P5A-7 normalized evidence utility (static mock + `ExpectedInformationGainSchema`); P5B-8 stream graph/lead changes live (demo overlay in `graph-live.ts`); P7 Lead card, Next-best-evidence panel, Realtime progress & recovery (PAUSED rendered, `HUMAN_ESCALATION` not surfaced); P9A Failure isolation (bounded retries + circuit breaker + human escalation only).
+- **Genuinely not found — left unchanged:** temporal burst detection, community candidates (backend), cross-case runtime, cross-observation relation retrieval, targeted reblocking (🔵), ER-split-explains-hole, gap-classification runtime, evidence Resolution Rate@K, evidence-independence tracking, Phase 6A robustness set, Phase 9B definitional items, PII masking / prompt-injection / secret management / tool-authorization boundaries / audit access logging, Phases 8/11/12.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
@@ -128,9 +135,9 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
   - [x] M-PR1: Artifact Acquisition Core (fetcher, hasher, mime-detector, storage, acquisition-service) `[Mayur]`
   - [x] M-PR2: Artifact Classification & Parser Routing (classifier, encoding-detector, router, registry) `[Mayur]`
   - [x] M-PR3: Raw Extraction Layer (7 parsers, ExtractionService, OCR, PDF extraction) `[Mayur]`
-- [ ] M-A02: FIR/narrative ingestion (raw artifacts + source metadata) `[Mayur]`
-- [ ] M-A03: CDR CSV ingestion (normalized communication rows) `[Mayur]`
-- [ ] M-A04: Financial CSV ingestion (normalized transaction rows) `[Mayur]`
+- 🟡 [ ] M-A02: FIR/narrative ingestion (raw artifacts + source metadata) `[Mayur]` — generic TXT/DOCX/PDF/IMAGE narrative path + `FIR` catalog value wired (POST evidence → observations); no FIR-specific parser/adapter and the source catalog is never consumed as a processing switch — partial dedicated milestone, NOT completion
+- 🟡 [ ] M-A03: CDR CSV ingestion (normalized communication rows) `[Mayur]` — generic CSV pipeline converts CDR-shaped rows (caller/callee/timestamp) into COMMUNICATION observations (0.7 strength, row provenance), integration-tested; no CDR-specific adapter — partial milestone via shared pipeline, NOT completion
+- 🟡 [ ] M-A04: Financial CSV ingestion (normalized transaction rows) `[Mayur]` — generic CSV pipeline composes FINANCIAL observations (from/to account, amount), integration-tested; no financial-specific adapter — partial milestone via shared pipeline, NOT completion
 - [x] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
 - [x] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
   - [x] Evidence read seam: durable `GET /investigations/:id/evidence` (`EvidenceProjection` — documented local shape, no fabricated strength/posture), live `listEvidence` server action + `LiveEvidenceProvider.listByInvestigation`, Evidence tab renders persisted artifacts in live mode `[Mayur]`
@@ -208,7 +215,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [x] Expose observation API `[Mayur]` — `GET /investigations/:id/observations` (full ObservationSchema records, case-scoped via auth → latest run → run.caseId; routes.ts)
 - 🟡 [x] Expose entity resolution API `[Mayur]` — decision authority exists (accept/reject/reverse route + canonical materialization, integra-verified); full resolution UX/review surface is frontend-phase work, not yet exposed end-to-end
 - 🟡 [x] Expose graph projection/query API `[Mayur]` — projection/query routes exist (graph, traversal, centrality, communities, 404/401/403 integration-tested); broad live-mode UI surfacing is frontend-phase work `[graph-http 9 tests]`
-- [ ] Seed one deliberately messy synthetic case `[Mayur]` — no seed script exists (only test fixtures + legacy mock-ingestion toggle)
+- 🟡 [ ] Seed one deliberately messy synthetic case `[Mayur]` — test fixtures + web demo fixtures only; **no product seed path / no benchmark dataset** — capability present in form only, does NOT satisfy the milestone
 
 ### Gurashish
 
@@ -234,12 +241,12 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 - [ ] Implement temporal burst detection `[Mayur]`
 - [ ] Implement community candidates `[Mayur]`
-- [ ] Implement bridge/connector candidates `[Mayur]`
+- 🟡 [ ] Implement bridge/connector candidates `[Mayur]` — web-only deterministic cut-edge detection/rendering (`use-graph-layout`); no backend candidate-generation metric (betweenness/bridge_impact explicitly unimplemented) — NOT milestone completion
 - 🟡 [ ] Implement bounded path queries `[Mayur]` — M-A13 delivered and tested the backend capability (`graph/traversal`, hop ≤ 4, path cap; 9 graph-http tests); not yet surfaced as a Phase 4-graded investigation-loop path query
 - [ ] Implement cross-case shared-entity/infrastructure discovery `[Mayur]`
 - 🔵 [ ] Cross-observation relation retrieval `[Mayur]` — recover relation candidates that span different observations (shared infrastructure / temporal / explicit relation claims / graph-gap-driven / semantic retrieval); must preserve "candidate relationship ≠ canonical relationship" and distinguish DIRECT RELATION EVIDENCE vs INDIRECT STRUCTURAL LINKAGE vs SEMANTIC ASSOCIATION
-- [ ] Create InvestigativeLead structure `[Mayur]`
-- [ ] Attach evidence FOR / AGAINST `[Mayur]`
+- 🟡 [ ] Create InvestigativeLead structure `[Mayur]` — `LeadSchema` contract + web-demo `buildLead`/`DemoLeadProvider` exist; no backend runtime/lifecycle — structure defined, milestone NOT complete
+- 🟡 [ ] Attach evidence FOR / AGAINST `[Mayur]` — platform persists supporting/contradicting observation sets (`EntityHypothesis`/`RelationHypothesis` evidenceBasis/contradictions); no dedicated verdict/attach API — runtime data exists, dedicated attach surface NOT complete
 - [ ] Generate alternative explanations `[Mayur]`
 - [ ] Persist lead provenance `[Mayur]`
 
@@ -248,7 +255,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [ ] Implement investigation state transitions around analysis `[Gurashish]`
 - [ ] Add tool orchestration for graph analytics `[Gurashish]`
 - [ ] Persist Lead/Hypothesis lifecycle `[Gurashish]`
-- [ ] Stream analysis progress to UI `[Gurashish]`
+- 🟡 [ ] Stream analysis progress to UI `[Gurashish]` — SSE infra + live run-status projection are real; analysis-progress events not yet emitted — NOT milestone completion
 - 🟡 [ ] Implement human-review state `[Gurashish]` — `REVIEW_REQUIRED` state + transitions frozen in the state-machine contract; runtime entry/wiring not implemented
 - 🟡 [ ] Add pause/resume behavior `[Gurashish]` — `PAUSED` + resume transitions frozen in the state machine; runtime only enters `PAUSED` via human escalation (`queue/recovery.ts`); no resume trigger yet
 
@@ -264,13 +271,13 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 5A. Mayur — Graph-Hole / Intelligence-Gap Core
 
-- [ ] Detect candidate missing relationships `[Mayur]`
+- 🟡 [ ] Detect candidate missing relationships `[Mayur]` — graph-hole detection + overlay rendering exist at the web/demo layer (`graph-hole-burst-layer`, `DemoGraphProvider.getGraphHoles`, real-case `buildHole`); backend detection runtime absent — NOT milestone completion
 - [ ] Classify gap (missing investigation / missing data / missing comparison / infrastructure gap / concealment-consistent pattern) `[Mayur]`
 - [ ] Generate competing explanations `[Mayur]`
 - [ ] Detect when an ER split could explain a graph hole `[Mayur]`
 - 🔵 [ ] Targeted reblocking `[Mayur]` — selectively generate candidate pairs around a suspicious candidate/entity/evidence region after downstream analysis suggests a missed match; **NOT** an O(N²) all-candidate sweep; preserve case isolation, deterministic identity, pair-level idempotency, bounded computation, auditability
-- [ ] Generate candidate evidence requests `[Mayur]`
-- [ ] Calculate normalized evidence utility `[Mayur]`
+- 🟡 [ ] Generate candidate evidence requests `[Mayur]` — web/demo lifecycle exists (`buildEvidenceRequest`, evidence-request fixtures) + `EvidenceRequestSchema`; backend generation absent — NOT milestone completion
+- 🟡 [ ] Calculate normalized evidence utility `[Mayur]` — web NBE mock (`netUtility` card) + `ExpectedInformationGainSchema` contract; no utility algorithm — NOT milestone completion
 - [ ] Implement Evidence Resolution Rate@K evaluation `[Mayur]`
 - [ ] Add evidence-independence tracking `[Mayur]`
 
@@ -283,7 +290,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - 🟡 [ ] Implement WAITING_FOR_EVIDENCE state `[Gurashish]` — state + transitions frozen in the state-machine contract; runtime entry/exit + evidence-arrival wiring not implemented
 - [ ] Handle evidence arrival event `[Gurashish]`
 - [ ] Re-trigger reassessment `[Gurashish]`
-- [ ] Stream graph/lead changes live `[Gurashish]`
+- 🟡 [ ] Stream graph/lead changes live `[Gurashish]` — web overlay materialization via `graph-live.ts` + realtime normalizer (demo); backend SSE for graph/lead changes absent — NOT milestone completion
 
 ### 5C. Signature Integration
 
@@ -333,17 +340,17 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 7A. Gurashish (Implementation)
 
-- [ ] Investigation workspace shell `[Gurashish]`
-- [ ] Graph visualization `[Gurashish]`
-- [ ] Timeline visualization `[Gurashish]`
-- [ ] Lead card `[Gurashish]`
-- [ ] Evidence FOR / AGAINST panels `[Gurashish]`
-- [ ] Gap / graph-hole visualization `[Gurashish]`
-- [ ] Next-best-evidence panel `[Gurashish]`
-- [ ] Reasoning ledger `[Gurashish]`
-- [ ] Review/approval UI `[Gurashish]`
-- [ ] Realtime progress and recovery states `[Gurashish]`
-- [ ] Premium loading/empty/error states `[Gurashish]`
+- 🟡 [ ] Investigation workspace shell `[Gurashish]` — full routes/nav dock + overview/scaffold render (`app/investigations/[id]/**`); live surfaces partial — demo/imcomplete milestone, NOT completion
+- 🟡 [ ] Graph visualization `[Gurashish]` — rendered d3-force graph + 5-zone control center (`graph-panel`, `graph-canvas`) — demo mode
+- 🟡 [ ] Timeline visualization `[Gurashish]` — provider-driven `timeline-panel` — demo mode
+- 🟡 [ ] Lead card `[Gurashish]` — `DemoLeadProvider` + leads-list/drawer; dedicated route feeds hardcoded `DEMO_LEADS` — partial, NOT completion
+- 🟡 [ ] Evidence FOR / AGAINST panels `[Gurashish]` — contradiction envelopes + `forAgainst` surface (`phase2-hypothesis-surface`) — demo mode
+- 🟡 [ ] Gap / graph-hole visualization `[Gurashish]` — burst layer + gap-adapter + `DemoGapProvider` — demo mode; dedicated gaps route is a stub
+- 🟡 [ ] Next-best-evidence panel `[Gurashish]` — NBE card + derived `nbeLead` surface; no dedicated panel — partial, NOT completion
+- 🟡 [ ] Reasoning ledger `[Gurashish]` — `reasoning-ledger` component + demo ledger; ledger route feeds hardcoded data — partial, NOT completion
+- 🟡 [ ] Review/approval UI `[Gurashish]` — `review-center` + `DemoReviewProvider`; demo route feeds `DEMO_TASKS` — demo mode
+- 🟡 [ ] Realtime progress and recovery states `[Gurashish]` — PAUSED + recovery visuals render; `HUMAN_ESCALATION` not surfaced anywhere — partial, NOT completion
+- 🟡 [ ] Premium loading/empty/error states `[Gurashish]` — `ui/` empty-state/error-display/loading-spinner/panel-error-boundary kit
 
 ### 7B. Mayur (Intelligence Presentation)
 
@@ -413,7 +420,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [ ] Audit access logging `[Gurashish]`
 - 🟡 [x] Hash-linked audit events `[Gurashish]` — sha256 chain via `previousHash`/`GENESIS` in `audit/logger.ts`; no test asserts linkage/tamper-evidence
 - [ ] Secret management `[Gurashish]`
-- [ ] Failure isolation `[Gurashish]`
+- 🟡 [ ] Failure isolation `[Gurashish]` — bounded retries + circuit breaker + human escalation isolate per-run failures; no cross-run/comprehensive isolation — partial, NOT completion
 
 ### 9B. Mayur
 
@@ -431,8 +438,8 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 **Date:** 5 Sep | **Owner:** Both | **Gate:** No P0 regression
 
-- [ ] Discovery Mode — detection logic `[Mayur]`
-- [ ] Discovery Mode — workflow + UI `[Gurashish]`
+- 🟡 [ ] Discovery Mode — detection logic `[Mayur]` — web/demo candidate derivation (`real-case/discovery.ts`, discovery fixtures); no backend — NOT milestone completion
+- 🟡 [ ] Discovery Mode — workflow + UI `[Gurashish]` — `discovery-panel` + `DemoIntelligenceProvider.listDiscovery` (demo); live unsupported — NOT milestone completion
 - [ ] Boundary Expansion — candidate logic `[Mayur]`
 - [ ] Boundary Expansion — approval/UI `[Gurashish]`
 - [ ] Route/Stage Mode — stage classifier + role checks `[Mayur]`
@@ -526,7 +533,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 |---|---|---|---|---|---|
 | 0 | 10 | 10 | 0 | 0 | 10 |
 | 1 | 40 | 40 | 20 | 6 | 14 |
-| 2A | 30 | 13 | 22 | 0 | 8 |
+| 2A | 30 | 19 | 22 | 0 | 8 |
 | 2B | 12 | 12 | 0 | 12 | 0 |
 | 3 | 12 | 10 | 5 | 6 | 1 |
 | 4 | 17 | 0 | 10 | 6 | 1 |
@@ -538,6 +545,6 @@ And the underlying temporal sub-items (tracked to reflect reality):
 | 10 | 10 | 0 | 5 | 5 | 0 |
 | 11 | 30 | 0 | 10 | 10 | 10 |
 | 12 | 16 | 0 | 7 | 8 | 1 |
-| **Total** | **277** | **97** | **122** | **96** | **59** |
+| **Total** | **277** | **103** | **122** | **96** | **59** |
 
 > Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). Phase 2A total includes the 13 un-done M-A12 entry-gate (G1–G8, `[Both]`) and temporal (T1–T5, `[Mayur]`) sub-task rows added by the V7 tracker reconciliation.
