@@ -22,6 +22,24 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 
 Advanced items are tagged with their status symbol in front of the checkbox. Backend-correctness and frontend-surfacing are evaluated separately: a backend route existing is **not** treated as the roadmap item "complete" unless the capability is genuinely surfaced end-to-end.
 
+## Tracker Reconciliation — 12 Sep 2026
+
+Read-only audit of this tracker against repo evidence (implementation + test suites). **No checkboxes toggled — the 97-done count remains unchanged** (partials stay `[ ]`, downgrades keep `[x]`).
+
+**Downgraded to `🟡 [x]` (6) — marked done but only partially verified:**
+- Phase 3 "Show graph-ready state in UI shell" — run state renders; graph/entity/relation live providers are `Unsupported*` stubs.
+- G-A08 "Agent orchestrator (bounded planning loop)" — event-driven BullMQ dispatch; no plan→observe→reflect→converge loop.
+- Phase 6B "Checkpoint/recovery tests" — no dedicated checkpoint/recovery contract unit suite.
+- Phase 6B "Bounded retries and circuit breakers" — `tools/runtime.ts` path untested.
+- Phase 9A "RBAC" — role gate never exercised (`requireRole` 403 via real routes cannot trigger).
+- Phase 9A "Hash-linked audit events" — no chain/tamper-evidence test.
+
+**Under-credited partials — now `🟡 [ ]` (6):** bounded path queries (M-A13 backend shipped/tested, not wired into the Phase 4 loop); human-review state (`REVIEW_REQUIRED` contract-only); pause/resume (`PAUSED` reached only via human escalation); graph-hole event type (`GRAPH_HOLE_DETECTED` declared, unwired); gap lifecycle state (`GapStatusSchema` frozen, no runtime, ⚠️ `WONFIX`); WAITING_FOR_EVIDENCE state (contract-only).
+
+**Known test-coverage gaps:** RBAC role gate, audit hash-chain linkage, `executeToolSafe` (bounded retries + idempotency cache-hit), dedicated checkpoint/recovery suite.
+
+**🔵 policy:** 🔵 retained only where a task is genuinely planned/future work (cross-observation relation retrieval, targeted reblocking, semantic retrieval, source/context visualization, provenance UX, semantic benchmark, model versioning); 🔵 is never combined with a 🟡 status marker.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
@@ -172,7 +190,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [x] G-A05: Checkpoint store (resume/replay state) `[Gurashish]`
 - [x] G-A06: Tool registry (tool metadata + validation) `[Gurashish]`
 - [x] G-A07: Tool execution runtime (request/result pipeline) `[Gurashish]`
-- [x] G-A08: Agent orchestrator (bounded planning loop) `[Gurashish]`
+- 🟡 [x] G-A08: Agent orchestrator (bounded planning loop) `[Gurashish]` — claim-grounding + BullMQ job dispatch implemented; orchestration is event-driven queue dispatch, no explicit plan→observe→reflect→converge loop
 - [x] G-A09: Retries/circuit breakers (failure controls) `[Gurashish]`
 - [x] G-A10: Realtime event stream (investigation progress events) `[Gurashish]`
 - [x] G-A11: Audit event infrastructure (append-only audit records) `[Gurashish]`
@@ -199,7 +217,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [x] Consume tool results `[Gurashish]`
 - [x] Persist state `[Gurashish]`
 - [x] Emit progress events `[Gurashish]`
-- [x] Show graph-ready state in UI shell `[Gurashish]`
+- 🟡 [x] Show graph-ready state in UI shell `[Gurashish]` — run state (InvestigationStatus/StateBadge) renders in the live UI shell; graph/entity/relation live providers remain `UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider` stubs (frontend-phase work)
 
 ### Joint Integration Test
 
@@ -217,7 +235,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [ ] Implement temporal burst detection `[Mayur]`
 - [ ] Implement community candidates `[Mayur]`
 - [ ] Implement bridge/connector candidates `[Mayur]`
-- [ ] Implement bounded path queries `[Mayur]`
+- 🟡 [ ] Implement bounded path queries `[Mayur]` — M-A13 delivered and tested the backend capability (`graph/traversal`, hop ≤ 4, path cap; 9 graph-http tests); not yet surfaced as a Phase 4-graded investigation-loop path query
 - [ ] Implement cross-case shared-entity/infrastructure discovery `[Mayur]`
 - 🔵 [ ] Cross-observation relation retrieval `[Mayur]` — recover relation candidates that span different observations (shared infrastructure / temporal / explicit relation claims / graph-gap-driven / semantic retrieval); must preserve "candidate relationship ≠ canonical relationship" and distinguish DIRECT RELATION EVIDENCE vs INDIRECT STRUCTURAL LINKAGE vs SEMANTIC ASSOCIATION
 - [ ] Create InvestigativeLead structure `[Mayur]`
@@ -231,8 +249,8 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [ ] Add tool orchestration for graph analytics `[Gurashish]`
 - [ ] Persist Lead/Hypothesis lifecycle `[Gurashish]`
 - [ ] Stream analysis progress to UI `[Gurashish]`
-- [ ] Implement human-review state `[Gurashish]`
-- [ ] Add pause/resume behavior `[Gurashish]`
+- 🟡 [ ] Implement human-review state `[Gurashish]` — `REVIEW_REQUIRED` state + transitions frozen in the state-machine contract; runtime entry/wiring not implemented
+- 🟡 [ ] Add pause/resume behavior `[Gurashish]` — `PAUSED` + resume transitions frozen in the state machine; runtime only enters `PAUSED` via human escalation (`queue/recovery.ts`); no resume trigger yet
 
 ### Joint Checkpoint
 
@@ -258,11 +276,11 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 5B. Gurashish — Investigation Workflow Around the Gap
 
-- [ ] Add graph-hole event type `[Gurashish]`
-- [ ] Add gap lifecycle state `[Gurashish]`
+- 🟡 [ ] Add graph-hole event type `[Gurashish]` — typed `GRAPH_HOLE_DETECTED` event + payload already declared (`events/graph-events.ts:118`, `event-types.ts`); emission not yet wired to a detection runtime
+- 🟡 [ ] Add gap lifecycle state `[Gurashish]` — `GapStatusSchema` (IDENTIFIED…ADDRESSED/WONFIX) frozen (`domain/investigative-gap.ts`; ⚠️ `WONFIX` typo pending amendment); no Gap model/store/runtime yet
 - [ ] Add evidence-request job `[Gurashish]`
 - [ ] Implement human approval for request `[Gurashish]`
-- [ ] Implement WAITING_FOR_EVIDENCE state `[Gurashish]`
+- 🟡 [ ] Implement WAITING_FOR_EVIDENCE state `[Gurashish]` — state + transitions frozen in the state-machine contract; runtime entry/exit + evidence-arrival wiring not implemented
 - [ ] Handle evidence arrival event `[Gurashish]`
 - [ ] Re-trigger reassessment `[Gurashish]`
 - [ ] Stream graph/lead changes live `[Gurashish]`
@@ -291,8 +309,8 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 6B. Gurashish
 
-- [x] Implement checkpoint/recovery tests `[Gurashish]`
-- [x] Implement bounded retries and circuit breakers `[Gurashish]`
+- 🟡 [x] Implement checkpoint/recovery tests `[Gurashish]` — recovery machinery + E2E checkpoint-row assertions exist (`ingestion-pipeline.e2e`); no dedicated checkpoint/recovery contract unit suite
+- 🟡 [x] Implement bounded retries and circuit breakers `[Gurashish]` — BullMQ attempts/backoff E2E-proven (`real-stack.e2e` real retry + permanent failure); `tools/runtime.ts` bounded-retry/backoff circuit-breaker path has zero direct test coverage (`executeToolSafe` never imported by any test)
 - [x] Implement tool idempotency `[Gurashish]`
 - [x] Implement claim-grounding validator `[Gurashish]`
 - [x] Reject unsupported agent claims `[Gurashish]`
@@ -387,13 +405,13 @@ And the underlying temporal sub-items (tracked to reflect reality):
 ### 9A. Gurashish
 
 - [x] Authentication `[Gurashish]`
-- [x] RBAC `[Gurashish]`
+- 🟡 [x] RBAC `[Gurashish]` — `requireRole` + `RoleSchema` + `DEFAULT_ROLE_PERMISSIONS` exist (`api/auth.ts:157`); no test exercises the role gate (demo principal hardcoded `INVESTIGATOR`, so `requireRole` never 403s through real routes)
 - [x] Case-scope authorization `[Gurashish]`
 - [ ] PII masking `[Gurashish]`
 - [ ] Tool authorization boundaries `[Gurashish]`
 - [ ] Prompt-injection defenses for untrusted evidence `[Gurashish]`
 - [ ] Audit access logging `[Gurashish]`
-- [x] Hash-linked audit events `[Gurashish]`
+- 🟡 [x] Hash-linked audit events `[Gurashish]` — sha256 chain via `previousHash`/`GENESIS` in `audit/logger.ts`; no test asserts linkage/tamper-evidence
 - [ ] Secret management `[Gurashish]`
 - [ ] Failure isolation `[Gurashish]`
 
