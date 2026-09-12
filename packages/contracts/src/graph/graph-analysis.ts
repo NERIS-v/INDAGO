@@ -7,7 +7,7 @@ import {
 } from '../common/ids.js';
 import { StructuralSignalSchema } from '../common/confidence.js';
 import { ObservedTimeSchema } from '../common/timestamps.js';
-import { RelationTypeSchema } from '../domain/relation.js';
+import { GraphHoleSchema } from '../intelligence/graph-holes.js';
 
 // ============================================================================
 // Graph Analysis
@@ -97,14 +97,12 @@ export const GraphAnalysisResultSchema = z.object({
     length: z.number().int().positive()
       .describe('Number of edges in this path'),
   })).optional(),
-  holes: z.array(z.object({
-    nodeIds: z.array(GraphNodeIdSchema),
-    expectedEdgeType: RelationTypeSchema
-      .describe('Type of edge expected but missing'),
-    significance: StructuralSignalSchema
-      .describe('Graph-theoretic significance of this hole'),
-    description: z.string(),
-  })).optional(),
+  holes: z.array(GraphHoleSchema).optional()
+    .describe(
+      'Canonical GraphHole candidates identified by a HOLE analysis. ' +
+      'Unified with the intelligence GraphHole contract (Phase 5A): no separate ' +
+      'anonymous hole shape exists. Candidate identity is explicit via `id`.',
+    ),
   computedAt: ObservedTimeSchema,
   computationTimeMs: z.number().int().nonnegative(),
 }).strict();

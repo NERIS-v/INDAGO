@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   InvestigationIdSchema,
+  CaseIdSchema,
   GraphNodeIdSchema,
   GraphVersionIdSchema,
   InvestigativeGapIdSchema,
@@ -9,6 +10,7 @@ import { StructuralSignalSchema } from '../common/confidence.js';
 import { ObservedTimeSchema } from '../common/timestamps.js';
 import { RelationTypeSchema } from '../domain/relation.js';
 import { MetadataSchema } from '../common/metadata.js';
+import { DETECTION_POLICY_VERSION } from './graph-hole-policy.js';
 
 // ============================================================================
 // Graph Holes
@@ -30,6 +32,13 @@ import { MetadataSchema } from '../common/metadata.js';
 // A graph hole is NOT itself a fact.
 // It is a candidate missing relationship / analytical gap.
 // It must NOT include isCriminal, isHiddenByCriminal, or intentional fields.
+//
+// IDENTITY (Phase 5A-PR0):
+//   A graph hole carries an explicit candidate identity (`id`).
+//   The candidate identity itself (caseId, graphVersionId, holeType,
+//   canonicalNodeIds, ...) is frozen in GraphHoleCandidateIdentityV1
+//   (intelligence/graph-hole-candidate.ts) and later hashed to produce
+//   `candidateId`. `id` is that deterministic candidate identifier.
 // ============================================================================
 
 export const GraphHoleTypeSchema = z.enum([
@@ -45,23 +54,42 @@ export const GraphHoleTypeSchema = z.enum([
 );
 export type GraphHoleType = z.infer<typeof GraphHoleTypeSchema>;
 
+/**
+ * Deterministic candidate identifier for a graph hole.
+ *
+ * In the Phase 5A V1 pipeline this is the content hash
+ * (candidateId = SHA-256(canonicalizeGraphHoleCandidateIdentity(identity)))
+ * computed by later PRs. Demo/legacy data may carry any stable non-empty
+ * identifier. This schema intentionally does NOT constrain the digest format:
+ * the hashing step is defined by the later implementation, not by PR0.
+ */
+export const GraphHoleCandidateIdSchema = z.string().min(1).max(256)
+  .describe('Deterministic candidate identifier (V1 pipeline: SHA-256 digest of the canonical candidate identity).');
+export type GraphHoleCandidateId = z.infer<typeof GraphHoleCandidateIdSchema>;
+
 export const GraphHoleSchema = z.object({
+  id: GraphHoleCandidateIdSchema
+    .describe('Candidate identity of this hole. Same logical gap under the same graph/policy → same id.'),
   investigationId: InvestigationIdSchema,
+  caseId: CaseIdSchema,
   graphVersionId: GraphVersionIdSchema,
   type: GraphHoleTypeSchema
-    .describe('Structural detection category (NOT GapType)'),
+    .describe('Structural detection category (NOT GapType). Candidate identity uses `holeType`.'),
   investigationGapId: InvestigativeGapIdSchema.optional()
     .describe('Associated InvestigativeGap, if one has been classified from this hole'),
   nodeIds: z.array(GraphNodeIdSchema)
-    .describe('Nodes involved in this hole'),
+    .describe('Nodes involved in this hole (canonical graph nodes; candidate identity uses `canonicalNodeIds`).'),
   expectedEdgeType: RelationTypeSchema
-    .describe('Type of edge expected but missing'),
+    .describe('Type of edge expected but missing (candidate identity uses `expectedRelationshipType`).'),
   significance: StructuralSignalSchema
     .describe('How significant this hole is in the graph topology'),
   description: z.string()
     .describe('Human-readable description of the hole'),
   suggestedEvidenceTypes: z.array(z.string()).optional()
     .describe('Evidence types that might fill this hole'),
+  detectionPolicyVersion: z.literal(DETECTION_POLICY_VERSION)
+    .optional()
+    .describe('Detection policy version consumed to produce this candidate'),
   detectedAt: ObservedTimeSchema,
   metadata: MetadataSchema.optional(),
 }).strict();
