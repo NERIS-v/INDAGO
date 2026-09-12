@@ -102,3 +102,6 @@ export type EntityMentionCandidateId = z.infer<typeof EntityMentionCandidateIdSc
 
 export const CandidatePairIdSchema = z.string().uuid();
 export type CandidatePairId = z.infer<typeof CandidatePairIdSchema>;
+
+export const SemanticTextUnitIdSchema = z.string().uuid();
+export type SemanticTextUnitId = z.infer<typeof SemanticTextUnitIdSchema>;

@@ -1,10 +1,14 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  // pgvector — required for the semantic embedding column + HNSW index.
+  // Declared so migrations/db push provision the extension automatically.
+  extensions = [vector]
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 // ============================================================================
@@ -763,4 +767,75 @@ model GraphVersion {
   @@index([caseId, status]) // lifecycle/active-version lookups
   @@index([caseId, projectionStatus]) // projection-status recovery queries
   @@index([parentGraphVersionId]) // lineage traversal
+}
+
+// ============================================================================
+// Phase 5A-PR1.5: Semantic embedding + retrieval (pgvector)
+//
+// SemanticTextUnit is the ATOMIC retrievable text item AND the durable,
+// content-addressed recall surface. It carries NO truth value and NO evidence
+// authority: it is a recall/context layer, never a conclusion and never the
+// authority for entity/relation resolution (M-A09/M-A10 stay authoritative).
+//
+// Identity conventions:
+//   - id = deterministic UUID (SHA-256 of the canonical identity key
+//     indago:semantic-text-unit:v1:caseId:sourceType:sourceId:contentHash) —
+//     retry/race safe; same source slice + same canonical text converges.
+//   - @@unique([caseId, sourceType, sourceId]) bounds ONE unit per source
+//     object; re-embedding a changed source UPDATES contentHash/normalizedText
+//     in place (the search path never reads stale vectors).
+//   - contentHash = SHA-256 of canonicalized text (source of truth for
+//     staleness detection in the embedding pipeline).
+//   - temporalScope = optional M-A12 TemporalInterval of the source claim;
+//     retrieval filters on it IN SQL (never in application memory).
+//
+// SemanticEmbedding stores the learned vector for a unit under an EXPLICIT
+// provider identity (providerId + modelId + modelVersion) + embedding policy
+// version. @@unique([semanticTextUnitId, providerId, modelId, modelVersion,
+// embeddingPolicyVersion]) means:
+//   - one provider slot per unit (a provider swap never mixes vectors)
+//   - a policy bump yields a NEW version, never a silent overwrite of history
+//
+// The `vector` column is UNSUPPORTED to Prisma (vector(768)) and is therefore
+// written/read ONLY through parameterized raw SQL inside the repositories —
+// never through the typed client. The HNSW cosine index is managed in the
+// migration SQL only (Prisma cannot model indexes over Unsupported columns);
+// `prisma migrate dev` drift checks may flag it and must NOT drop it.
+// ============================================================================
+model SemanticTextUnit {
+  id             String   @id // deterministic UUID (see header)
+  caseId         String
+  sourceType     String // SemanticSourceTypeSchema value
+  sourceId       String // canonical id of the source domain object
+  contentHash    String // SHA-256 of normalizedText
+  normalizedText String
+  temporalScope  Json? // M-A12 TemporalInterval or NULL
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  embeddings SemanticEmbedding[]
+
+  @@unique([caseId, sourceType, sourceId])
+  @@index([caseId])
+  @@index([contentHash])
+}
+
+model SemanticEmbedding {
+  id                     String   @id // deterministic UUID of the identity key
+  semanticTextUnitId     String
+  caseId                 String
+  contentHash            String // snapshot of the unit hash at embed time
+  providerId             String
+  modelId                String
+  modelVersion           String
+  dimensions             Int
+  embeddingPolicyVersion String // v1 — embedding policy version
+  vector                 Unsupported("vector(768)")? // never touched by the typed client
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  textUnit SemanticTextUnit @relation(fields: [semanticTextUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([semanticTextUnitId, providerId, modelId, modelVersion, embeddingPolicyVersion])
+  @@index([caseId, providerId, modelId, modelVersion, embeddingPolicyVersion])
 }
