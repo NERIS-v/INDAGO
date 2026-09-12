@@ -140,9 +140,10 @@ export class EntityHypothesisStore {
    *     refreshed to reflect the recomputed machine result.
    *
    * The read-then-write is executed inside a transaction so concurrent
-   * identical writes converge to one logical row (unique identityKey is the
-   * backstop against a lost create race → P2002 is treated as an idempotent
-   * no-op by falling through to the existing row).
+   * identical writes converge to one logical row. The insert uses
+   * createMany(… skipDuplicates) as the idempotent write — P2002-free by
+   * construction — so the transaction is never aborted and the winner row can
+   * be read back inside the same transaction after a lost create race.
    */
   async upsertHypothesis(input: {
     readonly identityKey: string;
@@ -169,12 +170,15 @@ export class EntityHypothesisStore {
       });
 
       // Lost-create race: a concurrent transaction inserted the identical
-      // identityKey between our read and our write. Re-read and proceed
-      // idempotently rather than surfacing a spurious duplicate error.
+      // identityKey between our read and our write. Insert via
+      // createMany(… skipDuplicates) — this is P2002-FREE by construction.
+      // DO NOT 'create' + P2002-catch here: a unique-violation aborts the
+      // PostgreSQL transaction, so any re-read inside it fails with 25P02
+      // ("current transaction is aborted, commands ignored …").
       if (!existing) {
-        try {
-          const created = await tx.entityHypothesis.create({
-            data: {
+        const { count } = await tx.entityHypothesis.createMany({
+          data: [
+            {
               id: hypothesis.id,
               identityKey,
               caseId: hypothesis.caseId,
@@ -194,24 +198,40 @@ export class EntityHypothesisStore {
               createdAt: now,
               updatedAt: now,
             },
+          ],
+          skipDuplicates: true,
+        });
+
+        if (count === 1) {
+          // We won the insert race (or there was no race at all). Re-read the
+          // durable row so the returned hypothesis reflects the stored row.
+          const created = await tx.entityHypothesis.findUnique({
+            where: { identityKey },
           });
+          if (!created) {
+            throw new Error(
+              "EntityHypothesisStore: inserted hypothesis row vanished immediately after createMany",
+            );
+          }
           return {
             wrote: true,
             preservedExisting: false,
             reusedExisting: false,
             hypothesis: rowToHypothesis(created),
           };
-        } catch (cause) {
-          const code =
-            cause instanceof Prisma.PrismaClientKnownRequestError
-              ? cause.code
-              : undefined;
-          if (code !== "P2002") throw cause;
-          // P2002 unique conflict on identityKey → a concurrent writer beat us.
-          existing = await tx.entityHypothesis.findUnique({
-            where: { identityKey },
-          });
-          if (!existing) throw cause; // unexpected — a conflict without a row
+        }
+
+        // A concurrent writer inserted the identical row between our read and
+        // create (skipDuplicates skipped our insert). The transaction is still
+        // live — re-read the winner and proceed through the shared refresh path.
+        existing = await tx.entityHypothesis.findUnique({
+          where: { identityKey },
+        });
+        if (!existing) {
+          // Defensive: a skip without a competing row is a constraint anomaly.
+          throw new Error(
+            `EntityHypothesisStore: unique conflict without a competing hypothesis row for ${identityKey}`,
+          );
         }
       }
 
