@@ -46,6 +46,9 @@ importers:
         specifier: workspace:*
         version: link:../graphology-projection
     devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
