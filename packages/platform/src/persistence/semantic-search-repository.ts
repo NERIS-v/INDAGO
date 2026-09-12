@@ -9,10 +9,14 @@
 //
 // temporalScope is JSONB:
 //   validFrom/validTo each carry { value: string } or are absent.
-//   Missing endpoint = open (no bound), matching graph-hole-region
-//   intervalOverlaps semantics. When temporalContext is provided with both
-//   endpoints the row overlaps iff NOT (validFrom > bTo OR bFrom > validTo).
-//   When either endpoint is missing, that bound is unconstrained.
+//   Missing endpoint (stored OR query) = OPEN bound, matching
+//   graph-hole-region intervalOverlapsContext. The filter implements TRUE
+//   closed-interval overlap for stored interval A and query window B:
+//     NOT (A.validFrom > B.validTo  OR  B.validFrom > A.validTo)
+//   so stored-contains-query, query-contains-stored, both partial overlaps and
+//   exact boundary touches all RETAIN the row; only a stored interval fully
+//   before OR fully after the query is excluded. All predicates are
+//   parameterized — no user values are string-interpolated.
 //
 // Cosine distance ∈ [0, 2]; similarity = 1 − distance. A threshold of 0
 // excludes distance > 1 (similarity < 0), which is defensible since
@@ -64,32 +68,32 @@ export class PostgresSemanticSearchRepository implements SemanticSearchRepositor
     const vecLiteral = toVectorLiteral(query.queryVector);
     const maxDistance = 1 - query.threshold;
 
-    // Temporal conditions: when an endpoint is provided, require overlap;
-    // when it's missing, treat that bound as unconstrained. Rows without
-    // temporalScope always pass. Each fragment is a parameterized Prisma.sql
-    // fragment — never string-interpolated into the query.
-    const temporalFilters: Prisma.Sql[] = [];
+    // True closed-interval overlap, mirroring graph-hole-region
+    // intervalOverlapsContext:
+    //   NOT (A.validFrom > B.validTo  OR  B.validFrom > A.validTo)
+    // where the STORED interval is A and the QUERY window is B. A missing
+    // endpoint on either side (or a NULL temporalScope) is an OPEN bound and
+    // always retains the row (SQL three-valued logic: every comparison is
+    // guarded by IS NOT NULL so an unbound endpoint can never exclude a row).
+    // A missing endpoint on either side (or a NULL temporalScope) is an OPEN
+    // bound and always retains the row (SQL three-valued logic: every
+    // comparison is guarded by IS NOT NULL so an unbound endpoint can never
+    // exclude a row). Only the ISO string VALUES are compared — boundary
+    // metadata (precision, semantics) is never used in the predicate.
+    // A single static shape is used; the parameters themselves gate which
+    // bounds are active — nothing is string-interpolated.
+    const bFrom = query.temporalContext?.validFrom?.value ?? null;
+    const bTo = query.temporalContext?.validTo?.value ?? null;
 
-    if (query.temporalContext?.validFrom !== undefined) {
-      temporalFilters.push(Prisma.sql`(
-        u."temporalScope" IS NULL
-        OR u."temporalScope"->'validFrom'->>'value' IS NULL
-        OR NOT ((u."temporalScope"->'validFrom'->>'value') > ${query.temporalContext.validFrom})
-      )`);
-    }
-
-    if (query.temporalContext?.validTo !== undefined) {
-      temporalFilters.push(Prisma.sql`(
-        u."temporalScope" IS NULL
-        OR u."temporalScope"->'validTo'->>'value' IS NULL
-        OR NOT (${query.temporalContext.validTo} > (u."temporalScope"->'validTo'->>'value'))
-      )`);
-    }
-
-    const temporalFilter =
-      temporalFilters.length > 0
-        ? Prisma.sql`AND ${Prisma.join(temporalFilters, ' AND ')}`
-        : Prisma.empty;
+    const temporalPredicate = Prisma.sql`NOT (
+      (u."temporalScope"->'validFrom'->>'value' IS NOT NULL
+        AND ${bTo}::text IS NOT NULL
+        AND (u."temporalScope"->'validFrom'->>'value') > ${bTo}::text)
+      OR
+      (${bFrom}::text IS NOT NULL
+        AND u."temporalScope"->'validTo'->>'value' IS NOT NULL
+        AND ${bFrom}::text > (u."temporalScope"->'validTo'->>'value'))
+    )`;
 
     const rows = await this.prisma.$queryRaw<RawNeighborRow[]>`
       SELECT
@@ -111,7 +115,7 @@ export class PostgresSemanticSearchRepository implements SemanticSearchRepositor
       WHERE u."caseId"  = ${query.caseId}
         AND e."caseId"  = ${query.caseId}
         AND (e."vector" <=> ${vecLiteral}::vector) <= ${maxDistance}
-        ${temporalFilter}
+        AND ${temporalPredicate}
       ORDER BY (e."vector" <=> ${vecLiteral}::vector) ASC, u."id" ASC
       LIMIT ${query.limit}
     `;

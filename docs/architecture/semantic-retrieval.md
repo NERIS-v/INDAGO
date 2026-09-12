@@ -19,9 +19,13 @@ as evidence authority.
 
 ## Contract invariants
 
-- `SemanticTextUnit.normalizedText` is trimmed non-empty canonical text;
-  `contentHash` = SHA-256 of canonicalized text (semantic-equivalent text →
-  same unit hash, so unchanged content is never re-embedded).
+- SemanticTextUnit IDENTITY = `caseId + sourceType + sourceId`; a MUTABLE
+  CURRENT RETRIEVAL PROJECTION (updated in place when source text changes, no
+  version history). `contentHash` = SHA-256 of canonicalized text = the
+  CURRENT TEXT VERSION; unchanged content is never re-embedded.
+- Embedding freshness rule: `embedding.contentHash === semanticTextUnit.contentHash`
+  ⇒ current (searchable); anything else ⇒ stale (excluded by the freshness join).
+- `SemanticTextUnit.normalizedText` is trimmed non-empty canonical text.
 - `EmbeddingProviderIdentity` = providerId + modelId + modelVersion +
   dimensions + embeddingPolicyVersion. One embedding row per unit per
   identity slot; a provider swap never mixes vectors; a policy bump yields a
@@ -62,14 +66,26 @@ Env contract (engine `config.ts`): `EMBEDDING_PROVIDER` (ollama default),
 
 - Database must ship the `vector` extension: CI service image
   `pgvector/pgvector:pg16`; Neon provides it natively.
-- HNSW cosine index is managed ONLY inside the hand-written migration
-  (`prisma/migrations/20240104000000_semantic_embedding_retrieval`) because
-  Prisma cannot express indexes over `Unsupported("vector(768)")` columns. A
-  future `prisma migrate dev` drift diff MUST NOT drop it; CI uses
-  `migrate deploy`.
-- Deterministic ids: unit id = UUID of sha256(`indago:semantic-text-unit:v1:
-  caseId:sourceType:sourceId:contentHash`); embedding row id = UUID of sha256
-  (`indago:semantic-embedding:v1:unitId:providerId:modelId:modelVersion:
+- V1 SHIPS **NO ANN INDEX**. A global HNSW index over vectors belonging to
+  multiple cases/providers/models/policies can produce INCOMPLETE filtered
+  retrieval because ANN candidate generation is not scoped to the required
+  semantic identity. V1 uses EXACT cosine distance ordering only
+  (`ORDER BY distance ASC, unit id ASC`). ANN/HNSW is deliberately deferred
+  until dataset scale and an identity-aware filtering/index strategy justify
+  it.
+- V1 DIMENSION CONSTRAINT: storage is FIXED at `vector(768)` because the active
+  Ollama production provider is `nomic-embed-text:latest`. Future cloud
+  providers MUST use 768-dimensional embeddings until a future storage
+  migration introduces dimension-specific storage. The provider identity keeps
+  carrying dimensions so incompatible vectors are still rejected.
+- SemanticTextUnit IDENTITY = `caseId + sourceType + sourceId` (mutable current
+  retrieval projection, updated IN PLACE, no version history); current text
+  version = `contentHash`; embedding freshness =
+  `embedding.contentHash === semanticTextUnit.contentHash`.
+- Deterministic row ids: unit id = UUID of sha256(`indago:semantic-text-unit:
+  v1:caseId:sourceType:sourceId:contentHash`) at first upsert (never recomputed
+  on later updates; NOT part of the identity contract); embedding row id = UUID
+  of sha256(`indago:semantic-embedding:v1:unitId:providerId:modelId:modelVersion:
   embeddingPolicyVersion`). Same convention as ingestion/entity-resolution.
 - `@@unique([caseId, sourceType, sourceId])` = one unit per source object;
   changed source text upserts `contentHash` + `normalizedText` in place,
@@ -79,9 +95,12 @@ Env contract (engine `config.ts`): `EMBEDDING_PROVIDER` (ollama default),
   - `WHERE distance <= 1 - threshold`, `ORDER BY distance ASC, unit id ASC`
   - case isolation on BOTH `SemanticTextUnit.caseId` and
     `SemanticEmbedding.caseId`
+  - provider/model/policy isolation on the embedding identity columns
   - freshness join `e.contentHash = u.contentHash` (never search stale text)
-  - temporal overlap over `temporalScope` JSONB (missing endpoint = open
-    bound; string comparisons are ISO-8601-safe)
+  - TRUE closed-interval temporal overlap over `temporalScope` JSONB for stored
+    interval A and query window B: `NOT (A.validFrom > B.validTo OR
+    B.validFrom > A.validTo)`, missing endpoint (stored or query) = open bound,
+    `temporalScope = NULL` pass-through. All predicates parameterized.
 
 ## Failure + isolation guarantees
 
