@@ -247,4 +247,88 @@ describe('AuthoritativeSemanticNodeAdapter', () => {
     const reasons: SemanticNodeMappingRejection[] = a.rejectedReasons.map((r) => r.reason);
     expect(reasons).toEqual([...reasons].sort());
   });
+
+  describe('adversarial authority hardening', () => {
+    const adapter = new AuthoritativeSemanticNodeAdapter();
+
+    it('a high-similarity hit with NO resolved entity is UNRESOLVED, never guessed', async () => {
+      const report = await adapter.mapSemanticResultsToNodes(
+        [
+          hit({
+            unit: 'u-1',
+            sourceId: 'obs-hot',
+            similarity: 0.9999,
+            text: 'string that smells like an entity name',
+          }),
+        ],
+        makeContext({ hasNode: () => true }),
+      );
+      expect(report.mappedCount).toBe(0);
+      expect(report.unresolvedCount).toBe(1);
+      expect(report.rejectedReasons).toEqual([{ reason: 'UNRESOLVED', count: 1 }]);
+    });
+
+    it('a perfect name-match on normalizedText is inert without authority', async () => {
+      const report = await adapter.mapSemanticResultsToNodes(
+        [hit({ unit: 'u-name', sourceId: 'obs-name', text: 'Node-X-Alpha' })],
+        makeContext({ hasNode: () => true }),
+      );
+      expect(report.mappedCount).toBe(0);
+      expect(report.unresolvedCount).toBe(1);
+    });
+
+    it('a sourceId that LOOKS like a nodeId (bare uuid) is still UNRESOLVED without authority', async () => {
+      const report = await adapter.mapSemanticResultsToNodes(
+        [
+          hit({
+            unit: 'u-nodelike',
+            sourceId: NODE_X,
+            text: 'identical to the node id string',
+          }),
+        ],
+        // Empty resolver: no entity is authoritative in THIS case/graph.
+        makeContext({ hasNode: () => true }),
+      );
+      expect(report.mappedCount).toBe(0);
+      expect(report.unresolvedCount).toBe(1);
+      expect(report.mappedNodeIds).not.toContain(NODE_X);
+    });
+
+    it('an entity that exists only in ANOTHER case is never admitted by string likeness', async () => {
+      const OTHER_CASE = uuid(0x00110001);
+      const context = makeContext({
+        // The resolver yields NODE_X only for the OTHER case — the adapter must
+        // call it with the MAPPING case only, so nothing resolves here.
+        resolveSourceEntities: async (input) =>
+          input.caseId === OTHER_CASE ? [NODE_X] : [],
+        hasNode: (id) => id === NODE_X,
+      });
+
+      const report = await adapter.mapSemanticResultsToNodes(
+        [hit({ unit: 'u-cross', sourceId: 'obs-cross' })],
+        context,
+      );
+      expect(report.mappedCount).toBe(0);
+      expect(report.unresolvedCount).toBe(1);
+      expect(report.mappedNodeIds).toEqual([]);
+    });
+
+    it('an entity name/spelling match can never bypass authoritative resolution', async () => {
+      const report = await adapter.mapSemanticResultsToNodes(
+        [
+          hit({
+            unit: 'u-alt',
+            sourceId: 'obj-1',
+            text: 'Functional Analyst at regional transit authority',
+            similarity: 0.95,
+          }),
+        ],
+        makeContext({ hasNode: () => true }),
+      );
+      const parsed = SemanticNodeMappingReportSchema.safeParse(report);
+      expect(parsed.success).toBe(true);
+      expect(report.mappedCount).toBe(0);
+      expect(report.unresolvedCount).toBe(1);
+    });
+  });
 });

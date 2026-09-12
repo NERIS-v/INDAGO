@@ -7,9 +7,10 @@ import {
   buildRegion,
   ProjectedGraphExpansionProvider,
   AuthoritativeSemanticNodeAdapter,
-  regionSemanticQueryOf,
+  buildRegionSemanticQuery,
   sha256Hex,
 } from '../../src/index.js';
+import type { RegionBuildDependencies, SemanticContextItem } from '../../src/index.js';
 import {
   uuid,
   node,
@@ -41,6 +42,18 @@ import {
 // ============================================================================
 
 const OBS_ISLE = uuid(0x40000001);
+
+// Authoritative regional context unit the injected resolver returns; queries
+// are built deterministically from this bounded context + sorted membership.
+const CONTEXT_UNIT: SemanticContextItem = {
+  sourceType: 'OBSERVATION',
+  sourceId: uuid(0x2f000001),
+  content: 'authoritative regional context describing transit movement patterns',
+};
+
+function ctxQuery(nodeIds: readonly string[]): string {
+  return buildRegionSemanticQuery([CONTEXT_UNIT], nodeIds);
+}
 
 function hit(unit: string, sourceId: string): SemanticSearchResult {
   return {
@@ -97,7 +110,8 @@ function depsFor(results: SemanticSearchResult[]) {
     if (input.sourceType === 'OBSERVATION' && input.sourceId === OBS_ISLE) return [NODE_ISLE];
     return [];
   };
-  return {
+  const getSemanticContextForRegion = async () => [CONTEXT_UNIT];
+  const deps: RegionBuildDependencies = {
     context: provider,
     resolveObservations: async (ids) => {
       const out: Array<{ id: string; entityIds: readonly string[] }> = [];
@@ -112,9 +126,11 @@ function depsFor(results: SemanticSearchResult[]) {
             port,
             adapter: new AuthoritativeSemanticNodeAdapter(),
             resolveSourceEntities,
+            getSemanticContextForRegion,
           }
         : undefined,
   };
+  return deps;
 }
 
 describe('Phase 5A-PR2 semantic node-expansion conformance', () => {
@@ -146,18 +162,20 @@ describe('Phase 5A-PR2 semantic node-expansion conformance', () => {
 
     expect(region.semanticExpansion.status).toBe('SUCCESS');
     expect(region.semanticExpansion.rounds[0].admittedNodeIds).toEqual([NODE_ISLE]);
-    // Round 1 ran against the seed-only membership; later rounds against the
-    // full (final) member set — queries depend on membership only.
+    // Query construction: bounded authoritative context content + sorted
+    // membership — never bare identifiers, never retrieved text.
     expect(region.semanticExpansion.rounds[0].query).toBe(
-      regionSemanticQueryOf([NODE_CENTER]),
+      ctxQuery([NODE_CENTER]),
     );
     expect(region.semanticExpansion.rounds[1].query).toBe(
-      regionSemanticQueryOf(region.nodeIds),
+      ctxQuery(region.nodeIds),
     );
     expect(region.semanticExpansion.rounds[2].query).toBe(
-      regionSemanticQueryOf(region.nodeIds),
+      ctxQuery(region.nodeIds),
     );
     for (const roundTrace of region.semanticExpansion.rounds) {
+      expect(roundTrace.query).toContain('transit movement patterns');
+      expect(roundTrace.query).not.toContain('isle-unit');
       expect(roundTrace.queryHash).toBe(sha256Hex(roundTrace.query));
     }
     expect(region.semanticExpansion.totalMappedNodes).toBeGreaterThan(0);

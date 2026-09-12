@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  MAX_SEMANTIC_CONTEXT_CHARS,
+  MAX_SEMANTIC_CONTEXT_ITEMS,
+  MAX_SEMANTIC_QUERY_CHARS,
   SemanticExpansionStatusSchema,
   SemanticNodeMappingReportSchema,
   SemanticExpansionTraceSchema,
@@ -60,6 +63,15 @@ describe('SemanticNodeMappingRejectionSchema', () => {
 
   it('rejects fuzzy/approximate reasons', () => {
     expect(SemanticNodeMappingRejectionSchema.safeParse('SIMILAR_NAME').success).toBe(false);
+  });
+});
+
+describe('semantic query-context budget', () => {
+  it('freezes the bounded-context query caps', () => {
+    // Deterministic bounded serialization: item count, context chars, query length.
+    expect(MAX_SEMANTIC_CONTEXT_ITEMS).toBeGreaterThan(0);
+    expect(MAX_SEMANTIC_CONTEXT_CHARS).toBeGreaterThan(0);
+    expect(MAX_SEMANTIC_QUERY_CHARS).toBeGreaterThan(MAX_SEMANTIC_CONTEXT_CHARS);
   });
 });
 
@@ -154,6 +166,7 @@ describe('SemanticExpansionTraceSchema', () => {
       totalRejected: 0,
       semanticNodeBoundReached: false,
       totalResultsBoundReached: false,
+      providerTruncated: false,
     };
     expect(SemanticExpansionTraceSchema.safeParse(trace).success).toBe(true);
   });
@@ -181,9 +194,38 @@ describe('SemanticExpansionTraceSchema', () => {
       totalRejected: 0,
       semanticNodeBoundReached: false,
       totalResultsBoundReached: false,
+      providerTruncated: false,
     };
     const parsed = SemanticExpansionTraceSchema.safeParse(trace);
     expect(parsed.success).toBe(true);
+  });
+
+  it('accepts a LIMITED trace carrying an explicit provider truncation', () => {
+    const trace = {
+      status: 'LIMITED',
+      rounds: [
+        {
+          round: 1,
+          query: 'n-1',
+          queryHash: HASH,
+          requestedLimit: 20,
+          retrievedCount: 20,
+          truncated: true,
+          admittedNodeIds: [N1, N2],
+          mappedCount: 2,
+          unresolvedCount: 0,
+          rejectedCount: 0,
+        },
+      ],
+      totalSemanticResults: 20,
+      totalMappedNodes: 2,
+      totalUnresolved: 0,
+      totalRejected: 0,
+      semanticNodeBoundReached: false,
+      totalResultsBoundReached: false,
+      providerTruncated: true,
+    };
+    expect(SemanticExpansionTraceSchema.safeParse(trace).success).toBe(true);
   });
 
   it('rejects a trace missing the query hash', () => {
@@ -208,6 +250,7 @@ describe('SemanticExpansionTraceSchema', () => {
       totalRejected: 0,
       semanticNodeBoundReached: false,
       totalResultsBoundReached: false,
+      providerTruncated: false,
     };
     expect(SemanticExpansionTraceSchema.safeParse(trace).success).toBe(false);
   });

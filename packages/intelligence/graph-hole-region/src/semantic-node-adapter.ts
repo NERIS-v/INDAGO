@@ -19,9 +19,16 @@
 //   - One hit may map to several nodes; the report deduplicates node ids and
 //     sorts them. The report's attribution preserves the port result order
 //     (deterministic).
-//   - The mapping context carries exactly ONE (caseId, graphVersionId); the
-//     resolver is invoked with that caseId and nothing else, so a query can
-//     never cross case boundaries here.
+//   - The mapping context carries exactly ONE caseId; the resolver is invoked
+//     with that caseId and nothing else, so a query can never cross case
+//     boundaries here.
+//
+// TEMPORAL AUTHORITY MODEL (explicit):
+//   Temporal filtering is authoritative at the semantic retrieval/storage
+//   boundary (PR1.5 closed-interval overlap in SQL). The port is invoked with
+//   the region's temporal context, so every hit reaching this adapter is
+//   ALREADY temporally valid for the requested window. This adapter performs
+//   NO temporal revalidation and does not claim to.
 // ============================================================================
 
 import type {
@@ -30,13 +37,11 @@ import type {
   SemanticNodeMappingRejection,
   SemanticSearchResult,
   SemanticSourceType,
-  TemporalInterval,
 } from '@indago/contracts';
 
 export interface SemanticNodeMappingContext {
   readonly caseId: string;
   readonly graphVersionId: string;
-  readonly temporalContext?: TemporalInterval | null;
   /**
    * M-A09/M-A10 authoritative resolution: a source object (by type + canonical
    * id) → its canonical entity ids. The caller must scope this lookup to

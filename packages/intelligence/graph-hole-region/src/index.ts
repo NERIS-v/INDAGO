@@ -62,7 +62,12 @@ export { ProjectedGraphExpansionProvider } from './graph-expansion-provider.js';
 // ---- Semantic region expansion (PR2) ----
 export { AuthoritativeSemanticNodeAdapter } from './semantic-node-adapter.js';
 export type { SemanticNodeAdapter, SemanticNodeMappingContext } from './semantic-node-adapter.js';
-export { regionSemanticQueryOf } from './semantic-query.js';
+export { buildRegionSemanticQuery } from './semantic-query.js';
+export type {
+  SemanticContextItem,
+  RegionSemanticContextRequest,
+  RegionSemanticContextResolver,
+} from './semantic-query.js';
 
 // ---- Orchestrator ----
 export { buildRegion, createRegionBuilder } from './build-region.js';

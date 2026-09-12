@@ -19,6 +19,7 @@ import type {
   TemporalInterval,
 } from '@indago/contracts';
 import type { SemanticNodeAdapter } from './semantic-node-adapter.js';
+import type { RegionSemanticContextResolver } from './semantic-query.js';
 
 export const REGION_LIMITATION_CODES = [
   'OBSERVATION_RESOLUTION_FAILED',
@@ -32,6 +33,7 @@ export const REGION_LIMITATION_CODES = [
   'SEMANTIC_RETRIEVAL_FAILURE',
   'SEMANTIC_NODE_BOUND_REACHED',
   'SEMANTIC_RESULTS_BOUND_REACHED',
+  'SEMANTIC_RESULTS_TRUNCATED',
 ] as const;
 export type RegionLimitationCode = (typeof REGION_LIMITATION_CODES)[number];
 
@@ -43,6 +45,7 @@ export const REGION_TRUNCATING_LIMITATIONS: readonly RegionLimitationCode[] = [
   'EXPANSION_ROUND_LIMIT_REACHED',
   'SEMANTIC_NODE_BOUND_REACHED',
   'SEMANTIC_RESULTS_BOUND_REACHED',
+  'SEMANTIC_RESULTS_TRUNCATED',
 ];
 
 /**
@@ -113,11 +116,20 @@ export interface GraphExpansionProvider {
 export type RegionExpansionContextProvider = GraphExpansionProvider;
 
 /**
- * Optional PR2 semantic expansion wiring. `port` supplies retrieval (recall),
- * `adapter` bridges text units → nodes authoritatively, and
- * `resolveSourceEntities` is the M-A09/M-A10 source → canonical entity lookup
- * (must be case-scoped by the caller). Without this dependency a region builds
- * with semantic expansion disabled.
+ * Optional PR2 semantic expansion wiring:
+ *   - `port` supplies retrieval (recall).
+ *   - `adapter` bridges text units → nodes authoritatively.
+ *   - `resolveSourceEntities` is the M-A09/M-A10 source → canonical entity
+ *     lookup (must be case-scoped by the caller).
+ *   - `getSemanticContextForRegion` is the AUTHORITATIVE regional source
+ *     context dependency used to build every query (case/graph-version/
+ *     temporal-scoped, read-only, bounded). Queries are NEVER built from
+ *     retrieved text, so no semantic feedback loop can form.
+ *
+ * Without this dependency a region builds with semantic expansion disabled
+ * (status DISABLED). When configured, a semantic failure degrades the semantic
+ * sub-system but NEVER halts the deterministic M-A13 graph expansion of the
+ * same build.
  */
 export interface SemanticExpansionDependency {
   readonly port: SemanticRetrievalPort;
@@ -127,6 +139,7 @@ export interface SemanticExpansionDependency {
     readonly sourceType: SemanticSourceType;
     readonly sourceId: string;
   }) => Promise<readonly string[]>;
+  readonly getSemanticContextForRegion: RegionSemanticContextResolver;
 }
 
 export interface RegionBuildDependencies {
