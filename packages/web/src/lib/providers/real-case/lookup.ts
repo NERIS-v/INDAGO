@@ -220,6 +220,7 @@ export const HOLE_B4 = id(NS_CASE_B, "hole:security-shooter-connection");
 export const GAP_B6 = id(NS_CASE_B, "gap:winter-hill-gunman-link");
 export const HOLE_B5 = id(NS_CASE_B, "hole:winter-hill-gunman-link");
 export const HOLE_B6 = id(NS_CASE_B, "hole:schedule-shooter-golf-schedule");
+export const HOLE_B7 = id(NS_CASE_B, "hole:rico-hitman-link");
 
 // -- Hypothesis ---------------------------------------------------------------
 export const HYP_B1 = id(NS_CASE_B, "hypothesis:insider-schedule-knowledge");
