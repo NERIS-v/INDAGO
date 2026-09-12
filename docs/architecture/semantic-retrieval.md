@@ -1,13 +1,13 @@
-# Semantic Retrieval (Phase 5A-PR1.5)
+# Semantic Retrieval (Phase 5A — PR1.5 + PR2)
 
 ## Scope
 
 Foundation for semantic recall: persist canonical text units, embed them once
 per provider identity, and answer deterministic nearest-neighbour queries with
-strict case isolation and temporal filtering. PR1.5 delivers the FOUNDATION
-only — no region expansion consumes it yet. PR2 will bridge semantic units to
-graph nodes; nothing here ever resolves text to entities or treats embeddings
-as evidence authority.
+strict case isolation and temporal filtering. PR1.5 delivers the FOUNDATION.
+PR2 (13, semantic region expansion) bridges semantic units to graph nodes via
+an authoritative adapter in `graph-hole-region`; nothing here ever resolves
+text to entities by similarity or treats embeddings as evidence authority.
 
 ## Layers
 
@@ -111,9 +111,25 @@ Env contract (engine `config.ts`): `EMBEDDING_PROVIDER` (ollama default),
 - Searches are memory-order-stable: identical request ⇒ identical result
   order (SQL-distinct ordering + no app-layer reordering).
 
-## PR2 note (seam)
+## PR2 note (semantic region expansion)
 
-`graph-hole-region`'s `retrieveSemanticContext?` remains optional and returns
-NODE ids. A conformance test (`tests/conformance/semantic-retrieval-seam.test.ts`,
-test-only adapter) pins the shape contract: semantic unit → node mapping is
-the ENTIRE future PR2 surface; PR1.5 ships NO production adapter.
+PR2 replaces the PR1.5 seam (`retrieveSemanticContext?` on
+`GraphExpansionProvider`) with a builder-level dependency:
+
+- `RegionBuildDependencies.semanticExpansion` = `SemanticRetrievalPort` +
+  `SemanticNodeAdapter` + case-scoped `resolveSourceEntities`. With no
+  dependency a region builds normally and reports `status DISABLED` (PR1 path).
+- The ONLY production bridge is `AuthoritativeSemanticNodeAdapter`:
+  hit → source → M-A09/M-A10 entity → M-A13 node, authoritatively. Never
+  similarity/text/name matching; no fabricated nodes; `UNRESOLVED` (no entity)
+  and `NON_NODE_SOURCE` (not in this graph version) are counted + reason-tagged.
+- Query per round = `regionSemanticQueryOf(nodeIds)` (canonical join of the
+  sorted region membership) — queries depend only on membership, so no
+  semantic feedback loop can form. Budgets come from `@indago/contracts`
+  (`MAX_SEMANTIC_RESULTS_PER_ROUND` 20, `MAX_TOTAL_SEMANTIC_RESULTS` 50,
+  `MAX_SEMANTIC_NODES_ADDED` 50) and semantic nodes share the region-node budget.
+- Outcome is traced on `GraphHoleRegion.semanticExpansion`
+  (`SemanticExpansionTraceSchema`, frozen contracts; deliberately NOT part of
+  the region identity). Statuses: DISABLED / SUCCESS / EMPTY / PARTIAL /
+  DEGRADED / LIMITED. A port/adapter failure DEGRADES the region — never a
+  fake empty.
