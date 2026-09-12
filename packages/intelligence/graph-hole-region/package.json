@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",
-    "@indago/graphology-projection": "workspace:*"
+    "@indago/graphology-projection": "workspace:*",
+    "@indago/semantic-retrieval": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

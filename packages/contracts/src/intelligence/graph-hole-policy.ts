@@ -95,6 +95,9 @@ export const MAX_SEMANTIC_RESULTS_PER_ROUND = 20;
 /** §5 maximum total semantic search results across all rounds. */
 export const MAX_TOTAL_SEMANTIC_RESULTS = 50;
 
+/** §5 maximum canonical graph nodes admitted to a region by semantic expansion. */
+export const MAX_SEMANTIC_NODES_ADDED = 50;
+
 /** §5 maximum hypotheses loaded into AI context. */
 export const MAX_HYPOTHESES_IN_CONTEXT = 50;
 
@@ -367,6 +370,7 @@ export const GraphHoleRegionPolicySchema = z.object({
   maxContextObservations: z.number().int().positive(),
   maxSemanticResultsPerRound: z.number().int().positive(),
   maxTotalSemanticResults: z.number().int().positive(),
+  maxSemanticNodesAdded: z.number().int().positive(),
   maxGraphHolesPerRegion: z.number().int().positive(),
 }).strict();
 export type GraphHoleRegionPolicy = z.infer<typeof GraphHoleRegionPolicySchema>;
@@ -472,6 +476,7 @@ export const GRAPH_HOLE_POLICY_V1: GraphHolePolicyV1 = {
     maxContextObservations: MAX_CONTEXT_OBSERVATIONS,
     maxSemanticResultsPerRound: MAX_SEMANTIC_RESULTS_PER_ROUND,
     maxTotalSemanticResults: MAX_TOTAL_SEMANTIC_RESULTS,
+    maxSemanticNodesAdded: MAX_SEMANTIC_NODES_ADDED,
     maxGraphHolesPerRegion: MAX_GRAPH_HOLES_PER_REGION,
   },
   grouping: {

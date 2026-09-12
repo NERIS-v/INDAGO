@@ -49,6 +49,7 @@ export * from './intelligence/cross-case.js';
 export * from './intelligence/graph-holes.js';
 export * from './intelligence/graph-hole-policy.js';
 export * from './intelligence/graph-hole-region.js';
+export * from './intelligence/graph-hole-semantic-expansion.js';
 export * from './intelligence/graph-hole-candidate.js';
 export * from './intelligence/identity-canonicalization.js';
 export * from './intelligence/gap-classification.js';

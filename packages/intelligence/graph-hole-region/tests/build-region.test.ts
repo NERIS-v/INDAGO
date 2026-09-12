@@ -445,43 +445,6 @@ describe('buildRegion — determinism and identity', () => {
   });
 });
 
-describe('buildRegion — optional PR2 semantic seam is capped', () => {
-  it('calls retrieveSemanticContext and respects both semantic budgets', async () => {
-    let calls = 0;
-    const semanticContext: GraphExpansionProvider = {
-      caseId: CASE_A,
-      graphVersionId: VERSION_A,
-      hasNode: (id) => id === NODE_CENTER,
-      expandGraph: async () => ({ candidateNodeIds: [] }),
-      incidentEdges: async () => [],
-      retrieveSemanticContext: async () => {
-        const offset = calls * 20;
-        calls += 1;
-        return Array.from({ length: 20 }, (_, i) => uuid(0x90000000 + offset + i));
-      },
-    };
-    const deps = depsFor(starProjection(CASE_A, [NODE_LEAF_A]), {
-      context: semanticContext,
-      resolveObservations: centerResolver,
-    });
-    const region = await buildRegion(
-      { caseId: CASE_A, graphVersionId: VERSION_A, seedObservationIds: [OBS_1] },
-      deps,
-    );
-    expect(calls).toBe(3);
-    expect(region.roundRecords[0].addedObservationIds).toHaveLength(20);
-    expect(region.roundRecords[1].addedObservationIds).toHaveLength(20);
-    expect(region.roundRecords[2].addedObservationIds).toHaveLength(10);
-    const totalSemantic = region.roundRecords.reduce(
-      (sum, r) => sum + r.addedObservationIds.length,
-      0,
-    );
-    expect(totalSemantic).toBe(50);
-    // The semantic observation ids never leak into the identity (seeds only).
-    expect(region.identity.seedObservationIds).toEqual([OBS_1]);
-  });
-});
-
 describe('createRegionBuilder', () => {
   it('binds deps and builds repeatedly and deterministically', async () => {
     const builder = createRegionBuilder(

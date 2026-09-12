@@ -45,6 +45,9 @@ importers:
       '@indago/graphology-projection':
         specifier: workspace:*
         version: link:../graphology-projection
+      '@indago/semantic-retrieval':
+        specifier: workspace:*
+        version: link:../semantic-retrieval
     devDependencies:
       '@types/node':
         specifier: ^26.2.0

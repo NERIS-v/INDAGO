@@ -60,9 +60,9 @@ export class ProjectedGraphExpansionProvider implements GraphExpansionProvider {
     );
   }
 
-  /** @deprecated PR2 semantic seam. Intentionally ABSENT in PR1 so the
-   *  orchestrator runs with semantic expansion disabled. Do not add here. */
-  // NOT IMPLEMENTED: retrieveSemanticContext?
+  // NOTE (PR2): semantic expansion is NOT part of this provider. It is an
+  // optional builder dependency (RegionBuildDependencies.semanticExpansion)
+  // wired as SemanticRetrievalPort + SemanticNodeAdapter by the caller.
 
   private assertAuthority(caseId: string, graphVersionId: string): void {
     if (caseId !== this.caseId || graphVersionId !== this.graphVersionId) {
