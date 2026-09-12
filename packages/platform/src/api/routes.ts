@@ -17,6 +17,9 @@ import { graphRuntime } from "../relations/graph-runtime.js";
 import { graphProjectionService, normalizeBuiltGraph } from "../relations/graph-version-service.js";
 import { graphVersionStore } from "../persistence/graph-version-store.js";
 import { materializeCanonicalEntityFromAcceptedHypothesis, EntityMaterializationError } from "../entities/entity-materialization.js";
+import { leadRuntime } from "../leads/lead-runtime.js";
+import { leadStore, IllegalLeadStatusTransitionError, LeadNotFoundError } from "../leads/lead-store.js";
+import { crossCaseDiscoveryService } from "../leads/cross-case-discovery.js";
 import {
   materializeCanonicalRelationFromAcceptedHypothesis,
   rejectRelationHypothesis,
@@ -33,6 +36,9 @@ import {
   TemporalBurstCandidateSchema,
   CommunityCandidateSchema,
   ConnectingPathCandidateSchema,
+  LeadStatusSchema,
+  AttachLeadEvidenceRequestSchema,
+  CrossCaseMatchSchema,
 } from "@indago/contracts";
 
 export const apiRouter: Router = Router();
@@ -984,6 +990,361 @@ apiRouter.get(
       });
     } catch (error: unknown) {
       console.error("Failed to serve connecting paths:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-1. P4 — Generate structural leads (bridge/burst/community candidates -> Lead).
+// Idempotent: re-running over unchanged graph state creates nothing new.
+apiRouter.post(
+  "/investigations/:investigationId/leads/generate",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const result = await leadRuntime.generateStructuralLeads(
+        { investigationId, caseId },
+        { actor: req.user.id },
+      );
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        candidatesConsidered: result.candidatesConsidered,
+        leadsCreated: result.leadsCreated.length,
+        leadsAlreadyExisted: result.leadsAlreadyExisted.length,
+        skipped: result.skipped,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to generate structural leads:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-2. P4 — List leads for a case, optionally filtered by status.
+apiRouter.get(
+  "/investigations/:investigationId/leads",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      let status: string | undefined;
+      if (req.query.status !== undefined) {
+        const statusResult = LeadStatusSchema.safeParse(req.query.status);
+        if (!statusResult.success) {
+          return res.status(400).json({ error: "Invalid status query parameter" });
+        }
+        status = statusResult.data;
+      }
+
+      const leads = await leadStore.listByCase(caseId, status ? { status: status as never } : {});
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        leadCount: leads.length,
+        leads,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to list leads:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-3. P4 — Fetch a single lead.
+apiRouter.get(
+  "/investigations/:investigationId/leads/:leadId",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const leadId = String(req.params.leadId);
+      if (!z.string().uuid().safeParse(investigationId).success || !z.string().uuid().safeParse(leadId).success) {
+        return res.status(400).json({ error: "Invalid investigation or lead ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const lead = await leadStore.findById(leadId, { caseId });
+      if (!lead) {
+        return res.status(404).json({ error: "Lead not found" });
+      }
+      const events = await leadStore.listEvents(leadId);
+      const evidence = await leadStore.listEvidence(leadId);
+      return res.status(200).json({ lead, events, evidence });
+    } catch (error: unknown) {
+      console.error("Failed to fetch lead:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-4. P4 — Dedicated evidence FOR/AGAINST attach surface.
+apiRouter.post(
+  "/investigations/:investigationId/leads/:leadId/evidence",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const leadId = String(req.params.leadId);
+      if (!z.string().uuid().safeParse(investigationId).success || !z.string().uuid().safeParse(leadId).success) {
+        return res.status(400).json({ error: "Invalid investigation or lead ID" });
+      }
+      const bodyResult = AttachLeadEvidenceRequestSchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return res.status(400).json({ error: "Invalid request body", issues: bodyResult.error.issues });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      try {
+        const { lead, link, created } = await leadStore.attachEvidence(leadId, {
+          caseId,
+          observationId: bodyResult.data.observationId,
+          verdict: bodyResult.data.verdict,
+          rationale: bodyResult.data.rationale,
+          actor: req.user.id,
+        });
+        return res.status(created ? 201 : 200).json({ lead, link, created });
+      } catch (err: unknown) {
+        if (err instanceof LeadNotFoundError) {
+          return res.status(404).json({ error: err.message });
+        }
+        throw err;
+      }
+    } catch (error: unknown) {
+      console.error("Failed to attach lead evidence:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-5. P4 — Lead status transitions (guarded by LEAD_STATUS_TRANSITIONS).
+apiRouter.post(
+  "/investigations/:investigationId/leads/:leadId/status",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const leadId = String(req.params.leadId);
+      if (!z.string().uuid().safeParse(investigationId).success || !z.string().uuid().safeParse(leadId).success) {
+        return res.status(400).json({ error: "Invalid investigation or lead ID" });
+      }
+      const bodySchema = z.object({ toStatus: LeadStatusSchema }).strict();
+      const bodyResult = bodySchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return res.status(400).json({ error: "Invalid request body", issues: bodyResult.error.issues });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      try {
+        const lead = await leadStore.transitionStatus(leadId, {
+          caseId,
+          toStatus: bodyResult.data.toStatus,
+          actor: req.user.id,
+        });
+        return res.status(200).json({ lead });
+      } catch (err: unknown) {
+        if (err instanceof LeadNotFoundError) {
+          return res.status(404).json({ error: err.message });
+        }
+        if (err instanceof IllegalLeadStatusTransitionError) {
+          return res.status(409).json({ error: err.message });
+        }
+        throw err;
+      }
+    } catch (error: unknown) {
+      console.error("Failed to transition lead status:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-6. P4 — Cross-case shared-entity discovery (read-only preview, no persistence).
+// Requires access to BOTH case boundaries.
+apiRouter.get(
+  "/investigations/:investigationId/cross-case-links",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const targetCaseId = String(req.query.targetCaseId || "");
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      if (!z.string().uuid().safeParse(targetCaseId).success) {
+        return res.status(400).json({ error: "targetCaseId query parameter must be a valid UUID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      const targetRun = await db.investigationRun.findFirst({
+        where: { caseId: targetCaseId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!targetRun) {
+        return res.status(404).json({ error: "Target case not found" });
+      }
+      if (
+        !req.user ||
+        !verifyCaseAccess(req.user, caseId) ||
+        !verifyCaseAccess(req.user, targetCaseId)
+      ) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}/${targetCaseId}`,
+        });
+      }
+
+      const matches = await crossCaseDiscoveryService.findMatches(
+        { caseId, investigationId },
+        { caseId: targetCaseId, investigationId: targetRun.investigationId },
+      );
+      const contract = z.array(CrossCaseMatchSchema).safeParse(matches);
+      if (!contract.success) {
+        console.error("Cross-case match contract violation:", contract.error.issues);
+        return res.status(500).json({ error: "Cross-case match response failed contract validation" });
+      }
+      return res.status(200).json({
+        caseId,
+        targetCaseId,
+        matchCount: contract.data.length,
+        matches: contract.data,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to discover cross-case links:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-7. P4 — Cross-case discovery, persisted as CROSS_CASE leads under this case.
+apiRouter.post(
+  "/investigations/:investigationId/cross-case-links/generate",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const targetCaseId = String(req.query.targetCaseId || "");
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      if (!z.string().uuid().safeParse(targetCaseId).success) {
+        return res.status(400).json({ error: "targetCaseId query parameter must be a valid UUID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      const targetRun = await db.investigationRun.findFirst({
+        where: { caseId: targetCaseId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!targetRun) {
+        return res.status(404).json({ error: "Target case not found" });
+      }
+      if (
+        !req.user ||
+        !verifyCaseAccess(req.user, caseId) ||
+        !verifyCaseAccess(req.user, targetCaseId)
+      ) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}/${targetCaseId}`,
+        });
+      }
+
+      const result = await leadRuntime.generateCrossCaseLeads(
+        { caseId, investigationId },
+        { caseId: targetCaseId, investigationId: targetRun.investigationId },
+        { actor: req.user.id },
+      );
+      return res.status(200).json({
+        caseId,
+        targetCaseId,
+        candidatesConsidered: result.candidatesConsidered,
+        leadsCreated: result.leadsCreated.length,
+        leadsAlreadyExisted: result.leadsAlreadyExisted.length,
+        skipped: result.skipped,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to generate cross-case leads:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }
