@@ -29,6 +29,10 @@ import {
   SourceCatalogSchema,
   CaseIdSchema,
   ProjectedGraphSchema,
+  BridgeCandidateSchema,
+  TemporalBurstCandidateSchema,
+  CommunityCandidateSchema,
+  ConnectingPathCandidateSchema,
 } from "@indago/contracts";
 
 export const apiRouter: Router = Router();
@@ -774,6 +778,212 @@ apiRouter.get(
       });
     } catch (error: unknown) {
       console.error("Failed to serve case communities:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2f. P4 Bridge/Connector Candidates — edges whose removal would disconnect
+// the case graph. Structural signal only (never criminal relevance).
+apiRouter.get(
+  "/investigations/:investigationId/graph/bridges",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const maxResultsParam = req.query.maxResults;
+      const maxResultsResult = parseGraphQueryParam(maxResultsParam, "maxResults");
+      if (!maxResultsResult.ok) {
+        return res.status(400).json({ error: maxResultsResult.error });
+      }
+
+      const bridges = await graphRuntime.bridgeCandidates(
+        { investigationId, caseId },
+        maxResultsResult.value,
+      );
+      const contract = z.array(BridgeCandidateSchema).safeParse(bridges);
+      if (!contract.success) {
+        console.error("Bridge candidate contract violation:", contract.error.issues);
+        return res.status(500).json({ error: "Bridge candidate response failed contract validation" });
+      }
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        bridgeCount: contract.data.length,
+        bridges: contract.data,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve bridge candidates:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2g. P4 Temporal Burst Candidates — entities whose incident relations
+// cluster anomalously against their own baseline activity rate.
+apiRouter.get(
+  "/investigations/:investigationId/graph/bursts",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const bursts = await graphRuntime.temporalBurstCandidates({ investigationId, caseId });
+      const contract = z.array(TemporalBurstCandidateSchema).safeParse(bursts);
+      if (!contract.success) {
+        console.error("Temporal burst contract violation:", contract.error.issues);
+        return res.status(500).json({ error: "Temporal burst response failed contract validation" });
+      }
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        burstCount: contract.data.length,
+        bursts: contract.data,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve temporal burst candidates:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2h. P4 Community Candidates — cohesion-scored Louvain communities dense
+// and large enough to be worth surfacing as an investigative signal.
+apiRouter.get(
+  "/investigations/:investigationId/graph/community-candidates",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const candidates = await graphRuntime.communityCandidates({ investigationId, caseId });
+      const contract = z.array(CommunityCandidateSchema).safeParse(candidates);
+      if (!contract.success) {
+        console.error("Community candidate contract violation:", contract.error.issues);
+        return res.status(500).json({ error: "Community candidate response failed contract validation" });
+      }
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        candidateCount: contract.data.length,
+        candidates: contract.data,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve community candidates:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1g-2i. P4 Connecting Paths — bounded paths between two specific canonical
+// entities (e.g. the endpoints of a candidate cross-case link, or two
+// entities surfaced independently by separate leads).
+apiRouter.get(
+  "/investigations/:investigationId/graph/paths",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      const fromEntityId = String(req.query.from || "");
+      const toEntityId = String(req.query.to || "");
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      if (!z.string().uuid().safeParse(fromEntityId).success) {
+        return res.status(400).json({ error: "from query parameter must be a valid UUID" });
+      }
+      if (!z.string().uuid().safeParse(toEntityId).success) {
+        return res.status(400).json({ error: "to query parameter must be a valid UUID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      const caseId = run.caseId;
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      const hopsResult = parseGraphQueryParam(req.query.hops, "hops");
+      if (!hopsResult.ok) {
+        return res.status(400).json({ error: hopsResult.error });
+      }
+
+      const paths = await graphRuntime.connectingPaths(
+        { investigationId, caseId },
+        fromEntityId,
+        toEntityId,
+        hopsResult.value,
+      );
+      const contract = z.array(ConnectingPathCandidateSchema).safeParse(paths);
+      if (!contract.success) {
+        console.error("Connecting path contract violation:", contract.error.issues);
+        return res.status(500).json({ error: "Connecting path response failed contract validation" });
+      }
+      return res.status(200).json({
+        investigationId,
+        caseId,
+        from: fromEntityId,
+        to: toEntityId,
+        pathCount: contract.data.length,
+        paths: contract.data,
+      });
+    } catch (error: unknown) {
+      console.error("Failed to serve connecting paths:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

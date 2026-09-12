@@ -39,6 +39,7 @@ export * from './graph/graph-edge.js';
 export * from './graph/graph-version.js';
 export * from './graph/graph-analysis.js';
 export * from './graph/graph-projection.js';
+export * from './graph/graph-candidates.js';
 
 // Intelligence contracts
 export * from './intelligence/entity-resolution.js';
