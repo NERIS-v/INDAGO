@@ -14,6 +14,7 @@ import {
   MAX_CONTEXT_OBSERVATIONS,
   MAX_SEMANTIC_RESULTS_PER_ROUND,
   MAX_TOTAL_SEMANTIC_RESULTS,
+  MAX_SEMANTIC_NODES_ADDED,
   MAX_HYPOTHESES_IN_CONTEXT,
   MAX_ATOMIC_HYPOTHESES_PER_GROUP,
   MAX_GROUP_NODES,
@@ -63,6 +64,7 @@ describe('V1 constants (single source of truth)', () => {
     expect(MAX_CONTEXT_OBSERVATIONS).toBe(150);
     expect(MAX_SEMANTIC_RESULTS_PER_ROUND).toBe(20);
     expect(MAX_TOTAL_SEMANTIC_RESULTS).toBe(50);
+    expect(MAX_SEMANTIC_NODES_ADDED).toBe(50);
     expect(MAX_HYPOTHESES_IN_CONTEXT).toBe(50);
     expect(MAX_ATOMIC_HYPOTHESES_PER_GROUP).toBe(25);
     expect(MAX_GROUP_NODES).toBe(50);
@@ -283,6 +285,7 @@ describe('§26 GRAPH_HOLE_POLICY_V1', () => {
     expect(policy.region.maxContextObservations).toBe(MAX_CONTEXT_OBSERVATIONS);
     expect(policy.region.maxSemanticResultsPerRound).toBe(MAX_SEMANTIC_RESULTS_PER_ROUND);
     expect(policy.region.maxTotalSemanticResults).toBe(MAX_TOTAL_SEMANTIC_RESULTS);
+    expect(policy.region.maxSemanticNodesAdded).toBe(MAX_SEMANTIC_NODES_ADDED);
     expect(policy.region.maxGraphHolesPerRegion).toBe(MAX_GRAPH_HOLES_PER_REGION);
     expect(policy.aiContext.maxHypothesesInContext).toBe(MAX_HYPOTHESES_IN_CONTEXT);
     expect(policy.aiContext.maxAiAnalysesPerRegion).toBe(MAX_AI_ANALYSES_PER_REGION);
