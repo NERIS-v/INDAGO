@@ -491,7 +491,9 @@ function buildGap(memberEntityIds: readonly string[]) {
 
 function buildHole(): GraphHole {
   return {
+    id: HOLE_B3,
     investigationId: INVESTIGATION_B_ID,
+    caseId: CASE_B_ID,
     graphVersionId: GRAPH_VERSION_B,
     type: "MISSING_EDGE",
     investigationGapId: GAP_B4,

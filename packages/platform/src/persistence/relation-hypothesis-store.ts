@@ -212,10 +212,15 @@ export class RelationHypothesisStore {
         where: { identityKey },
       });
 
+      // Lost-create race: a concurrent transaction inserted the identical
+      // identityKey between our read and our write. Insert via
+      // createMany(… skipDuplicates) — P2002-FREE by construction. DO NOT
+      // 'create' + P2002-catch here: a unique-violation aborts the PostgreSQL
+      // transaction, so any re-read inside it fails with 25P02.
       if (!existing) {
-        try {
-          const created = await tx.relationHypothesis.create({
-            data: {
+        const { count } = await tx.relationHypothesis.createMany({
+          data: [
+            {
               id,
               identityKey,
               caseId: input.caseId,
@@ -242,23 +247,39 @@ export class RelationHypothesisStore {
               createdAt: now,
               updatedAt: now,
             },
+          ],
+          skipDuplicates: true,
+        });
+
+        if (count === 1) {
+          // We won the insert race (or there was no race at all). Re-read the
+          // durable row so the returned hypothesis reflects the stored row.
+          const created = await tx.relationHypothesis.findUnique({
+            where: { identityKey },
           });
+          if (!created) {
+            throw new Error(
+              "RelationHypothesisStore: inserted hypothesis row vanished immediately after createMany",
+            );
+          }
           return {
             wrote: true,
             preservedExisting: false,
             reusedExisting: false,
             hypothesis: rowToRelationHypothesis(created),
           };
-        } catch (cause) {
-          const code =
-            cause instanceof Prisma.PrismaClientKnownRequestError
-              ? cause.code
-              : undefined;
-          if (code !== "P2002") throw cause;
-          existing = await tx.relationHypothesis.findUnique({
-            where: { identityKey },
-          });
-          if (!existing) throw cause;
+        }
+
+        // A concurrent writer inserted the identical row between our read and
+        // create (skipDuplicates skipped our insert). The transaction is still
+        // live — re-read the winner and fall through to the shared refresh path.
+        existing = await tx.relationHypothesis.findUnique({
+          where: { identityKey },
+        });
+        if (!existing) {
+          throw new Error(
+            `RelationHypothesisStore: unique conflict without a competing hypothesis row for ${identityKey}`,
+          );
         }
       }
 
