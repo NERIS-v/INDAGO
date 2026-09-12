@@ -31,6 +31,7 @@ export const NODE_CENTER = uuid(0x00000001);
 export const NODE_LEAF_A = uuid(0x00000002);
 export const NODE_LEAF_B = uuid(0x00000003);
 export const NODE_LEAF_C = uuid(0x00000004);
+export const NODE_ISLE = uuid(0x00000005);
 
 export const EDGE_A = uuid(0x10000001);
 export const EDGE_B = uuid(0x10000002);

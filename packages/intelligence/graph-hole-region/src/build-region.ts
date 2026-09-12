@@ -1,5 +1,5 @@
 // ============================================================================
-// buildRegion — deterministic candidate-region builder (Phase 5A-PR1)
+// buildRegion — deterministic candidate-region builder (Phase 5A-PR1 + PR2)
 //
 // Orchestrates observation-seeded, bounded, deterministic region construction
 // over the existing M-A13 projected graph runtime (Graphology projection).
@@ -11,13 +11,21 @@
 //        - seed context edges collected (temporal-filtered) and edge-budgeted
 //   2. EXPANSION ROUNDS 1..MAX_REGION_EXPANSION_ROUNDS
 //        - one-hop frontier expansion via GraphExpansionProvider.expandGraph
-//        - optional PR2 semantic seam adds observations
+//        - OPTIONAL PR2 semantic expansion: a deterministic query over the
+//          current region membership is sent to the SemanticRetrievalPort; the
+//          SemanticNodeAdapter maps hits → authoritative canonical graph nodes
+//          (source → M-A09/M-A10 entity → M-A13 node), which are admitted under
+//          the shared region-node budget. Isolated by case, bounded by
+//          MAX_SEMANTIC_RESULTS_PER_ROUND / MAX_TOTAL_SEMANTIC_RESULTS /
+//          MAX_SEMANTIC_NODES_ADDED. A provider failure DEGRADES the region
+//          (never a fake empty); a reached semantic bound stops it (LIMITED).
 //        - hard budgets applied to nodes / edges / observations
 //        - saturation evaluated AFTER each round (two CONSECUTIVE satisfying
 //          rounds required; a round that hits a hard bound cannot count)
 //   3. FINALIZE
 //        - status by documented precedence: DEGRADED > LIMITED > SATURATED
 //        - identity + regionId = sha256(canonicalizeRegionIdentity(identity))
+//          (semantic expansion trace is traceability ONLY, never in the id)
 //
 // Semantic invariants:
 //   - a region is context, NOT a graph-hole candidate (detection is later PRs)
@@ -25,6 +33,9 @@
 //     provider failure is never rewarded with SATURATED
 //   - case isolation is enforced twice (orchestrator + provider authority)
 //   - every output ID set is sorted/unique; nothing ties regionId to execution
+//   - semantic mapping is authoritative only; no similarity/string resolution,
+//     no fabricated nodes, no semantic feedback loop (queries depend solely on
+//     region membership)
 // ============================================================================
 
 import {
@@ -32,16 +43,24 @@ import {
   MAX_REGION_EDGES,
   MAX_REGION_EXPANSION_ROUNDS,
   MAX_REGION_NODES,
+  MAX_SEMANTIC_NODES_ADDED,
   MAX_SEMANTIC_RESULTS_PER_ROUND,
   MAX_TOTAL_SEMANTIC_RESULTS,
   RegionIdentityV1Schema,
 } from '@indago/contracts';
-import type { RegionStatus } from '@indago/contracts';
+import type {
+  RegionStatus,
+  SemanticExpansionRoundTrace,
+  SemanticExpansionStatus,
+  SemanticExpansionTrace,
+  SemanticNodeMappingReport,
+} from '@indago/contracts';
 import { SATURATION_DEFINITION_V1, SaturationTracker } from './calculate-saturation.js';
 import { applyBudget } from './region-bounds.js';
 import { computeRegionId, sortedUnique } from './region-identity.js';
+import { regionSemanticQueryOf } from './semantic-query.js';
 import { resolveSeedNodeIds } from './resolve-observation-nodes.js';
-import { RegionBuildError } from './types.js';
+import { RegionBuildError, REGION_TRUNCATING_LIMITATIONS } from './types.js';
 import type {
   BuildRegionInput,
   GraphHoleRegion,
@@ -60,6 +79,28 @@ export async function buildRegion(
 ): Promise<GraphHoleRegion> {
   assertBuildable(input, deps);
 
+  const semanticExpansion = deps.semanticExpansion;
+  const semanticState: SemanticState = {
+    enabled: semanticExpansion !== undefined,
+    held: false,
+    failure: false,
+    nodeBound: false,
+    resultsBound: false,
+    mappedSomething: false,
+    unresolvedOrRejected: false,
+    rounds: [],
+    totalResults: 0,
+    totalMappedNodes: 0,
+    totalUnresolved: 0,
+    totalRejected: 0,
+    pendingQuery: '',
+    pendingQueryHash: '',
+    pendingRequestedLimit: 0,
+    pendingRetrievedCount: 0,
+    pendingTruncated: false,
+  };
+  const semanticTrace = () => semanticTraceOf(semanticState);
+
   const temporalContext = input.temporalContext ?? undefined;
   const seedAttempt = sortedUnique(input.seedObservationIds);
   const degradations = new Limitations();
@@ -70,7 +111,7 @@ export async function buildRegion(
     seedObservations = await deps.resolveObservations(seedAttempt);
   } catch {
     degradations.add('OBSERVATION_RESOLUTION_FAILED');
-    return finalizeRegion(input, degradations, {
+    return finalizeRegion(input, degradations, semanticTrace(), {
       nodeIds: [],
       edgeIds: [],
       seedObservationIds: seedAttempt,
@@ -102,7 +143,7 @@ export async function buildRegion(
   }
   if (resolvedSeedNodeIds.length === 0) {
     degradations.add('NO_RESOLVABLE_SEED_NODES');
-    return finalizeRegion(input, degradations, {
+    return finalizeRegion(input, degradations, semanticTrace(), {
       nodeIds: [],
       edgeIds: [],
       seedObservationIds: observationIds.length > 0 ? observationIds : seedAttempt,
@@ -135,7 +176,7 @@ export async function buildRegion(
     }
   } catch {
     degradations.add('EXPANSION_PROVIDER_FAILURE');
-    return finalizeRegion(input, degradations, {
+    return finalizeRegion(input, degradations, semanticTrace(), {
       nodeIds,
       edgeIds,
       seedObservationIds: observationIds.length > 0 ? observationIds : seedAttempt,
@@ -156,7 +197,6 @@ export async function buildRegion(
   const roundRecords: RegionExpansionRoundRecord[] = [];
   const tracker = new SaturationTracker(SATURATION_DEFINITION);
   let expansionRounds = 0;
-  let totalSemanticResults = 0;
   const observationSet = new Set(observationIds);
 
   if (!hardStop) {
@@ -164,27 +204,65 @@ export async function buildRegion(
     for (let round = 1; round <= MAX_REGION_EXPANSION_ROUNDS; round++) {
       let providerFailure = false;
 
-      // ---- Optional PR2 semantic seam ----
-      let addedObservations: readonly string[] = [];
-      if (deps.context.retrieveSemanticContext) {
-        try {
-          const results = sortedUnique(
-            await deps.context.retrieveSemanticContext({
+      // ---- Optional PR2 semantic expansion (retrieve + authoritative map) ----
+      let semanticMapping: SemanticNodeMappingReport | null = null;
+      semanticState.held = false;
+      if (semanticExpansion !== undefined && !providerFailure) {
+        if (semanticState.totalResults >= MAX_TOTAL_SEMANTIC_RESULTS) {
+          semanticState.resultsBound = true;
+          degradations.add('SEMANTIC_RESULTS_BOUND_REACHED');
+        } else {
+          try {
+            const query = regionSemanticQueryOf(nodeIds);
+            const requestedLimit = Math.min(
+              MAX_SEMANTIC_RESULTS_PER_ROUND,
+              MAX_TOTAL_SEMANTIC_RESULTS - semanticState.totalResults,
+            );
+            const envelope = await semanticExpansion.port.retrieve({
               caseId: input.caseId,
-              graphVersionId: input.graphVersionId,
-              regionNodeIds: nodeIds,
-temporalContext: temporalContext,
-            }),
-          ).filter((id) => !observationSet.has(id));
-          const perRound = applyBudget(results, 0, MAX_SEMANTIC_RESULTS_PER_ROUND).kept;
-          const remainingTotal = MAX_TOTAL_SEMANTIC_RESULTS - totalSemanticResults;
-          const admitted = applyBudget(perRound, 0, remainingTotal).kept;
-          addedObservations = admitted;
-          totalSemanticResults += admitted.length;
-          for (const id of admitted) observationSet.add(id);
-        } catch {
-          degradations.add('EXPANSION_PROVIDER_FAILURE');
-          providerFailure = true;
+              query,
+              temporalContext: temporalContext,
+              limit: requestedLimit,
+            });
+            if (envelope.caseId !== input.caseId) {
+              throw new RegionBuildError(
+                'AUTHORITY_MISMATCH',
+                `Semantic retrieval returned case ${envelope.caseId} for a ${input.caseId} region.`,
+              );
+            }
+            semanticState.totalResults += envelope.results.length;
+            if (semanticState.totalResults >= MAX_TOTAL_SEMANTIC_RESULTS) {
+              semanticState.resultsBound = true;
+              degradations.add('SEMANTIC_RESULTS_BOUND_REACHED');
+            }
+            semanticState.pendingQuery = query;
+            semanticState.pendingQueryHash = envelope.queryHash;
+            semanticState.pendingRequestedLimit = requestedLimit;
+            semanticState.pendingRetrievedCount = envelope.results.length;
+            semanticState.pendingTruncated = envelope.truncated;
+
+            semanticMapping = await semanticExpansion.adapter.mapSemanticResultsToNodes(
+              envelope.results,
+              {
+                caseId: input.caseId,
+                graphVersionId: input.graphVersionId,
+                temporalContext: temporalContext,
+                resolveSourceEntities: semanticExpansion.resolveSourceEntities,
+                hasNode: (id) => deps.context.hasNode(id),
+              },
+            );
+            semanticState.totalUnresolved += semanticMapping.unresolvedCount;
+            semanticState.totalRejected += semanticMapping.rejectedCount;
+            if (semanticMapping.mappedCount > 0) semanticState.mappedSomething = true;
+            if (semanticMapping.unresolvedCount + semanticMapping.rejectedCount > 0) {
+              semanticState.unresolvedOrRejected = true;
+            }
+            semanticState.held = true;
+          } catch {
+            semanticState.failure = true;
+            degradations.add('SEMANTIC_RETRIEVAL_FAILURE');
+            providerFailure = true;
+          }
         }
       }
 
@@ -207,9 +285,70 @@ temporalContext: temporalContext,
       }
 
       // ---- Apply budgets (deterministic prefix of sorted candidates) ----
+      // Graph frontier first, then semantic nodes against the SAME region-node
+      // budget, so semantic admission can never push the region past MAX_REGION_NODES.
       const boundedNodes = applyBudget(candidateNodeIds, nodeIds.length, MAX_REGION_NODES);
-      const addedNodes = [...boundedNodes.kept];
+      const graphKept = [...boundedNodes.kept];
+      let nodeBoundReached = boundedNodes.boundReached;
       if (boundedNodes.boundReached) {
+        degradations.add('REGION_NODE_BOUND_REACHED');
+      }
+
+      let admittedNodes: string[] = [];
+      let addedObservations: string[] = [];
+      if (semanticMapping !== null) {
+        const existing = new Set(nodeIds);
+        const freshNodes = semanticMapping.mappedNodeIds.filter((id) => !existing.has(id));
+        const remainingRegionNodes = MAX_REGION_NODES - (nodeIds.length + graphKept.length);
+        const semanticNodeBudget = Math.min(
+          MAX_SEMANTIC_NODES_ADDED - semanticState.totalMappedNodes,
+          remainingRegionNodes,
+        );
+        const boundedSemantic = applyBudget(freshNodes, 0, Math.max(0, semanticNodeBudget));
+        admittedNodes = [...boundedSemantic.kept];
+        semanticState.totalMappedNodes += admittedNodes.length;
+
+        if (boundedSemantic.boundReached || semanticState.totalMappedNodes >= MAX_SEMANTIC_NODES_ADDED) {
+          semanticState.nodeBound = true;
+          degradations.add('SEMANTIC_NODE_BOUND_REACHED');
+        }
+        if (remainingRegionNodes <= 0 && freshNodes.length > 0) {
+          nodeBoundReached = true;
+          degradations.add('REGION_NODE_BOUND_REACHED');
+        }
+
+        // Observation context surface: source ids of every OBSERVATION-type hit
+        // the adapter mapped (semantic recall surfaced new context observations;
+        // bounded overall by the results budget and the observation cap).
+        const obsIds = new Set<string>();
+        for (const hit of semanticMapping.attribution) {
+          if (hit.sourceType !== 'OBSERVATION' || hit.outcome !== 'MAPPED') continue;
+          obsIds.add(hit.sourceId);
+        }
+        addedObservations = [...obsIds].sort();
+        for (const id of addedObservations) observationSet.add(id);
+
+        if (semanticState.held) {
+          semanticState.rounds.push({
+            round,
+            query: semanticState.pendingQuery,
+            queryHash: semanticState.pendingQueryHash,
+            requestedLimit: semanticState.pendingRequestedLimit,
+            retrievedCount: semanticState.pendingRetrievedCount,
+            truncated: semanticState.pendingTruncated,
+            admittedNodeIds: admittedNodes,
+            mappedCount: semanticMapping.mappedCount,
+            unresolvedCount: semanticMapping.unresolvedCount,
+            rejectedCount: semanticMapping.rejectedCount,
+          });
+        }
+      }
+
+      let addedNodes = sortedUnique([...graphKept, ...admittedNodes]);
+      const regionRemaining = MAX_REGION_NODES - nodeIds.length;
+      if (addedNodes.length > regionRemaining) {
+        addedNodes = addedNodes.slice(0, regionRemaining);
+        nodeBoundReached = true;
         degradations.add('REGION_NODE_BOUND_REACHED');
       }
 
@@ -250,9 +389,11 @@ temporalContext: temporalContext,
       edgeIds = sortedUnique([...edgeIds, ...addedEdges]);
 
       const budgetBoundReached =
-        boundedNodes.boundReached ||
+        nodeBoundReached ||
         edgeBoundReached ||
-        observationBoundReached;
+        observationBoundReached ||
+        semanticState.nodeBound ||
+        semanticState.resultsBound;
 
       const record: RegionExpansionRoundRecord = {
         round,
@@ -302,7 +443,7 @@ temporalContext: temporalContext,
     }
   }
 
-  return finalizeRegion(input, degradations, {
+  return finalizeRegion(input, degradations, semanticTrace(), {
     nodeIds,
     edgeIds,
     seedObservationIds: observationIds.length > 0 ? observationIds : seedAttempt,
@@ -328,6 +469,7 @@ interface RegionParts {
 function finalizeRegion(
   input: BuildRegionInput,
   degradations: Limitations,
+  semanticExpansion: SemanticExpansionTrace,
   parts: RegionParts,
 ): GraphHoleRegion {
   const { identity, regionId } = computeRegionId({
@@ -371,13 +513,14 @@ function finalizeRegion(
     nodeIds: parts.nodeIds,
     edgeIds: parts.edgeIds,
     roundRecords: parts.roundRecords,
+    semanticExpansion,
   };
 }
 
 /**
  * Status precedence (documented, deterministic):
  *   DEGRADED  — known incomplete/degraded context (unresolved seeds,
- *               provider failure) — never redeems to SATURATED.
+ *               provider failure — graph or semantic) — never redeems to SATURATED.
  *   LIMITED   — a hard budget/round bound stopped the process.
  *   SATURATED — natural stopping condition, no bound exhausted.
  * Rounds-exhausted is treated as LIMITED (EXPANSION_ROUND_LIMIT_REACHED).
@@ -391,6 +534,7 @@ function resolveStatus(
     'NO_RESOLVABLE_SEED_NODES',
     'UNRESOLVED_SEED_ENTITIES',
     'EXPANSION_PROVIDER_FAILURE',
+    'SEMANTIC_RETRIEVAL_FAILURE',
   ].some((code) => (limitations as readonly string[]).includes(code));
   if (degraded) return 'DEGRADED';
   if (limitations.length > 0) return 'LIMITED';
@@ -426,12 +570,7 @@ class Limitations {
 
   get truncating(): boolean {
     return this.codes.some((code) =>
-      [
-        'CONTEXT_OBSERVATION_BOUND_REACHED',
-        'REGION_NODE_BOUND_REACHED',
-        'REGION_EDGE_BOUND_REACHED',
-        'EXPANSION_ROUND_LIMIT_REACHED',
-      ].includes(code),
+      (REGION_TRUNCATING_LIMITATIONS as readonly string[]).includes(code),
     );
   }
 
@@ -453,5 +592,51 @@ export function createRegionBuilder(deps: RegionBuildDependencies): RegionBuilde
     build(input: BuildRegionInput): Promise<GraphHoleRegion> {
       return buildRegion(input, deps);
     },
+  };
+}
+
+// ============================================================================
+// Semantic expansion state + status resolution (PR2)
+// ============================================================================
+
+interface SemanticState {
+  readonly enabled: boolean;
+  /** true when a retrieved round is awaiting its round-record entry (after budget). */
+  held: boolean;
+  failure: boolean;
+  nodeBound: boolean;
+  resultsBound: boolean;
+  mappedSomething: boolean;
+  unresolvedOrRejected: boolean;
+  rounds: SemanticExpansionRoundTrace[];
+  totalResults: number;
+  totalMappedNodes: number;
+  totalUnresolved: number;
+  totalRejected: number;
+  pendingQuery: string;
+  pendingQueryHash: string;
+  pendingRequestedLimit: number;
+  pendingRetrievedCount: number;
+  pendingTruncated: boolean;
+}
+
+function semanticExpansionStatusOf(state: SemanticState): SemanticExpansionStatus {
+  if (!state.enabled) return 'DISABLED';
+  if (state.failure) return 'DEGRADED';
+  if (state.nodeBound || state.resultsBound) return 'LIMITED';
+  if (state.mappedSomething) return state.unresolvedOrRejected ? 'PARTIAL' : 'SUCCESS';
+  return 'EMPTY';
+}
+
+function semanticTraceOf(state: SemanticState): SemanticExpansionTrace {
+  return {
+    status: semanticExpansionStatusOf(state),
+    rounds: state.rounds,
+    totalSemanticResults: state.totalResults,
+    totalMappedNodes: state.totalMappedNodes,
+    totalUnresolved: state.totalUnresolved,
+    totalRejected: state.totalRejected,
+    semanticNodeBoundReached: state.nodeBound,
+    totalResultsBoundReached: state.resultsBound,
   };
 }

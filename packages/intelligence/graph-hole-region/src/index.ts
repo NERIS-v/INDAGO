@@ -12,10 +12,10 @@ export type {
   GraphExpansionRequest,
   GraphExpansionResult,
   IncidentEdgesRequest,
-  SemanticRetrievalRequest,
   GraphExpansionProvider,
   RegionExpansionContextProvider,
   RegionBuildDependencies,
+  SemanticExpansionDependency,
   GraphHoleRegion,
   RegionExpansionRoundRecord,
   RegionBuildErrorCode,
@@ -58,6 +58,11 @@ export { expandGraphSteps, incidentEdgesOf, intervalOverlapsContext } from './ex
 
 // ---- Projected graph provider (M-A13 adapter) ----
 export { ProjectedGraphExpansionProvider } from './graph-expansion-provider.js';
+
+// ---- Semantic region expansion (PR2) ----
+export { AuthoritativeSemanticNodeAdapter } from './semantic-node-adapter.js';
+export type { SemanticNodeAdapter, SemanticNodeMappingContext } from './semantic-node-adapter.js';
+export { regionSemanticQueryOf } from './semantic-query.js';
 
 // ---- Orchestrator ----
 export { buildRegion, createRegionBuilder } from './build-region.js';
