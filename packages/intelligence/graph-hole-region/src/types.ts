@@ -87,13 +87,21 @@ export interface SemanticRetrievalRequest {
 }
 
 /**
- * The region expansion seam (PR2 will add a real semantic implementation):
+ * The region expansion seam:
  *  - expandGraph     — one-hop frontier expansion over the authoritative
  *                      projected graph (M-A13).
  *  - incidentEdges   — edges incident to a set of nodes.
  *  - retrieveSemanticContext — OPTIONAL PR2 boundary. When absent, PR1 runs
  *                      with semantic expansion disabled. Never implemented
  *                      here; never required for a valid region.
+ *
+ * Phase 5A-PR1.5 note: the SEMANTIC capability next door (contracts
+ * `SemanticRetrievalPort`, engine `SemanticSearchService`) returns semantic
+ * text units, NOT graph node ids. This seam stays typed to NODE ids because a
+ * region is a bounded set of canonical graph nodes; the PR2 adapter is the
+ * only place that may bridge semantic units → nodes. The conformance test
+ * (tests/conformance/semantic-retrieval-seam.test.ts, test-only adapter) pins
+ * the shape contract; no production adapter ships here.
  */
 export interface GraphExpansionProvider {
   readonly caseId: string;
