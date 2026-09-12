@@ -19,6 +19,7 @@
     "@indago/contracts": "workspace:*",
     "@indago/entity-resolution": "workspace:*",
     "@indago/graphology-projection": "workspace:*",
+    "@indago/lead-generation": "workspace:*",
     "@indago/ingestion": "workspace:*",
     "@indago/relation-resolution": "workspace:*",
     "@prisma/client": "^5.10.0",

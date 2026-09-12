@@ -38,7 +38,7 @@ import {
   type RelationStore,
 } from "../persistence/relation-store.js";
 
-interface GraphScopeInput {
+export interface GraphScopeInput {
   readonly investigationId: string;
   readonly caseId: string;
 }
