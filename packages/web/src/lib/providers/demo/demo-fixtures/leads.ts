@@ -47,8 +47,13 @@ const l1: Lead = {
   posture: "T2_CORROBORATED_LEAD",
   relatedEntityIds: [ENT_BANK, ENT_SHELL_ONE, ENT_SHELL_TWO],
   supportingObservationIds: [OBS_3, OBS_4],
+  contradictingObservationIds: [],
   relatedEvidenceIds: [EVID_WIRE_1, EVID_WIRE_2],
   gapIds: [GAP_1],
+  sourceCandidateType: "MANUAL",
+  sourceCandidateKey: `manual:${LEAD_1}`,
+  sourceCandidateSnapshot: {},
+  alternativeExplanations: [],
   assignedTo: "analyst.lead@indago.dev",
   provenance: {
     entries: [
@@ -77,8 +82,13 @@ const l2: Lead = {
   posture: "T1_INVESTIGATIVE_LEAD",
   relatedEntityIds: [ENT_MARIA, ENT_BANK, ENT_VICTOR],
   supportingObservationIds: [OBS_7, OBS_6],
+  contradictingObservationIds: [],
   relatedEvidenceIds: [EVID_EMAIL_2, EVID_EMAIL_1],
   gapIds: [GAP_2],
+  sourceCandidateType: "MANUAL",
+  sourceCandidateKey: `manual:${LEAD_2}`,
+  sourceCandidateSnapshot: {},
+  alternativeExplanations: [],
   assignedTo: "analyst.entity@indago.dev",
   provenance: {
     entries: [
@@ -107,8 +117,13 @@ const l3: Lead = {
   posture: "T3_EVIDENCE_PACKAGE_CANDIDATE",
   relatedEntityIds: [ENT_SHELL_ONE, ENT_VICTOR],
   supportingObservationIds: [OBS_8],
+  contradictingObservationIds: [],
   relatedEvidenceIds: [EVID_REGISTRY],
   gapIds: [GAP_3],
+  sourceCandidateType: "MANUAL",
+  sourceCandidateKey: `manual:${LEAD_3}`,
+  sourceCandidateSnapshot: {},
+  alternativeExplanations: [],
   provenance: {
     entries: [
       {
