@@ -770,6 +770,126 @@ model GraphVersion {
 }
 
 // ============================================================================
+// P4 — InvestigativeLead (backend lifecycle)
+//
+// A Lead is the Phase-4 investigation-loop record produced by interpreting a
+// structural/temporal candidate (bridge / temporal burst / community /
+// cross-case match — @indago/graphology-projection, @indago/lead-generation)
+// into a line of inquiry a human can review. Leads are STRUCTURAL SIGNALS,
+// never verdicts: `confidence` is analytical confidence the lead is worth
+// pursuing, NOT a probability of guilt (see contracts/common/confidence.ts).
+//
+// Identity: id = deterministic UUID derived from
+// (caseId, sourceCandidateType, sourceCandidateKey) via
+// @indago/lead-generation's buildLeadIdentityKey — re-running generation over
+// an unchanged candidate reproduces the SAME lead id (idempotent upsert,
+// matching the identity-key discipline used everywhere else in this schema:
+// Relation.relationKey, GraphVersion natural key, etc.) rather than minting
+// duplicate leads on every generation pass.
+//
+// status lifecycle (LeadStore-enforced, mirrors GraphVersionStore's
+// no-arbitrary-transitions discipline):
+//   NEW -> UNDER_REVIEW -> ACTIVE -> { PROMOTED | REJECTED | STALE }
+//   NEW -> REJECTED (fast reject without review)
+//   Any of {UNDER_REVIEW, ACTIVE} -> STALE (goes stale from inactivity)
+// Terminal: PROMOTED, REJECTED, STALE never transition further.
+//
+// alternativeExplanations (Json array of AlternativeExplanationSchema) are
+// generated alongside the lead by @indago/lead-generation — every P4 lead
+// ships with at least one non-incriminating alternative reading of the same
+// structural signal (Phase 6/9 discipline: structural signal != criminal
+// relevance; alternatives must be surfaced for high-impact leads).
+//
+// NO-FK DECOUPLING (intentional, consistent with the rest of the schema):
+// caseId/investigationId/entity & observation id arrays are plain
+// indexed/Json columns, not Prisma FKs — mirroring Relation, Entity, etc.
+// ============================================================================
+model Lead {
+  id                        String    @id // deterministic UUID — see identity note above
+  caseId                    String
+  investigationId           String?
+  title                     String
+  description               String
+  status                    String    @default("NEW") // NEW | UNDER_REVIEW | ACTIVE | PROMOTED | REJECTED | STALE
+  priority                  String    @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  confidence                Float     // AnalyticalConfidenceSchema — NOT a probability unless calibrated
+  posture                   String    // EvidencePostureSchema tier
+  relatedEntityIds          Json      // EntityId[]
+  supportingObservationIds  Json      // ObservationId[] — evidence FOR
+  contradictingObservationIds Json    @default("[]") // ObservationId[] — evidence AGAINST
+  relatedEvidenceIds        Json      @default("[]") // EvidenceId[]
+  gapIds                    Json      @default("[]") // InvestigativeGapId[]
+  sourceCandidateType       String    // BRIDGE | TEMPORAL_BURST | COMMUNITY | CROSS_CASE
+  sourceCandidateKey        String    // deterministic identity key of the originating candidate (see lead-generation)
+  sourceCandidateSnapshot   Json      // the candidate payload at generation time, for audit/explainability
+  alternativeExplanations   Json      @default("[]") // AlternativeExplanationSchema[]
+  provenance                Json      // ProvenanceChainSchema
+  assignedTo                String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  closedAt                  DateTime?
+
+  @@index([caseId])
+  @@index([investigationId, caseId])
+  @@index([caseId, status])
+  @@index([sourceCandidateType])
+}
+
+// ============================================================================
+// P4 — LeadEvidenceLink (dedicated evidence FOR/AGAINST attach surface)
+//
+// The Phase-4 tracker gap this closes: Entity/RelationHypothesis already
+// persist supporting/contradicting observation sets, but there was no
+// DEDICATED attach API or verdict record at the Lead level. This table is
+// that dedicated surface: one row per (lead, observation) verdict, with the
+// human/system rationale for the attach kept alongside it (never silently
+// folded into the raw id arrays on Lead — those stay a denormalized summary,
+// this table is the source of truth for "why").
+//
+// verdict is FOR or AGAINST ONLY — this is an evidentiary relevance verdict,
+// never a truth/guilt verdict (same discipline as everywhere else: role !=
+// culpability, structural signal != criminal relevance).
+// ============================================================================
+model LeadEvidenceLink {
+  id             String   @id @default(uuid())
+  leadId         String
+  observationId  String
+  verdict        String   // FOR | AGAINST
+  rationale      String?
+  addedBy        String
+  createdAt      DateTime @default(now())
+
+  @@unique([leadId, observationId, verdict]) // idempotent re-attach guard
+  @@index([leadId])
+  @@index([observationId])
+}
+
+// ============================================================================
+// P4 — LeadEvent (append-only lead provenance / audit trail)
+//
+// Mirrors TemporalStateChange's append-only discipline (D6) at the Lead
+// level: every material change to a Lead (creation, evidence attach, status
+// transition, alternative-explanation addition) is recorded here as an
+// immutable row, so a lead's full history is reconstructable independent of
+// its current (mutable) row — this is the "Persist lead provenance" Phase-4
+// deliverable, distinct from the evidentiary ProvenanceChain stored inline
+// on Lead.provenance (that traces evidence lineage; this traces the lead
+// RECORD's own lifecycle).
+// ============================================================================
+model LeadEvent {
+  id        String   @id @default(uuid())
+  leadId    String
+  caseId    String
+  eventType String   // LEAD_CREATED | EVIDENCE_ATTACHED | STATUS_CHANGED | ALTERNATIVE_EXPLANATION_ADDED
+  actor     String
+  payload   Json
+  sequence  Int      // monotonic per leadId, application-allocated (max(existing)+1) — deterministic replay order
+  createdAt DateTime @default(now())
+
+  @@unique([leadId, sequence])
+  @@index([leadId])
+  @@index([caseId])
+}
 // Phase 5A-PR1.5: Semantic embedding + retrieval (pgvector)
 //
 // SemanticTextUnit is the ATOMIC retrievable text item. It is a MUTABLE CURRENT
