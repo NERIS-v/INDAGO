@@ -28,6 +28,25 @@ export type { CentralityResult } from './centrality.js';
 export { detectCommunities, COMMUNITY_BOUNDS } from './communities.js';
 export type { CommunityResult } from './communities.js';
 
+// ----------------------------------------------------------------------------
+// P4 Graph Analytics — candidate detectors (burst / bridge / community /
+// connecting-path). See each module's header for algorithm + determinism
+// notes. All are read-only, bounded, and deterministic like the primitives
+// above; they interpret the primitives into investigation-loop candidates.
+// ----------------------------------------------------------------------------
+
+export { detectTemporalBursts, BURST_BOUNDS } from './temporal-bursts.js';
+export type { TemporalBurstCandidate } from './temporal-bursts.js';
+
+export { detectBridgeCandidates, BRIDGE_BOUNDS } from './bridges.js';
+export type { BridgeCandidate } from './bridges.js';
+
+export { detectCommunityCandidates, COMMUNITY_CANDIDATE_BOUNDS } from './community-candidates.js';
+export type { CommunityCandidate } from './community-candidates.js';
+
+export { findConnectingPaths, CONNECTING_PATH_BOUNDS } from './path-candidates.js';
+export type { ConnectingPathCandidate } from './path-candidates.js';
+
 export type {
   GraphProjectionInput,
   GraphNode,

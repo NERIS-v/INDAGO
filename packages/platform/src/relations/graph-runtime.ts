@@ -20,6 +20,10 @@ import {
   traverseBounded,
   degreeCentrality,
   detectCommunities,
+  detectBridgeCandidates,
+  detectTemporalBursts,
+  detectCommunityCandidates,
+  findConnectingPaths,
   type BuiltGraph,
   type GraphProjectionInput,
 } from "@indago/graphology-projection";
@@ -120,6 +124,26 @@ export interface GraphAnalyticsService {
   ): Promise<ReturnType<typeof degreeCentrality>>;
   /** Deterministic Louvain community groups for one case. */
   communities(scope: GraphScopeInput): Promise<ReturnType<typeof detectCommunities>>;
+  /** P4: bridge/connector candidate edges (removal would disconnect the graph). */
+  bridgeCandidates(
+    scope: GraphScopeInput,
+    maxResults?: number,
+  ): Promise<ReturnType<typeof detectBridgeCandidates>>;
+  /** P4: temporal burst candidates (entities with anomalously clustered activity). */
+  temporalBurstCandidates(
+    scope: GraphScopeInput,
+  ): Promise<ReturnType<typeof detectTemporalBursts>>;
+  /** P4: cohesion-scored community candidates (filtered Louvain communities). */
+  communityCandidates(
+    scope: GraphScopeInput,
+  ): Promise<ReturnType<typeof detectCommunityCandidates>>;
+  /** P4: bounded paths connecting two specific canonical entities. */
+  connectingPaths(
+    scope: GraphScopeInput,
+    sourceEntityId: string,
+    targetEntityId: string,
+    hops?: number,
+  ): Promise<ReturnType<typeof findConnectingPaths>>;
 }
 
 export interface GraphRuntimeStores {
@@ -182,6 +206,38 @@ export class GraphRuntime implements GraphAnalyticsService {
   ): Promise<ReturnType<typeof detectCommunities>> {
     const built = await this.projection(scope);
     return detectCommunities(built.graph);
+  }
+
+  async bridgeCandidates(
+    scope: GraphScopeInput,
+    maxResults?: number,
+  ): Promise<ReturnType<typeof detectBridgeCandidates>> {
+    const built = await this.projection(scope);
+    return detectBridgeCandidates(built.graph, maxResults);
+  }
+
+  async temporalBurstCandidates(
+    scope: GraphScopeInput,
+  ): Promise<ReturnType<typeof detectTemporalBursts>> {
+    const built = await this.projection(scope);
+    return detectTemporalBursts(built.graph);
+  }
+
+  async communityCandidates(
+    scope: GraphScopeInput,
+  ): Promise<ReturnType<typeof detectCommunityCandidates>> {
+    const built = await this.projection(scope);
+    return detectCommunityCandidates(built.graph);
+  }
+
+  async connectingPaths(
+    scope: GraphScopeInput,
+    sourceEntityId: string,
+    targetEntityId: string,
+    hops?: number,
+  ): Promise<ReturnType<typeof findConnectingPaths>> {
+    const built = await this.projection(scope);
+    return findConnectingPaths(built.graph, sourceEntityId, targetEntityId, { hops });
   }
 }
 
