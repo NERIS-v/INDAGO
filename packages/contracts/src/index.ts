@@ -51,6 +51,7 @@ export * from './intelligence/graph-hole-region.js';
 export * from './intelligence/graph-hole-candidate.js';
 export * from './intelligence/identity-canonicalization.js';
 export * from './intelligence/gap-classification.js';
+export * from './intelligence/semantic-retrieval.js';
 export * from './intelligence/evidence-ranking.js';
 export * from './intelligence/counter-evidence.js';
 export * from './intelligence/robustness.js';

@@ -40,6 +40,15 @@ export type GraphHolePolicyVersion = typeof GRAPH_HOLE_POLICY_VERSION;
 export const SEMANTIC_RETRIEVAL_POLICY_VERSION = 'v1' as const;
 export type SemanticRetrievalPolicyVersion = typeof SEMANTIC_RETRIEVAL_POLICY_VERSION;
 
+/**
+ * Embedding policy version — versioned INDEPENDENTLY of the retrieval and
+ * detection policies. An embedding's identity includes this value, so a policy
+ * bump (e.g. a changed canonicalization rule or similarity semantics)
+ * automatically invalidates prior embeddings instead of silently mixing them.
+ */
+export const EMBEDDING_POLICY_VERSION = 'v1' as const;
+export type EmbeddingPolicyVersion = typeof EMBEDDING_POLICY_VERSION;
+
 /** Detection policy version (deterministic candidate identity formulation). */
 export const DETECTION_POLICY_VERSION = 'v1' as const;
 export type DetectionPolicyVersion = typeof DETECTION_POLICY_VERSION;
