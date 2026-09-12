@@ -355,7 +355,7 @@ export function GraphPanel({
 
   const mergedHoles = useMemo(() => {
     if (!data) return [];
-    const holeKey = (h: GraphHole) => h.investigationGapId ?? h.nodeIds.join("-");
+    const holeKey = (h: GraphHole) => h.id;
     const seen = new Set(data.holes.map(holeKey));
     const additions = overlayHoles.filter((h) => !seen.has(holeKey(h)));
     const all = [...data.holes, ...additions];

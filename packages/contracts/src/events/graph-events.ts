@@ -4,6 +4,7 @@ import {
   GraphEdgeIdSchema,
   GraphVersionIdSchema,
   InvestigationIdSchema,
+  CaseIdSchema,
   EntityIdSchema,
   RelationHypothesisIdSchema,
   InvestigativeGapIdSchema,
@@ -13,6 +14,7 @@ import { RelationTypeSchema } from '../domain/relation.js';
 import { GraphNodeTypeSchema } from '../graph/graph-node.js';
 import { GraphAnalysisTypeSchema } from '../graph/graph-analysis.js';
 import { StructuralSignalSchema } from '../common/confidence.js';
+import { GraphHoleTypeSchema, GraphHoleCandidateIdSchema } from '../intelligence/graph-holes.js';
 
 // ============================================================================
 // Graph Events
@@ -102,10 +104,16 @@ export const GraphAnalysisCompletedEventSchema = BaseEventSchema.extend({
 }).strict();
 
 export const GraphHoleDetectedPayloadSchema = z.object({
+  holeId: GraphHoleCandidateIdSchema
+    .describe('Deterministic candidate identity of the detected hole.'),
+  caseId: CaseIdSchema,
   graphVersionId: GraphVersionIdSchema,
+  holeType: GraphHoleTypeSchema
+    .describe('Structural detection category (strongly typed, NOT GapType).'),
   investigationGapId: InvestigativeGapIdSchema.optional()
     .describe('Associated InvestigativeGap, if one exists'),
-  nodeIds: z.array(GraphNodeIdSchema),
+  nodeIds: z.array(GraphNodeIdSchema)
+    .describe('Canonical graph nodes involved in this hole'),
   expectedEdgeType: RelationTypeSchema
     .describe('Type of edge expected but missing (strongly typed)'),
   significance: StructuralSignalSchema

@@ -225,9 +225,14 @@ export class RelationStore {
         where: { relationKey },
       });
       if (!existing) {
-        try {
-          const created = await client.relation.create({
-            data: {
+        // Lost-create race: a concurrent transaction inserted the identical
+        // relationKey between our read and our write. Insert via
+        // createMany(… skipDuplicates) — P2002-FREE by construction. DO NOT
+        // 'create' + P2002-catch here: a unique-violation aborts the PostgreSQL
+        // transaction, so any re-read inside it fails with 25P02.
+        const { count } = await client.relation.createMany({
+          data: [
+            {
               id,
               relationKey,
               caseId: input.caseId,
@@ -251,26 +256,40 @@ export class RelationStore {
               createdAt: now,
               updatedAt: now,
             },
-          });
+          ],
+          skipDuplicates: true,
+        });
+
+        if (count === 1) {
+          // We won the insert race (or there was no race at all). Re-read the
+          // durable row so the returned relation reflects the stored row.
+          const created = await client.relation.findUnique({ where: { relationKey } });
+          if (!created) {
+            throw new Error(
+              "RelationStore: inserted relation row vanished immediately after createMany",
+            );
+          }
           return {
             wrote: true,
             reusedExisting: false,
             relation: rowToRelation(created),
           };
-        } catch (cause) {
-          const code =
-            cause instanceof Prisma.PrismaClientKnownRequestError
-              ? cause.code
-              : undefined;
-          if (code !== "P2002") throw cause;
-          const raced = await client.relation.findUnique({ where: { relationKey } });
-          if (!raced) throw cause;
-          return {
-            wrote: true,
-            reusedExisting: true,
-            relation: rowToRelation(raced),
-          };
         }
+
+        // A concurrent writer inserted the identical row between our read and
+        // create (skipDuplicates skipped our insert). The transaction is still
+        // live — return the winner idempotently.
+        const raced = await client.relation.findUnique({ where: { relationKey } });
+        if (!raced) {
+          throw new Error(
+            `RelationStore: unique conflict without a competing relation row for ${relationKey}`,
+          );
+        }
+        return {
+          wrote: true,
+          reusedExisting: true,
+          relation: rowToRelation(raced),
+        };
       }
       return {
         wrote: true,

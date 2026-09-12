@@ -11,12 +11,13 @@ jobs:
     name: Build, Typecheck & Test
     runs-on: ubuntu-latest
 
-    # Real Postgres for the DB-backed suites (the M-A12 comparisons, D4/D5/D7
-    # invariants, advisory-lock version allocation, and the TSC append-only
-    # trigger only hold against a live server).
+    # Real Postgres + pgvector for the DB-backed suites (the M-A12 comparisons,
+    # D4/D5/D7 invariants, advisory-lock version allocation, the TSC append-only
+    # trigger, and the Phase 5A-PR1.5 vector migration only hold against a live
+    # server). pgvector/pgvector:pg16 ships the vector extension natively.
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: indago
           POSTGRES_PASSWORD: indago

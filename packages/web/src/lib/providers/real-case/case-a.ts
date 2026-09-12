@@ -90,6 +90,8 @@ import {
   GE_A_CALLAHAN_FBI,
   GAP_A1,
   GAP_A2,
+  HOLE_A1,
+  HOLE_A2,
   HYP_A1,
   LEAD_A1,
   LEAD_A2,
@@ -574,7 +576,8 @@ const gapsA = [
 
 const holesA: GraphHole[] = [
   {
-    investigationId: INVESTIGATION_A_ID, graphVersionId: GRAPH_VERSION_A,
+    id: HOLE_A1,
+    investigationId: INVESTIGATION_A_ID, caseId: CASE_A_ID, graphVersionId: GRAPH_VERSION_A,
     type: "MISSING_EDGE", investigationGapId: GAP_A1,
     nodeIds: [GN_A_SOCTF, GN_A_FBI], expectedEdgeType: "communication",
     significance: 0.65,
@@ -583,7 +586,8 @@ const holesA: GraphHole[] = [
     detectedAt: obs("2024-07-01"),
   },
   {
-    investigationId: INVESTIGATION_A_ID, graphVersionId: GRAPH_VERSION_A,
+    id: HOLE_A2,
+    investigationId: INVESTIGATION_A_ID, caseId: CASE_A_ID, graphVersionId: GRAPH_VERSION_A,
     type: "TEMPORAL_GAP", investigationGapId: GAP_A2,
     nodeIds: [GN_A_RICO, GN_A_WJA], expectedEdgeType: "organizational",
     significance: 0.6,

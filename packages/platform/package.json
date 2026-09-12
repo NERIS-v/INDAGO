@@ -22,6 +22,7 @@
     "@indago/lead-generation": "workspace:*",
     "@indago/ingestion": "workspace:*",
     "@indago/relation-resolution": "workspace:*",
+    "@indago/semantic-retrieval": "workspace:*",
     "@prisma/client": "^5.10.0",
     "bullmq": "^5.0.0",
     "cors": "^2.8.6",

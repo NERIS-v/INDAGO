@@ -167,7 +167,10 @@ describe("PASS 2 Phase-1 derivation — derived artifacts cross-reference", () =
     expect(hole.suggestedEvidenceTypes).toEqual(
       expect.arrayContaining(["company operational records", "purchase or expense records", "travel and activity records"]),
     );
-    expect("id" in hole).toBe(false);
+    expect(hole.id).toBe(HOLE_B3);
+    expect(hole.caseId).toBe(CASE_B_ID);
+    expect("sourceNodeId" in hole).toBe(false);
+    expect("targetNodeId" in hole).toBe(false);
     expect(caseBFixtureSet.graphEdges).toHaveLength(6);
     expect(caseBEnriched.graphEdges).toHaveLength(6);
     expect(REAL_CASE_GRAPH_HOLES[CASE_B_ID].some((h) => h.investigationGapId === GAP_B4)).toBe(true);

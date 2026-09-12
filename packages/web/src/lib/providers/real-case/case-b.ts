@@ -112,6 +112,12 @@ import {
   GAP_B3,
   GAP_B5,
   GAP_B6,
+  HOLE_B1,
+  HOLE_B2,
+  HOLE_B4,
+  HOLE_B5,
+  HOLE_B6,
+  HOLE_B7,
   HYP_B1,
   LEAD_B1,
   LEAD_B2,
@@ -560,7 +566,8 @@ const gapsB = [
 
 const holesB: GraphHole[] = [
   {
-    investigationId: INVESTIGATION_B_ID, graphVersionId: GRAPH_VERSION_B,
+    id: HOLE_B1,
+    investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID, graphVersionId: GRAPH_VERSION_B,
     type: "MISSING_EDGE", investigationGapId: GAP_B1,
     nodeIds: [GN_B_WHEELER], expectedEdgeType: "case-link",
     significance: 0.8,
@@ -569,7 +576,8 @@ const holesB: GraphHole[] = [
     detectedAt: obs("2024-07-01"),
   },
   {
-    investigationId: INVESTIGATION_B_ID, graphVersionId: GRAPH_VERSION_B,
+    id: HOLE_B2,
+    investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID, graphVersionId: GRAPH_VERSION_B,
     type: "TEMPORAL_GAP", investigationGapId: GAP_B2,
     nodeIds: [GN_B_FBI], expectedEdgeType: "communication",
     significance: 0.6,
@@ -578,7 +586,8 @@ const holesB: GraphHole[] = [
     detectedAt: obs("2024-07-01"),
   },
   {
-    investigationId: INVESTIGATION_B_ID, graphVersionId: GRAPH_VERSION_B,
+    id: HOLE_B7,
+    investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID, graphVersionId: GRAPH_VERSION_B,
     type: "MISSING_EDGE", investigationGapId: GAP_B1,
     nodeIds: [GN_B_RICO, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.7,
@@ -587,7 +596,8 @@ const holesB: GraphHole[] = [
     detectedAt: obs("2024-07-01"),
   },
   {
-    investigationId: INVESTIGATION_B_ID, graphVersionId: GRAPH_VERSION_B,
+    id: HOLE_B4,
+    investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID, graphVersionId: GRAPH_VERSION_B,
     type: "MISSING_EDGE", investigationGapId: GAP_B5,
     nodeIds: [GN_B_CALLAHAN, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.72,
@@ -596,7 +606,8 @@ const holesB: GraphHole[] = [
     detectedAt: obs("2024-07-01"),
   },
   {
-    investigationId: INVESTIGATION_B_ID, graphVersionId: GRAPH_VERSION_B,
+    id: HOLE_B5,
+    investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID, graphVersionId: GRAPH_VERSION_B,
     type: "MISSING_EDGE", investigationGapId: GAP_B6,
     nodeIds: [GN_B_WINTER_HILL, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.68,
@@ -605,7 +616,8 @@ const holesB: GraphHole[] = [
     detectedAt: obs("2024-07-01"),
   },
   {
-    investigationId: INVESTIGATION_B_ID, graphVersionId: GRAPH_VERSION_B,
+    id: HOLE_B6,
+    investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID, graphVersionId: GRAPH_VERSION_B,
     type: "MISSING_EDGE", investigationGapId: GAP_B2,
     nodeIds: [GN_B_SHC, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.66,

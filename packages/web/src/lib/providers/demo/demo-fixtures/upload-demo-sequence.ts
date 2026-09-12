@@ -4,7 +4,7 @@ import type { GraphRealtimeCatalog } from "../../types";
 import { catalogKey } from "../../types";
 import { deterministicUuid } from "../submit";
 import { obs } from "./times";
-import { INVESTIGATION_ID, GRAPH_VERSION, GN_BANK, GN_VICTOR } from "./lookup";
+import { CASE_ID, INVESTIGATION_ID, GRAPH_VERSION, GN_BANK, GN_VICTOR } from "./lookup";
 
 export interface DemoStreamEvent extends SseEvent {
   readonly delayMs: number;
@@ -18,6 +18,7 @@ const GE_BANK_COURIER = deterministicUuid("upload:edge:bank-courier");
 const GE_COURIER_SIM = deterministicUuid("upload:edge:courier-sim");
 const GE_COURIER_OWNER = deterministicUuid("upload:edge:courier-owner");
 const GAP_COURIER_OWNER = deterministicUuid("upload:gap:courier-owner");
+const HOLE_COURIER_OWNER = deterministicUuid("upload:hole:courier-owner");
 
 const courierNode: GraphNode = {
   id: GN_COURIER,
@@ -82,7 +83,9 @@ const courierToSimEdge: GraphEdge = {
 };
 
 const ownershipHole: GraphHole = {
+  id: HOLE_COURIER_OWNER,
   investigationId: INVESTIGATION_ID,
+  caseId: CASE_ID,
   graphVersionId: GRAPH_VERSION,
   type: "ISOLATED_NODE",
   investigationGapId: GAP_COURIER_OWNER,

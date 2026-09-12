@@ -1,10 +1,14 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  // pgvector — required for the semantic embedding column (exact cosine distance).
+  // Declared so migrations/db push provision the extension automatically.
+  extensions = [vector]
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 // ============================================================================
@@ -885,4 +889,82 @@ model LeadEvent {
   @@unique([leadId, sequence])
   @@index([leadId])
   @@index([caseId])
+}
+// Phase 5A-PR1.5: Semantic embedding + retrieval (pgvector)
+//
+// SemanticTextUnit is the ATOMIC retrievable text item. It is a MUTABLE CURRENT
+// RETRIEVAL PROJECTION, not immutable historical text identity: the same
+// (caseId, sourceType, sourceId) row is UPDATED IN PLACE when the source text
+// changes. It carries NO truth value and NO evidence authority: it is a
+// recall/context layer, never a conclusion and never the authority for
+// entity/relation resolution (M-A09/M-A10 stay authoritative). No version
+// history is kept — a changed source simply has a new contentHash.
+//
+// Identity model (single source of truth):
+//   - SemanticTextUnit identity = caseId + sourceType + sourceId
+//     (@@unique([caseId, sourceType, sourceId]) bounds ONE row per source
+//     object; "shared content" under the SAME triple is the SAME unit).
+//   - Current text version = contentHash (SHA-256 of canonicalized text).
+//     Upserting a changed source updates normalizedText + contentHash IN PLACE.
+//   - Embedding freshness: an embedding row is CURRENT for a unit iff
+//     embedding.contentHash === semanticTextUnit.contentHash; anything else is
+//     STALE and excluded from search by the freshness join.
+//   - temporalScope = optional M-A12 TemporalInterval of the source claim;
+//     retrieval filters on it IN SQL (never in application memory).
+//
+// SemanticEmbedding stores the learned vector for a unit under an EXPLICIT
+// provider identity (providerId + modelId + modelVersion) + embedding policy
+// version. @@unique([semanticTextUnitId, providerId, modelId, modelVersion,
+// embeddingPolicyVersion]) means:
+//   - one provider slot per unit (a provider swap never mixes vectors)
+//   - a policy bump yields a NEW version, never a silent overwrite of history
+//
+// V1 DIMENSION CONSTRAINT: the `vector` column is FIXED at vector(768) because
+// the active Ollama production provider is nomic-embed-text:latest. Future
+// cloud providers MUST use 768-dimensional embeddings until a future storage
+// migration introduces dimension-specific storage. The provider identity keeps
+// carrying dimensions so incompatible vectors are STILL rejected at validation.
+//
+// The `vector` column is UNSUPPORTED to Prisma (vector(768)) and is therefore
+// written/read ONLY through parameterized raw SQL inside the repositories —
+// never through the typed client. V1 ships NO ANN index: retrieval is EXACT
+// cosine distance ordering (ORDER BY distance ASC, unit id ASC); ANN/HNSW is
+// deferred until dataset scale + an identity-aware filtering/index strategy.
+// ============================================================================
+model SemanticTextUnit {
+  id             String   @id // durable row id (deterministic; identity = caseId+sourceType+sourceId, see header)
+  caseId         String
+  sourceType     String // SemanticSourceTypeSchema value
+  sourceId       String // canonical id of the source domain object
+  contentHash    String // SHA-256 of normalizedText — CURRENT text version; embedding freshness key
+  normalizedText String
+  temporalScope  Json? // M-A12 TemporalInterval or NULL
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  embeddings SemanticEmbedding[]
+
+  @@unique([caseId, sourceType, sourceId])
+  @@index([caseId])
+  @@index([contentHash])
+}
+
+model SemanticEmbedding {
+  id                     String   @id // deterministic UUID of the identity key
+  semanticTextUnitId     String
+  caseId                 String
+  contentHash            String // snapshot of the unit hash at embed time
+  providerId             String
+  modelId                String
+  modelVersion           String
+  dimensions             Int
+  embeddingPolicyVersion String // v1 — embedding policy version
+  vector                 Unsupported("vector(768)")? // never touched by the typed client
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  textUnit SemanticTextUnit @relation(fields: [semanticTextUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([semanticTextUnitId, providerId, modelId, modelVersion, embeddingPolicyVersion])
+  @@index([caseId, providerId, modelId, modelVersion, embeddingPolicyVersion])
 }
