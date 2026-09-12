@@ -24,7 +24,7 @@ Advanced items are tagged with their status symbol in front of the checkbox. Bac
 
 ## Tracker Reconciliation — 12 Sep 2026
 
-Read-only audit of this tracker against repo evidence (implementation + test suites). **No checkboxes toggled — the 103-done count remains unchanged** (partials stay `[ ]`, downgrades keep `[x]`).
+Read-only audit of this tracker against repo evidence (implementation + test suites). **No checkboxes toggled — the 103-done count remains unchanged at audit time** (partials stay `[ ]`, downgrades keep `[x]`) **; the later M-A12 entry-gate closure toggled only the eight G1–G8 gates, bringing the 103 → 111**.
 
 **Downgraded to `🟡 [x]` (6) — marked done but only partially verified:**
 - Phase 3 "Show graph-ready state in UI shell" — run state renders; graph/entity/relation live providers are `Unsupported*` stubs.
@@ -40,7 +40,7 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 
 **🔵 policy:** 🔵 retained only where a task is genuinely planned/future work (cross-observation relation retrieval, targeted reblocking, semantic retrieval, source/context visualization, provenance UX, semantic benchmark, model versioning); 🔵 is never combined with a 🟡 status marker.
 
-**Second-pass audit (same date).** Full sweep of **every** unchecked tracker item against the repo. Same discipline: no checkboxes toggled, **103-done count unchanged**, every new flag is `🟡 [ ]` — a real subset exists but the milestone/surfacing is **not** complete, and nothing is upgraded to ✅.
+**Second-pass audit (same date).** Full sweep of **every** unchecked tracker item against the repo. Same discipline: no checkboxes toggled, **103-done count unchanged at audit time**, every new flag is `🟡 [ ]` — a real subset exists but the milestone/surfacing is **not** complete, and nothing is upgraded to ✅ **; the M-A12 entry-gate closure later toggled the eight G1–G8 gates (103 → 111)**.
 
 - **Real algorithm / persisted runtime (3):** M-A03 CDR CSV ingestion + M-A04 Financial CSV ingestion (generic CSV pipeline converts CDR/financial rows → observations, integration-tested); P4 "Attach evidence FOR / AGAINST" (supporting/contradicting observation sets persisted on `EntityHypothesis`/`RelationHypothesis`).
 - **Demo/UI surfacing (12):** P5A-1 graph-hole detection + P5A-6 evidence-request lifecycle at the web/demo layer; P7 workspace shell, graph visualization, timeline visualization, evidence FOR/AGAINST panels, gap/graph-hole visualization, reasoning ledger, review/approval UI, premium states; P10 Discovery Mode (detection-logic demo + workflow/UI demo).
@@ -141,8 +141,8 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 - [x] M-A05: Normalization engine (canonical fields + quality metadata) `[Mayur]`
 - [x] M-A06: Observation extraction (Observation[] with provenance) `[Mayur]`
   - [x] Evidence read seam: durable `GET /investigations/:id/evidence` (`EvidenceProjection` — documented local shape, no fabricated strength/posture), live `listEvidence` server action + `LiveEvidenceProvider.listByInvestigation`, Evidence tab renders persisted artifacts in live mode `[Mayur]`
-- [x] M-A07: Entity candidate generator (candidate entities) `[Mayur]` — `completeMA07` mention-candidate extraction wired into worker; **backend-verified; candidate-provenance recheck is part of the M-A12 entry audit** 🟡
-- [x] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]` — `completeMA08` CandidatePair + per-pair idempotent blocking pipeline; **backend-verified; blocking-semantics recheck is part of the M-A12 entry audit** 🟡
+- [x] M-A07: Entity candidate generator (candidate entities) `[Mayur]` — `completeMA07` mention-candidate extraction wired into worker; **backend-verified; candidate provenance verified in the M-A12 entry gate (G2)**
+- [x] M-A08: Multi-pass blocking (candidate pairs) `[Mayur]` — `completeMA08` CandidatePair + per-pair idempotent blocking pipeline; **backend-verified; blocking semantics verified in the M-A12 entry gate (G3)**
 - [x] M-A09: Entity resolver (reversible EntityHypothesis) `[Mayur]` — canonical-entity authority boundary, identity key, worker, audit; **backend-verified (`entity-hypothesis-store` + accept/reject/reverse HTTP); NOT yet surfaced in a full frontend resolution-review surface** 🟡
 - [x] M-A10: Relation resolver (RelationHypothesis) `[Mayur]` — source-grounded scoring v1, canonical Relation decision authority, directionality-aware identity, completeMA10 wiring, Graphology runtime + HTTP routes; **hardened (`caa74cd`, merged via PR #49) — prior 2 P2 findings (audit-log + @relation FK, non-transactional accept) requested and resolved as documented hardening follow-ups**; verified 43/43 platform integration across 5 suites (relation 18, graph 6, graph-http 9, contradiction 2, ingest-http 8)
 - [x] M-A11: Graph projection (GraphNode/GraphEdge) `[Mayur]` — delivered via Graphology (`@indago/graphology-projection`: build-graph/centrality/communities), NOT Neo4j; Neo4j deferred to a reversible §13 seam
@@ -153,16 +153,16 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 
 Before M-A12 starts, the following audit items gate it (see `development-plan.md` "M-A12 Entry Gate" and "Known Limitations"). Future semantic retrieval is **NOT** required to enter M-A12.
 
-- [ ] M-A12-G1: M-A06 observation representation audited for silent source-context loss (fragmentation concern) — remediation planned if loss found `[Both]`
-- [ ] M-A12-G2: M-A07 candidate provenance verified (candidate ≠ entity; candidateId never becomes EntityId) `[Both]`
-- [ ] M-A12-G3: M-A08 blocking semantics verified (cheap deterministic recall-control layer; bounded; pair ≠ identity) `[Both]`
-- [ ] M-A12-G4: M-A09 authority boundary verified (candidate → pair → hypothesis → explicit authority → canonical Entity) `[Both]`
-- [ ] M-A12-G5: M-A10 relation authority verified (canonical Entity + evidence → relation candidate → scoring → hypothesis → explicit authority → canonical Relation → Graphology) `[Both]`
-- [ ] M-A12-G6: M-A11 graph projection verified (Graphology derived/disposable; Postgres authoritative) `[Both]`
-- [ ] M-A12-G7: M-A13 current graph APIs verified (graph, traversal, centrality, communities) `[Both]`
-- [ ] M-A12-G8: DEMO / LIVE / AUTO regression status documented (frontend provider seam intact; demo untouched) `[Both]`
+- [x] M-A12-G1: M-A06 observation representation audited for silent source-context loss (fragmentation concern) — remediation planned if loss found `[Both]` — **VERIFIED** (`docs/reports/m-a12-entry-gate-audit.md`): Observation preserves `sourceContextId`/`eventTime` (observation-extractor.ts:425-449, store round-trip observation-store.ts:239/338-340, m-a12-temporal-history.test.ts:178); fragmentation concern + remediation documented (dev-plan §23.3/§23.8); named limitation: no ingestion-unit test asserts these fields
+- [x] M-A12-G2: M-A07 candidate provenance verified (candidate ≠ entity; candidateId never becomes EntityId) `[Both]` — **VERIFIED** (`docs/reports/m-a12-entry-gate-audit.md`): distinct id namespaces; canonical EntityId from `(caseId, canonicalName, entityType)` under ACCEPT authority only; no path assigns candidate/pair id → entityId
+- [x] M-A12-G3: M-A08 blocking semantics verified (cheap deterministic recall-control layer; bounded; pair ≠ identity) `[Both]` — **VERIFIED** (`docs/reports/m-a12-entry-gate-audit.md`): deterministic bounded UNION blocking (maxBlockSize 50/maxPassesPerPair 100); pair carries no EntityId/score; per-pair idempotent store
+- 🟡 [x] M-A12-G4: M-A09 authority boundary verified (candidate → pair → hypothesis → explicit authority → canonical Entity) `[Both]` — **VERIFIED accept chain** (entity-materialization.ts:173-315, one-tx Entity+ENTITY_CREATED versioning; hypothesis≠truth); **PARTIAL**: entity reject/reverse authority unimplemented (relation-only) + `m-a09-entity-resolution.md` §13 stale (follow-up)
+- [x] M-A12-G5: M-A10 relation authority verified (canonical Entity + evidence → relation candidate → scoring → hypothesis → explicit authority → canonical Relation → Graphology) `[Both]` — **VERIFIED** (`docs/reports/m-a12-entry-gate-audit.md`): accept/reject/reverse authority + directionality-aware identity + same-tx GraphVersion/TSC coupling; suites green (relation 18, graph 6, graph-http 9, contradiction 2, ingest-http 8)
+- [x] M-A12-G6: M-A11 graph projection verified (Graphology derived/disposable; Postgres authoritative) `[Both]` — **VERIFIED** (`docs/reports/m-a12-entry-gate-audit.md`): Postgres authoritative / Graphology derived+disposable; deterministic replay (normalizeBuiltGraph); reverse containment over time
+- [x] M-A12-G7: M-A13 current graph APIs verified (graph, traversal, centrality, communities) `[Both]` — **VERIFIED** (`docs/reports/m-a12-entry-gate-audit.md`): case-scoped + bounded + canonical truncation metadata; suites green (graph-http 9, security 7, PR3-apis 9, ingest-http 8); non-blocking: 3 analytics routes lack requireRole
+- [x] M-A12-G8: DEMO / LIVE / AUTO regression status documented (frontend provider seam intact; demo untouched) `[Both]` — **DOCUMENTED** (`docs/reports/m-a12-entry-gate-audit.md`): seam + per-capability AUTO intact; four protected demo files untouched by M-A12 commits (git-verified)
 
-> **Entry criterion:** G1–G8 satisfied (documented), plus DEMO/LIVE/AUTO regression status recorded. Semantic retrieval may remain unimplemented at M-A12 entry, by design.
+> **Entry criterion:** G1–G8 satisfied (documented), plus DEMO/LIVE/AUTO regression status recorded. Semantic retrieval may remain unimplemented at M-A12 entry, by design. **— COMPLETE (12 Sep 2026):** all eight audits documented in `docs/reports/m-a12-entry-gate-audit.md`; G1–G3, G5–G7 verified, G4 tracked 🟡 (entity reject/reverse deferred to M-A09 follow-up), G8 documented.
 
 ### M-A12 — Temporal Projection
 
@@ -182,7 +182,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [x] M-A12-T5: Reversal-over-time + interaction with checkpoints (immutable audit history; do not reorder) `[Mayur]` — design in PR0; reversal lifecycle preserved in PR2 (`REVERSED` retained, not deleted); checkpoint interaction **done in PR3** (`associateCheckpoint`/`resolveVersionByCheckpoint`; explicit association model; cross-case isolation verified)
 
 > **Status:** M-A12-PR0 = DESIGN/LOCK (complete as a design PR). M-A12-PR1 = **IMPLEMENTED** (persistence/validation/history + WS-2 boundary validation; PR1 pure suite green). M-A12-PR2 = **IMPLEMENTED** (graph versioning + WS-7 auto-activation + WS-8 strict replay + WS-10 `projectGraphValidAt`; PR2 pure suite green (21 tests)). M-A12-PR3 = **IMPLEMENTED** (temporal APIs incl. WS-10 `valid-at`, WS-3 interval producer, WS-13 same-tx TSC writers; PR3 pure suite green (18 tests)). **M-A12 SECOND-PASS HARDENING = IMPLEMENTED** (ws item A amendment authority + ORIGINAL→AMENDMENT temporal assertions + revision-correct as-of projection; item B ENTITY_CREATED/ENTITY_ARCHIVED versioning + entity-lifecycle node filtering; item C typed `GraphRevisionEvent`s (5 change types); item D partial unique ACTIVE index per case; items E/F/G concurrency + idempotency; revision-events pure suite green (18 tests).
-> **Full M-A12 verification:** 85 pure tests green (5 suites: interval-aggregation 7, temporal-interval-validation 21, PR2 21, PR3 18, revision-events 18) + **43/43 real-Postgres integration tests green** (PR2 10, PR3 8, temporal-history 7, hardening 11, HTTP-security 7) run against a migrated `TEST_DATABASE_URL` (Neon/Postgres, `prisma migrate deploy`-equivalent schema path — the same path CI uses with its Postgres 16 service, baseline + append-only-trigger + unique-ACTIVE migrations). Two genuine concurrency bugs surfaced and fixed during this run (`GraphVersionStore.createVersion` insert-before-demote vs. partial unique ACTIVE index; `TemporalStateChangeStore.recordChange` P2002-re-read inside aborted tx → `createMany(skipDuplicates)` + winner re-read). G1–G8 entry-gate audits remain the gate; semantic retrieval not required.
+> **Full M-A12 verification:** 85 pure tests green (5 suites: interval-aggregation 7, temporal-interval-validation 21, PR2 21, PR3 18, revision-events 18) + **43/43 real-Postgres integration tests green** (PR2 10, PR3 8, temporal-history 7, hardening 11, HTTP-security 7) run against a migrated `TEST_DATABASE_URL` (Neon/Postgres, `prisma migrate deploy`-equivalent schema path — the same path CI uses with its Postgres 16 service, baseline + append-only-trigger + unique-ACTIVE migrations). Two genuine concurrency bugs surfaced and fixed during this run (`GraphVersionStore.createVersion` insert-before-demote vs. partial unique ACTIVE index; `TemporalStateChangeStore.recordChange` P2002-re-read inside aborted tx → `createMany(skipDuplicates)` + winner re-read). G1–G8 entry-gate audits COMPLETE (12 Sep 2026, `docs/reports/m-a12-entry-gate-audit.md`); semantic retrieval not required.
 
 ---
 
@@ -533,7 +533,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 |:------|------:|-----:|-----:|------:|-----------:|-----:|-------:|
 | 0 | 10 | 10 | 0 | 0 | 0 | 10 | 100% |
 | 1 | 40 | 40 | 0 | 20 | 6 | 14 | 100% |
-| 2A | 30 | 19 | 11 | 22 | 0 | 8 | 63% |
+| 2A | 30 | 27 | 3 | 22 | 0 | 8 | 90% |
 | 2B | 12 | 12 | 0 | 0 | 12 | 0 | 100% |
 | 3 | 12 | 10 | 2 | 5 | 6 | 1 | 83% |
 | 4 | 17 | 0 | 17 | 10 | 6 | 1 | 0% |
@@ -545,6 +545,6 @@ And the underlying temporal sub-items (tracked to reflect reality):
 | 10 | 10 | 0 | 10 | 5 | 5 | 0 | 0% |
 | 11 | 30 | 0 | 30 | 10 | 10 | 10 | 0% |
 | 12 | 16 | 0 | 16 | 7 | 8 | 1 | 0% |
-| **Total** | **277** | **103** | **174** | **122** | **96** | **59** | **37%** |
+| **Total** | **277** | **111** | **166** | **122** | **96** | **59** | **40%** |
 
-> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 13 M-A12 sub-task rows added by the V7 tracker reconciliation: 8 **open** gate audits (G1–G8, `[Both]`) + 5 **implemented** temporal deep-dives (T1–T5, `[Mayur]`).
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 13 M-A12 sub-task rows added by the V7 tracker reconciliation: 8 gate audits (G1–G8, `[Both]`, **verified 12 Sep 2026 — see `docs/reports/m-a12-entry-gate-audit.md`**) + 5 **implemented** temporal deep-dives (T1–T5, `[Mayur]`).
