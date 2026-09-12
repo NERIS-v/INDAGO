@@ -5,14 +5,21 @@
 // materializes a SemanticTextUnit from canonical text (canonicalized + hashed
 // by @indago/semantic-retrieval) and persists it here BEFORE embedding.
 //
-// Identity:
-//   - id = deterministic UUID of the canonical identity key
-//     indago:semantic-text-unit:v1:caseId:sourceType:sourceId:contentHash —
-//     retry/race safe; same source slice + same canonical text ≡ same unit.
-//   - @@unique([caseId, sourceType, sourceId]): one unit per source object.
-//     A changed source upserts in place (contentHash/normalizedText updated),
-//     which is exactly what drives staleness detection in the embedding
-//     pipeline.
+// Identity model:
+//   - SemanticTextUnit IDENTITY = caseId + sourceType + sourceId
+//     (@@unique[caseId, sourceType, sourceId]: ONE unit per source object).
+//   - CURRENT TEXT VERSION = contentHash (SHA-256 of canonicalized text).
+//     This is a MUTABLE CURRENT RETRIEVAL PROJECTION, not immutable historical
+//     text identity: a changed source UPSERTS IN PLACE (normalizedText +
+//     contentHash updated, id never changes). No version history is kept.
+//   - Embedding freshness rule:
+//     embedding.contentHash === semanticTextUnit.contentHash (current),
+//     anything else is stale and excluded by the search freshness join.
+//
+// The row `id` is a deterministic UUID derived from
+//   indago:semantic-text-unit:v1:caseId:sourceType:sourceId:contentHash
+// AT FIRST UPSERT — retry/race safe for a first-seen slice — but is NOT part
+// of the identity contract and is never recomputed on later updates.
 //
 // This store persists RECALL SURFACES only. A SemanticTextUnit carries NO truth
 // value, NO evidence authority and NO entity/relation meaning.
@@ -38,7 +45,7 @@ export interface SemanticTextUnitIdentityInput {
   readonly contentHash: string;
 }
 
-/** Canonical identity representation (single source for key + id). */
+/** Deterministic id key (first-seen slice; NOT the identity contract). */
 export function buildSemanticTextUnitIdentityKey(input: SemanticTextUnitIdentityInput): string {
   return JSON.stringify([
     SEMANTIC_TEXT_UNIT_NAMESPACE,
@@ -50,7 +57,7 @@ export function buildSemanticTextUnitIdentityKey(input: SemanticTextUnitIdentity
   ]);
 }
 
-/** Deterministic UUID (v4-shaped, contract-valid) from the identity key. */
+/** Deterministic UUID (v4-shaped, contract-valid) for the durable row id. */
 export function deterministicSemanticTextUnitId(input: SemanticTextUnitIdentityInput): string {
   const digest = createHash('sha256').update(buildSemanticTextUnitIdentityKey(input), 'utf8').digest();
   return bytesToUuid4(Array.from(digest.subarray(0, 16)));

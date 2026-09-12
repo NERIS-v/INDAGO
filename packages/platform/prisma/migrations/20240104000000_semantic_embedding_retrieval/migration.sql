@@ -1,11 +1,11 @@
 -- ============================================================================
 -- Phase 5A-PR1.5: Semantic embedding + retrieval (pgvector)
 --
--- Requires the pgvector extension (vector type + cosine distance + HNSW).
+-- Requires the pgvector extension (vector type + cosine distance).
 -- CI runs this against pgvector/pgvector:pg16; Neon provides vector natively.
--- The `vector` column + HNSW index are managed ONLY in raw SQL (Prisma models
--- the columns as Unsupported, and can never express the HNSW index), so a
--- future `prisma migrate dev` drift diff MUST NOT drop these.
+-- The `vector` column is managed ONLY in raw SQL (Prisma models it as
+-- Unsupported), so a future `prisma migrate dev` drift diff MUST NOT drop it.
+-- V1 ships NO ANN index — retrieval is exact cosine distance (see footer note).
 -- ============================================================================
 
 -- CreateExtension (declared as `extensions = [vector]` in schema.prisma)
@@ -54,5 +54,13 @@ CREATE INDEX "SemanticEmbedding_caseId_providerId_modelId_modelVersion_embed_idx
 -- AddForeignKey
 ALTER TABLE "SemanticEmbedding" ADD CONSTRAINT "SemanticEmbedding_semanticTextUnitId_fkey" FOREIGN KEY ("semanticTextUnitId") REFERENCES "SemanticTextUnit"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- pgvector HNSW cosine index (managed in raw SQL only — see header comment)
-CREATE INDEX "SemanticEmbedding_vector_hnsw_idx" ON "SemanticEmbedding" USING hnsw ("vector" vector_cosine_ops);
+-- NOTE: NO ANN index in V1. Retrieval uses EXACT cosine distance ordering
+--   ORDER BY (e."vector" <=> query_vector) ASC, u."id" ASC
+-- A global HNSW index over vectors that belong to many cases / providers /
+-- models / policies is SAFE-UNSOUND for the required filtering semantics:
+-- ANN candidate generation is not scoped to the search identity and can
+-- therefore return INCOMPLETE filtered results (candidates pruned before the
+-- caseId/providerId/modelId/modelVersion/embeddingPolicyVersion/contentHash/
+-- temporal filters apply). ANN/HNSW is intentionally DEFERRED until dataset
+-- scale and an identity-aware filtering/index strategy justify it. The plain
+-- btree indexes above keep the filtered access paths exact and cheap.
