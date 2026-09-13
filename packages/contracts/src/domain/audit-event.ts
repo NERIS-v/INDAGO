@@ -61,6 +61,9 @@ export const AuditActionSchema = z.enum([
   'ENTITY_MENTION_EXTRACTED',
   'CANDIDATE_PAIR_GENERATED',
   'ENTITY_RESOLUTION_PROPOSED',
+  'RUN_PAUSED',
+  'RUN_RESUMED',
+  'REVIEW_REQUIRED_ENTERED',
   'SYSTEM_ACTION',
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

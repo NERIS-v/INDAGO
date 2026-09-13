@@ -99,3 +99,39 @@ export function emitObservationExtracted(params: {
   };
   realtimeEvents.emit("progress", frame);
 }
+
+// P4-PR3 typed ANALYSIS_PROGRESS frame
+export type AnalysisProgressPhase =
+  | "ANALYSIS_STARTED"
+  | "CANDIDATES_DETECTED"
+  | "LEAD_CREATED"
+  | "ANALYSIS_COMPLETED";
+
+export interface AnalysisProgressFrame {
+  readonly investigationId: string;
+  readonly type: "ANALYSIS_PROGRESS";
+  readonly caseId: string;
+  readonly phase: AnalysisProgressPhase;
+  readonly message: string;
+  readonly detail?: Record<string, number | string>;
+  readonly timestamp: string;
+}
+
+export function emitAnalysisProgress(params: {
+  investigationId: string;
+  caseId: string;
+  phase: AnalysisProgressPhase;
+  message: string;
+  detail?: Record<string, number | string>;
+}): void {
+  const frame: AnalysisProgressFrame = {
+    investigationId: params.investigationId,
+    type: "ANALYSIS_PROGRESS",
+    caseId: params.caseId,
+    phase: params.phase,
+    message: params.message,
+    detail: params.detail,
+    timestamp: new Date().toISOString(),
+  };
+  realtimeEvents.emit("progress", frame);
+}
