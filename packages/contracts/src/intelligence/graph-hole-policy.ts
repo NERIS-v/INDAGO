@@ -49,6 +49,16 @@ export type SemanticRetrievalPolicyVersion = typeof SEMANTIC_RETRIEVAL_POLICY_VE
 export const EMBEDDING_POLICY_VERSION = 'v1' as const;
 export type EmbeddingPolicyVersion = typeof EMBEDDING_POLICY_VERSION;
 
+/**
+ * AI-agent-runtime policy version — the shared LLM execution bound contract
+ * (@indago/ai-agent-runtime). Versioned INDEPENDENTLY of embedding, retrieval
+ * and detection policies: a budget/reliability policy bump re-identifies the
+ * execution semantics that produced a given LLM result without touching
+ * provider/model/prompt/schema versioning, which stay separate dimensions.
+ */
+export const AI_RUNTIME_POLICY_VERSION = 'v1' as const;
+export type AiRuntimePolicyVersion = typeof AI_RUNTIME_POLICY_VERSION;
+
 /** Detection policy version (deterministic candidate identity formulation). */
 export const DETECTION_POLICY_VERSION = 'v1' as const;
 export type DetectionPolicyVersion = typeof DETECTION_POLICY_VERSION;
