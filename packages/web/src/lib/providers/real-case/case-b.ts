@@ -672,9 +672,6 @@ const leadsB = [
     provenance: { entries: [{ sourceId: SRC_HR_TULSA_B, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_B1, OBS_B2] }], createdAt: obs("2024-07-01") },
     createdAt: obs("2024-07-01"),
     updatedAt: obs("2024-07-01"),
-    sourceCandidateType: "MANUAL",
-    sourceCandidateKey: `manual:${LEAD_B1}`,
-    sourceCandidateSnapshot: {},
     alternativeExplanations: [],
   }),
   LeadSchema.parse({
@@ -698,9 +695,6 @@ const leadsB = [
     provenance: { entries: [{ sourceId: SRC_HR_TULSA_B, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_B4] }], createdAt: obs("2024-07-01") },
     createdAt: obs("2024-07-01"),
     updatedAt: obs("2024-07-01"),
-    sourceCandidateType: "MANUAL",
-    sourceCandidateKey: `manual:${LEAD_B2}`,
-    sourceCandidateSnapshot: {},
     alternativeExplanations: [],
   }),
 ];

@@ -20,6 +20,8 @@ export const FIXTURE_LEAD_1: Lead = {
   relatedEvidenceIds: [FIXTURE_IDS.evidence1],
   sourceCandidateType: 'COMMUNITY',
   sourceCandidateKey: 'community:graph-hole:lead-1',
+  contradictingObservationIds: [],
+  alternativeExplanations: [],
   sourceCandidateSnapshot: {
     detectorType: 'COMMUNITY',
     nodeIds: [FIXTURE_IDS.entity1, FIXTURE_IDS.entity2],
