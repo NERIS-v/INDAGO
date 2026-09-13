@@ -422,10 +422,10 @@ describe('M-A10: deterministic identity', () => {
     }
   });
 
-  it('isRelationDirected / resolveRelationDirected reflect the authoritative map', () => {
+  it('isRelationDirected reflects the type map; resolveRelationDirected is the v1 direction-unknown seam', () => {
     expect(isRelationDirected('ownership')).toBe(true);
     expect(isRelationDirected('financial')).toBe(false);
-    expect(resolveRelationDirected('transport')).toBe(true);
+    expect(resolveRelationDirected('transport')).toBe(false);
     expect(resolveRelationDirected('co-location')).toBe(false);
   });
 
@@ -605,8 +605,9 @@ describe('M-A10: end-to-end case resolution', () => {
     expect(contradicted.metrics.hypothesesProposed).toBe(0);
   });
 
-  it('resolves `directed` from the authoritative relation type', () => {
-    // ownership is DIRECTED; financial is UNDIRECTED.
+  it('emits `directed` via the v1 direction-unknown seam (never from type vocabulary)', () => {
+    // ownership is a DIRECTED type in the vocabulary map, but v1 has no
+    // directional evidence extractor: the emission must be direction-unknown.
     const ownershipObs = [
       makeObservation(1, { type: 'FACTUAL', content: 'registered to entity', entityIds: [ENT_ID(1), ENT_ID(2)] }),
     ];
@@ -621,7 +622,7 @@ describe('M-A10: end-to-end case resolution', () => {
       allObservations: ownershipObs,
       temporalWindowMs: RELATION_RESOLUTION_BOUNDS.temporalProximityWindowMs,
     });
-    expect(ownershipRes.directed).toBe(true);
+    expect(ownershipRes.directed).toBe(false);
 
     const financialObs = [
       makeObservation(1, { type: 'FINANCIAL', entityIds: [ENT_ID(1), ENT_ID(2)] }),

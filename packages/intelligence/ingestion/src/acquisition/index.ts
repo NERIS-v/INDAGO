@@ -28,7 +28,11 @@ export type {
   FetchedArtifact,
 } from './artifact-fetcher.js';
 
-export { computeContentHash, deterministicArtifactId } from './content-hasher.js';
+export {
+  computeContentHash,
+  deterministicArtifactId,
+  deterministicArtifactIdForCase,
+} from './content-hasher.js';
 
 export { deterministicSourceId } from './source-id.js';
 
