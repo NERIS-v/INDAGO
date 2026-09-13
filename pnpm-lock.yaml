@@ -240,6 +240,15 @@ importers:
       '@indago/entity-resolution':
         specifier: workspace:*
         version: link:../intelligence/entity-resolution
+      '@indago/graph-hole-detection':
+        specifier: workspace:*
+        version: link:../intelligence/graph-hole-detection
+      '@indago/graph-hole-qualification':
+        specifier: workspace:*
+        version: link:../intelligence/graph-hole-qualification
+      '@indago/graph-hole-region':
+        specifier: workspace:*
+        version: link:../intelligence/graph-hole-region
       '@indago/graphology-projection':
         specifier: workspace:*
         version: link:../intelligence/graphology-projection
