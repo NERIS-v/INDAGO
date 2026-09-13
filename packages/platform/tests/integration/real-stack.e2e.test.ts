@@ -296,7 +296,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
     // --- Durable persistence assertions ---
     const artifact = await prisma.artifact.findUnique({
-      where: { contentHash: fixtureHash },
+      where: { caseId_contentHash: { caseId, contentHash: fixtureHash } },
     });
     expect(artifact).not.toBeNull();
     expect(artifact!.caseId).toBe(caseId);
