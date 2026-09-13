@@ -15,6 +15,7 @@ Single authoritative source of truth for thresholds, scoring, saturation, groupi
 | Policy constants (V1 thresholds, bounds) | `graph-hole-policy.ts` — all `MAX_*`, `MIN_*`, `SATURATION_*` constants |
 | Structural-score weights | `graph-hole-policy.ts` → `STRUCTURAL_SCORE_WEIGHTS` |
 | Significance weights | `graph-hole-policy.ts` → `SIGNIFICANCE_WEIGHTS` |
+| Scoring calibration (V1.1/v2) | `graph-hole-policy.ts` → `GRAPH_HOLE_SCORING_POLICY_VERSION`, `*_WEIGHTS`, `*_SATURATION`, `GEOMETRIC_MEAN_EPSILON` |
 | Support-unit resolution rule | `graph-hole-policy.ts` → `resolveSupportUnitKey()`, `countIndependentSupportUnits()` |
 | Saturation definition | `graph-hole-policy.ts` → `RegionSaturationDefinitionSchema` |
 | Qualification gates | `graph-hole-policy.ts` → `GraphHoleQualificationGateSchema` (11 gates) |
@@ -52,6 +53,36 @@ Single authoritative source of truth for thresholds, scoring, saturation, groupi
 | `expectedInformationValue` | 0.15 |
 
 `significanceMeaning = 'INVESTIGATIVE_PRIORITIZATION_VALUE_NOT_PROBABILITY'` — this is a ranking signal, never probability.
+
+### Scoring calibration (V1.1, `GRAPH_HOLE_SCORING_POLICY_VERSION = "v2"`)
+
+The scoring revision is versioned **independently** from the region and detection
+policies (repo convention: one version constant per subsystem). `GRAPH_HOLE_POLICY_VERSION`,
+`DETECTION_POLICY_VERSION`, `SEMANTIC_RETRIEVAL_POLICY_VERSION`, and
+`EMBEDDING_POLICY_VERSION` stay `'v1'` because candidate/region identity inputs
+and detection outputs are unchanged. Every `QualifiedGraphHoleCandidate` and
+`GraphHoleQualificationResult` reports `scoringPolicyVersion: "v2"`.
+
+Frozen constants (`graph-hole-policy.ts`):
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS` | `0.50 / 0.30 / 0.20` | geometric-mean exponents over `supportBreadth / supportConsistency / provenanceCompleteness` |
+| `PATTERN_STRENGTH_INFLUENCE_WEIGHTS` | `0.60 / 0.40` | `patternStrength = basisStrength × (0.60 + 0.40×evidenceRatio)`, ratio defaults 0.5 ⇒ never exceeds basis |
+| `EXPECTED_INFORMATION_VALUE_WEIGHTS` | `0.50 / 0.30 / 0.20` | linear weights over `uncertaintyPotential / hypothesisCoverage / evidenceDiversity` |
+| `SUPPORT_BREADTH_SATURATION` | `4` | `min(U,4)/4` |
+| `HYPOTHESIS_COVERAGE_SATURATION` | `3` | `min(H,3)/3` |
+| `EVIDENCE_DIVERSITY_SATURATION` | `4` | `min(U,4)/4` |
+| `GEOMETRIC_MEAN_EPSILON` | `0.000001` | floor for the geometric mean so a zero component defects to ε, never exactly 0 |
+
+V1.1 semantics: the evidence-support score is a **weighted geometric mean, never
+an arithmetic sum** — more evidence can never inflate it past its natural ceiling
+(two perfect units cap at `sqrt(0.5) ≈ 0.707107`). `expectedInformationValue`
+estimates the opportunity for useful resolution/discrimination among competing
+explanations — a heuristic, NOT a probability and NOT calibrated information
+gain; the contradiction count itself is never rewarded. Benchmark calibration is
+required before any empirical claim about precision, recall, calibration, or
+investigator utility.
 
 ### Qualification gates (11, all mandatory)
 
@@ -185,6 +216,7 @@ One region may produce several candidates. Multiple detector paths must converge
 - A graph hole is a structural/evidentiary candidate — NOT a fact, NOT proof, NOT criminality, NOT intent
 - `StructuralSignal` ≠ criminal relevance
 - `Significance` = investigative prioritization value, NOT probability
+- More evidence cannot inflate a V1.1 score past its natural ceiling (weighted geometric mean + saturation + bounded pattern strength)
 - Community membership ≠ hypothesis grouping
 - Absence ≠ concealment
 - Truncated projections suppress normal-mode qualification
