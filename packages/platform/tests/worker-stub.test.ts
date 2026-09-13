@@ -24,14 +24,14 @@ const VALID_CASE_ID = "550e8400-e29b-41d4-a716-446655440010";
 const VALID_CASE_ID_2 = "550e8400-e29b-41d4-a716-446655440011";
 const VALID_OP_ID = "770e8400-e29b-41d4-a716-446655440002";
 const VALID_SOURCE_ID = "880e8400-e29b-41d4-a716-446655440003";
-const VALID_ARTIFACT_ID = "a00e8400-e29b-41d4-a716-446655440004";
+const VALID_ARTIFACT_ID = "mock-artifact-id";
 
 // Hoisted module mocks — accessible inside vi.mock factories (hoisting-safe).
 const h = vi.hoisted(() => {
   const acquire = vi.fn();
   const extract = vi.fn();
   const deterministicSourceId = vi.fn();
-  const deterministicArtifactIdForCase = vi.fn();
+  const deterministicArtifactIdForCase = vi.fn().mockResolvedValue("mock-artifact-id");
   const normalize = vi.fn();
   const parseStoredRawExtraction = vi.fn();
   // M-A06 observation pipeline stubs (called by completeMA06).
@@ -226,6 +226,7 @@ const runState = {
   state: "CREATED",
   status: "QUEUED",
   contextData: {} as Record<string, unknown>,
+  error: null as string | null,
 };
 
 function makeValidPayload() {

@@ -4,7 +4,6 @@ import { PrismaClient } from "@prisma/client";
 import { DEFAULT_NORMALIZATION_CONFIG } from "@indago/contracts";
 import type { NormalizedExtraction } from "@indago/contracts";
 import { IngestionStore } from "../../src/persistence/ingestion-store.js";
-import { deterministicArtifactIdForCase } from "@indago/ingestion";
 import type {
   ArtifactWriteRecord,
   AttemptRevision,
@@ -177,6 +176,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       // find is always case-scoped: each case sees exactly its own row.
       expect((await store.findArtifactForCase(caseId, hash))!.id).toBe(caseA.id);
       expect((await store.findArtifactForCase(otherCaseId, hash))!.id).toBe(caseB.id);
+
       expect(
         await prisma.artifact.count({ where: { caseId, contentHash: hash } }),
       ).toBe(1);

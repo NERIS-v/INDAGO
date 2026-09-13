@@ -21,6 +21,14 @@ import { leadRuntime } from "../leads/lead-runtime.js";
 import { leadStore, IllegalLeadStatusTransitionError, LeadNotFoundError } from "../leads/lead-store.js";
 import { crossCaseDiscoveryService } from "../leads/cross-case-discovery.js";
 import {
+  runStateMachine,
+  RunNotFoundError,
+  RunNotPausedError,
+  RunNotInReviewError,
+  RunAlreadyTerminalError,
+  IllegalRunStateTransitionError,
+} from "../execution/run-state-machine.js";
+import {
   materializeCanonicalRelationFromAcceptedHypothesis,
   rejectRelationHypothesis,
   reverseRelationHypothesis,
@@ -1022,7 +1030,7 @@ apiRouter.post(
 
       const result = await leadRuntime.generateStructuralLeads(
         { investigationId, caseId },
-        { actor: req.user.id },
+        { actor: req.user.id, runId: run.id },
       );
       return res.status(200).json({
         investigationId,
@@ -1031,6 +1039,7 @@ apiRouter.post(
         leadsCreated: result.leadsCreated.length,
         leadsAlreadyExisted: result.leadsAlreadyExisted.length,
         skipped: result.skipped,
+        reviewTriggered: result.reviewTriggered,
       });
     } catch (error: unknown) {
       console.error("Failed to generate structural leads:", error);
@@ -1333,7 +1342,7 @@ apiRouter.post(
       const result = await leadRuntime.generateCrossCaseLeads(
         { caseId, investigationId },
         { caseId: targetCaseId, investigationId: targetRun.investigationId },
-        { actor: req.user.id },
+        { actor: req.user.id, runId: run.id },
       );
       return res.status(200).json({
         caseId,
@@ -1342,9 +1351,159 @@ apiRouter.post(
         leadsCreated: result.leadsCreated.length,
         leadsAlreadyExisted: result.leadsAlreadyExisted.length,
         skipped: result.skipped,
+        reviewTriggered: result.reviewTriggered,
       });
     } catch (error: unknown) {
       console.error("Failed to generate cross-case leads:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-8. P4-PR3 — Human-invoked pause. Freezes execution status without
+// disturbing the pipeline stage, so resume() returns to the same place.
+apiRouter.post(
+  "/investigations/:investigationId/pause",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const bodySchema = z.object({ reason: z.string().min(1).max(2000) }).strict();
+      const bodyResult = bodySchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return res.status(400).json({ error: "Invalid request body", issues: bodyResult.error.issues });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      if (!req.user || !verifyCaseAccess(req.user, run.caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${run.caseId}`,
+        });
+      }
+
+      const snapshot = await runStateMachine.pause(run.id, { actor: req.user.id, reason: bodyResult.data.reason });
+      return res.status(200).json({ run: snapshot });
+    } catch (error: unknown) {
+      if (error instanceof RunNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      if (error instanceof RunAlreadyTerminalError) {
+        return res.status(409).json({ error: error.message });
+      }
+      console.error("Failed to pause investigation run:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-9. P4-PR3 — Resume a PAUSED run. This was the missing half of PAUSED:
+// previously only reachable via queue/recovery.ts's circuit-breaker
+// escalation, with no way back (tracker gap: "Add pause/resume behavior").
+apiRouter.post(
+  "/investigations/:investigationId/resume",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      if (!req.user || !verifyCaseAccess(req.user, run.caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${run.caseId}`,
+        });
+      }
+
+      try {
+        const snapshot = await runStateMachine.resume(run.id, { actor: req.user.id });
+        return res.status(200).json({ run: snapshot });
+      } catch (err: unknown) {
+        if (err instanceof RunNotPausedError) {
+          return res.status(409).json({ error: err.message });
+        }
+        if (err instanceof IllegalRunStateTransitionError) {
+          return res.status(409).json({ error: err.message });
+        }
+        throw err;
+      }
+    } catch (error: unknown) {
+      if (error instanceof RunNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Failed to resume investigation run:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 1h-10. P4-PR3 — Human resolution of REVIEW_REQUIRED (Phase 4 joint
+// checkpoint: STRUCTURAL SIGNAL > LEAD > EVIDENCE FOR/AGAINST > HUMAN REVIEW).
+// APPROVED -> COMPLETED, or NEEDS_EVIDENCE -> WAITING_FOR_EVIDENCE.
+apiRouter.post(
+  "/investigations/:investigationId/review/resolve",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+      const bodySchema = z
+        .object({
+          outcome: z.enum(["APPROVED", "NEEDS_EVIDENCE"]),
+          notes: z.string().max(2000).optional(),
+        })
+        .strict();
+      const bodyResult = bodySchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return res.status(400).json({ error: "Invalid request body", issues: bodyResult.error.issues });
+      }
+      const run = await db.investigationRun.findFirst({
+        where: { investigationId },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+      if (!req.user || !verifyCaseAccess(req.user, run.caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${run.caseId}`,
+        });
+      }
+
+      try {
+        const snapshot = await runStateMachine.resolveReview(run.id, {
+          outcome: bodyResult.data.outcome,
+          actor: req.user.id,
+          notes: bodyResult.data.notes,
+        });
+        return res.status(200).json({ run: snapshot });
+      } catch (err: unknown) {
+        if (err instanceof RunNotInReviewError) {
+          return res.status(409).json({ error: err.message });
+        }
+        throw err;
+      }
+    } catch (error: unknown) {
+      if (error instanceof RunNotFoundError) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Failed to resolve investigation review:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

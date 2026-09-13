@@ -37,6 +37,8 @@ import {
   type CrossCaseDiscoveryService,
   type CrossCaseScope,
 } from "./cross-case-discovery.js";
+import { runStateMachine, type RunStateMachine } from "../execution/run-state-machine.js";
+import { emitAnalysisProgress } from "../realtime/sse.js";
 
 /** Bound on how many internal edges' evidence we union for a single community lead. */
 const COMMUNITY_EVIDENCE_UNION_CAP = 200;
@@ -75,7 +77,12 @@ export interface GenerationResult {
   readonly leadsCreated: DurableLead[];
   readonly leadsAlreadyExisted: DurableLead[];
   readonly skipped: readonly SkippedCandidate[];
+  /** True if a CRITICAL-priority lead successfully moved the run into REVIEW_REQUIRED. */
+  readonly reviewTriggered: boolean;
 }
+
+/** Priority threshold at which a newly created lead triggers human review. */
+const REVIEW_TRIGGER_PRIORITY = "CRITICAL";
 
 export class LeadRuntime {
   constructor(
@@ -84,6 +91,7 @@ export class LeadRuntime {
     private readonly relations: RelationStore = new RelationStore(),
     private readonly leads: LeadStore = leadStore,
     private readonly crossCase: CrossCaseDiscoveryService = crossCaseDiscoveryService,
+    private readonly runState: RunStateMachine = runStateMachine,
   ) {}
 
   /**
@@ -91,11 +99,23 @@ export class LeadRuntime {
    * and persist any new leads. Idempotent: re-running over unchanged graph
    * state produces the same lead ids and creates nothing new (LeadStore
    * never overwrites an existing lead).
+   *
+   * `runId`, when supplied, enables two P4-PR3 behaviors: ANALYSIS_PROGRESS
+   * SSE frames are emitted throughout, and a newly created CRITICAL lead
+   * will (best-effort — never throws) attempt to move the run into
+   * REVIEW_REQUIRED.
    */
   async generateStructuralLeads(
     scope: GraphScopeInput,
-    params: { actor: string },
+    params: { actor: string; runId?: string },
   ): Promise<GenerationResult> {
+    emitAnalysisProgress({
+      investigationId: scope.investigationId,
+      caseId: scope.caseId,
+      phase: "ANALYSIS_STARTED",
+      message: "Starting structural candidate detection (bridges/bursts/communities)",
+    });
+
     const [bridges, bursts, communities, entityRows, relationRows] = await Promise.all([
       this.graph.bridgeCandidates(scope),
       this.graph.temporalBurstCandidates(scope),
@@ -103,6 +123,14 @@ export class LeadRuntime {
       this.entities.listByCase(scope.caseId, { investigationId: scope.investigationId }),
       this.relations.listActiveByCase(scope.caseId, { investigationId: scope.investigationId }),
     ]);
+
+    emitAnalysisProgress({
+      investigationId: scope.investigationId,
+      caseId: scope.caseId,
+      phase: "CANDIDATES_DETECTED",
+      message: `Detected ${bridges.length} bridge, ${bursts.length} burst, ${communities.length} community candidates`,
+      detail: { bridges: bridges.length, bursts: bursts.length, communities: communities.length },
+    });
 
     const nameById = new Map(entityRows.map((e: CanonicalEntity) => [e.id, e.canonicalName]));
     const entityName = (id: string) => nameById.get(id) ?? id;
@@ -182,7 +210,15 @@ export class LeadRuntime {
       );
     }
 
-    return this.persistDrafts(drafts, bridges.length + bursts.length + communities.length, skipped, scope.investigationId, params.actor);
+    return this.persistDrafts({
+      drafts,
+      candidatesConsidered: bridges.length + bursts.length + communities.length,
+      skipped,
+      caseId: scope.caseId,
+      investigationId: scope.investigationId,
+      runId: params.runId,
+      actor: params.actor,
+    });
   }
 
   /**
@@ -194,14 +230,29 @@ export class LeadRuntime {
   async generateCrossCaseLeads(
     source: CrossCaseScope,
     target: CrossCaseScope,
-    params: { actor: string },
+    params: { actor: string; runId?: string },
   ): Promise<GenerationResult> {
+    emitAnalysisProgress({
+      investigationId: source.investigationId,
+      caseId: source.caseId,
+      phase: "ANALYSIS_STARTED",
+      message: `Starting cross-case discovery against case ${target.caseId}`,
+    });
+
     const matches = await this.crossCase.findMatches(source, target);
     const entityRows = await this.entities.listByCase(source.caseId, { investigationId: source.investigationId });
     const targetEntityRows = await this.entities.listByCase(target.caseId, { investigationId: target.investigationId });
     const nameById = new Map([...entityRows, ...targetEntityRows].map((e) => [e.id, e.canonicalName]));
     const entityName = (id: string) => nameById.get(id) ?? id;
     const entityById = new Map([...entityRows, ...targetEntityRows].map((e) => [e.id, e]));
+
+    emitAnalysisProgress({
+      investigationId: source.investigationId,
+      caseId: source.caseId,
+      phase: "CANDIDATES_DETECTED",
+      message: `Detected ${matches.length} cross-case identity matches`,
+      detail: { matches: matches.length },
+    });
 
     const drafts: LeadDraft[] = [];
     const skipped: SkippedCandidate[] = [];
@@ -238,24 +289,80 @@ export class LeadRuntime {
       );
     }
 
-    return this.persistDrafts(drafts, matches.length, skipped, source.investigationId, params.actor);
+    return this.persistDrafts({
+      drafts,
+      candidatesConsidered: matches.length,
+      skipped,
+      caseId: source.caseId,
+      investigationId: source.investigationId,
+      runId: params.runId,
+      actor: params.actor,
+    });
   }
 
-  private async persistDrafts(
-    drafts: readonly LeadDraft[],
-    candidatesConsidered: number,
-    skipped: readonly SkippedCandidate[],
-    investigationId: string | null,
-    actor: string,
-  ): Promise<GenerationResult> {
+  private async persistDrafts(params: {
+    drafts: readonly LeadDraft[];
+    candidatesConsidered: number;
+    skipped: readonly SkippedCandidate[];
+    caseId: string;
+    investigationId: string;
+    runId?: string;
+    actor: string;
+  }): Promise<GenerationResult> {
     const leadsCreated: DurableLead[] = [];
     const leadsAlreadyExisted: DurableLead[] = [];
-    for (const draft of drafts) {
-      const { lead, created } = await this.leads.upsertDraft(draft, { investigationId, actor });
-      if (created) leadsCreated.push(lead);
-      else leadsAlreadyExisted.push(lead);
+    for (const draft of params.drafts) {
+      const { lead, created } = await this.leads.upsertDraft(draft, {
+        investigationId: params.investigationId,
+        actor: params.actor,
+      });
+      if (created) {
+        leadsCreated.push(lead);
+        emitAnalysisProgress({
+          investigationId: params.investigationId,
+          caseId: params.caseId,
+          phase: "LEAD_CREATED",
+          message: `Lead created: ${lead.title}`,
+          detail: { leadId: lead.id, sourceCandidateType: lead.sourceCandidateType, priority: lead.priority },
+        });
+      } else {
+        leadsAlreadyExisted.push(lead);
+      }
     }
-    return { candidatesConsidered, leadsCreated, leadsAlreadyExisted, skipped };
+
+    let reviewTriggered = false;
+    if (params.runId) {
+      const criticalLead = leadsCreated.find((l) => l.priority === REVIEW_TRIGGER_PRIORITY);
+      if (criticalLead) {
+        const snapshot = await this.runState.tryEnterReviewRequired(params.runId, {
+          actor: params.actor,
+          reason: `CRITICAL lead requires review: ${criticalLead.title}`,
+        });
+        reviewTriggered = snapshot !== null;
+      }
+    }
+
+    emitAnalysisProgress({
+      investigationId: params.investigationId,
+      caseId: params.caseId,
+      phase: "ANALYSIS_COMPLETED",
+      message: `Analysis complete: ${leadsCreated.length} new leads, ${leadsAlreadyExisted.length} already existed, ${params.skipped.length} skipped`,
+      detail: {
+        candidatesConsidered: params.candidatesConsidered,
+        leadsCreated: leadsCreated.length,
+        leadsAlreadyExisted: leadsAlreadyExisted.length,
+        skipped: params.skipped.length,
+        reviewTriggered: reviewTriggered ? "true" : "false",
+      },
+    });
+
+    return {
+      candidatesConsidered: params.candidatesConsidered,
+      leadsCreated,
+      leadsAlreadyExisted,
+      skipped: params.skipped,
+      reviewTriggered,
+    };
   }
 }
 

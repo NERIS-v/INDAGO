@@ -622,10 +622,14 @@ const hypothesesA = [
 
 const leadsA = [
   LeadSchema.parse({
-    id: LEAD_A1, investigationId: INVESTIGATION_A_ID, caseId: CASE_A_ID,
+    id: LEAD_A1,
+    investigationId: INVESTIGATION_A_ID,
+    caseId: CASE_A_ID,
     title: "Pursue disposition of January 1976 request",
     description: "Determine whether the CT SOCTF received any response to the January 1976 federal records request concerning Callahan.",
-    status: "NEW", priority: "HIGH", confidence: 0.5,
+    status: "NEW",
+    priority: "HIGH",
+    confidence: 0.5,
     posture: "T1_INVESTIGATIVE_LEAD",
     relatedEntityIds: [ENT_A_SOCTF, ENT_CALLAHAN],
     supportingObservationIds: [OBS_A1],
@@ -638,10 +642,14 @@ const leadsA = [
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
   LeadSchema.parse({
-    id: LEAD_A2, investigationId: INVESTIGATION_A_ID, caseId: CASE_A_ID,
+    id: LEAD_A2,
+    investigationId: INVESTIGATION_A_ID,
+    caseId: CASE_A_ID,
     title: "Document scope of Rico's WJA role (1975-76)",
     description: "Establish the nature, timing, and duration of Rico's security consultancy for WJA and his interactions with federal authorities.",
-    status: "NEW", priority: "MEDIUM", confidence: 0.45,
+    status: "NEW",
+    priority: "MEDIUM",
+    confidence: 0.45,
     posture: "T1_INVESTIGATIVE_LEAD",
     relatedEntityIds: [ENT_RICO, ENT_WJA, ENT_FBIBOSTON],
     supportingObservationIds: [OBS_A4, OBS_A5, OBS_A6],
