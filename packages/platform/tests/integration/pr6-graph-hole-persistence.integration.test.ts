@@ -177,8 +177,8 @@ function buildRawCandidate(
       boundReached: false,
     },
     provenance: {
-      sourceId: 'src-fixture',
-      artifactId: 'art-fixture',
+      sourceId: randomUUID(),
+      artifactId: randomUUID(),
       extractor: 'graph-hole-detection.v1',
       extractionMethod: 'test-fixture',
     },
