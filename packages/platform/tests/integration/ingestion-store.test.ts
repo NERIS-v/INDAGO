@@ -172,11 +172,11 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
       // Same content, two cases → two durable rows (case-scoped identity),
       // so one case's provenance cannot clobber the other's.
-      expect(caseB.id).not.toBe(caseA.id proiektuak
+      expect(caseB.id).not.toBe(caseA.id);
     
       // find is always case-scoped: each case sees exactly its own row.
       expect((await store.findArtifactForCase(caseId, hash))!.id).toBe(caseA.id);
-      expect((await store.findArtifactForCase(otherCaseId, hash))!.id).toBe(caseB.id etxek problem identifier `caseId` spans a single enclosing scope at position ...
+      expect((await store.findArtifactForCase(otherCaseId, hash))!.id).toBe(caseB.id);
       expect(
         await prisma.artifact.count({ where: { caseId, contentHash: hash } }),
       ).toBe(1);

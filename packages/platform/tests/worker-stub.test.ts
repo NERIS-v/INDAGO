@@ -31,6 +31,7 @@ const h = vi.hoisted(() => {
   const acquire = vi.fn();
   const extract = vi.fn();
   const deterministicSourceId = vi.fn();
+  const deterministicArtifactIdForCase = vi.fn();
   const normalize = vi.fn();
   const parseStoredRawExtraction = vi.fn();
   // M-A06 observation pipeline stubs (called by completeMA06).
@@ -47,6 +48,7 @@ const h = vi.hoisted(() => {
     acquire,
     extract,
     deterministicSourceId,
+    deterministicArtifactIdForCase,
     normalize,
     parseStoredRawExtraction,
     computeContentHash,
@@ -156,6 +158,9 @@ vi.mock("@indago/ingestion", () => ({
   createDefaultParserRegistry: vi.fn(),
   createTesseractOcrProvider: vi.fn(),
   deterministicSourceId: h.deterministicSourceId,
+  // Case-scoped artifact id (v2 identity): not derived from bytesToUuid4 in the
+  // worker flow anymore — the job derives it from (caseId, contentHash).
+  deterministicArtifactIdForCase: h.deterministicArtifactIdForCase.mockResolvedValue(VALID_ARTIFACT_ID),
   NormalizationService: vi.fn().mockImplementation(() => ({ normalize: h.normalize })),
   parseStoredRawExtraction: h.parseStoredRawExtraction,
   NORMALIZER_ID: "indago-text-canonicalizer",
