@@ -57,6 +57,7 @@ import {
   buildEntityMentionIdentityKey,
   buildCandidatePairIdentityKey,
   blockCandidates,
+  deterministicArtifactIdForCase,
   deterministicSourceId,
   extractEntityMentions,
   extractObservations,
@@ -300,9 +301,18 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
 
   const artifact = acquireResult.artifact;
 
-  // ---- 6. Persist artifact (content-addressed upsert)
+  // Artifact identity is CASE-SCOPED: the deterministic id is derived from
+  // (caseId, contentHash), not the content hash alone, so the same bytes
+  // ingested under a different case resolve to a distinct artifact row and
+  // cannot clobber another case's provenance. The acquisition envelope keeps
+  // its content-level id, but every durable reference downstream uses the
+  // case-scoped id.
+  const artifactId = await deterministicArtifactIdForCase(run.caseId, artifact.contentHash);
+  const caseScopedArtifact = { ...artifact, artifactId };
+
+  // ---- 6. Persist artifact (case-scoped content-addressed upsert)
   const persistedArtifact = await ingestionStore.upsertArtifact({
-    id: artifact.artifactId,
+    id: artifactId,
     contentHash: artifact.contentHash,
     storagePath: artifact.storagePath,
     detectedMimeType: artifact.detectedMimeType,
@@ -332,7 +342,7 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
   );
 
   // ---- 7. Classify → route → extract
-  const extractionResult = await extractionService.extract(artifact);
+  const extractionResult = await extractionService.extract(caseScopedArtifact);
 
   if (!extractionResult.ok) {
     await onIngestionError({ job, payload, runId, error: extractionResult.error });
@@ -351,7 +361,7 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
     attemptNumber,
     status: "SUCCEEDED",
     sourceId,
-    artifactId: artifact.artifactId,
+    artifactId,
     parserId: extraction.parserId,
     parserVersion: extraction.parserVersion,
     format: extraction.format,
@@ -362,7 +372,7 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
   // gate above) treat an already-persisted RawExtraction as complete.
   await ingestionStore.ensureRawExtraction({
     attemptId: attempt.id,
-    artifactId: artifact.artifactId,
+    artifactId,
     parserId: extraction.parserId,
     parserVersion: extraction.parserVersion,
     format: extraction.format,
@@ -380,7 +390,7 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
     action: "EVIDENCE_INGESTED",
     actor: "INGESTION_PIPELINE",
     targetType: "EVIDENCE",
-    targetId: artifact.artifactId,
+    targetId: artifactId,
     description: `Durably ingested ${extraction.format} content for ${payload.evidenceTitle} (attempt ${attemptNumber}, case ${run.caseId})`,
   });
 
@@ -390,7 +400,7 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
     runId,
     attemptId: attempt.id,
     caseId: run.caseId,
-    artifactId: artifact.artifactId,
+    artifactId,
     raw: extraction,
   });
 }

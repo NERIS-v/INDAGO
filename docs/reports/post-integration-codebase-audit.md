@@ -248,7 +248,7 @@ Note: the queue job is the parent; there is **no Evidence/Source row** written a
 ## 17. Prisma / Persistence
 
 - Models (4): `InvestigationRun` (incl. `caseId` column, `contextData Json`), `AgentCheckpoint` (pseudo-hash: `stateHash = randomUUID()` 🧪 not a real hash), `ToolExecution`, `AuditEvent`.
-- **No** migrations directory — schema is pushed via `db push`. No Artifact, RawExtraction, Source, Evidence, or EvidenceItem models ❌.
+- Schema: Prisma migrations under `packages/platform/prisma/migrations` (versioned, applied to the test DB; no `db push` for schema changes). Models now include Artifact, RawExtraction, Source, Evidence, and EvidenceItem (full ingestion persistence).
 - Evidence submission writes **zero** DB rows (audit event only).
 - `logAuditEvent` (audit/logger.ts) — genuine append-only SHA-256 hash chain inside a `$transaction`: `sha256(previousHash:actor:action:targetId:timestamp)`, `previousHash` chain, unique `hash`.
 
@@ -374,8 +374,7 @@ All green at HEAD `b423ec8`:
 - Legacy `/ingest` integration path + `USE_MOCK_INGESTION` still live in the state machine, shadowing the new ingestion package.
 - `payloadCaseId` hack (above) is a load-bearing defect.
 - UploadThing URL pinned by mnemonic.
-- No `Prisma Migrations`; schema commentary drifting.
-- `AgentCheckpoint.stateHash` not a real content hash.
+- Superseded: Prisma migrations now live under `packages/platform/prisma/migrations` (versioned, applied to the test DB). Remaining drift: `AgentCheckpoint.stateHash` not a real content hash.
 
 ---
 
@@ -395,7 +394,7 @@ All green at HEAD `b423ec8`:
 | Live providers functional | ❌ | unsupported stubs |
 | Idempotent job identity | ✅ | jobId dedupe |
 | Correlation end-to-end | ⚠️ | batch-level only |
-| Immutable audit trail | ✅ | hash chain |
+| Append-only write audit trail | ✅ | write-only hash chain (append + forkable; not tamper-evident — see ipr2 audit §chain) |
 | Case boundary enforcement | ✅ | production path via run.caseId |
 | Frontend cannot be forced to rewrite | ✅ | read-only seam |
 
@@ -407,7 +406,7 @@ All green at HEAD `b423ec8`:
 
 - ✅ End-to-end ingestion pipeline proven in-process (acquire → OCR → parse → audit).
 - ✅ Queue/worker/tests/builds all green; single-producer discipline verified.
-- ⚠️ Prerequisite A — **Persistence:** introduce Prisma `Evidence`/`Artifact`/`RawExtraction` (+ real object store), and a `db push`/migration policy.
+- ✅ Prerequisite A — **Persistence:** Prisma `Evidence`/`Artifact`/`RawExtraction` migrations added and applied to the test DB (real object store for raw bytes still pending).
 - ⚠️ Prerequisite B — **Lifecycle wiring:** evidence jobs must write run-state transitions/checkpoints so the UI can reflect progress.
 - ⚠️ Prerequisite C — **Write-path seam:** add `evidence.submit/upload` to the web provider seam (backend-first contract; frontend stays decoupled).
 - ⚠️ Prerequisite D — **Sanitize:** fix `payloadCaseId` fabrication and `sea1` pin; remove `test-db.mjs`.

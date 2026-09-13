@@ -1006,7 +1006,7 @@ packages/
 
 ### Investigative Workspace (packages/web)
 
-The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provider seam. Every surface renders from the provider seam and never fabricates data; demo mode is deterministic and covered by `vitest` suites. Feature-scoped reports live in `docs/reports/`.
+The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provider seam. Every surface renders from the provider seam. In DEMO mode the provider serves curated demo fixtures (deterministic, covered by `vitest` suites); in LIVE mode it renders authoritative data from the platform API. The seam itself never fabricates data — it selects between demo fixtures and live data, and never injects ad-hoc values at render time. Feature-scoped reports live in `docs/reports/`.
 
 | PR | Surface | Scope |
 |---|---|---|

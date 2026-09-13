@@ -40,3 +40,24 @@ export function deterministicArtifactId(contentHash: string): string {
   const bytes = hexPairs.map((h) => parseInt(h, 16));
   return bytesToUuid4(bytes);
 }
+
+/**
+ * Generate a case-scoped deterministic artifact ID.
+ *
+ * Artifact identity is scoped to (caseId, contentHash): the same bytes
+ * ingested under different cases MUST NOT resolve to the same artifact.
+ * The digest covers a namespaced string (not the raw content hash), so
+ * the resulting UUID is stable across retries within a case and unique
+ * across cases. UUID format remains compatible with ArtifactIdSchema.
+ */
+export async function deterministicArtifactIdForCase(
+  caseId: string,
+  contentHash: string,
+): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(`indago:artifact:v2:${caseId}:${contentHash}`),
+  );
+  const bytes = new Uint8Array(digest);
+  return bytesToUuid4(Array.from(bytes).slice(0, 16));
+}

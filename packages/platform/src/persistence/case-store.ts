@@ -157,10 +157,11 @@ export class CaseStore {
    * active (QUEUED/INITIALIZING/RUNNING/PAUSED) investigation runs — deleting
    * mid-pipeline would orphan the orchestrator's work.
    *
-   * Artifacts are CONTENT-ADDRESSED AND GLOBAL: one Artifact row per content
-   * hash, potentially referenced by other cases' evidence/attempts. Only
-   * artifacts with no remaining Evidence/IngestionAttempt reference anywhere
-   * are deleted; any still-shared row survives intact.
+   * Artifacts are CASE-SCOPED AND CONTENT-ADDRESSED: one Artifact row per
+   * (caseId, contentHash). IDs are (caseId, contentHash)-derived, so artifact
+   * ids cannot collide across cases. Only artifacts with no remaining
+   * Evidence/IngestionAttempt reference anywhere are deleted; any still-shared
+   * row survives intact.
    */
   async deleteCase(caseId: string): Promise<DeleteCaseResult> {
     // The default interactive-transaction timeout is 5000 ms, which the full

@@ -44,7 +44,7 @@ import {
   deriveRelationHypothesisStatus,
   shouldProposeRelationHypothesis,
 } from './scoring.js';
-import { isRelationDirected } from './types.js';
+import { resolveRelationDirected } from './types.js';
 
 /**
  * Index an observation by id (bounded to the case observation cap for
@@ -249,7 +249,7 @@ export function resolveRelationPair(params: {
     sourceEntityId: candidate.sourceEntityId,
     targetEntityId: candidate.targetEntityId,
     relationType,
-    directed: isRelationDirected(relationType),
+    directed: resolveRelationDirected(relationType),
     support: settled.score,
     evidenceBasis: candidate.observationIds,
     contradictions: contradictionObservations,

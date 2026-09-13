@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { DEFAULT_NORMALIZATION_CONFIG } from "@indago/contracts";
 import type { NormalizedExtraction } from "@indago/contracts";
 import { IngestionStore } from "../../src/persistence/ingestion-store.js";
+import { deterministicArtifactIdForCase } from "@indago/ingestion";
 import type {
   ArtifactWriteRecord,
   AttemptRevision,
@@ -133,7 +134,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       await prisma.$disconnect();
     });
 
-    it("upserts artifact by contentHash — same hash always resolves to the same row", async () => {
+    it("upserts artifact by (caseId, contentHash) — same case + same hash always resolve to the same row", async () => {
       const first = await store.upsertArtifact(makeArtifact());
       const second = await store.upsertArtifact(
         makeArtifact({ id: randomUUID(), originalFilename: "renamed.txt" }),
@@ -142,14 +143,14 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(second.id).toBe(first.id);
       expect(
         await prisma.artifact.count({
-          where: { contentHash: first.contentHash! },
+          where: { caseId, contentHash: first.contentHash! },
         }),
       ).toBe(1);
     });
 
-    it("findArtifactByContentHash returns the durable row with full provenance", async () => {
+    it("findArtifactForCase returns the durable row with full provenance", async () => {
       const artifact = await store.upsertArtifact(makeArtifact());
-      const found = await store.findArtifactByContentHash(artifact.contentHash!);
+      const found = await store.findArtifactForCase(artifact.caseId, artifact.contentHash!);
 
       expect(found).not.toBeNull();
       expect(found!.id).toBe(artifact.id);
@@ -158,6 +159,30 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(found!.investigationId).toBe(investigationId);
       expect(found!.idempotencyKey).toBe(idempotencyKey);
       expect(found!.providerMetadata as unknown).toEqual({ fileKey: "a.txt" });
+    });
+
+    it("cross-case isolation — identical bytes under different cases resolve to DIFFERENT rows (dedup stays per case)", async () => {
+      const otherCaseId = randomUUID();
+      const hash = contentHashOf("shared-bytes");
+
+      const caseA = await store.upsertArtifact(makeArtifact({ id: randomUUID(), contentHash: hash }));
+      const caseB = await store.upsertArtifact(
+        makeArtifact({ id: randomUUID(), contentHash: hash, caseId: otherCaseId }),
+      );
+
+      // Same content, two cases → two durable rows (case-scoped identity),
+      // so one case's provenance cannot clobber the other's.
+      expect(caseB.id).not.toBe(caseA.id proiektuak
+    
+      // find is always case-scoped: each case sees exactly its own row.
+      expect((await store.findArtifactForCase(caseId, hash))!.id).toBe(caseA.id);
+      expect((await store.findArtifactForCase(otherCaseId, hash))!.id).toBe(caseB.id etxek problem identifier `caseId` spans a single enclosing scope at position ...
+      expect(
+        await prisma.artifact.count({ where: { caseId, contentHash: hash } }),
+      ).toBe(1);
+      expect(
+        await prisma.artifact.count({ where: { caseId: otherCaseId, contentHash: hash } }),
+      ).toBe(1);
     });
 
     it("attempt revisions keep one row per (investigationId, idempotencyKey) and advance attemptNumber", async () => {
