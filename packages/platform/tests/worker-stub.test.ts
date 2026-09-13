@@ -31,6 +31,7 @@ const h = vi.hoisted(() => {
   const acquire = vi.fn();
   const extract = vi.fn();
   const deterministicSourceId = vi.fn();
+  const deterministicArtifactIdForCase = vi.fn().mockResolvedValue("mock-artifact-id");
   const normalize = vi.fn();
   const parseStoredRawExtraction = vi.fn();
   // M-A06 observation pipeline stubs (called by completeMA06).
@@ -47,6 +48,7 @@ const h = vi.hoisted(() => {
     acquire,
     extract,
     deterministicSourceId,
+    deterministicArtifactIdForCase,
     normalize,
     parseStoredRawExtraction,
     computeContentHash,
@@ -156,6 +158,7 @@ vi.mock("@indago/ingestion", () => ({
   createDefaultParserRegistry: vi.fn(),
   createTesseractOcrProvider: vi.fn(),
   deterministicSourceId: h.deterministicSourceId,
+  deterministicArtifactIdForCase: h.deterministicArtifactIdForCase,
   NormalizationService: vi.fn().mockImplementation(() => ({ normalize: h.normalize })),
   parseStoredRawExtraction: h.parseStoredRawExtraction,
   NORMALIZER_ID: "indago-text-canonicalizer",
@@ -221,6 +224,7 @@ const runState = {
   state: "CREATED",
   status: "QUEUED",
   contextData: {} as Record<string, unknown>,
+  error: null as string | null,
 };
 
 function makeValidPayload() {

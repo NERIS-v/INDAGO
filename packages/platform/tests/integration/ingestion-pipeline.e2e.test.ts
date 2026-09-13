@@ -4,7 +4,8 @@ import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:http";
-import type { Server, AddressInfo } from "node:http";
+import type { Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import type { Job } from "bullmq";
 import { PrismaClient } from "@prisma/client";
 import type { IngestionJobPayload } from "@indago/contracts";
@@ -157,7 +158,7 @@ describeOrSkip("E2E: POST → ingest-evidence → durable persistence", () => {
   });
 
   it("persists a real artifact with correct content hash, caseId and storage file", async () => {
-    const artifact = await prisma.artifact.findUnique({
+    const artifact = await prisma.artifact.findFirst({
       where: { contentHash: contentHash() },
     });
 
