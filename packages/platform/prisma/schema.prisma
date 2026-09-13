@@ -971,3 +971,165 @@ model SemanticEmbedding {
   @@unique([semanticTextUnitId, providerId, modelId, modelVersion, embeddingPolicyVersion])
   @@index([caseId, providerId, modelId, modelVersion, embeddingPolicyVersion])
 }
+
+// ============================================================================
+// Phase 5A-PR6: GraphHole intelligence persistence (identity, persistence,
+// deduplication, idempotency, concurrency safety, ownership, supersession).
+//
+// These four models are the SINGLE authoritative persistence boundary for the
+// deterministic PR4/PR5 pipeline. They persist INTELLIGENCE FINDINGS only —
+// never investigation workflow state (that stays with Lead / InvestigationRun).
+//
+// Identity discipline (mirrors the repo-wide identityKey convention):
+//   - regionId / candidateId are SHA-256 of the canonical identity string
+//     (computed by @indago/graph-hole-region / @indago/graph-hole-detection).
+//   - identityKey @unique stores the canonical identity STRING (exact-dedup
+//     guard — "the DB rejects duplicate rows, never SELECT-then-INSERT").
+//   - id is a random UUID RECORD id, deliberately distinct from the domain
+//     candidateId (same stance as GraphVersion, whose natural key is
+//     (caseId, versionNumber)).
+//
+// scoringPolicyVersion is persisted METADATA only — it is deliberately NOT
+// part of candidate identity (see graph-hole-candidate.ts / graph-hole-
+// persistence.ts contracts).
+//
+// NO-FK DECOUPLING (intentional, consistent with the rest of the schema):
+// caseId / graphVersionId / regionId / supersedesGraphHoleId are plain
+// indexed columns, not Prisma FKs. GraphHoleDetectorContribution and
+// GraphHoleAssessment ARE strict children of GraphHole and carry a Prisma FK
+// (GraphHole is never deleted, so cascade semantics are inert; the FK mirrors
+// EntityMentionCandidate → Observation).
+// ============================================================================
+
+// ============================================================================
+// P-GH-1: Durable RegionAnalysis (no-repeat behavior + traceability)
+//
+// Stores only the BOUNDED region facts required for no-repeat, reassessment,
+// historical traceability, and policy/version awareness. Deliberately NO graph
+// payloads (region identity already content-addresses the full node/edge/seed
+// context via the canonical region identity).
+// ============================================================================
+model GraphHoleRegionAnalysis {
+  id                             String   @id @default(uuid()) // record id (domain id = regionId hex)
+  identityKey                    String   @unique // canonical region identity string — exact-dedup guard
+  regionId                       String // SHA-256 hex of the canonical region identity
+  caseId                         String
+  investigationId                String?
+  graphVersionId                 String
+  regionPolicyVersion            String // GRAPH_HOLE_POLICY_VERSION
+  semanticRetrievalPolicyVersion String // SEMANTIC_RETRIEVAL_POLICY_VERSION
+  status                         String // RegionStatusSchema: SATURATED | LIMITED | DEGRADED
+  truncated                      Boolean  @default(false)
+  seedObservationIds             Json // sorted unique ObservationId[]
+  nodeIds                        Json // sorted unique GraphNodeId[]
+  edgeIds                        Json // sorted unique GraphEdgeId[]
+  temporalContext                Json? // TemporalInterval or NULL
+  summary                        Json? // bounded RegionAnalysisSummary (see store)
+  analyzedAt                     DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
+
+  @@unique([regionId, caseId, graphVersionId, regionPolicyVersion]) // DB-enforced composite identity
+  @@index([caseId])
+  @@index([caseId, graphVersionId])
+  @@index([graphVersionId])
+}
+
+// ============================================================================
+// P-GH-2: Durable GraphHole (authoritative current intelligence finding)
+// ============================================================================
+model GraphHole {
+  id                         String   @id @default(uuid()) // RECORD id — never the domain candidateId
+  identityKey                String   @unique // canonical candidate identity string — exact-dedup guard
+  candidateId                String // SHA-256 hex of the canonical candidate identity
+  caseId                     String
+  investigationId            String?
+  graphVersionId             String
+  regionId                   String // producing region.regionId (content-addressed)
+  holeType                   String // GraphHoleTypeSchema value
+  canonicalNodeIds           Json // sorted unique GraphNodeId[]
+  expectedRelationshipType   String? // RelationTypeSchema or NULL
+  temporalScope              Json? // TemporalInterval or NULL
+  detectionPolicyVersion     String // DETECTION_POLICY_VERSION
+  scoringPolicyVersion       String // GRAPH_HOLE_SCORING_POLICY_VERSION (METADATA, not identity)
+  qualificationPolicyVersion String // GRAPH_HOLE_POLICY_VERSION (qualification-policy schema version)
+  status                     String   @default("ACTIVE") // GraphHolePersistenceStatusSchema
+  structuralScore            Float
+  evidenceSupportScore       Float
+  expectedInformationValue   Float
+  significance               Float
+  supersedesGraphHoleId      String? // lineage to the prior-version record of the same logical hole (plain column)
+  supersededAt               DateTime?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  contributions GraphHoleDetectorContribution[]
+  assessments   GraphHoleAssessment[]
+
+  @@unique([caseId, candidateId]) // case-scoped identity uniqueness (DB-enforced)
+  @@index([caseId, status])
+  @@index([graphVersionId])
+  @@index([regionId])
+}
+
+// ============================================================================
+// P-GH-3: Durable detector contributions (multi-detector deduplication)
+//
+// One row per (graphHoleId, detectorType, detectionPolicyVersion). Multiple
+// detectors converging on the same candidate coexist here; the first
+// detector's provenance is never overwritten by a later detector.
+// ============================================================================
+model GraphHoleDetectorContribution {
+  id                            String   @id @default(uuid())
+  identityKey                   String   @unique // buildDetectorContributionIdentityKey — exact-dedup guard
+  graphHoleId                   String
+  caseId                        String
+  candidateId                   String // parent candidateId (queryability, case-scoped audit)
+  detectorType                  String // GraphHoleTypeSchema value
+  detectionPolicyVersion        String // DETECTION_POLICY_VERSION consumed by THIS detector
+  structuralBasis               String // StructuralBasisSchema value
+  supportingHypothesisIds       Json // PR3 hypothesis ids (sorted unique)
+  supportingObservationIds      Json // ObservationId[] (sorted unique)
+  contradictingObservationIds   Json // ObservationId[] (sorted unique)
+  observedEdgeIds               Json // GraphEdgeId[] (sorted unique)
+  detectorMetadata              Json // GraphHoleDetectorMetadataSchema
+  provenance                    Json // ProvenanceSchema — first-detector provenance preserved
+  createdAt                     DateTime @default(now())
+
+  graphHole GraphHole @relation(fields: [graphHoleId], references: [id], onDelete: Cascade)
+
+  @@unique([graphHoleId, detectorType, detectionPolicyVersion])
+  @@index([caseId])
+  @@index([candidateId])
+}
+
+// ============================================================================
+// P-GH-4: Append-only GraphHole assessment history (LeadEvent/TemporalStateChange
+// discipline)
+//
+// One row per assessment/state event, monotonic `sequence` per graphHoleId
+// (app-side max+1), `logicalKey @unique` dedups identical re-runs. `snapshot`
+// preserves the exact qualified output of each assessment so old analysis
+// remains queryable after the current row mutates.
+// ============================================================================
+model GraphHoleAssessment {
+  id                            String   @id @default(uuid())
+  graphHoleId                   String
+  caseId                        String
+  sequence                      Int // monotonic per graphHoleId — app-side max+1
+  logicalKey                    String?  @unique // dedup of identical re-runs (null for state events)
+  assessmentType                String // GraphHoleAssessmentTypeSchema
+  status                        String // GraphHolePersistenceStatusSchema value at event time
+  graphVersionId                String
+  detectionPolicyVersion        String
+  scoringPolicyVersion          String
+  qualificationPolicyVersion    String
+  snapshot                      Json // qualified output (assessment) or current-state summary (state event)
+  reason                        String?
+  createdAt                     DateTime @default(now())
+
+  graphHole GraphHole @relation(fields: [graphHoleId], references: [id], onDelete: Cascade)
+
+  @@unique([graphHoleId, sequence])
+  @@index([graphHoleId])
+  @@index([caseId])
+}
