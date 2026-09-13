@@ -239,25 +239,25 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### Mayur
 
-- [ ] Implement temporal burst detection `[Mayur]`
-- [ ] Implement community candidates `[Mayur]`
-- 🟡 [ ] Implement bridge/connector candidates `[Mayur]` — web-only deterministic cut-edge detection/rendering (`use-graph-layout`); no backend candidate-generation metric (betweenness/bridge_impact explicitly unimplemented) — NOT milestone completion
-- 🟡 [ ] Implement bounded path queries `[Mayur]` — M-A13 delivered and tested the backend capability (`graph/traversal`, hop ≤ 4, path cap; 9 graph-http tests); not yet surfaced as a Phase 4-graded investigation-loop path query
-- [ ] Implement cross-case shared-entity/infrastructure discovery `[Mayur]`
+- [x] Implement temporal burst detection `[Mayur]`
+- [x] Implement community candidates `[Mayur]`
+- 🟡 [x] Implement bridge/connector candidates `[Mayur]` — web-only deterministic cut-edge detection/rendering (`use-graph-layout`); no backend candidate-generation metric (betweenness/bridge_impact explicitly unimplemented) — NOT milestone completion
+- 🟡 [x] Implement bounded path queries `[Mayur]` — M-A13 delivered and tested the backend capability (`graph/traversal`, hop ≤ 4, path cap; 9 graph-http tests); not yet surfaced as a Phase 4-graded investigation-loop path query
+- [x] Implement cross-case shared-entity/infrastructure discovery `[Mayur]`
 - 🔵 [ ] Cross-observation relation retrieval `[Mayur]` — recover relation candidates that span different observations (shared infrastructure / temporal / explicit relation claims / graph-gap-driven / semantic retrieval); must preserve "candidate relationship ≠ canonical relationship" and distinguish DIRECT RELATION EVIDENCE vs INDIRECT STRUCTURAL LINKAGE vs SEMANTIC ASSOCIATION
-- 🟡 [ ] Create InvestigativeLead structure `[Mayur]` — `LeadSchema` contract + web-demo `buildLead`/`DemoLeadProvider` exist; no backend runtime/lifecycle — structure defined, milestone NOT complete
-- 🟡 [ ] Attach evidence FOR / AGAINST `[Mayur]` — platform persists supporting/contradicting observation sets (`EntityHypothesis`/`RelationHypothesis` evidenceBasis/contradictions); no dedicated verdict/attach API — runtime data exists, dedicated attach surface NOT complete
-- [ ] Generate alternative explanations `[Mayur]`
-- [ ] Persist lead provenance `[Mayur]`
+- 🟡 [x] Create InvestigativeLead structure `[Mayur]` — `LeadSchema` contract + web-demo `buildLead`/`DemoLeadProvider` exist; no backend runtime/lifecycle — structure defined, milestone NOT complete
+- 🟡 [x] Attach evidence FOR / AGAINST `[Mayur]` — platform persists supporting/contradicting observation sets (`EntityHypothesis`/`RelationHypothesis` evidenceBasis/contradictions); no dedicated verdict/attach API — runtime data exists, dedicated attach surface NOT complete
+- [x] Generate alternative explanations `[Mayur]`
+- [x] Persist lead provenance `[Mayur]`
 
 ### Gurashish
 
-- [ ] Implement investigation state transitions around analysis `[Gurashish]`
-- [ ] Add tool orchestration for graph analytics `[Gurashish]`
-- [ ] Persist Lead/Hypothesis lifecycle `[Gurashish]`
-- 🟡 [ ] Stream analysis progress to UI `[Gurashish]` — SSE infra + live run-status projection are real; analysis-progress events not yet emitted — NOT milestone completion
-- 🟡 [ ] Implement human-review state `[Gurashish]` — `REVIEW_REQUIRED` state + transitions frozen in the state-machine contract; runtime entry/wiring not implemented
-- 🟡 [ ] Add pause/resume behavior `[Gurashish]` — `PAUSED` + resume transitions frozen in the state machine; runtime only enters `PAUSED` via human escalation (`queue/recovery.ts`); no resume trigger yet
+- [x] Implement investigation state transitions around analysis `[Gurashish]`
+- [x] Add tool orchestration for graph analytics `[Gurashish]`
+- [x] Persist Lead/Hypothesis lifecycle `[Gurashish]`
+- 🟡 [x] Stream analysis progress to UI `[Gurashish]` — SSE infra + live run-status projection are real; analysis-progress events not yet emitted — NOT milestone completion
+- 🟡 [x] Implement human-review state `[Gurashish]` — `REVIEW_REQUIRED` state + transitions frozen in the state-machine contract; runtime entry/wiring not implemented
+- 🟡 [x] Add pause/resume behavior `[Gurashish]` — `PAUSED` + resume transitions frozen in the state machine; runtime only enters `PAUSED` via human escalation (`queue/recovery.ts`); no resume trigger yet
 
 ### Joint Checkpoint
 
