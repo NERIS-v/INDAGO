@@ -261,7 +261,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### Joint Checkpoint
 
-- [ ] CASE > GRAPH > STRUCTURAL SIGNAL > INVESTIGATIVE LEAD > EVIDENCE FOR/AGAINST > HUMAN REVIEW `[Both]`
+- [x] CASE > GRAPH > STRUCTURAL SIGNAL > INVESTIGATIVE LEAD > EVIDENCE FOR/AGAINST > HUMAN REVIEW `[Both]`
 
 ---
 
