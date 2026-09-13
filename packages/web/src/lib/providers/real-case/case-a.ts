@@ -633,6 +633,10 @@ const leadsA = [
     gapIds: [GAP_A1],
     provenance: { entries: [{ sourceId: SRC_JAN76_A, extractor: "registry.extractor.v1", derivedFrom: [OBS_A1] }], createdAt: obs("2024-07-01") },
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateSnapshot: {},
+    alternativeExplanations: [],
   }),
   LeadSchema.parse({
     id: LEAD_A2, investigationId: INVESTIGATION_A_ID, caseId: CASE_A_ID,
@@ -646,6 +650,10 @@ const leadsA = [
     gapIds: [GAP_A2],
     provenance: { entries: [{ sourceId: SRC_HR_VOL1_A, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_A4, OBS_A5, OBS_A6] }], createdAt: obs("2024-07-01") },
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateSnapshot: {},
+    alternativeExplanations: [],
   }),
 ];
 

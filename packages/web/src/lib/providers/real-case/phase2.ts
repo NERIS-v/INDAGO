@@ -655,6 +655,10 @@ function buildLead(): Lead {
     relatedEntityIds: [ENT_WHEELER, ENT_WJA],
     supportingObservationIds: [OBS_B4],
     relatedEvidenceIds: [EVID_HR_TULSA],
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateSnapshot: {},
+    alternativeExplanations: [],
     gapIds: [GAP_AG2],
     provenance: {
       entries: [

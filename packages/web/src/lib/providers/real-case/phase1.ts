@@ -453,6 +453,10 @@ function buildLead(sets: DerivedSets, topCandidate: ScoredCandidate) {
     relatedEntityIds: [topCandidate.entityId, ENT_WJA],
     supportingObservationIds: [...sets.supportingObservationIds],
     relatedEvidenceIds: [EVID_HR_CT, EVID_HR_WJA],
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateSnapshot: {},
+    alternativeExplanations: [],
     gapIds: [GAP_B4],
     provenance: {
       entries: [

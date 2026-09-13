@@ -663,6 +663,10 @@ const leadsB = [
     gapIds: [GAP_B2],
     provenance: { entries: [{ sourceId: SRC_HR_TULSA_B, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_B1, OBS_B2] }], createdAt: obs("2024-07-01") },
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateSnapshot: {},
+    alternativeExplanations: [],
   }),
   LeadSchema.parse({
     id: LEAD_B2, investigationId: INVESTIGATION_B_ID, caseId: CASE_B_ID,
@@ -676,6 +680,10 @@ const leadsB = [
     gapIds: [GAP_B3],
     provenance: { entries: [{ sourceId: SRC_HR_TULSA_B, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_B4] }], createdAt: obs("2024-07-01") },
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateSnapshot: {},
+    alternativeExplanations: [],
   }),
 ];
 
