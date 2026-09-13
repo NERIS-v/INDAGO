@@ -404,7 +404,7 @@ Passed to BullMQ as `{ jobId: idempotencyKey }` (`routes.ts:213`). Verified inva
 
 These are two different channels:
 
-- **Audit** (`platform/src/audit/logger.ts`): persistent, DB-oriented, tamper-evident. Each event: previous tip of chain (`previousHash` or `"GENESIS"`) → `sha256(prevHash:actor:action:targetId:timestamp)` → insert into Prisma `AuditEvent` (`logger.ts:15-47`). The same DB event is then also broadcast on SSE (`logger.ts:43`).
+- **Audit** (`platform/src/audit/logger.ts`): persistent, DB-oriented, write-only append hash chain (tamper-evident within a single chain; the chain itself is forkable/re-writable by a privileged writer — not a blockchain, no external witness). Each event: previous tip of chain (`previousHash` or `"GENESIS"`) → `sha256(prevHash:actor:action:targetId:timestamp)` → insert into Prisma `AuditEvent` (`logger.ts:15-47`). The same DB event is then also broadcast on SSE (`logger.ts:43`).
 - **SSE** (`platform/src/realtime/sse.ts`): `EventEmitter` broadcast; `realtimeEvents.emit("progress", ...)`; `streamEventsHandler` filters by investigationId and pipes to the browser. Non-persistent, best-effort, in-memory.
 
 Current actions/types in play on the I-PR2 path:

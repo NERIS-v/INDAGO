@@ -173,11 +173,17 @@ export function isRelationDirected(relationType: RelationType): boolean {
   return RELATION_DIRECTION[relationType] === 'directed';
 }
 
-/** Resolve the effective `directed` flag for a relation type (never overridden to false). */
-export function resolveRelationDirected(
-  relationType: RelationType,
-): boolean {
-  return isRelationDirected(relationType);
+/**
+ * Resolve the effective `directed` flag for a relation type.
+ *
+ * DIRECTION-UNKNOWN SEAM (H3): v1 has no directional evidence extractor, so it
+ * must NOT fabricate direction from the relation-type vocabulary
+ * (`RELATION_DIRECTION`/`isRelationDirected`). v1 emits `false` ("direction
+ * unknown"); a v2 directional evidence extractor replaces this seam.
+ * Pair identity remains canonical `(min, max)` ordering.
+ */
+export function resolveRelationDirected(_relationType: RelationType): boolean {
+  return false;
 }
 
 /**

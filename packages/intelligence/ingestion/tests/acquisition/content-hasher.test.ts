@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeContentHash, deterministicArtifactId } from '../../src/acquisition/content-hasher.js';
+import {
+  computeContentHash,
+  deterministicArtifactId,
+  deterministicArtifactIdForCase,
+} from '../../src/acquisition/content-hasher.js';
 import { ArtifactIdSchema } from '@indago/contracts';
 import {
   TEXT_ARTIFACT_CONTENT,
@@ -113,5 +117,48 @@ describe('deterministicArtifactId', () => {
     const id = deterministicArtifactId(hash);
     // Should parse without throwing — proves UUID format matches the contract
     expect(() => ArtifactIdSchema.parse(id)).not.toThrow();
+  });
+});
+
+describe('deterministicArtifactIdForCase', () => {
+  const CASE_A = '550e8400-e29b-41d4-a716-446655440000';
+  const CASE_B = '550e8400-e29b-41d4-a716-446655440001';
+
+  it('is deterministic — same (case, hash) always produces the same ID', async () => {
+    const hash = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+    const id1 = await deterministicArtifactIdForCase(CASE_A, hash);
+    const id2 = await deterministicArtifactIdForCase(CASE_A, hash);
+    expect(id1).toBe(id2);
+  });
+
+  it('returns a valid UUID format compatible with ArtifactIdSchema', async () => {
+    const hash = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+    const id = await deterministicArtifactIdForCase(CASE_A, hash);
+    expect(id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(() => ArtifactIdSchema.parse(id)).not.toThrow();
+  });
+
+  it('same content under different cases produces different IDs', async () => {
+    const hash = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+    const idA = await deterministicArtifactIdForCase(CASE_A, hash);
+    const idB = await deterministicArtifactIdForCase(CASE_B, hash);
+    expect(idA).not.toBe(idB);
+  });
+
+  it('different content in the same case produces different IDs', async () => {
+    const hash1 = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+    const hash2 = await computeContentHash(PDF_ARTIFACT_CONTENT);
+    const id1 = await deterministicArtifactIdForCase(CASE_A, hash1);
+    const id2 = await deterministicArtifactIdForCase(CASE_A, hash2);
+    expect(id1).not.toBe(id2);
+  });
+
+  it('case-scoped ID differs from the global content-derived ID', async () => {
+    const hash = await computeContentHash(TEXT_ARTIFACT_CONTENT);
+    const globalId = deterministicArtifactId(hash);
+    const caseId = await deterministicArtifactIdForCase(CASE_A, hash);
+    expect(caseId).not.toBe(globalId);
   });
 });

@@ -52,6 +52,7 @@ export {
   ArtifactAcquisitionService,
   computeContentHash,
   deterministicArtifactId,
+  deterministicArtifactIdForCase,
   deterministicSourceId,
   detectMimeType,
   bytesToUuid4,

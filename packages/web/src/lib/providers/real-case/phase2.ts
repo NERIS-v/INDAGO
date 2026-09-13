@@ -660,6 +660,9 @@ function buildLead(): Lead {
     sourceCandidateSnapshot: {},
     alternativeExplanations: [],
     gapIds: [GAP_AG2],
+    sourceCandidateType: "MANUAL",
+    sourceCandidateKey: `manual:${LEAD_P2}`,
+    sourceCandidateSnapshot: {},
     provenance: {
       entries: [
         {

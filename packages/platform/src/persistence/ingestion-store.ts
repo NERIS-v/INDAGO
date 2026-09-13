@@ -6,7 +6,7 @@
 // no `as any`, no `@ts-ignore`.
 //
 // Uniqueness rules:
-//   - Artifact.contentHash @unique  → content-level dedup owner
+//   - Artifact (caseId, contentHash) @@unique → per-case content dedup owner
 //   - IngestionAttempt (investigationId, idempotencyKey) @unique → job-level dedup
 //   - RawExtraction.attemptId @unique → immutable per attempt
 // ============================================================================
@@ -88,8 +88,11 @@ export class IngestionStore {
   constructor(private readonly prisma: PrismaClient = db) {}
 
   /**
-   * Upsert an artifact by content hash. Same contentHash always resolves
-   * to the same row (and the same deterministic artifactId).
+   * Upsert an artifact by (caseId, contentHash). Same case + same contentHash
+   * always resolve to the same row (and the same case-scoped deterministic
+   * artifactId). The identical bytes under a different case resolve to a
+   * DIFFERENT row — artifact identity is case-scoped, so provenance cannot
+   * clobber another case's record.
    */
   async upsertArtifact(record: ArtifactWriteRecord) {
     const data: Prisma.ArtifactUncheckedCreateInput = {
@@ -116,11 +119,10 @@ export class IngestionStore {
     };
 
     return this.prisma.artifact.upsert({
-      where: { contentHash: record.contentHash },
+      where: { caseId_contentHash: { caseId: record.caseId, contentHash: record.contentHash } },
       create: data,
       update: {
         investigationId: record.investigationId,
-        caseId: record.caseId,
         operationId: record.operationId,
         correlationId: record.correlationId,
         idempotencyKey: record.idempotencyKey,
@@ -130,8 +132,10 @@ export class IngestionStore {
     });
   }
 
-  async findArtifactByContentHash(contentHash: string) {
-    return this.prisma.artifact.findUnique({ where: { contentHash } });
+  async findArtifactForCase(caseId: string, contentHash: string) {
+    return this.prisma.artifact.findUnique({
+      where: { caseId_contentHash: { caseId, contentHash } },
+    });
   }
 
   async findAttempt(investigationId: string, idempotencyKey: string) {

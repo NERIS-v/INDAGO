@@ -635,22 +635,11 @@ const leadsA = [
     supportingObservationIds: [OBS_A1],
     relatedEvidenceIds: [EVID_JAN76],
     gapIds: [GAP_A1],
-    provenance: {
-      entries: [
-        {
-          sourceId: SRC_JAN76_A,
-          extractor: "registry.extractor.v1",
-          derivedFrom: [OBS_A1],
-        },
-      ],
-      createdAt: obs("2024-07-01"),
-    },
-    createdAt: obs("2024-07-01"),
-    updatedAt: obs("2024-07-01"),
     sourceCandidateType: "MANUAL",
-    sourceCandidateKey: "legacy-mock-key",
+    sourceCandidateKey: `manual:${LEAD_A1}`,
     sourceCandidateSnapshot: {},
-    alternativeExplanations: [],
+    provenance: { entries: [{ sourceId: SRC_JAN76_A, extractor: "registry.extractor.v1", derivedFrom: [OBS_A1] }], createdAt: obs("2024-07-01") },
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
   LeadSchema.parse({
     id: LEAD_A2,
@@ -666,22 +655,11 @@ const leadsA = [
     supportingObservationIds: [OBS_A4, OBS_A5, OBS_A6],
     relatedEvidenceIds: [EVID_HR_CT, EVID_BAHAMAS],
     gapIds: [GAP_A2],
-    provenance: {
-      entries: [
-        {
-          sourceId: SRC_HR_VOL1_A,
-          extractor: "govinfo.extractor.v1",
-          derivedFrom: [OBS_A4, OBS_A5, OBS_A6],
-        },
-      ],
-      createdAt: obs("2024-07-01"),
-    },
-    createdAt: obs("2024-09-01"),
-    updatedAt: obs("2024-09-01"),
     sourceCandidateType: "MANUAL",
-    sourceCandidateKey: "legacy-mock-key2",
+    sourceCandidateKey: `manual:${LEAD_A2}`,
     sourceCandidateSnapshot: {},
-    alternativeExplanations: [],
+    provenance: { entries: [{ sourceId: SRC_HR_VOL1_A, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_A4, OBS_A5, OBS_A6] }], createdAt: obs("2024-07-01") },
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
 ];
 

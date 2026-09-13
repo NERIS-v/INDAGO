@@ -18,11 +18,12 @@ export const FIXTURE_LEAD_1: Lead = {
   relatedEntityIds: [FIXTURE_IDS.entity1, FIXTURE_IDS.entity2],
   supportingObservationIds: [FIXTURE_IDS.observation1],
   relatedEvidenceIds: [FIXTURE_IDS.evidence1],
-  sourceCandidateType: "MANUAL",
-  sourceCandidateKey: "contract-test-key",
-  sourceCandidateSnapshot: {},
-  alternativeExplanations: [],
-  contradictingObservationIds: [],
+  sourceCandidateType: 'COMMUNITY',
+  sourceCandidateKey: 'community:graph-hole:lead-1',
+  sourceCandidateSnapshot: {
+    detectorType: 'COMMUNITY',
+    nodeIds: [FIXTURE_IDS.entity1, FIXTURE_IDS.entity2],
+  },
   provenance: {
     entries: [
       {
