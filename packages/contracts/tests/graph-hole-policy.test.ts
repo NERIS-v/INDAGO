@@ -3,6 +3,7 @@ import {
   GRAPH_HOLE_POLICY_VERSION,
   SEMANTIC_RETRIEVAL_POLICY_VERSION,
   DETECTION_POLICY_VERSION,
+  GRAPH_HOLE_SCORING_POLICY_VERSION,
   MIN_INDEPENDENT_SUPPORT_UNITS,
   MIN_STRUCTURAL_SCORE,
   MIN_SIGNIFICANCE,
@@ -23,7 +24,15 @@ import {
   MAX_EVIDENCE_PER_AI_PACKAGE,
   STRUCTURAL_SCORE_WEIGHTS,
   SIGNIFICANCE_WEIGHTS,
+  EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS,
+  PATTERN_STRENGTH_INFLUENCE_WEIGHTS,
+  EXPECTED_INFORMATION_VALUE_WEIGHTS,
+  SUPPORT_BREADTH_SATURATION,
+  HYPOTHESIS_COVERAGE_SATURATION,
+  EVIDENCE_DIVERSITY_SATURATION,
+  GEOMETRIC_MEAN_EPSILON,
   GraphHoleQualificationGateSchema,
+  GraphHoleScoringPolicySchema,
   resolveSupportUnitKey,
   countIndependentSupportUnits,
   GRAPH_HOLE_POLICY_V1,
@@ -41,9 +50,16 @@ import {
 // ============================================================================
 
 describe('V1 policy versions', () => {
-  it('freezes all three versions to v1', () => {
+  it('freezes base policy versions to v1', () => {
     expect(GRAPH_HOLE_POLICY_VERSION).toBe('v1');
     expect(SEMANTIC_RETRIEVAL_POLICY_VERSION).toBe('v1');
+    expect(DETECTION_POLICY_VERSION).toBe('v1');
+  });
+
+  it('bumps ONLY the scoring calibration policy to v2 (V1.1 formula revision)', () => {
+    expect(GRAPH_HOLE_SCORING_POLICY_VERSION).toBe('v2');
+    // Unrelated policy versions are untouched by the scoring revision.
+    expect(GRAPH_HOLE_POLICY_VERSION).toBe('v1');
     expect(DETECTION_POLICY_VERSION).toBe('v1');
   });
 });
@@ -95,6 +111,50 @@ describe('V1 weights', () => {
     });
     const sum = Object.values(SIGNIFICANCE_WEIGHTS).reduce((a, b) => a + b, 0);
     expect(sum).toBeCloseTo(1, 10);
+  });
+
+  it('freezes the V1.1 scoring calibration weights and saturations', () => {
+    expect(EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS).toEqual({
+      supportBreadth: 0.5,
+      supportConsistency: 0.3,
+      provenanceCompleteness: 0.2,
+    });
+    const geoSum = Object.values(EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS).reduce((a, b) => a + b, 0);
+    expect(geoSum).toBeCloseTo(1, 10);
+
+    expect(PATTERN_STRENGTH_INFLUENCE_WEIGHTS).toEqual({ base: 0.6, evidenceRatio: 0.4 });
+    expect(PATTERN_STRENGTH_INFLUENCE_WEIGHTS.base + PATTERN_STRENGTH_INFLUENCE_WEIGHTS.evidenceRatio).toBeCloseTo(1, 10);
+
+    expect(EXPECTED_INFORMATION_VALUE_WEIGHTS).toEqual({
+      uncertaintyPotential: 0.5,
+      hypothesisCoverage: 0.3,
+      evidenceDiversity: 0.2,
+    });
+    const eivSum = Object.values(EXPECTED_INFORMATION_VALUE_WEIGHTS).reduce((a, b) => a + b, 0);
+    expect(eivSum).toBeCloseTo(1, 10);
+
+    expect(SUPPORT_BREADTH_SATURATION).toBe(4);
+    expect(HYPOTHESIS_COVERAGE_SATURATION).toBe(3);
+    expect(EVIDENCE_DIVERSITY_SATURATION).toBe(4);
+    expect(GEOMETRIC_MEAN_EPSILON).toBe(0.000001);
+  });
+
+  it('freezes the scoring policy schema with the v2 calibration surface', () => {
+    const parsed = GraphHoleScoringPolicySchema.parse({
+      version: 'v2',
+      structuralScoreWeights: { ...STRUCTURAL_SCORE_WEIGHTS },
+      significanceWeights: { ...SIGNIFICANCE_WEIGHTS },
+      structuralComponentNotApplicableRenormalizes: true,
+      significanceMeaning: 'INVESTIGATIVE_PRIORITIZATION_VALUE_NOT_PROBABILITY',
+      evidenceSupportGeometricWeights: { ...EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS },
+      patternStrengthInfluence: { ...PATTERN_STRENGTH_INFLUENCE_WEIGHTS },
+      expectedInformationValueWeights: { ...EXPECTED_INFORMATION_VALUE_WEIGHTS },
+      supportBreadthSaturation: SUPPORT_BREADTH_SATURATION,
+      hypothesisCoverageSaturation: HYPOTHESIS_COVERAGE_SATURATION,
+      evidenceDiversitySaturation: EVIDENCE_DIVERSITY_SATURATION,
+      geometricMeanEpsilon: GEOMETRIC_MEAN_EPSILON,
+    });
+    expect(parsed.version).toBe('v2');
   });
 });
 
@@ -300,5 +360,13 @@ describe('§26 GRAPH_HOLE_POLICY_V1', () => {
     );
     expect(policy.scoring.structuralScoreWeights).toEqual({ ...STRUCTURAL_SCORE_WEIGHTS });
     expect(policy.scoring.significanceWeights).toEqual({ ...SIGNIFICANCE_WEIGHTS });
+    expect(policy.scoring.version).toBe(GRAPH_HOLE_SCORING_POLICY_VERSION);
+    expect(policy.scoring.evidenceSupportGeometricWeights).toEqual({ ...EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS });
+    expect(policy.scoring.patternStrengthInfluence).toEqual({ ...PATTERN_STRENGTH_INFLUENCE_WEIGHTS });
+    expect(policy.scoring.expectedInformationValueWeights).toEqual({ ...EXPECTED_INFORMATION_VALUE_WEIGHTS });
+    expect(policy.scoring.supportBreadthSaturation).toBe(SUPPORT_BREADTH_SATURATION);
+    expect(policy.scoring.hypothesisCoverageSaturation).toBe(HYPOTHESIS_COVERAGE_SATURATION);
+    expect(policy.scoring.evidenceDiversitySaturation).toBe(EVIDENCE_DIVERSITY_SATURATION);
+    expect(policy.scoring.geometricMeanEpsilon).toBe(GEOMETRIC_MEAN_EPSILON);
   });
 });

@@ -53,6 +53,18 @@ export type EmbeddingPolicyVersion = typeof EMBEDDING_POLICY_VERSION;
 export const DETECTION_POLICY_VERSION = 'v1' as const;
 export type DetectionPolicyVersion = typeof DETECTION_POLICY_VERSION;
 
+/**
+ * Scoring calibration policy version — versioned INDEPENDENTLY of the
+ * detection and graph-hole policy versions. A bump (e.g. formula revision,
+ * new scoring components, or calibrated thresholds) automatically
+ * identifies the scoring semantics that produced a qualified candidate.
+ *
+ * v2 = PR5 V1.1 formula revision (geometric-mean evidenceSupportScore,
+ *      bounded patternStrength, revised expectedInformationValue).
+ */
+export const GRAPH_HOLE_SCORING_POLICY_VERSION = 'v2' as const;
+export type GraphHoleScoringPolicyVersion = typeof GRAPH_HOLE_SCORING_POLICY_VERSION;
+
 // ============================================================================
 // §5 V1 Thresholds & Bounds (single source of truth)
 // ============================================================================
@@ -162,6 +174,55 @@ export const SIGNIFICANCE_WEIGHTS = {
   expectedInformationValue: 0.15,
 } as const;
 export type SignificanceWeights = typeof SIGNIFICANCE_WEIGHTS;
+
+// ============================================================================
+// §14b Scoring Calibration Constants (PR5 V1.1 Formula Revision)
+//
+// Frozen geometric-mean weights, pattern-strength influence, and bounded
+// saturation constants for the V1.1 scoring calibration. All numbers are
+// HEURISTIC DETERMINISTIC SCORES, NOT probabilities.
+// ============================================================================
+
+/** Frozen geometric-mean factor weights for evidenceSupportScore (V1.1). */
+export const EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS = {
+  supportBreadth: 0.5,
+  supportConsistency: 0.3,
+  provenanceCompleteness: 0.2,
+} as const;
+export type EvidenceSupportGeometricWeights = typeof EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS;
+
+/**
+ * patternStrength = basisStrength × (base + evidenceRatio × evidenceRatioSignal),
+ * never exceeds basisStrength. Frozen (V1.1).
+ */
+export const PATTERN_STRENGTH_INFLUENCE_WEIGHTS = {
+  base: 0.6,
+  evidenceRatio: 0.4,
+} as const;
+export type PatternStrengthInfluenceWeights = typeof PATTERN_STRENGTH_INFLUENCE_WEIGHTS;
+
+/** Frozen weighted-sum weights for expectedInformationValue (V1.1). */
+export const EXPECTED_INFORMATION_VALUE_WEIGHTS = {
+  uncertaintyPotential: 0.5,
+  hypothesisCoverage: 0.3,
+  evidenceDiversity: 0.2,
+} as const;
+export type ExpectedInformationValueWeights = typeof EXPECTED_INFORMATION_VALUE_WEIGHTS;
+
+/** Support breadth saturation: min(U, SUPPORT_BREADTH_SATURATION) / saturation. */
+export const SUPPORT_BREADTH_SATURATION = 4;
+
+/** Hypothesis coverage saturation: min(H, HYPOTHESIS_COVERAGE_SATURATION) / saturation. */
+export const HYPOTHESIS_COVERAGE_SATURATION = 3;
+
+/** Evidence diversity saturation: min(U, EVIDENCE_DIVERSITY_SATURATION) / saturation. */
+export const EVIDENCE_DIVERSITY_SATURATION = 4;
+
+/**
+ * Geometric-mean epsilon: floor for each factor before applying ln, ensuring
+ * zero factors clamp to a tiny positive value rather than producing -Infinity.
+ */
+export const GEOMETRIC_MEAN_EPSILON = 0.000001;
 
 // ============================================================================
 // §16 Hard Qualification Gates (the only way a candidate enters AI analysis)
@@ -376,6 +437,8 @@ export const GraphHoleRegionPolicySchema = z.object({
 export type GraphHoleRegionPolicy = z.infer<typeof GraphHoleRegionPolicySchema>;
 
 export const GraphHoleScoringPolicySchema = z.object({
+  version: z.literal(GRAPH_HOLE_SCORING_POLICY_VERSION)
+    .describe('Scoring calibration policy version. v2 = PR5 V1.1 formula revision.'),
   structuralScoreWeights: z.object({
     patternStrength: z.number().min(0).max(1),
     connectivitySupport: z.number().min(0).max(1),
@@ -383,19 +446,44 @@ export const GraphHoleScoringPolicySchema = z.object({
     temporalSupport: z.number().min(0).max(1),
     communitySupport: z.number().min(0).max(1),
   }).strict()
-    .describe('Frozen V1 structural-score weights. Must sum to 1.0.'),
+    .describe('Frozen structural-score weights. Must sum to 1.0.'),
   significanceWeights: z.object({
     structuralScore: z.number().min(0).max(1),
     evidenceSupportScore: z.number().min(0).max(1),
     expectedInformationValue: z.number().min(0).max(1),
   }).strict()
-    .describe('Frozen V1 significance weights. Must sum to 1.0.'),
+    .describe('Frozen significance weights. Must sum to 1.0.'),
   structuralComponentNotApplicableRenormalizes: z.literal(true)
     .describe(
       'When a structural component is not applicable, runtime must renormalize ' +
       'remaining applicable weights rather than treating the absent component as zero.',
     ),
   significanceMeaning: z.literal('INVESTIGATIVE_PRIORITIZATION_VALUE_NOT_PROBABILITY'),
+  evidenceSupportGeometricWeights: z.object({
+    supportBreadth: z.number().min(0).max(1),
+    supportConsistency: z.number().min(0).max(1),
+    provenanceCompleteness: z.number().min(0).max(1),
+  }).strict()
+    .describe('Frozen geometric-mean weights for evidenceSupportScore (v2). Must sum to 1.0.'),
+  patternStrengthInfluence: z.object({
+    base: z.number().min(0).max(1),
+    evidenceRatio: z.number().min(0).max(1),
+  }).strict()
+    .describe('Frozen pattern-strength bound: basisStrength × (base + evidenceRatio × evidenceRatioSignal).'),
+  expectedInformationValueWeights: z.object({
+    uncertaintyPotential: z.number().min(0).max(1),
+    hypothesisCoverage: z.number().min(0).max(1),
+    evidenceDiversity: z.number().min(0).max(1),
+  }).strict()
+    .describe('Frozen weighted-sum weights for expectedInformationValue (v2). Must sum to 1.0.'),
+  supportBreadthSaturation: z.number().int().positive()
+    .describe('Saturation threshold for supportBreadth: min(U, saturation) / saturation.'),
+  hypothesisCoverageSaturation: z.number().int().positive()
+    .describe('Saturation threshold for hypothesisCoverage: min(H, saturation) / saturation.'),
+  evidenceDiversitySaturation: z.number().int().positive()
+    .describe('Saturation threshold for evidenceDiversity: min(U, saturation) / saturation.'),
+  geometricMeanEpsilon: z.number().min(0).max(1)
+    .describe('Epsilon floor inside geometric-mean ln to avoid ln(0).'),
 }).strict();
 export type GraphHoleScoringPolicy = z.infer<typeof GraphHoleScoringPolicySchema>;
 
@@ -490,10 +578,18 @@ export const GRAPH_HOLE_POLICY_V1: GraphHolePolicyV1 = {
     splitOrdering: [...GROUP_SPLIT_ORDER],
   },
   scoring: {
+    version: GRAPH_HOLE_SCORING_POLICY_VERSION,
     structuralScoreWeights: { ...STRUCTURAL_SCORE_WEIGHTS },
     significanceWeights: { ...SIGNIFICANCE_WEIGHTS },
     structuralComponentNotApplicableRenormalizes: true,
     significanceMeaning: 'INVESTIGATIVE_PRIORITIZATION_VALUE_NOT_PROBABILITY',
+    evidenceSupportGeometricWeights: { ...EVIDENCE_SUPPORT_GEOMETRIC_WEIGHTS },
+    patternStrengthInfluence: { ...PATTERN_STRENGTH_INFLUENCE_WEIGHTS },
+    expectedInformationValueWeights: { ...EXPECTED_INFORMATION_VALUE_WEIGHTS },
+    supportBreadthSaturation: SUPPORT_BREADTH_SATURATION,
+    hypothesisCoverageSaturation: HYPOTHESIS_COVERAGE_SATURATION,
+    evidenceDiversitySaturation: EVIDENCE_DIVERSITY_SATURATION,
+    geometricMeanEpsilon: GEOMETRIC_MEAN_EPSILON,
   },
   aiContext: {
     maxHypothesesInContext: MAX_HYPOTHESES_IN_CONTEXT,
