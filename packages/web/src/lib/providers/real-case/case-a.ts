@@ -649,7 +649,7 @@ const leadsA = [
     relatedEvidenceIds: [EVID_HR_CT, EVID_BAHAMAS],
     gapIds: [GAP_A2],
     provenance: { entries: [{ sourceId: SRC_HR_VOL1_A, extractor: "govinfo.extractor.v1", derivedFrom: [OBS_A4, OBS_A5, OBS_A6] }], createdAt: obs("2024-07-01") },
-    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+    createdAt: obs("2024-09-01"), updatedAt: obs("2024-09-01"),
     sourceCandidateType: "MANUAL",
     sourceCandidateKey: "legacy-mock-key",
     sourceCandidateSnapshot: {},
