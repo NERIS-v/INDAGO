@@ -158,7 +158,7 @@ describeOrSkip("E2E: POST → ingest-evidence → durable persistence", () => {
 
   it("persists a real artifact with correct content hash, caseId and storage file", async () => {
     const artifact = await prisma.artifact.findUnique({
-      where: { contentHash: contentHash() },
+      where: { caseId_contentHash: { caseId, contentHash: contentHash() } },
     });
 
     expect(artifact).not.toBeNull();
