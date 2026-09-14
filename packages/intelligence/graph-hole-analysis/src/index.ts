@@ -35,6 +35,9 @@ export type { GraphHoleAnalysisErrorCode } from './errors/analysis-error.js';
 export { GraphHoleAnalysisV1Schema } from './contracts/analysis-v1.js';
 export { GraphHoleAnalysisSchemaStampSchema } from './contracts/analysis-v1.js';
 
+// Canonical serializer (for downstream validators reconstructing the profile).
+export { canonicalStringify } from './context/serialize.js';
+
 // Policy/version constants (for version-gating / audits).
 export {
   GRAPH_HOLE_ANALYSIS_POLICY_VERSION,
