@@ -35,6 +35,8 @@ export interface LLMRequest {
   readonly responseFormat?: LLMResponseFormat;
   /** Optional caller-supplied zod schema (informational at the request level; supplied explicitly to generateStructured). */
   readonly outputSchema?: z.ZodType<unknown>;
+  /** Runtime-internal: the provider-native JSON Schema representation of the feature zod schema. Set by the runtime for generateStructured; callers MUST NOT set it manually. */
+  readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly maxOutputTokens?: number;
   readonly temperature?: number;
   readonly timeoutMs?: number;
@@ -54,6 +56,8 @@ export interface ResolvedLLMRequest {
   readonly systemPrompt?: string;
   readonly messages: readonly LLMMessage[];
   readonly responseFormat: LLMResponseFormat;
+  /** Provider-native JSON Schema for the call (set by the runtime for generateStructured). Absent for plain generate. */
+  readonly jsonSchema?: Readonly<Record<string, unknown>>;
   readonly maxOutputTokens: number;
   readonly temperature?: number;
   readonly timeoutMs: number;

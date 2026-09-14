@@ -6,9 +6,17 @@
 // Provider-specific HTTP semantics, response shapes, error formats and usage
 // reporting live INSIDE each provider implementation.
 //
-// Structured output is a runtime-level capability: providers only produce
-// text (honoring an optional JSON mode hint); the runtime parses + validates
-// with the caller's zod schema. Providers NEVER see domain schemas.
+// Structured output is FIRST-CLASS and provider-native:
+//   feature zod schema → JSON Schema representation (runtime) → the provider
+//   ENFORCES that schema (Gemini Interactions response_format.schema, Ollama
+//   format: <schema>) → response parsed + validated by the caller's zod schema.
+// Providers advertise two independent capabilities:
+//   - structuredOutput   — provider-enforced structured (JSON) output exists
+//   - nativeJsonSchema    — the converted JSON Schema is sent verbatim
+//                          (not a language hint, no provider-side schema invention)
+// A provider is NOT allowed to weaken the contract. If a call carries a schema
+// but the provider cannot enforce it natively, it MUST throw
+// UNSUPPORTED_CAPABILITY — there is never a silent fallback to a hint-only mode.
 // ============================================================================
 
 import type { AiProviderKind } from '../config/types.js';
@@ -18,11 +26,18 @@ import type {
   LLMUsage,
 } from '../core/types.js';
 
+export interface ProviderStructuredCapabilities {
+  /** Provider-enforced structured (JSON) output is supported. */
+  readonly structuredOutput: boolean;
+  /** The converted JSON Schema is sent to the provider verbatim (no hint, no invention). */
+  readonly nativeJsonSchema: boolean;
+}
+
 export interface LlmProviderCapabilities {
   /** Plain text generation. */
   readonly generate: boolean;
-  /** JSON-mode generation (responseFormat: 'json'). */
-  readonly generateStructured: boolean;
+  /** Provider-native structured output capabilities (JSON mode + JSON Schema enforcement). */
+  readonly structured: ProviderStructuredCapabilities;
   readonly healthCheck: boolean;
 }
 

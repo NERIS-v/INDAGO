@@ -111,6 +111,7 @@ export function resolveRequest(request: LLMRequest, ctx: ResolutionContext): Res
     systemPrompt: request.systemPrompt,
     messages,
     responseFormat: request.responseFormat ?? 'text',
+    jsonSchema: request.jsonSchema,
     maxOutputTokens,
     temperature: request.temperature,
     timeoutMs,

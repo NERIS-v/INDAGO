@@ -11,6 +11,13 @@
 //     .generateStructured(request, zod) → validated data + raw text + metadata
 //     .healthCheck()                   → provider reachability probe
 //
+// Structured output (v2, provider-native): generateStructured converts the
+// feature zod schema to a JSON Schema representation (structured-output/schema)
+// and the provider ENFORCES it natively (Gemini Interactions response_format
+// schema / Ollama format). A provider that cannot enforce the schema natively
+// fails with UNSUPPORTED_CAPABILITY — there is no silent fallback to a plain
+// JSON-mode hint. The response is still parsed and zod-validated afterwards.
+//
 // Reliability: transient failures are retried with bounded exponential
 // backoff (honoring Retry-After within limits); exhaustion surfaces as
 // RETRY_EXHAUSTED carrying the last provider error as `cause`.
@@ -31,6 +38,8 @@ import type { RetryPolicy } from '../reliability/retry.js';
 import { withBoundedRetry } from '../reliability/retry.js';
 import { parseJsonText } from '../structured-output/parse.js';
 import { validateStructured } from '../structured-output/validate.js';
+import { convertSchemaDocument } from '../structured-output/schema.js';
+import type { SchemaDocument } from '../structured-output/schema.js';
 import { buildExecutionMetadata } from '../metadata/execution.js';
 import type {
   LLMExecutionMetadata,
@@ -46,6 +55,8 @@ import type {
 export interface AiRuntimeOptions {
   /** Optional observability hook. Events NEVER contain prompts, context, responses or secrets. */
   readonly onEvent?: (event: AiRuntimeEvent) => void;
+  /** Optional pre-built provider (testing/adapters). Defaults to createLLMProvider(config). */
+  readonly provider?: AIProvider;
 }
 
 export interface AiRuntime {
@@ -80,13 +91,16 @@ class AiRuntimeImpl implements AiRuntime {
     private readonly options?: AiRuntimeOptions,
   ) {
     this.config = config;
-    this.provider = createLLMProvider(config);
+    this.provider = options?.provider ?? createLLMProvider(config);
   }
 
   get capabilities(): AiRuntimeCapabilities {
+    const structured = this.provider.capabilities.structured;
     return {
       generate: this.provider.capabilities.generate,
-      generateStructured: this.provider.capabilities.generateStructured,
+      generateStructured: structured.structuredOutput && structured.nativeJsonSchema,
+      structuredOutput: structured.structuredOutput,
+      nativeJsonSchema: structured.nativeJsonSchema,
       healthCheck: this.provider.capabilities.healthCheck,
     };
   }
@@ -110,7 +124,7 @@ class AiRuntimeImpl implements AiRuntime {
     };
   }
 
-  private async execute(request: LLMRequest, forceJson: boolean): Promise<ExecuteOutcome> {
+  private async execute(request: LLMRequest, schemaDocument?: SchemaDocument): Promise<ExecuteOutcome> {
     const requestId = randomUUID();
     const startedAt = new Date();
     const startedMs = Date.now();
@@ -119,17 +133,25 @@ class AiRuntimeImpl implements AiRuntime {
     let retryCount = 0;
     try {
       const resolvedRequest = resolveRequest(
-        forceJson ? { ...request, responseFormat: 'json' } : request,
+        schemaDocument !== undefined ? { ...request, jsonSchema: schemaDocument.schema } : request,
         this.resolutionContext(),
       );
 
-      if (forceJson && !this.provider.capabilities.generateStructured) {
-        throw new AiRuntimeError(
-          'UNSUPPORTED_CAPABILITY',
-          `Provider "${this.config.provider}" does not support structured generation`,
-        );
-      }
-      if (!forceJson && !this.provider.capabilities.generate) {
+      if (schemaDocument !== undefined) {
+        if (
+          !this.provider.capabilities.structured.structuredOutput ||
+          !this.provider.capabilities.structured.nativeJsonSchema
+        ) {
+          throw new AiRuntimeError(
+            'UNSUPPORTED_CAPABILITY',
+            `Provider "${this.config.provider}" cannot enforce the schema natively (structuredOutput: ${String(
+              this.provider.capabilities.structured.structuredOutput,
+            )}, nativeJsonSchema: ${String(
+              this.provider.capabilities.structured.nativeJsonSchema,
+            )}) — refusing a silent hint-only fallback`,
+          );
+        }
+      } else if (!this.provider.capabilities.generate) {
         throw new AiRuntimeError(
           'UNSUPPORTED_CAPABILITY',
           `Provider "${this.config.provider}" does not support plain generation`,
@@ -206,12 +228,15 @@ class AiRuntimeImpl implements AiRuntime {
   }
 
   async generate(request: LLMRequest): Promise<LLMGenerationResult> {
-    const outcome = await this.execute(request, false);
+    const outcome = await this.execute(request);
     return { text: outcome.providerResult.text, metadata: outcome.metadata };
   }
 
   async generateStructured<T>(request: LLMRequest, schema: z.ZodType<T>): Promise<LLMStructuredResult<T>> {
-    const outcome = await this.execute(request, true);
+    const schemaDocument = convertSchemaDocument(schema, {
+      maxBytes: this.config.budgets.maxSchemaBytes,
+    });
+    const outcome = await this.execute(request, schemaDocument);
     const parsed = parseJsonText(outcome.providerResult.text);
     const data = validateStructured(parsed, schema);
     return { data, rawText: outcome.providerResult.text, metadata: outcome.metadata };

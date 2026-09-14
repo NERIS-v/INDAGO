@@ -27,6 +27,8 @@ export interface AiBudgets {
   readonly retryBaseDelayMs: number;
   /** Ceiling for any single backoff delay (incl. provider Retry-After hints) in ms. */
   readonly maxRetryDelayMs: number;
+  /** Max serialized size (UTF-8 bytes) of the provider-native JSON Schema derived from a feature zod schema. Hard rejection. */
+  readonly maxSchemaBytes: number;
 }
 
 export const DEFAULT_AI_BUDGETS: AiBudgets = {
@@ -37,4 +39,5 @@ export const DEFAULT_AI_BUDGETS: AiBudgets = {
   maxRetries: 2,
   retryBaseDelayMs: 250,
   maxRetryDelayMs: 8_000,
+  maxSchemaBytes: 50_000,
 };

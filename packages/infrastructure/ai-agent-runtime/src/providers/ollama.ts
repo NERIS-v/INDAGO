@@ -6,8 +6,13 @@
 // the Ollama chat/generation API:
 //   POST {baseUrl}/api/chat   →  text generation (stream: false)
 //   GET  {baseUrl}/api/tags   →  health/model-availability probe
-// Structured output uses Ollama's `format: "json"` mode as a hint; schema
-// enforcement lives in the runtime (the caller's zod schema), never here.
+//
+// Provider-native structured output (v2): a structured call sends the runtime's
+// converted JSON Schema VERBATIM in Ollama's `format` field (Ollama enforces it
+// via its JSON Schema grammar support). Plain generate() keeps the legacy
+// `format: "json"` hint for responseFormat 'json'. The runtime still parses +
+// zod-validates the response; provider-native enforcement and zod validation
+// are complementary, never alternatives.
 // ============================================================================
 
 import { AiRuntimeError } from '../errors/ai-runtime-error.js';
@@ -43,7 +48,7 @@ interface OllamaTagsResponse {
 export class OllamaGenerationProvider implements AIProvider {
   readonly capabilities: LlmProviderCapabilities = {
     generate: true,
-    generateStructured: true,
+    structured: { structuredOutput: true, nativeJsonSchema: true },
     healthCheck: true,
   };
 
@@ -75,11 +80,22 @@ export class OllamaGenerationProvider implements AIProvider {
       stream: false,
       options,
     };
-    if (request.responseFormat === 'json') body.format = 'json';
+    if (request.jsonSchema !== undefined) {
+      body.format = request.jsonSchema;
+    } else if (request.responseFormat === 'json') {
+      body.format = 'json';
+    }
     return body;
   }
 
   async generate(request: ResolvedLLMRequest): Promise<LLMProviderResult> {
+    if (request.jsonSchema !== undefined && !this.capabilities.structured.nativeJsonSchema) {
+      // Defense-in-depth: never silently degrade to a hint-only mode.
+      throw new AiRuntimeError(
+        'UNSUPPORTED_CAPABILITY',
+        'Ollama cannot enforce the supplied schema natively; refusing a hint-only fallback',
+      );
+    }
     const url = `${this.config.baseUrl}/api/chat`;
     const signal = createAbortSignalWithTimeout(request.timeoutMs, request.signal);
 

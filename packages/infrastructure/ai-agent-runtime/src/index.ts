@@ -60,15 +60,22 @@ export type {
   AIProviderHealth,
   LLMProviderResult,
   LlmProviderCapabilities,
+  ProviderStructuredCapabilities,
 } from './providers/types.js';
 export { normalizeFinishReason } from './providers/types.js';
 export { createLLMProvider } from './providers/factory.js';
 export { GeminiProvider } from './providers/gemini.js';
 export { OllamaGenerationProvider } from './providers/ollama.js';
 
-// ---- Structured output (parse → validate → reject) ----
+// ---- Structured output (zod → native JSON Schema → parse → validate → reject) ----
 export { parseJsonText } from './structured-output/parse.js';
 export { validateStructured, parseStructured } from './structured-output/validate.js';
+export { convertSchemaDocument } from './structured-output/schema.js';
+export type {
+  SchemaDocument,
+  ConvertSchemaOptions,
+} from './structured-output/schema.js';
+export { MAX_SCHEMA_DEPTH, DEFAULT_MAX_SCHEMA_BYTES } from './structured-output/schema.js';
 
 // ---- Errors ----
 export { AiRuntimeError } from './errors/ai-runtime-error.js';

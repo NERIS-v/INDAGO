@@ -1,12 +1,25 @@
 // ============================================================================
 // Gemini provider (@indago/ai-agent-runtime)
 //
-// First-class provider over the CURRENT official Gemini REST API:
-//   POST {baseUrl}/models/{model}:generateContent
-// Authentication via the x-goog-api-key header. Structured output is requested
-// as a JSON mode hint (responseMimeType: 'application/json'); schema
-// enforcement stays in the runtime (the caller's zod schema), never the
-// provider.
+// First-class provider over the CURRENT official Gemini REST API — the
+// Interactions API (POST {baseUrl}/interactions). `generateContent` is the
+// legacy surface (Google marks it "Legacy"); Interactions is the recommended
+// surface since its June-2026 GA and the new step-based response schema is the
+// default (no `Api-Revision` opt-in header needed).
+//
+// Provider-native structured output (v2):
+//   - structured call (request.jsonSchema set by the runtime) → the converted
+//     JSON Schema is sent VERBATIM in
+//       response_format: { type: "text", mime_type: "application/json", schema }
+//     The provider enforces that schema; the runtime still parses + zod-validates.
+//   - plain generate() with responseFormat 'json' (no schema) → JSON mode hint,
+//     response_format without a schema.
+//   - multi-turn is stateless via the documented `input` array of typed steps:
+//       { type: "user_input",  content: [{ type: "text", text }] }
+//       { type: "model_output", content: [{ type: "text", text }] }
+//   - response text is extracted from the last `model_output` step's
+//     TextContent blocks (the `steps` array is the current response schema;
+//     the SDK-only `.output_text` convenience is not part of the REST JSON).
 //
 // The REST API is used directly (native fetch, no SDK dependency) so that all
 // providers share one transport (timeout/retry/error normalization), matching
@@ -30,33 +43,22 @@ import type {
   LLMProviderResult,
   LlmProviderCapabilities,
 } from './types.js';
-import { normalizeFinishReason } from './types.js';
 
-interface GeminiContentItem {
-  readonly role?: string;
-  readonly parts?: unknown[];
-}
-
-interface GeminiCandidate {
+interface GeminiInteractionStep {
+  readonly type?: string;
   readonly content?: unknown;
-  readonly finishReason?: string;
 }
 
-interface GeminiUsageMetadata {
-  readonly promptTokenCount?: number;
-  readonly candidatesTokenCount?: number;
-  readonly totalTokenCount?: number;
-}
-
-interface GeminiResponseMetadata {
-  readonly requestId?: string;
-}
-
-interface GeminiGenerateResponse {
-  readonly candidates?: Array<GeminiCandidate | Record<string, unknown>>;
-  readonly usageMetadata?: GeminiUsageMetadata;
-  readonly modelVersion?: string;
-  readonly responseMetadata?: GeminiResponseMetadata;
+interface GeminiInteraction {
+  readonly id?: string;
+  readonly model?: string;
+  readonly status?: string;
+  readonly steps?: unknown;
+  readonly usage?: {
+    readonly total_input_tokens?: number;
+    readonly total_output_tokens?: number;
+    readonly total_tokens?: number;
+  };
 }
 
 interface GeminiTagsResponse {
@@ -66,7 +68,7 @@ interface GeminiTagsResponse {
 export class GeminiProvider implements AIProvider {
   readonly capabilities: LlmProviderCapabilities = {
     generate: true,
-    generateStructured: true,
+    structured: { structuredOutput: true, nativeJsonSchema: true },
     healthCheck: true,
   };
 
@@ -79,35 +81,90 @@ export class GeminiProvider implements AIProvider {
   private buildBody(request: ResolvedLLMRequest): Record<string, unknown> {
     const systemParts: string[] = [];
     if (request.systemPrompt) systemParts.push(request.systemPrompt);
-    const contents: Array<Record<string, unknown>> = [];
+
+    const steps: Array<Record<string, unknown>> = [];
     for (const message of request.messages) {
       if (message.role === 'system') {
         systemParts.push(message.content);
         continue;
       }
-      contents.push({
-        role: message.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: message.content }],
+      steps.push({
+        type: message.role === 'assistant' ? 'model_output' : 'user_input',
+        content: [{ type: 'text', text: message.content }],
       });
     }
 
-    const body: Record<string, unknown> = { contents };
+    const body: Record<string, unknown> = {
+      model: request.model,
+      input: steps,
+    };
     if (systemParts.length > 0) {
-      body.systemInstruction = { parts: systemParts.map((text) => ({ text })) };
+      body.system_instruction = systemParts.join('\n');
     }
 
     const generationConfig: Record<string, unknown> = {};
-    if (request.maxOutputTokens > 0) generationConfig.maxOutputTokens = request.maxOutputTokens;
-    if (request.temperature !== undefined) generationConfig.temperature = request.temperature;
-    if (request.responseFormat === 'json') {
-      generationConfig.responseMimeType = 'application/json';
+    if (request.maxOutputTokens > 0) {
+      generationConfig.max_output_tokens = request.maxOutputTokens;
     }
-    body.generationConfig = generationConfig;
+    if (request.temperature !== undefined) {
+      generationConfig.temperature = request.temperature;
+    }
+    if (Object.keys(generationConfig).length > 0) {
+      body.generation_config = generationConfig;
+    }
+
+    if (request.jsonSchema !== undefined) {
+      body.response_format = {
+        type: 'text',
+        mime_type: 'application/json',
+        schema: request.jsonSchema,
+      };
+    } else if (request.responseFormat === 'json') {
+      body.response_format = {
+        type: 'text',
+        mime_type: 'application/json',
+      };
+    }
+
     return body;
   }
 
+  /** Extracts the final model text from the Interactions `steps` timeline. */
+  private extractInteractionText(body: GeminiInteraction): string {
+    const parts: string[] = [];
+    const steps = Array.isArray(body.steps) ? body.steps : [];
+    for (const raw of steps) {
+      if (typeof raw !== 'object' || raw === null) continue;
+      const step = raw as GeminiInteractionStep;
+      if (step.type !== 'model_output') continue;
+
+      if (typeof step.content === 'string') {
+        parts.push(step.content);
+        continue;
+      }
+      if (!Array.isArray(step.content)) continue;
+
+      for (const block of step.content) {
+        if (typeof block !== 'object' || block === null) continue;
+        const entry = block as { type?: string; text?: unknown };
+        if (entry.type === 'text' && typeof entry.text === 'string') {
+          parts.push(entry.text);
+        }
+      }
+    }
+    return parts.join('');
+  }
+
   async generate(request: ResolvedLLMRequest): Promise<LLMProviderResult> {
-    const url = `${this.config.baseUrl}/models/${encodeURIComponent(request.model)}:generateContent`;
+    if (request.jsonSchema !== undefined && !this.capabilities.structured.nativeJsonSchema) {
+      // Defense-in-depth: never silently degrade to a hint-only mode.
+      throw new AiRuntimeError(
+        'UNSUPPORTED_CAPABILITY',
+        'Gemini cannot enforce the supplied schema natively; refusing a hint-only fallback',
+      );
+    }
+
+    const url = `${this.config.baseUrl}/interactions`;
     const signal = createAbortSignalWithTimeout(request.timeoutMs, request.signal);
 
     let response: Response;
@@ -129,51 +186,39 @@ export class GeminiProvider implements AIProvider {
       throw this.mapHttpError(response, request.model);
     }
 
-    let body: GeminiGenerateResponse;
+    let body: GeminiInteraction;
     try {
-      body = (await response.json()) as GeminiGenerateResponse;
+      body = (await response.json()) as GeminiInteraction;
     } catch (error) {
       throw new AiRuntimeError(
         'INVALID_PROVIDER_RESPONSE',
-        'Gemini returned non-JSON to generateContent',
+        'Gemini returned non-JSON to /interactions',
         { cause: error },
       );
     }
 
-    const candidate = body.candidates?.[0];
-    if (!candidate) {
-      throw new AiRuntimeError('INVALID_PROVIDER_RESPONSE', 'Gemini returned no candidates');
+    const text = this.extractInteractionText(body);
+    if (text === '') {
+      throw new AiRuntimeError(
+        'INVALID_PROVIDER_RESPONSE',
+        'Gemini returned no text output for the interaction',
+      );
     }
 
-    const content = candidate.content;
-    const parts = typeof content === 'object' && content !== null ? (content as GeminiContentItem) : undefined;
-    let text = '';
-    if (parts?.parts) {
-      for (const part of parts.parts) {
-        if (typeof part === 'object' && part !== null && 'text' in part) {
-          const raw = (part as { text?: unknown }).text;
-          text += typeof raw === 'string' ? raw : '';
+    const usage = body.usage !== undefined
+      ? {
+          inputTokens: body.usage.total_input_tokens,
+          outputTokens: body.usage.total_output_tokens,
+          totalTokens: body.usage.total_tokens,
         }
-      }
-    }
-
-    const usage =
-      body.usageMetadata !== undefined
-        ? {
-            inputTokens: body.usageMetadata.promptTokenCount,
-            outputTokens: body.usageMetadata.candidatesTokenCount,
-            totalTokens: body.usageMetadata.totalTokenCount,
-          }
-        : undefined;
+      : undefined;
 
     return {
       text,
-      finishReason: normalizeFinishReason(candidate.finishReason),
+      finishReason: body.status === 'completed' ? 'stop' : 'other',
       modelVersion:
-        typeof body.modelVersion === 'string' && body.modelVersion !== ''
-          ? body.modelVersion
-          : undefined,
-      requestId: body.responseMetadata?.requestId,
+        typeof body.model === 'string' && body.model !== '' ? body.model : undefined,
+      requestId: typeof body.id === 'string' && body.id !== '' ? body.id : undefined,
       usage,
     };
   }
