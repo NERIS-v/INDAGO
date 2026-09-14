@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { createAiRuntime } from '../src/core/runtime.js';
 import { AiRuntimeError } from '../src/errors/ai-runtime-error.js';
+import { convertSchemaDocument } from '../src/structured-output/schema.js';
 import { testConfig, jsonResponse } from './support.js';
 
 const SchemaV1 = z.object({ verdict: z.enum(['open', 'closed']) });
@@ -33,7 +34,7 @@ describe('createAiRuntime', () => {
     expect(result.text).toBe('The analysis result text');
     expect(result.metadata.provider).toBe('ollama');
     expect(result.metadata.model).toBe('m');
-    expect(result.metadata.runtimePolicyVersion).toBe('v1');
+    expect(result.metadata.runtimePolicyVersion).toBe('v2');
     expect(result.metadata.finishReason).toBe('stop');
     expect(result.metadata.inputTokens).toBe(5);
     expect(result.metadata.outputTokens).toBe(7);
@@ -164,7 +165,13 @@ describe('createAiRuntime', () => {
       vi.fn().mockResolvedValue(jsonResponse({ models: [{ name: 'llama3.2' }] })),
     );
     const runtime = createAiRuntime(testConfig());
-    expect(runtime.capabilities).toEqual({ generate: true, generateStructured: true, healthCheck: true });
+    expect(runtime.capabilities).toEqual({
+      generate: true,
+      generateStructured: true,
+      structuredOutput: true,
+      nativeJsonSchema: true,
+      healthCheck: true,
+    });
     const health = await runtime.healthCheck();
     expect(health).toMatchObject({ provider: 'ollama', healthy: true });
   });
@@ -179,5 +186,70 @@ describe('createAiRuntime', () => {
       expect(error).toBeInstanceOf(AiRuntimeError);
       expect((error as AiRuntimeError).code).toBe('INVALID_PROVIDER_RESPONSE');
     }
+  });
+
+  it('sends the converted provider-native schema to the provider (ollama format)', async () => {
+    const mock = vi.fn().mockResolvedValue(
+      ollamaChat({ message: { role: 'assistant', content: '{"verdict":"open"}' } }),
+    );
+    vi.stubGlobal('fetch', mock);
+    const runtime = createAiRuntime(testConfig());
+    await runtime.generateStructured({ model: 'm' }, SchemaV1);
+
+    const expected = convertSchemaDocument(SchemaV1).schema;
+    const body = JSON.parse(String((mock.mock.calls[0] as readonly [string, RequestInit])[1]?.body));
+    expect(body.format).toEqual(expected);
+    expect((expected as { type: string }).type).toBe('object');
+  });
+
+  it('rejects structurally unrepresentable schemas with UNSUPPORTED_CAPABILITY before any provider call', async () => {
+    const mock = vi.fn();
+    vi.stubGlobal('fetch', mock);
+    const runtime = createAiRuntime(testConfig());
+    const unrepresentable = z.union([
+      z.object({ kind: z.literal('a') }),
+      z.object({ kind: z.literal('b') }),
+    ]);
+    await expect(runtime.generateStructured({ model: 'm' }, unrepresentable)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+    });
+    expect(mock).not.toHaveBeenCalled();
+  });
+
+  it('rejects unconstrained/oversized schemas with SCHEMA_VALIDATION_FAILED before any provider call', async () => {
+    const mock = vi.fn();
+    vi.stubGlobal('fetch', mock);
+    const runtime = createAiRuntime(testConfig());
+
+    await expect(runtime.generateStructured({ model: 'm' }, z.any())).rejects.toMatchObject({
+      code: 'SCHEMA_VALIDATION_FAILED',
+    });
+
+    const tinyBudgets = testConfig({ budgets: { ...testConfig().budgets, maxSchemaBytes: 16 } });
+    const tinyRuntime = createAiRuntime(tinyBudgets);
+    await expect(tinyRuntime.generateStructured({ model: 'm' }, SchemaV1)).rejects.toMatchObject({
+      code: 'SCHEMA_VALIDATION_FAILED',
+    });
+    expect(mock).not.toHaveBeenCalled();
+  });
+
+  it('refuses structured requests on a provider without native schema support — no silent fallback', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+    const provider = {
+      capabilities: {
+        generate: true,
+        structured: { structuredOutput: true, nativeJsonSchema: false },
+        healthCheck: false,
+      },
+      generate: vi.fn(async () => ({ text: '{"verdict":"open"}', finishReason: 'stop' as const })),
+      healthCheck: vi.fn(),
+    };
+    const runtime = createAiRuntime(testConfig(), { provider: provider as unknown as import('../src/providers/types.js').AIProvider });
+
+    expect(runtime.capabilities.generateStructured).toBe(false);
+    await expect(runtime.generateStructured({ model: 'm' }, SchemaV1)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+    });
+    expect(provider.generate).not.toHaveBeenCalled();
   });
 });

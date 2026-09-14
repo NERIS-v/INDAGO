@@ -22,19 +22,21 @@ function request(overrides?: Partial<ResolvedLLMRequest>): ResolvedLLMRequest {
   };
 }
 
-function geminiResponse(overrides?: Record<string, unknown>) {
+function interactionResponse(overrides?: Record<string, unknown>) {
   return jsonResponse({
-    candidates: [
-      {
-        content: { parts: [{ text: 'Analysis result' }], role: 'model' },
-        finishReason: 'STOP',
-      },
-    ],
-    modelVersion: 'gemini-2.5-flash-001',
-    usageMetadata: { promptTokenCount: 40, candidatesTokenCount: 12, totalTokenCount: 52 },
-    responseMetadata: { requestId: 'r-1234' },
+    id: 'int_123',
+    model: 'gemini-2.5-flash-001',
+    object: 'interaction',
+    status: 'completed',
+    steps: [{ type: 'model_output', content: [{ type: 'text', text: 'Analysis result' }] }],
+    usage: { total_input_tokens: 40, total_output_tokens: 12, total_tokens: 52 },
     ...overrides,
   });
+}
+
+function captureBody(mock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+  const [url, init] = mock.mock.calls[0] as readonly [string, RequestInit];
+  return { url, ...(JSON.parse(String(init?.body)) as Record<string, unknown>) };
 }
 
 afterEach(() => {
@@ -42,41 +44,121 @@ afterEach(() => {
 });
 
 describe('GeminiProvider', () => {
-  it('calls the generateContent endpoint with the API key in the header', async () => {
-    const mock = vi.fn().mockResolvedValue(geminiResponse());
+  it('calls the Interactions endpoint with the API key in the header and normalizes the response', async () => {
+    const mock = vi.fn().mockResolvedValue(interactionResponse());
     vi.stubGlobal('fetch', mock);
     const provider = new GeminiProvider(CONFIG);
     const result = await provider.generate(request());
     expect(mock).toHaveBeenCalledTimes(1);
     const [url, init] = mock.mock.calls[0] as readonly [string, RequestInit];
-    expect(url).toContain(`models/${MODEL}:generateContent`);
+    expect(url).toBe(`${BASE}/interactions`);
     expect(init.headers).toMatchObject({
       'x-goog-api-key': SECRET,
     });
     expect(result.text).toBe('Analysis result');
     expect(result.finishReason).toBe('stop');
     expect(result.modelVersion).toBe('gemini-2.5-flash-001');
-    expect(result.requestId).toBe('r-1234');
+    expect(result.requestId).toBe('int_123');
     expect(result.usage).toEqual({ inputTokens: 40, outputTokens: 12, totalTokens: 52 });
   });
 
-  it('sets responseMimeType to application/json when the request forces JSON mode', async () => {
-    const mock = vi.fn().mockResolvedValue(geminiResponse());
+  it('sends the provider-native JSON Schema verbatim in response_format for a structured call', async () => {
+    const schema = {
+      type: 'object',
+      properties: { verdict: { type: 'string', enum: ['open', 'closed'] } },
+      required: ['verdict'],
+    };
+    const mock = vi.fn().mockResolvedValue(
+      interactionResponse({ steps: [{ type: 'model_output', content: [{ type: 'text', text: '{"verdict":"open"}' }] }] }),
+    );
     vi.stubGlobal('fetch', mock);
-    const provider = new GeminiProvider(CONFIG);
-    await provider.generate(request({ responseFormat: 'json' }));
-    const body = JSON.parse(String((mock.mock.calls[0] as readonly [string, RequestInit])[1]?.body));
-    expect(body.generationConfig.responseMimeType).toBe('application/json');
+    await new GeminiProvider(CONFIG).generate(request({ jsonSchema: schema }));
+
+    const body = captureBody(mock);
+    expect(body.response_format).toEqual({
+      type: 'text',
+      mime_type: 'application/json',
+      schema,
+    });
   });
 
-  it('sends temperature and maxOutputTokens in generationConfig', async () => {
-    const mock = vi.fn().mockResolvedValue(geminiResponse());
+  it('sends a schema-less JSON mode hint when responseFormat json has no schema', async () => {
+    const mock = vi.fn().mockResolvedValue(interactionResponse());
     vi.stubGlobal('fetch', mock);
-    const provider = new GeminiProvider(CONFIG);
-    await provider.generate(request({ temperature: 0.42, maxOutputTokens: 512 }));
-    const body = JSON.parse(String((mock.mock.calls[0] as readonly [string, RequestInit])[1]?.body));
-    expect(body.generationConfig.temperature).toBe(0.42);
-    expect(body.generationConfig.maxOutputTokens).toBe(512);
+    await new GeminiProvider(CONFIG).generate(request({ responseFormat: 'json' }));
+
+    const body = captureBody(mock);
+    expect(body.response_format).toEqual({ type: 'text', mime_type: 'application/json' });
+  });
+
+  it('omits response_format for plain text generation', async () => {
+    const mock = vi.fn().mockResolvedValue(interactionResponse());
+    vi.stubGlobal('fetch', mock);
+    await new GeminiProvider(CONFIG).generate(request());
+
+    const body = captureBody(mock);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  it('builds stateless multi-turn steps and a system_instruction string', async () => {
+    const mock = vi.fn().mockResolvedValue(interactionResponse());
+    vi.stubGlobal('fetch', mock);
+    await new GeminiProvider(CONFIG).generate(
+      request({
+        systemPrompt: 'system rules',
+        messages: [
+          { role: 'system', content: 'another rule' },
+          { role: 'user', content: 'hi' },
+          { role: 'assistant', content: 'hello' },
+          { role: 'user', content: 'again' },
+        ],
+      }),
+    );
+
+    const body = captureBody(mock);
+    expect(body.input).toEqual([
+      { type: 'user_input', content: [{ type: 'text', text: 'hi' }] },
+      { type: 'model_output', content: [{ type: 'text', text: 'hello' }] },
+      { type: 'user_input', content: [{ type: 'text', text: 'again' }] },
+    ]);
+    expect(body.system_instruction).toBe('system rules\nanother rule');
+  });
+
+  it('sends generation_config with snake_case keys and omits it when empty', async () => {
+    const mock = vi.fn().mockResolvedValue(interactionResponse());
+    vi.stubGlobal('fetch', mock);
+    await new GeminiProvider(CONFIG).generate(request({ temperature: 0.42, maxOutputTokens: 512 }));
+
+    const body = captureBody(mock);
+    expect(body.generation_config).toEqual({ temperature: 0.42, max_output_tokens: 512 });
+
+    const bareFetch = vi.fn().mockResolvedValue(interactionResponse());
+    vi.stubGlobal('fetch', bareFetch);
+    await new GeminiProvider(CONFIG).generate(request({ temperature: undefined, maxOutputTokens: 0 }));
+    const bare = captureBody(bareFetch);
+    expect(bare.generation_config).toBeUndefined();
+  });
+
+  it('extracts text only from model_output steps and rejects responses with no readable text', async () => {
+    const mock = vi.fn().mockResolvedValue(
+      interactionResponse({
+        steps: [
+          { type: 'function_call', name: 'f', arguments: '{}' },
+          { type: 'model_output', content: [{ type: 'text', text: 'part one ' }, { type: 'text', text: 'part two' }] },
+        ],
+      }),
+    );
+    vi.stubGlobal('fetch', mock);
+    const result = await new GeminiProvider(CONFIG).generate(request());
+    expect(result.text).toBe('part one part two');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(interactionResponse({ steps: [{ type: 'function_call', name: 'f' }] })),
+    );
+    await expect(new GeminiProvider(CONFIG).generate(request())).rejects.toMatchObject({
+      code: 'INVALID_PROVIDER_RESPONSE',
+    });
   });
 
   it('normalizes a 429 rate-limit into RATE_LIMITED with a Retry-After hint', async () => {
@@ -138,13 +220,15 @@ describe('GeminiProvider', () => {
     });
   });
 
-  it('returns raw text for JSON-mode requests (schema validation is the runtime job)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(geminiResponse({ candidates: [{ content: { parts: [{ text: 'not json' }] }, finishReason: 'STOP' }] })),
-    );
-    const result = await new GeminiProvider(CONFIG).generate(request({ responseFormat: 'json' }));
-    expect(result.text).toBe('not json');
+  it('refuses to degrade a structured call without native schema support (defense-in-depth)', async () => {
+    const provider = new GeminiProvider(CONFIG);
+    const degraded = request({ jsonSchema: { type: 'object' } });
+    (
+      provider as { capabilities: { structured: { nativeJsonSchema: boolean } } }
+    ).capabilities.structured.nativeJsonSchema = false;
+    await expect(provider.generate(degraded)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_CAPABILITY',
+    });
   });
 
   it('normalizes fetch network errors into AiRuntimeError codes', async () => {

@@ -12,7 +12,8 @@ describe('loadAiConfig', () => {
     expect(config.gemini.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta');
     expect(config.ollama.baseUrl).toBe('http://localhost:11434');
     expect(config.budgets).toEqual(DEFAULT_AI_BUDGETS);
-    expect(config.policyVersion).toBe('v1');
+    expect(config.budgets.maxSchemaBytes).toBe(50_000);
+    expect(config.policyVersion).toBe('v2');
   });
 
   it('honours env overrides, strips trailing slashes and trims secrets', () => {
@@ -24,6 +25,7 @@ describe('loadAiConfig', () => {
       AI_MAX_OUTPUT_TOKENS: '1024',
       AI_TIMEOUT_MS: '15000',
       AI_MAX_RETRIES: '3',
+      AI_MAX_SCHEMA_BYTES: '2048',
     } as NodeJS.ProcessEnv);
     expect(config.provider).toBe('gemini');
     expect(config.gemini.apiKey).toBe('sk-1234');
@@ -32,6 +34,7 @@ describe('loadAiConfig', () => {
     expect(config.budgets.maxOutputTokens).toBe(1024);
     expect(config.budgets.timeoutMs).toBe(15_000);
     expect(config.budgets.maxRetries).toBe(3);
+    expect(config.budgets.maxSchemaBytes).toBe(2048);
     expect(config.gemini.timeoutMs).toBe(15_000);
   });
 
@@ -55,7 +58,7 @@ describe('loadAiConfig', () => {
   });
 
   it('rejects degenerate and out-of-range numeric configuration', () => {
-    for (const key of ['AI_MAX_INPUT_CHARS', 'AI_MAX_OUTPUT_TOKENS', 'AI_TIMEOUT_MS']) {
+    for (const key of ['AI_MAX_INPUT_CHARS', 'AI_MAX_OUTPUT_TOKENS', 'AI_TIMEOUT_MS', 'AI_MAX_SCHEMA_BYTES']) {
       expect(() => loadAiConfig({ [key]: 'abc' } as NodeJS.ProcessEnv)).toThrow(TypeError);
       expect(() => loadAiConfig({ [key]: '0' } as NodeJS.ProcessEnv)).toThrow(TypeError);
       expect(() => loadAiConfig({ [key]: '-5' } as NodeJS.ProcessEnv)).toThrow(TypeError);

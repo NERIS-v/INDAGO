@@ -30,7 +30,7 @@ export function testConfig(overrides?: Partial<AiConfig>): AiConfig {
       timeoutMs: 30_000,
     },
     budgets: DEFAULT_AI_BUDGETS,
-    policyVersion: 'v1',
+    policyVersion: 'v2',
     ...overrides,
   };
 }
