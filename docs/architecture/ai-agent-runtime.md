@@ -23,12 +23,14 @@ to an LLM**, never **WHAT INDAGO believes or decides**.
 
 ## Scope
 
-**In scope (V1):** bounded, structured LLM inference — `generate`,
+**In scope (V2):** bounded, structured LLM inference — `generate`,
 `generateStructured`, `healthCheck`; Gemini + Ollama generation providers;
-environment-backed configuration; zod schema validation; budgets; retry/
-timeout; typed errors; execution metadata; secret safety.
+**provider-native structured output** enforced by the provider's own JSON
+Schema support without silent weakening; environment-backed configuration; zod
+schema validation; budgets; retry/timeout; typed errors; execution metadata;
+secret safety.
 
-**Out of scope (V1, hard):** web browsing, database tools, shell access,
+**Out of scope (V2, hard):** web browsing, database tools, shell access,
 filesystem tools, arbitrary function calling, agent loops, self-directed
 planning, autonomous retries based on model decisions. No autonomous tools of
 any kind.
@@ -43,14 +45,21 @@ runtime.generateStructured(request, zodSchema) // validated data + raw + metadat
 runtime.healthCheck()                // reachability probe (never throws)
 ```
 
-`AIProvider` is the single provider contract:
+`AIProvider` exposes a capability model so consumers can check what a provider
+can actually enforce **before** issuing structured calls:
 
 ```
 AIProvider
-  ├─ capabilities       generate / generateStructured / healthCheck
+  ├─ capabilities                 generate / structured{structuredOutput,nativeJsonSchema} / healthCheck
   ├─ generate(request)  → LLMProviderResult (normalized text, usage, modelVersion)
   └─ healthCheck()      → AIProviderHealth (safe, never throws)
 ```
+
+`structuredOutput` means the provider has *any* structured-output mechanism;
+`nativeJsonSchema` means it accepts the runtime's JSON Schema document
+**verbatim**. Both providers in V2 are native; a provider that cannot accept
+the schema natively rejects `generateStructured` with `UNSUPPORTED_CAPABILITY`
+— **never** a silent JSON-hint fallback.
 
 Provider selection is **deterministic**: `AI_PROVIDER=gemini|ollama`, built by
 `createLLMProvider`. There is **no hidden fallback chain** — a Gemini outage
@@ -70,23 +79,33 @@ retry loop is wrapped into `INVALID_PROVIDER_RESPONSE` with the original as
 
 ## Gemini provider
 
-Implemented over the **current official Gemini REST API**:
+Implemented over the **current official Gemini REST API — the Interactions API**
+(`generateContent` is legacy):
 
 ```
-POST {GEMINI_BASE_URL}/models/{model}:generateContent
+POST {GEMINI_BASE_URL}/interactions
 ```
+
+The runtime talks to Interactions with stateless multi-turn steps
+(`user_input` / `model_output`), a flat `system_instruction` string, and
+snake-case `generation_config` keys. The call to the canonical
+`:generateContent` endpoint shipped in V1 is gone.
 
 Food for the transport choice: the repository uses native `fetch` everywhere
 (no HTTP SDK dependencies, cf. the Ollama embedding provider), so Gemini uses
 the same dependency-free transport — one timeout/retry/error path for all
-providers. The official `@google/genai` SDK (current 2.x) is available but
-would duplicate this provider's plumbing for no additional capability here.
+providers. The official `@google/genai` SDK is available but would duplicate
+this provider's plumbing for no additional capability here.
 
 - Auth: `x-goog-api-key` header only. The key never appears in URLs, logs,
   messages, errors, metadata or API results.
-- Structured output: requested as a **JSON mode hint**
-  (`responseMimeType: "application/json"`). Schema enforcement is done by the
-  runtime with the caller's zod schema — never by provider-defined schemas.
+- Structured output: requested with the runtime's JSON Schema document
+  **verbatim** in `response_format: { type: "text", mime_type:
+  "application/json", schema }`. A JSON-mode hint without a schema is sent for
+  JSON-mode requests that carry no schema; plain text passes no
+  `response_format`.
+- Text is recovered from `model_output` steps; a response with no readable text
+  is `INVALID_PROVIDER_RESPONSE`, never a silent empty string.
 - Model: configured (`GEMINI_DEFAULT_MODEL` / `AI_DEFAULT_MODEL` / per
   request). The runtime **never hardcodes a model**.
 - Timeouts, retries, error mapping and `Retry-After` handling are shared
@@ -104,12 +123,13 @@ GET  {OLLAMA_BASE_URL}/api/tags    (healthCheck)
 This is **not** the `OllamaEmbeddingProvider` in `@indago/semantic-retrieval`.
 Embeddings stay text→vector; this package is prompt/context→generative
 response. The two never share implementation or abstractions. Structured output
-uses Ollama's `format: "json"` mode as a hint; the runtime then enforces the
-caller's zod schema.
+sends the runtime's JSON Schema document **verbatim** as Ollama's `format`
+field (Ollama's native grammar-based schema support); a plain JSON-mode request
+without a schema uses `format: "json"` as a hint.
 
-Gemini and Ollama expose the same `generate` / `healthCheck` surface; a
-consumer cannot tell which provider is behind a resolved runtime without
-reading `metadata.provider`.
+Gemini and Ollama expose the same `generate` / `healthCheck` surface and the
+same capabilities; a consumer cannot tell which provider is behind a resolved
+runtime without reading `metadata.provider`.
 
 ## Configuration
 
@@ -134,6 +154,7 @@ non-http URLs) is a hard `TypeError` at load time — never a silent fallback.
 | `AI_MAX_INPUT_CHARS` | `120000` | context bound (hard rejection) |
 | `AI_MAX_OUTPUT_TOKENS` | `8192` | output bound |
 | `AI_MAX_REQUEST_MESSAGES` | `32` | request message bound |
+| `AI_MAX_SCHEMA_BYTES` | `50000` | serialized provider-schema bound (hard rejection) |
 
 `.env.example` (platform package) documents placeholders only — never a real
 key.
@@ -158,26 +179,52 @@ errors.
 
 ## Structured output
 
-Flow:
+Flow (V2):
 
 ```
-LLM → raw response → JSON recovery → zod validation → typed result
+feature zod schema
+   → JSON Schema representation (shared provider subset, bounded)
+   → provider-native structured output
+       Gemini  response_format.schema
+       Ollama  format: <schema>
+   → LLM → raw response → JSON recovery → zod validation → typed result
 ```
 
+- **Conversion** uses `zod-to-json-schema` (deterministic, documented), then
+  normalizes onto a **shared conservative provider subset** — the intersection
+  of keywords both provider contracts enumerate natively. Normalizations are
+  semantics-preserving only (optional → omitted from `required`; nullable →
+  `[T, "null"]` type array; `const` → `enum`; `$schema` stripped).
+- **No silent weakening, deterministically.** A valid zod construct the shared
+  subset cannot enforce natively (union/`anyOf`, `oneOf`, `allOf`, `not`,
+  `$ref/`$defs`, `pattern`, `min`/`maxLength`, tuples, `exclusiveMinimum`,
+  multiple concrete types, …) is rejected **before** any provider call with
+  `UNSUPPORTED_CAPABILITY`. Conversion failures, recursive/inline-`$ref`
+  schemas, unconstrained (typeless) schemas, schemas nested deeper than 64
+  levels, and schemas whose serialized form exceeds `maxSchemaBytes` are
+  rejected before any provider call with `SCHEMA_VALIDATION_FAILED`. The schema
+  document the provider receives is **byte-identical** across Gemini and
+  Ollama; the caller's zod schema is never mutated.
+- The provider enforces the schema natively; the runtime then **still** parses
+  the recovered JSON and validates it with the caller's zod schema. Provider
+  schema adherence is no substitute for zod `safeParse`: the provider's native
+  schema and the zod schema are *equivalent* by construction, but the provider
+  may still produce values that fail zod (e.g. defaults, coercion surprises).
+  **Zod remains the final acceptance boundary.**
 - Recovery is intentionally minimal and deterministic: try raw text; strip a
   markdown fence; slice the outermost `{...}` JSON region. No quote fixing, no
   character cleaning, no "make it fit" mutation. Truncated/empty/malformed
   output → `STRUCTURED_OUTPUT_INVALID`.
-- Validation uses the **feature package's zod schema**. The runtime **never
-  defines domain output schemas** and **never invents a second schema system**.
-  Features define `GraphHoleAnalysisV1Schema`, `IngestionAnalysisV1Schema` etc.
-  and hand them to `generateStructured`.
 - **Invariant:** a response is not "successfully structured" because the
   provider returned HTTP 200 — it must pass zod `safeParse`.
 - Unknown fields follow the feature schema's zod semantics (strip, or reject
   with `.strict()`).
 - Validation errors surface issue **paths only**, never received values, so a
   model response can't leak secrets through a `SCHEMA_VALIDATION_FAILED`.
+
+> No output schema can prove semantic correctness. Provider-native enforcement
+> constrains the *shape* of output; it never means the model is right about the
+> domain.
 
 ## Budgets
 
@@ -188,6 +235,7 @@ errors — it never silently truncates analytical context:
 - `maxInputChars` (system + all messages) → `INPUT_TOO_LARGE`
 - `maxRequestMessages` → `INPUT_TOO_LARGE`
 - requested `maxOutputTokens` above the bound → `OUTPUT_LIMIT_EXCEEDED`
+- `maxSchemaBytes` (serialized provider schema) → `SCHEMA_VALIDATION_FAILED`
 
 Feature packages learn the boundary from the typed error, not from silent data
 loss.
@@ -210,7 +258,7 @@ loss.
 Every successful execution returns `LLMExecutionMetadata`:
 
 ```
-runtimePolicyVersion  v1 (shared policy version)
+runtimePolicyVersion  v2 (shared policy version)
 provider / model / modelVersion
 promptVersion / schemaVersion / policyVersion   (feature-owned, recorded verbatim)
 requestId (UUID)   startedAt / completedAt / latencyMs
@@ -254,7 +302,11 @@ It returns results; **the caller decides what a structured result means**.
 
 ## Non-goals
 
-- Not an autonomous agent framework (no tools, no loops — V1).
+- Validated against a **shared provider subset** (see Structured output). This
+  constraint is the reason common zod patterns that need `minLength`/`pattern`/
+  unions at the leaf level must be avoided (or wrapped) in feature schemas —
+  they are rejected deterministically, never silently downgraded.
+- Not an autonomous agent framework (no tools, no loops — V2).
 - Not a prompt library (no `graph-hole-prompt.ts`, no `ingestion-prompt.ts`).
 - Not a schema registry (features own their zod schemas).
 - Not a replacement for / generalization of `@indago/semantic-retrieval`.
@@ -280,18 +332,18 @@ provider-specific logic in feature code.
 
 ## Verification
 
-- Package: 81 unit tests pass (config, budgets, structured output, reliability,
-  security, Gemini, Ollama, interchangeability, runtime), typecheck + build
-  clean.
-- `@indago/contracts`: 334 tests pass (regression after adding
-  `AI_RUNTIME_POLICY_VERSION`).
+- Package: 105 unit tests pass (config, budgets, schema conversion, structured
+  output, reliability, security, Gemini, Ollama, interchangeability, runtime),
+  typecheck + build clean.
+- `@indago/contracts`: 334 tests pass (regression after bumping
+  `AI_RUNTIME_POLICY_VERSION` to v2).
 - Recursive workspace typecheck and build pass; existing embedding
   infrastructure unchanged (no imports from or into semantic-retrieval).
 - Public API smoke-import (workspace-aware): `pnpm --filter
   @indago/ai-agent-runtime exec node --input-type=module
   -e "import('@indago/ai-agent-runtime')..."` passes via Node package
   self-reference (`exports` → `dist/index.js`) from the package directory;
-  all 17 public exports load. Bare-name import from the repo root fails with
+  all 20 public exports load. Bare-name import from the repo root fails with
   `ERR_MODULE_NOT_FOUND` for this package just as it does for the
   established `@indago/contracts` and `@indago/semantic-retrieval` — pnpm
   does not link unreferenced workspace packages at the root, so root-level
