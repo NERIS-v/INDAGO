@@ -55,8 +55,16 @@ export type EmbeddingPolicyVersion = typeof EMBEDDING_POLICY_VERSION;
  * and detection policies: a budget/reliability policy bump re-identifies the
  * execution semantics that produced a given LLM result without touching
  * provider/model/prompt/schema versioning, which stay separate dimensions.
+ *
+ * v2 = provider-native strict structured output:
+ *   - feature zod schema → JSON Schema representation → provider-enforced
+ *     structured output (Gemini Interactions response_format.schema, Ollama
+ *     format: <schema>), then parse + zod validation
+ *   - new maxSchemaBytes schema-conversion bound
+ *   - capability model: structuredOutput / nativeJsonSchema, no silent fallback
+ *     (a provider that cannot enforce the schema natively → UNSUPPORTED_CAPABILITY)
  */
-export const AI_RUNTIME_POLICY_VERSION = 'v1' as const;
+export const AI_RUNTIME_POLICY_VERSION = 'v2' as const;
 export type AiRuntimePolicyVersion = typeof AI_RUNTIME_POLICY_VERSION;
 
 /** Detection policy version (deterministic candidate identity formulation). */

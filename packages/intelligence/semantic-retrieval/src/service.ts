@@ -13,6 +13,13 @@
 // temporal filtering, threshold filtering, deduplication and the deterministic
 // ORDER BY (distance ASC, unit id ASC). The service never re-orders, never
 // re-filters case boundaries in memory, and never resolves text to entities.
+//
+// Truncation truthfulness: `truncated` MUST mean "additional matching units
+// existed but were cut off", never "we hit the page size". The service probes
+// the repository with limit + 1 rows and derives truncation from OBSERVED
+// overflow (rows.length > limit), then slices the caller-visible result back
+// to limit so the port's "max hits" contract is preserved. An exactly-full
+// result set (== limit) is therefore NOT truncated.
 // ============================================================================
 
 import type {
@@ -63,17 +70,23 @@ export class SemanticSearchService implements SemanticRetrievalPort {
     const threshold =
       request.threshold ?? this.options.threshold ?? DEFAULT_SEMANTIC_SEARCH_THRESHOLD;
 
+    // Overflow probe: ask for one more row than the caller's limit so we can
+    // distinguish "exactly limit matching units" (NOT truncated) from "more
+    // than limit matched" (truncated) by direct observation. The public result
+    // is always sliced back to `limit`.
     const rows = await this.deps.repository.findNearestNeighbors({
       caseId: request.caseId,
       queryVector,
       providerIdentity: this.deps.provider.identity,
-      limit,
+      limit: limit + 1,
       threshold,
       temporalContext: request.temporalContext ?? null,
     });
 
+    const truncated = rows.length > limit;
+
     const identity = this.deps.provider.identity;
-    const results = rows.map((row) => ({
+    const results = rows.slice(0, limit).map((row) => ({
       semanticTextUnitId: row.semanticTextUnitId,
       contentHash: row.contentHash,
       providerId: identity.providerId,
@@ -87,8 +100,6 @@ export class SemanticSearchService implements SemanticRetrievalPort {
       sourceId: row.sourceId,
       ...(row.temporalScope !== undefined ? { temporalScope: row.temporalScope } : {}),
     }));
-
-    const truncated = results.length >= limit;
 
     return {
       caseId: request.caseId,

@@ -3,7 +3,7 @@
 //
 // Every successful execution returns enough metadata for reproducibility and
 // observability. Version dimensions are kept STRICTLY separate:
-//   runtimePolicyVersion — the shared runtime policy/budget version (v1)
+//   runtimePolicyVersion — the shared runtime policy/budget version (v2)
 //   provider/model/modelVersion — WHAT executed the call
 //   promptVersion / schemaVersion / policyVersion — feature-side versions,
 //     recorded verbatim, never interpreted by the runtime

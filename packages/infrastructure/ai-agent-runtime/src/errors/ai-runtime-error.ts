@@ -16,8 +16,14 @@
 //   OUTPUT_LIMIT_EXCEEDED        — requested/observed output exceeded a runtime budget
 //   INVALID_PROVIDER_RESPONSE    — provider replied with an unusable payload
 //   STRUCTURED_OUTPUT_INVALID    — response text did not contain parsable JSON
-//   SCHEMA_VALIDATION_FAILED     — parsed JSON failed the caller-supplied zod schema
-//   UNSUPPORTED_CAPABILITY       — requested capability not offered by the provider/runtime
+//   SCHEMA_VALIDATION_FAILED     — schema conversion/violation (zod→JSON Schema
+//                                  conversion failed, unconstrained/overlarge/
+//                                  overlarge schema, or parsed JSON failed the
+//                                  caller-supplied zod schema)
+//   UNSUPPORTED_CAPABILITY       — requested capability not offered by the
+//                                  provider/runtime, OR a schema construct the
+//                                  shared provider subset cannot enforce
+//                                  natively (no silent fallback)
 //   RETRY_EXHAUSTED              — a transient failure was retried to the bound
 //   ABORTED                      — the caller cancelled the operation
 //

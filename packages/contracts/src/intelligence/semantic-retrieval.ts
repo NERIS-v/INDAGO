@@ -140,7 +140,13 @@ export const SemanticRetrievalResultSchema = z.object({
   semanticRetrievalPolicyVersion: z.literal(SEMANTIC_RETRIEVAL_POLICY_VERSION),
   embeddingPolicyVersion: z.literal(EMBEDDING_POLICY_VERSION),
   results: z.array(SemanticSearchResultSchema),
-  /** true when the result list was capped by the requested limit. */
+  /**
+   * true when MORE THAN `limit` matching units existed and the returned list
+   * was capped by the requested limit — i.e. retrieval was genuinely
+   * incomplete. An exactly-full result set (results.length === limit) is
+   * NOT truncated. Derived from an observed overflow probe, never from
+   * "we hit the page size".
+   */
   truncated: z.boolean(),
 }).strict();
 export type SemanticRetrievalResult = z.infer<typeof SemanticRetrievalResultSchema>;

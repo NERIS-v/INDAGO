@@ -52,10 +52,13 @@ describe('secret safety', () => {
     const fetchMock = captureFetch();
     fetchMock.mockImplementation(async (_input: unknown, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
+      const userStep = (body.input ?? []).find((step: { type?: string }) => step.type === 'user_input');
+      const text = userStep?.content?.[0]?.text ?? '';
       return jsonResponse({
-        candidates: [{ content: { parts: [{ text: body.contents?.[0]?.parts?.[0]?.text ?? '' }] }, finishReason: 'STOP' }],
-        modelVersion: 'gemini-model-001',
-        usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 5, totalTokenCount: 8 },
+        id: 'int_1',
+        status: 'completed',
+        steps: [{ type: 'model_output', content: [{ type: 'text', text }] }],
+        usage: { total_input_tokens: 3, total_output_tokens: 5, total_tokens: 8 },
       });
     });
 
@@ -125,5 +128,33 @@ describe('secret safety', () => {
     })();
     expect(error).toBeInstanceOf(AiRuntimeError);
     expect(flattenError(error)).not.toContain(SECRET);
+  });
+
+  it('structured calls never leak echoed secrets through the SCHEMA_VALIDATION_FAILED error', async () => {
+    const fetchMock = captureFetch();
+    fetchMock.mockImplementation(async (input: unknown) => {
+      if (String(input).endsWith('/api/chat')) {
+        return jsonResponse({
+          message: { role: 'assistant', content: `{"verdict":"open","echo":"${SECRET}"}` },
+          done: true,
+          done_reason: 'stop',
+        });
+      }
+      throw new Error(`unexpected URL: ${String(input)}`);
+    });
+
+    const StrictV1 = z.object({ verdict: z.enum(['open', 'closed']) }).strict();
+    const runtime = createAiRuntime(testConfig({ provider: 'ollama' }));
+    let caught: unknown;
+    try {
+      await runtime.generateStructured({ model: 'm' }, StrictV1);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(AiRuntimeError);
+    expect((caught as AiRuntimeError).code).toBe('SCHEMA_VALIDATION_FAILED');
+    for (const entry of [String(caught), JSON.stringify(caught), flattenError(caught)]) {
+      expect(entry).not.toContain(SECRET);
+    }
   });
 });

@@ -21,6 +21,7 @@
 //   AI_MAX_INPUT_CHARS      context bound                     (default 120_000)
 //   AI_MAX_OUTPUT_TOKENS    output bound                      (default 8_192)
 //   AI_MAX_REQUEST_MESSAGES message bound                     (default 32)
+//   AI_MAX_SCHEMA_BYTES     provider schema bound             (default 50_000)
 // ============================================================================
 
 import { AI_RUNTIME_POLICY_VERSION } from '@indago/contracts';
@@ -92,6 +93,7 @@ export function loadAiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
     maxRetries: boundedInt('MAX_RETRIES', env.AI_MAX_RETRIES, DEFAULT_AI_BUDGETS.maxRetries, 0, 10),
     retryBaseDelayMs: boundedInt('RETRY_BASE_DELAY_MS', env.AI_RETRY_BASE_DELAY_MS, DEFAULT_AI_BUDGETS.retryBaseDelayMs, 0, 60_000),
     maxRetryDelayMs: boundedInt('MAX_RETRY_DELAY_MS', env.AI_MAX_RETRY_DELAY_MS, DEFAULT_AI_BUDGETS.maxRetryDelayMs, 1, 300_000),
+    maxSchemaBytes: boundedInt('MAX_SCHEMA_BYTES', env.AI_MAX_SCHEMA_BYTES, DEFAULT_AI_BUDGETS.maxSchemaBytes, 1, 10_000_000),
   };
 
   return {

@@ -85,6 +85,37 @@ describe('OllamaGenerationProvider', () => {
     expect(body.format).toBe('json');
   });
 
+  it('sends the provider-native JSON Schema verbatim in format for a structured call', async () => {
+    const schema = {
+      type: 'object',
+      properties: { verdict: { type: 'string', enum: ['open', 'closed'] } },
+      required: ['verdict'],
+    };
+    const mock = vi.fn().mockResolvedValue(ollamaResponse());
+    vi.stubGlobal('fetch', mock);
+    await new OllamaGenerationProvider(CONFIG).generate(request({ jsonSchema: schema }));
+    const body = JSON.parse(String((mock.mock.calls[0] as readonly [string, RequestInit])[1]?.body));
+    expect(body.format).toEqual(schema);
+  });
+
+  it('omits format entirely for plain text requests', async () => {
+    const mock = vi.fn().mockResolvedValue(ollamaResponse());
+    vi.stubGlobal('fetch', mock);
+    await new OllamaGenerationProvider(CONFIG).generate(request());
+    const body = JSON.parse(String((mock.mock.calls[0] as readonly [string, RequestInit])[1]?.body));
+    expect(body.format).toBeUndefined();
+  });
+
+  it('refuses to degrade a structured call without native schema support (defense-in-depth)', async () => {
+    const provider = new OllamaGenerationProvider(CONFIG);
+    (
+      provider as { capabilities: { structured: { nativeJsonSchema: boolean } } }
+    ).capabilities.structured.nativeJsonSchema = false;
+    await expect(
+      provider.generate(request({ jsonSchema: { type: 'object' } })),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' });
+  });
+
   it('maps length done_reason to the length finish reason', async () => {
     vi.stubGlobal(
       'fetch',

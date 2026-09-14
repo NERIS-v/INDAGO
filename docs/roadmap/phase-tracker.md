@@ -537,11 +537,11 @@ And the underlying temporal sub-items (tracked to reflect reality):
 |:------|------:|-----:|-----:|------:|-----------:|-----:|-------:|
 | 0 | 10 | 10 | 0 | 0 | 0 | 10 | 100% |
 | 1 | 40 | 40 | 0 | 20 | 6 | 14 | 100% |
-| 2A | 30 | 27 | 3 | 22 | 0 | 8 | 90% |
+| 2A | 34 | 31 | 3 | 26 | 0 | 8 | 91% |
 | 2B | 12 | 12 | 0 | 0 | 12 | 0 | 100% |
 | 3 | 12 | 10 | 2 | 5 | 6 | 1 | 83% |
-| 4 | 17 | 0 | 17 | 10 | 6 | 1 | 0% |
-| 5 | 18 | 0 | 18 | 9 | 8 | 1 | 0% |
+| 4 | 17 | 16 | 1 | 10 | 6 | 1 | 94% |
+| 5 | 22 | 5 | 17 | 13 | 8 | 1 | 23% |
 | 6 | 21 | 8 | 13 | 9 | 8 | 4 | 38% |
 | 7 | 20 | 0 | 20 | 9 | 11 | 0 | 0% |
 | 8 | 24 | 0 | 24 | 9 | 6 | 9 | 0% |
@@ -549,6 +549,6 @@ And the underlying temporal sub-items (tracked to reflect reality):
 | 10 | 10 | 0 | 10 | 5 | 5 | 0 | 0% |
 | 11 | 30 | 0 | 30 | 10 | 10 | 10 | 0% |
 | 12 | 16 | 0 | 16 | 7 | 8 | 1 | 0% |
-| **Total** | **277** | **111** | **166** | **122** | **96** | **59** | **40%** |
+| **Total** | **285** | **136** | **149** | **130** | **96** | **59** | **48%** |
 
-> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 13 M-A12 sub-task rows added by the V7 tracker reconciliation: 8 gate audits (G1–G8, `[Both]`, **verified 12 Sep 2026 — see `docs/reports/m-a12-entry-gate-audit.md`**) + 5 **implemented** temporal deep-dives (T1–T5, `[Mayur]`).
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 17 M-A12 rows added by the V7 tracker reconciliation plus M-A12 implementation: 8 gate audits (G1–G8, `[Both]`, **verified 12 Sep 2026 — see `docs/reports/m-a12-entry-gate-audit.md`**) + 4 design/implementation rows (PR0–PR3, `[Mayur]`) + 5 implemented temporal deep-dives (T1–T5, `[Mayur]`).

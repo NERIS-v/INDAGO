@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { createAiRuntime } from '../src/core/runtime.js';
 import { createLLMProvider } from '../src/providers/factory.js';
+import { convertSchemaDocument } from '../src/structured-output/schema.js';
 import { testConfig, jsonResponse } from './support.js';
 
 const AnalysisV1 = z.object({
@@ -22,13 +23,14 @@ const GENERIC_REQUEST = {
 /** One fetch mock that serves BOTH provider wire formats based on the URL. */
 function dualFetch(geminiJson: unknown, ollamaJson: unknown) {
   return vi.fn().mockImplementation(async (input: string) => {
-    if (input.includes(':generateContent')) {
+    if (input.endsWith('/interactions')) {
       return jsonResponse({
-        candidates: [
-          { content: { parts: [{ text: JSON.stringify(geminiJson) }] }, finishReason: 'STOP' },
-        ],
-        modelVersion: 'gemini-model-001',
-        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 8, totalTokenCount: 18 },
+        id: 'int_123',
+        model: 'shared-model',
+        object: 'interaction',
+        status: 'completed',
+        steps: [{ type: 'model_output', content: [{ type: 'text', text: JSON.stringify(geminiJson) }] }],
+        usage: { total_input_tokens: 10, total_output_tokens: 8, total_tokens: 18 },
       });
     }
     if (input.endsWith('/api/chat')) {
@@ -70,10 +72,48 @@ describe('provider interchangeability', () => {
 
     expect(fromGemini.metadata.provider).toBe('gemini');
     expect(fromOllama.metadata.provider).toBe('ollama');
-    expect(fromGemini.metadata.runtimePolicyVersion).toBe('v1');
-    expect(fromOllama.metadata.runtimePolicyVersion).toBe('v1');
+    expect(fromGemini.metadata.runtimePolicyVersion).toBe('v2');
+    expect(fromOllama.metadata.runtimePolicyVersion).toBe('v2');
     expect(fromGemini.metadata.schemaVersion).toBe('analysis-schema-v1');
     expect(fromGemini.metadata.promptVersion).toBe('analysis-v1');
+  });
+
+  it('both providers receive the SAME provider-native schema from the same zod schema', async () => {
+    const expected = { verdict: 'closed', entities: ['beta'], confidence: 0.9 };
+    const capturedBodies: Record<string, unknown> = {};
+    const mock = vi.fn().mockImplementation(async (input: string, init?: RequestInit) => {
+      capturedBodies[input] = JSON.parse(String(init?.body));
+      if (input.endsWith('/interactions')) {
+        return jsonResponse({
+          id: 'int_1',
+          status: 'completed',
+          steps: [{ type: 'model_output', content: [{ type: 'text', text: JSON.stringify(expected) }] }],
+        });
+      }
+      if (input.endsWith('/api/chat')) {
+        return jsonResponse({
+          model: 'shared-model',
+          message: { role: 'assistant', content: JSON.stringify(expected) },
+          done: true,
+          done_reason: 'stop',
+        });
+      }
+      throw new Error(`unexpected URL: ${input}`);
+    });
+    vi.stubGlobal('fetch', mock);
+
+    const runtime = createAiRuntime(testConfig({ provider: 'gemini' }));
+    await runtime.generateStructured(GENERIC_REQUEST, AnalysisV1);
+    const ollamaRuntime = createAiRuntime(testConfig({ provider: 'ollama' }));
+    await ollamaRuntime.generateStructured(GENERIC_REQUEST, AnalysisV1);
+
+    const expectedSchema = convertSchemaDocument(AnalysisV1).schema;
+    const geminiBody = capturedBodies['https://generativelanguage.googleapis.com/v1beta/interactions'] as Record<string, unknown>;
+    const ollamaBody = capturedBodies['http://localhost:11434/api/chat'] as Record<string, unknown>;
+
+    expect((geminiBody.response_format as Record<string, unknown>).schema).toEqual(expectedSchema);
+    expect(ollamaBody.format).toEqual(expectedSchema);
+    expect((geminiBody.response_format as Record<string, unknown>).schema).toEqual(ollamaBody.format);
   });
 
   it('consumers need zero provider-specific branches for execution behavior', async () => {
@@ -110,7 +150,8 @@ describe('provider interchangeability', () => {
   it('the factory builds providers deterministically and identically from a config', () => {
     const gemini = createLLMProvider(testConfig({ provider: 'gemini' }));
     const ollama = createLLMProvider(testConfig({ provider: 'ollama' }));
-    expect(gemini.capabilities).toEqual({ generate: true, generateStructured: true, healthCheck: true });
-    expect(ollama.capabilities).toEqual({ generate: true, generateStructured: true, healthCheck: true });
+    const structured = { structuredOutput: true, nativeJsonSchema: true };
+    expect(gemini.capabilities).toEqual({ generate: true, structured, healthCheck: true });
+    expect(ollama.capabilities).toEqual({ generate: true, structured, healthCheck: true });
   });
 });

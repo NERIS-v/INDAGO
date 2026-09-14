@@ -81,17 +81,17 @@ describe('SemanticSearchService', () => {
     expect(repository.lastQuery?.queryVector).toEqual(expectedVector);
   });
 
-  it('forwards caseId, limit (default 20), threshold and provider identity to the repository', async () => {
+  it('probes the repository with limit + 1 (overflow detection), forwards caseId, threshold and identity', async () => {
     await service.retrieve(await request());
     expect(repository.lastQuery?.caseId).toBe(caseId);
-    expect(repository.lastQuery?.limit).toBe(20);
+    expect(repository.lastQuery?.limit).toBe(21);
     expect(repository.lastQuery?.threshold).toBe(0);
     expect(repository.lastQuery?.providerIdentity).toEqual(provider.identity);
   });
 
-  it('honours request-level limit and threshold overrides', async () => {
+  it('honours request-level limit and threshold overrides (probing limit + 1)', async () => {
     await service.retrieve(await request({ limit: 1, threshold: 0.8 }));
-    expect(repository.lastQuery?.limit).toBe(1);
+    expect(repository.lastQuery?.limit).toBe(2);
     expect(repository.lastQuery?.threshold).toBe(0.8);
   });
 
@@ -116,11 +116,22 @@ describe('SemanticSearchService', () => {
     expect(temporal.queryHash).not.toBe(a.queryHash);
   });
 
-  it('marks the result truncated only when the limit was reached', async () => {
-    const full = await service.retrieve(await request());
-    expect(full.truncated).toBe(false);
-    const capped = await service.retrieve(await request({ limit: 2 }));
-    expect(capped.truncated).toBe(true);
+  it('reports truncated only on OBSERVED overflow — NOT an exactly-full result set', async () => {
+    // fewer than limit → not truncated
+    const partial = await service.retrieve(await request());
+    expect(partial.results).toHaveLength(2);
+    expect(partial.truncated).toBe(false);
+
+    // exactly limit matches exist → NOT truncated (the fixed boundary bug)
+    const exactly = await service.retrieve(await request({ limit: 2 }));
+    expect(exactly.results).toHaveLength(2);
+    expect(exactly.truncated).toBe(false);
+
+    // more than limit matches exist → truncated, returned count = limit
+    const overflowing = await service.retrieve(await request({ limit: 1 }));
+    expect(overflowing.results).toHaveLength(1);
+    expect(overflowing.truncated).toBe(true);
+    expect(overflowing.results[0]?.semanticTextUnitId).toBe(unitA);
   });
 
   it('returns an empty, non-truncated result for no hits', async () => {
