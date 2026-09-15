@@ -1,8 +1,10 @@
 # PR10 — Next-Best-Evidence / Evidence Utility & Selection: Contract Freeze
 
-> Phase 5A-PR10. **Status: FROZEN (Contract + Policy only).**
-> This document codifies the semantics a future PR10 implementer MUST build against.
-> It does **not** implement any runtime behavior.
+> Phase 5A-PR10. **FROZEN (Contract + Policy) — runtime now implemented.**
+> This document codifies the semantics the PR10 implementer MUST build against.
+> The corresponding runtime (deterministic, persistence-free pipeline + tests)
+> is implemented in `@indago/next-best-evidence`; see
+> [`docs/architecture/pr10-next-best-evidence.md`](./pr10-next-best-evidence.md).
 
 Baseline audit: [`docs/architecture/pr10-evidence-audit.md`](./pr10-evidence-audit.md).
 
@@ -312,20 +314,21 @@ phase1/phase2 fixtures, web `real-case-phase1.test.ts`.
 
 ## 15. Non-goals and future runtime requirements
 
-Not implemented here (must be built by the future PR10 pass, in dependency order):
+**Implemented** (dependency items 1–4) by `@indago/next-best-evidence`:
+utility calculator (## 6), candidate request generation bounded by
+`MAX_CANDIDATE_REQUESTS_CONSIDERED_PER_GAP`, discrimination-aware ranking per
+`rankOrder` (## 10, incl. the canonical-key final tiebreak made total and
+order-independent via rationale), and bounded selection surfaced with
+`truncated` (## 9).
 
-1. Utility **calculator** implementing the frozen formula (## 6).
-2. **Candidate request generation** for a gap (bounded by
-   `MAX_CANDIDATE_REQUESTS_CONSIDERED_PER_GAP`).
-3. **Discrimination-aware ranking** per `rankOrder` (## 10), including the
-   canonical-key final tiebreak.
-4. **Bounded selection** surfaced with `truncated` (## 9).
-5. **Persistence / store** minting real `EvidenceRequestId`s (## 12).
-6. **Lifecycle + authorization** (draft → authorized/acquired → reuse) —
+Still not implemented by this pass (must be built by future PRs, in dependency order):
+
+1. **Persistence / store** minting real `EvidenceRequestId`s (## 12).
+2. **Lifecycle + authorization** (draft → authorized/acquired → reuse) —
    explicitly out of the selection snapshot.
-7. **Intelligence API** exposing selection to the platform.
-8. **Web integration** for proposing/accepting evidence requests.
-9. **Resolution Rate@K evaluation harness** to validate the frozen weighing.
+3. **Intelligence API** exposing selection to the platform.
+4. **Web integration** for proposing/accepting evidence requests.
+5. **Resolution Rate@K evaluation harness** to validate the frozen weighing.
 
 Documented follow-ups carried by this freeze: PR8 **reference validation** for
 the new `RecommendedEvidenceSchema.discriminatesAmongIds`
