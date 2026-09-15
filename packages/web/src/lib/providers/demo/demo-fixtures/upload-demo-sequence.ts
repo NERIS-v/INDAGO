@@ -94,7 +94,7 @@ const ownershipHole: GraphHole = {
   significance: 0.7,
   description:
     "Meridian Transit Pvt Ltd has no resolved ownership record — beneficial owner unconfirmed.",
-  suggestedEvidenceTypes: ["ROC/MCA filing", "registered-agent record"],
+  suggestedEvidenceTypes: ["RECORD"],
   detectedAt: obs("2024-06-18", "12:05:00"),
 };
 
