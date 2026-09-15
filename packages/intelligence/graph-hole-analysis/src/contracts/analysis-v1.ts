@@ -28,6 +28,7 @@
 import { z } from 'zod';
 
 import { GRAPH_HOLE_ANALYSIS_SCHEMA_VERSION } from './analysis-policy.js';
+import { EvidenceTypeSchema } from '@indago/contracts';
 
 // ============================================================================
 // Reference id shapes (into the supplied context)
@@ -233,14 +234,29 @@ export const ReasoningStepSchema = z.object({
 }).strict();
 export type ReasoningStep = z.infer<typeof ReasoningStepSchema>;
 
-/** One recommended evidence request grounded in the supplied context. */
+/**
+ * One recommended evidence request grounded in the supplied context.
+ *
+ * PR10 FREEZE (F1, F3):
+ *   - `evidenceType` uses the authoritative canonical EvidenceTypeSchema
+ *     vocabulary (domain/evidence.ts). A free-form descriptive subtype is NOT
+ *     an evidence type; specificity lives in `rationale`.
+ *   - `discriminatesAmongIds` names the explicitly considered competing
+ *     explanations this request would help distinguish. References are
+ *     atomic-hypothesis derivedIds into the supplied bounded context
+ *     (never free text). The recommendation is LLM-PROPOSED and NOT
+ *     authoritative; PR8 reference-validates the analysis references, and the
+ *     PR10 selector decides deterministically.
+ */
 export const RecommendedEvidenceSchema = z.object({
-  evidenceType: z.string()
-    .describe('Recommended evidence/artifact category (open-ended, matches repository evidence vocabulary).'),
+  evidenceType: EvidenceTypeSchema
+    .describe('Canonical evidence/artifact type (EvidenceTypeSchema — authoritative PR10 vocabulary).'),
   rationale: z.string()
     .describe('Short rationale for the recommendation.'),
   supportingObservationIds: z.array(analysisObservationIdRef())
     .describe('Observations from the supplied context that motivate this recommendation (sorted).'),
+  discriminatesAmongIds: z.array(analysisHypothesisIdRef()).optional()
+    .describe('Atomic-hypothesis derivedIds (from the supplied context) this recommendation would help distinguish — the discrimination target (sorted, deduped). PR10 freeze.'),
 }).strict();
 export type RecommendedEvidence = z.infer<typeof RecommendedEvidenceSchema>;
 

@@ -193,7 +193,7 @@ describe('reference existence', () => {
     const result = validateGraphHoleAnalysis(
       validResult(b, {
         recommendedEvidence: [
-          { evidenceType: 'records', rationale: 'r', supportingObservationIds: ['00000000-0000-4b7f-0000-0000000000bb'] },
+          { evidenceType: 'RECORD', rationale: 'r', supportingObservationIds: ['00000000-0000-4b7f-0000-0000000000bb'] },
         ],
       }),
       b.context,

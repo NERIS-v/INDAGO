@@ -507,9 +507,8 @@ function buildHole(): GraphHole {
     description:
       "No edge connects the WJA internal security function to the people surrounding the Wheeler homicide; whether that function may have provided an information/operational pathway is the missing schedule edge this Phase-1 analysis asks Phase 2 to resolve.",
     suggestedEvidenceTypes: [
-      "company operational records",
-      "purchase or expense records",
-      "travel and activity records",
+      "RECORD",
+      "FINANCIAL",
     ],
     detectedAt: obs("2024-07-01"),
   };

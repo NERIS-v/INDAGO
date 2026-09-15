@@ -165,7 +165,7 @@ describe("PASS 2 Phase-1 derivation — derived artifacts cross-reference", () =
     expect(hole.expectedEdgeType).toBe("case-link");
     expect(hole.significance).toBe(0.75);
     expect(hole.suggestedEvidenceTypes).toEqual(
-      expect.arrayContaining(["company operational records", "purchase or expense records", "travel and activity records"]),
+      expect.arrayContaining(["RECORD", "FINANCIAL"]),
     );
     expect(hole.id).toBe(HOLE_B3);
     expect(hole.caseId).toBe(CASE_B_ID);

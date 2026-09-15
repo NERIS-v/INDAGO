@@ -582,7 +582,7 @@ const holesA: GraphHole[] = [
     nodeIds: [GN_A_SOCTF, GN_A_FBI], expectedEdgeType: "communication",
     significance: 0.65,
     description: "No edge documents the response (or non-response) to the January 1976 request between CT SOCTF and FBI Boston.",
-    suggestedEvidenceTypes: ["federal response letter", "task force routing record"],
+    suggestedEvidenceTypes: ["RECORD"],
     detectedAt: obs("2024-07-01"),
   },
   {
@@ -592,7 +592,7 @@ const holesA: GraphHole[] = [
     nodeIds: [GN_A_RICO, GN_A_WJA], expectedEdgeType: "organizational",
     significance: 0.6,
     description: "The temporal scope of Rico's WJA security consultancy is not bounded by the available evidence.",
-    suggestedEvidenceTypes: ["WJA employment records", "contract or payroll document"],
+    suggestedEvidenceTypes: ["RECORD", "DOCUMENT"],
     detectedAt: obs("2024-07-01"),
   },
 ];

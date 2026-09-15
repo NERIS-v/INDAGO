@@ -572,7 +572,7 @@ const holesB: GraphHole[] = [
     nodeIds: [GN_B_WHEELER], expectedEdgeType: "case-link",
     significance: 0.8,
     description: "No edge connects Wheeler to a responsible party. The graph shows the victim and organizational context but no assailant.",
-    suggestedEvidenceTypes: ["surveillance testimony", "confession", "forensic linkage"],
+    suggestedEvidenceTypes: ["TESTIMONY", "DIGITAL"],
     detectedAt: obs("2024-07-01"),
   },
   {
@@ -582,7 +582,7 @@ const holesB: GraphHole[] = [
     nodeIds: [GN_B_FBI], expectedEdgeType: "communication",
     significance: 0.6,
     description: "FBI Boston is an isolated node with no edges. The congressional report references FBI stonewalling but provides no structural link to the Tulsa investigation.",
-    suggestedEvidenceTypes: ["FBI cooperation records", "inter-agency communication"],
+    suggestedEvidenceTypes: ["RECORD", "COMMUNICATION"],
     detectedAt: obs("2024-07-01"),
   },
   {
@@ -592,7 +592,7 @@ const holesB: GraphHole[] = [
     nodeIds: [GN_B_RICO, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.7,
     description: "No edge connects H. Paul Rico to the unidentified hitman. Whether Rico arranged or coordinated the gunman who killed Wheeler is the unestablished link between the operation and the shooter.",
-    suggestedEvidenceTypes: ["homicide investigation records", "witness testimony", "confession"],
+    suggestedEvidenceTypes: ["RECORD", "TESTIMONY"],
     detectedAt: obs("2024-07-01"),
   },
   {
@@ -602,7 +602,7 @@ const holesB: GraphHole[] = [
     nodeIds: [GN_B_CALLAHAN, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.72,
     description: "No edge connects WJA security director Jack Callahan to the unidentified hitman — the security-and-murder link the demo narrative raises: whether the security apparatus sourced, scheduled, or shielded the people who killed Wheeler.",
-    suggestedEvidenceTypes: ["employment records", "travel and activity records", "witness testimony"],
+    suggestedEvidenceTypes: ["RECORD", "TESTIMONY"],
     detectedAt: obs("2024-07-01"),
   },
   {
@@ -612,7 +612,7 @@ const holesB: GraphHole[] = [
     nodeIds: [GN_B_WINTER_HILL, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.68,
     description: "No edge connects Winter Hill Gang to the unidentified hitman. The July 1981 tip ties the murder to a Winter Hill / WJA matter, but the gang↔shooter link is unestablished.",
-    suggestedEvidenceTypes: ["homicide investigation records", "confession", "witness testimony"],
+    suggestedEvidenceTypes: ["RECORD", "TESTIMONY"],
     detectedAt: obs("2024-07-01"),
   },
   {
@@ -622,7 +622,7 @@ const holesB: GraphHole[] = [
     nodeIds: [GN_B_SHC, GN_B_HITMAN], expectedEdgeType: "case-link",
     significance: 0.66,
     description: "No edge connects Southern Hills Country Club (the scheduling context) to the shooter. Who at the club or in the security orbit knew Wheeler's golf schedule the gunman relied on is unresolved.",
-    suggestedEvidenceTypes: ["membership and schedule records", "witness testimony"],
+    suggestedEvidenceTypes: ["RECORD", "TESTIMONY"],
     detectedAt: obs("2024-07-01"),
   },
 ];

@@ -710,9 +710,8 @@ function buildHole(): GraphHole {
     description:
       "The motive hole: the graph can show access (which organizations touch the operation), but it cannot yet show purpose (who benefits from the killing of the owner). No candidate motive-context edge connects the company's financial operation to a motive for the homicide — the sealed WJA audit / financial record (S1) is the discriminator that would break the H1/H2 fork.",
     suggestedEvidenceTypes: [
-      "corporate audit records",
-      "financial records",
-      "Connecticut Special Revenue files",
+      "RECORD",
+      "FINANCIAL",
     ],
     detectedAt: PRE_ANALYSIS_AT,
   };

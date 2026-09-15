@@ -9,6 +9,7 @@ import {
 import { StructuralSignalSchema } from '../common/confidence.js';
 import { ObservedTimeSchema } from '../common/timestamps.js';
 import { RelationTypeSchema } from '../domain/relation.js';
+import { EvidenceTypeSchema } from '../domain/evidence.js';
 import { MetadataSchema } from '../common/metadata.js';
 import { DETECTION_POLICY_VERSION } from './graph-hole-policy.js';
 
@@ -85,8 +86,8 @@ export const GraphHoleSchema = z.object({
     .describe('How significant this hole is in the graph topology'),
   description: z.string()
     .describe('Human-readable description of the hole'),
-  suggestedEvidenceTypes: z.array(z.string()).optional()
-    .describe('Evidence types that might fill this hole'),
+  suggestedEvidenceTypes: z.array(EvidenceTypeSchema).optional()
+    .describe('Canonical evidence types (EvidenceTypeSchema) that might fill this hole — authoritative PR10 vocabulary.'),
   detectionPolicyVersion: z.literal(DETECTION_POLICY_VERSION)
     .optional()
     .describe('Detection policy version consumed to produce this candidate'),
