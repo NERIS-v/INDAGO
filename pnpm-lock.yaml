@@ -165,6 +165,22 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
+  packages/intelligence/graph-hole-reassessment:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
   packages/intelligence/graph-hole-region:
     dependencies:
       '@indago/contracts':
@@ -303,6 +319,34 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
+  packages/intelligence/next-best-evidence:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@indago/graph-hole-analysis':
+        specifier: workspace:*
+        version: link:../graph-hole-analysis
+      '@indago/graph-hole-judge':
+        specifier: workspace:*
+        version: link:../graph-hole-judge
+      '@indago/graph-hole-qualification':
+        specifier: workspace:*
+        version: link:../graph-hole-qualification
+      '@indago/graph-hole-validation':
+        specifier: workspace:*
+        version: link:../graph-hole-validation
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
   packages/intelligence/relation-resolution:
     dependencies:
       '@indago/contracts':
@@ -324,6 +368,28 @@ importers:
       '@indago/contracts':
         specifier: workspace:*
         version: link:../../contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
+  packages/intelligence/targeted-reblocking:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@indago/graph-hole-region':
+        specifier: workspace:*
+        version: link:../graph-hole-region
+      '@indago/ingestion':
+        specifier: workspace:*
+        version: link:../ingestion
     devDependencies:
       '@types/node':
         specifier: ^26.2.0
@@ -367,6 +433,9 @@ importers:
       '@indago/semantic-retrieval':
         specifier: workspace:*
         version: link:../intelligence/semantic-retrieval
+      '@indago/targeted-reblocking':
+        specifier: workspace:*
+        version: link:../intelligence/targeted-reblocking
       '@prisma/client':
         specifier: ^5.10.0
         version: 5.22.0(prisma@5.22.0)
