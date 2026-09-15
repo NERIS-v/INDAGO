@@ -78,6 +78,8 @@ export * from './intelligence/evidence-submission.js';
 export * from './intelligence/upload-router.js';
 export * from './intelligence/ingestion-job-payload.js';
 export * from './intelligence/normalization.js';
+export * from './intelligence/targeted-reblock.js';
+export * from './intelligence/reassessment.js';
 
 // Execution contracts
 export * from './execution/investigation-run.js';

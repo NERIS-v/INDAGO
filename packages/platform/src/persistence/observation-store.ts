@@ -274,6 +274,29 @@ export class ObservationStore {
   }
 
   /**
+   * Read seam — observations whose persisted Json `entityIds` intersects ANY
+   * of the given ids (DB-level `array_contains`). Case + investigation scoped
+   * so a cross-case entity id can never leak into the result. Used by the
+   * targeted-reblocking pipeline to resolve region node touch observations
+   * from the durable region record (PR11).
+   */
+  async listByEntityIds(
+    entityIds: readonly string[],
+    filter: { investigationId: string; caseId: string },
+  ): Promise<Observation[]> {
+    if (entityIds.length === 0) return [];
+    const rows = await this.prisma.observation.findMany({
+      where: {
+        caseId: filter.caseId,
+        investigationId: filter.investigationId,
+        entityIds: { array_contains: [...entityIds] },
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row) => this.rowToObservation(row));
+  }
+
+  /**
    * Read seam — list Evidence rows within authorization boundaries. Mirrors
    * listObservations: caseId is resolved SERVER-SIDE by the caller routes.
    * Returns the documented EvidenceProjection shape (never fabricated into the
