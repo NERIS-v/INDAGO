@@ -53,7 +53,7 @@ const validHole = {
   expectedEdgeType: 'communication',
   significance: 0.8,
   description: 'No edge documents the response to the request.',
-  suggestedEvidenceTypes: ['federal response letter'],
+  suggestedEvidenceTypes: ['RECORD'],
   detectionPolicyVersion: 'v1',
   detectedAt: OBSERVED_AT,
 } as const;

@@ -128,7 +128,7 @@ export function validAnalysis(base: ReturnType<typeof buildBaseScenario>) {
     ],
     recommendedEvidence: [
       {
-        evidenceType: 'communication-records',
+        evidenceType: 'COMMUNICATION',
         rationale: 'Direct records would confirm or rule out the expected contact.',
         supportingObservationIds: [OBS_2],
       },
