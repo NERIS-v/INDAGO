@@ -34,6 +34,8 @@ export type { GraphHoleAnalysisErrorCode } from './errors/analysis-error.js';
 // Schema (for downstream consumers / tests wanting to parse/validate).
 export { GraphHoleAnalysisV1Schema } from './contracts/analysis-v1.js';
 export { GraphHoleAnalysisSchemaStampSchema } from './contracts/analysis-v1.js';
+export { RecommendedEvidenceSchema } from './contracts/analysis-v1.js';
+export type { RecommendedEvidence } from './contracts/analysis-v1.js';
 
 // Canonical serializer (for downstream validators reconstructing the profile).
 export { canonicalStringify } from './context/serialize.js';
