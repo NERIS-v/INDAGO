@@ -1035,6 +1035,36 @@ model GraphHoleRegionAnalysis {
 }
 
 // ============================================================================
+// P-TR-1: Durable TargetedReblockRun (Phase 5A-PR11)
+//
+// One authoritative row per targeted reblock execution identity. Stores only
+// the bounded run facts (identity, accounting, counts, provenance) — never the
+// candidate graph (the run identity content-addresses the selected candidates).
+// runId = SHA-256 hex of identityKey; the DB unique constraint is the
+// duplicate-prevention mechanism, never SELECT-then-INSERT.
+// ============================================================================
+model TargetedReblockRun {
+  id                  String   @id @default(uuid()) // record id (domain id = runId hex)
+  runId               String   @unique // SHA-256 hex of the canonical run identity
+  identityKey         String   @unique // canonical run identity string — exact-dedup guard
+  caseId              String
+  investigationId     String?
+  graphVersionId      String
+  regionId            String // producing region.regionId (targeted scope)
+  regionPolicyVersion String // GRAPH_HOLE_POLICY_VERSION of the persisted region
+  policyVersion       String   @default("v1") // TARGETED_REBLOCK_POLICY_VERSION
+  requestedAt         DateTime // clock-resolved run request time
+  accounting          Json // TargetedReblockAccountingSchema
+  counts              Json // TargetedReblockCountsSchema
+  provenance          Json // TargetedReblockProvenanceSchema
+  truncated           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  @@index([caseId, graphVersionId])
+  @@index([regionId])
+}
+
+// ============================================================================
 // P-GH-2: Durable GraphHole (authoritative current intelligence finding)
 // ============================================================================
 model GraphHole {
@@ -1131,5 +1161,89 @@ model GraphHoleAssessment {
 
   @@unique([graphHoleId, sequence])
   @@index([graphHoleId])
+  @@index([caseId])
+}
+
+// ============================================================================
+// Phase 5A-PR12 — Incremental Graph-Hole Reassessment (ordered change ledger)
+//
+// One durable row per authoritative change that may affect graph-hole
+// intelligence. `changeId` is the deterministic SHA-256 of the canonical change
+// identity (canonicalizeReassessmentChangeIdentity) and is UNIQUE — the DB
+// constraint, not SELECT-then-INSERT, is the duplicate-prevention mechanism
+// (duplicate publication / crash-then-rerun is an idempotent no-op).
+//
+// `sequence` is a per-case monotonic order allocated under a transaction-scoped
+// PostgreSQL advisory lock (mirroring GraphVersion allocation). The worker
+// drains PENDING changes in canonical sequence order, coalesces deterministically,
+// resolves the affected set, executes the plan, records the per-change outcome,
+// and advances the per-case CaseReassessmentCursor. A change whose own
+// processing partially/fully failed is recorded PARTIAL/FAILED before the cursor
+// advances — the cursor never claims failed work was fully applied. FAILED is
+// terminal for a changeId (a fresh REASSESSMENT_REQUESTED may re-open it).
+//
+// No FK is declared (caseId / graphVersionId are plain indexed columns),
+// consistent with the rest of the schema's no-FK decoupling doctrine.
+// ============================================================================
+model CaseReassessmentChange {
+  id                   String    @id @default(uuid())
+  caseId               String
+  graphVersionId       String? // the ACTIVE version the change was evaluated on
+  sequence             Int // per-case monotonic (max+1, advisory-locked)
+  changeId             String    @unique // deterministic change identity — dedup guard
+  trigger              Json // ReassessmentTriggerSchema (zod-validated)
+  effectClass          String // EVIDENCE_AFFECTING | GRAPH_AFFECTING | MANUAL_REASSESSMENT
+  status               String    @default("PENDING") // PENDING | COMPLETED | PARTIAL | FAILED | SKIPPED
+  attemptCount         Int       @default(0)
+  failureReason        String?
+  processedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([caseId, sequence])
+  @@index([caseId, sequence])
+  @@index([caseId, status])
+  @@index([graphVersionId])
+}
+
+// ============================================================================
+// PR12 — per-case reassessment watermark
+//
+// `lastProcessedSequence` names the highest change sequence fully accounted.
+// TemporalStateChange.sequence is per (caseId, entityType, entityId) and is NOT
+// an acceptable global cursor — this dedicated per-case cursor is authoritative.
+// ============================================================================
+model CaseReassessmentCursor {
+  caseId                  String   @id
+  lastProcessedSequence   Int      @default(0)
+  updatedAt               DateTime @updatedAt
+  policyVersion           String   @default("v1") // PR12_REASSESSMENT_POLICY_VERSION
+}
+
+// ============================================================================
+// PR12 — per-change reassessment run outcome (append-only audit)
+//
+// One row per COMPLETED/PARTIAL run executing an incremental reassessment plan
+// for a change. runId is a deterministic UUID; the row records the frozen
+// IncrementalReassessmentRun envelope (affectedSet, plan, regionResults,
+// accounting, status) plus the per-case sequences it covered (cursorBefore/
+// cursorAfter) for exact auditability.
+// ============================================================================
+model ReassessmentRun {
+  id                 String   @id @default(uuid())
+  runId              String   @unique
+  caseId             String
+  investigationId    String?
+  changeId           String
+  sequence           Int // the change sequence this run accounts for
+  graphVersionId     String
+  policyVersion      String   @default("v1")
+  envelope           Json // IncrementalReassessmentRunSchema (zod-validated)
+  cursorBefore       Int
+  cursorAfter        Int
+  createdAt          DateTime @default(now())
+
+  @@index([caseId, sequence])
+  @@index([changeId])
   @@index([caseId])
 }
