@@ -282,8 +282,8 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [ ] Generate competing explanations `[Mayur]`
 - [ ] Detect when an ER split could explain a graph hole `[Mayur]`
 - 🔵 [ ] Targeted reblocking `[Mayur]` — selectively generate candidate pairs around a suspicious candidate/entity/evidence region after downstream analysis suggests a missed match; **NOT** an O(N²) all-candidate sweep; preserve case isolation, deterministic identity, pair-level idempotency, bounded computation, auditability
-- 🟡 [ ] Generate candidate evidence requests `[Mayur]` — web/demo lifecycle exists (`buildEvidenceRequest`, evidence-request fixtures) + `EvidenceRequestSchema`; backend generation absent — NOT milestone completion
-- 🟡 [ ] Calculate normalized evidence utility `[Mayur]` — web NBE mock (`netUtility` card) + `ExpectedInformationGainSchema` contract; no utility algorithm — NOT milestone completion
+- 🟡 [ ] Generate candidate evidence requests `[Mayur]` — web/demo lifecycle exists (`buildEvidenceRequest`, evidence-request fixtures) + `EvidenceRequestSchema`; backend generation absent — NOT milestone completion. 🔵 PR10 contract freeze landed 2026-09-15 (`docs/architecture/pr10-evidence-policy.md`): candidate/generation contracts + selection bounds frozen
+- 🟡 [ ] Calculate normalized evidence utility `[Mayur]` — web NBE mock (`netUtility` card) + `ExpectedInformationGainSchema` contract; no utility algorithm — NOT milestone completion. 🔵 PR10 freeze 2026-09-15: `EVIDENCE_UTILITY_POLICY_V1` formula/weights/semantics frozen (`docs/architecture/pr10-evidence-policy.md`)
 - [ ] Implement Evidence Resolution Rate@K evaluation `[Mayur]`
 - [ ] Add evidence-independence tracking `[Mayur]`
 
