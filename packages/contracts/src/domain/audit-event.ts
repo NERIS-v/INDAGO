@@ -61,6 +61,7 @@ export const AuditActionSchema = z.enum([
   'ENTITY_MENTION_EXTRACTED',
   'CANDIDATE_PAIR_GENERATED',
   'ENTITY_RESOLUTION_PROPOSED',
+  'TARGETED_REBLOCK_COMPLETED',
   'RUN_PAUSED',
   'RUN_RESUMED',
   'REVIEW_REQUIRED_ENTERED',
@@ -88,6 +89,7 @@ export const AuditEventSchema = z.object({
     'INVESTIGATION',
     'COMPARISON',
     'CANDIDATE_PAIR',
+    'REBLOCK_RUN',
     'SYSTEM',
   ]),
   targetId: z.string().min(1)

@@ -15,6 +15,12 @@ import { GraphNodeTypeSchema } from '../graph/graph-node.js';
 import { GraphAnalysisTypeSchema } from '../graph/graph-analysis.js';
 import { StructuralSignalSchema } from '../common/confidence.js';
 import { GraphHoleTypeSchema, GraphHoleCandidateIdSchema } from '../intelligence/graph-holes.js';
+import {
+  ReassessmentChangeIdSchema,
+  REASSESSMENT_POLICY_VERSION,
+  ReassessmentOutcomeSchema,
+  ReassessmentRegionIdSchema,
+} from '../intelligence/reassessment.js';
 
 // ============================================================================
 // Graph Events
@@ -127,6 +133,36 @@ export const GraphHoleDetectedEventSchema = BaseEventSchema.extend({
   payload: GraphHoleDetectedPayloadSchema,
 }).strict();
 
+// ----------------------------------------------------------------------------
+// Graph-Hole Reassessed (Phase 5A-PR12)
+//
+// Represents a COMPLETED incremental reassessment semantic outcome. It never
+// implies a canonical graph mutation unless one actually happened through the
+// appropriate authority path, and it NEVER retriggers PR12 by itself.
+// ----------------------------------------------------------------------------
+
+export const GraphHoleReassessedPayloadSchema = z.object({
+  changeId: ReassessmentChangeIdSchema
+    .describe('Deterministic id of the authoritative change that drove the reassessment.'),
+  caseId: CaseIdSchema,
+  graphVersionId: GraphVersionIdSchema
+    .describe('Single authoritative version the reassessment was evaluated against.'),
+  regionId: ReassessmentRegionIdSchema
+    .describe('Content-addressed region reassessed (a graph-affecting reassessment may have derived a new id).'),
+  candidateId: GraphHoleCandidateIdSchema.optional()
+    .describe('Candidate reassessed, when a candidate was evaluated.'),
+  outcome: ReassessmentOutcomeSchema
+    .describe('Deterministic lifecycle conclusion (STRENGTHENED / WEAKENED / RESOLVED / CONTRADICTED / SUPERSEDED).'),
+  policyVersion: z.literal(REASSESSMENT_POLICY_VERSION),
+  assessmentsAppended: z.number().int().nonnegative(),
+}).strict();
+export type GraphHoleReassessedPayload = z.infer<typeof GraphHoleReassessedPayloadSchema>;
+
+export const GraphHoleReassessedEventSchema = BaseEventSchema.extend({
+  eventType: z.literal('GRAPH_HOLE_REASSESSED'),
+  payload: GraphHoleReassessedPayloadSchema,
+}).strict();
+
 export const GraphEventSchema = z.discriminatedUnion('eventType', [
   GraphVersionCreatedEventSchema,
   GraphNodeAddedEventSchema,
@@ -135,5 +171,6 @@ export const GraphEventSchema = z.discriminatedUnion('eventType', [
   GraphEdgeRemovedEventSchema,
   GraphAnalysisCompletedEventSchema,
   GraphHoleDetectedEventSchema,
+  GraphHoleReassessedEventSchema,
 ]);
 export type GraphEvent = z.infer<typeof GraphEventSchema>;
