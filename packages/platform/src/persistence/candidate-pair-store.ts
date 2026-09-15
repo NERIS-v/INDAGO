@@ -101,6 +101,28 @@ export class CandidatePairStore {
     return rows.map((row) => this.rowToPair(row));
   }
 
+  /**
+   * Read seam — fetch a bounded set of pairs by deterministic id, case-scoped.
+   * Mirrors EntityMentionStore.findByIds (200-cap). Used by the targeted
+   * reblock pipeline to hand a run's bounded pair set to the M-A09 boundary.
+   */
+  async findByIds(
+    ids: readonly string[],
+    filter: { investigationId: string; caseId: string },
+  ): Promise<CandidatePair[]> {
+    if (ids.length === 0) return [];
+    const bounded = [...ids].slice(0, 200);
+    const rows = await this.prisma.candidatePair.findMany({
+      where: {
+        id: { in: bounded },
+        caseId: filter.caseId,
+        investigationId: filter.investigationId,
+      },
+      orderBy: [{ id: "asc" }],
+    });
+    return rows.map((row) => this.rowToPair(row));
+  }
+
   private rowToPair(row: CandidatePairRow): CandidatePair {
     const passes = (row.blockingPasses as unknown as unknown[]).map((p) =>
       BlockingPassSchema.parse(p),

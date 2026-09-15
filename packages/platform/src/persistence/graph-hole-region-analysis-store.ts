@@ -227,6 +227,30 @@ export class GraphHoleRegionAnalysisStore {
     });
     return row ? toRecord(row) : null;
   }
+
+  /**
+   * Equivalent-analysis lookup by the persisted composite identity WITHOUT a
+   * semantic-retrieval filter. PR11 region references carry only the graph-hole
+   * policy version, so this lookup is keyed on the @@unique composite identity
+   * [regionId, caseId, graphVersionId, regionPolicyVersion] — the same durable
+   * identity PR6 guarantees never repeats.
+   */
+  async findCompletedByRegionIdAndPolicy(input: {
+    readonly caseId: string;
+    readonly graphVersionId: string;
+    readonly regionId: string;
+    readonly regionPolicyVersion: string;
+  }): Promise<RegionAnalysisRecord | null> {
+    const row = await this.prisma.graphHoleRegionAnalysis.findFirst({
+      where: {
+        caseId: input.caseId,
+        graphVersionId: input.graphVersionId,
+        regionId: input.regionId,
+        regionPolicyVersion: input.regionPolicyVersion,
+      },
+    });
+    return row ? toRecord(row) : null;
+  }
 }
 
 /** Convenience singleton bound to the platform Prisma client. */
