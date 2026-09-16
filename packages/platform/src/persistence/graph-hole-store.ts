@@ -101,6 +101,7 @@ export interface GraphHoleAssessmentRecord {
   readonly scoringPolicyVersion: string;
   readonly qualificationPolicyVersion: string;
   readonly snapshot: unknown;
+  readonly contextSha256: string | null;
   readonly reason: string | null;
   readonly createdAt: Date;
 }
@@ -114,6 +115,8 @@ export interface PersistGraphHoleInput {
   readonly assessmentType?: 'QUALIFICATION' | 'REASSESSMENT';
   /** Lineage: graphHoleId (same case) of the prior-version record to supersede. */
   readonly supersedesGraphHoleId?: string;
+  /** Bounded analysis context digest (PR12 AI-skip gate); stored on the assessment. */
+  readonly contextSha256?: string;
   readonly reason?: string;
 }
 
@@ -183,6 +186,7 @@ function toAssessmentRecord(row: AssessmentRow): GraphHoleAssessmentRecord {
     scoringPolicyVersion: row.scoringPolicyVersion,
     qualificationPolicyVersion: row.qualificationPolicyVersion,
     snapshot: row.snapshot,
+    contextSha256: row.contextSha256 ?? null,
     reason: row.reason,
     createdAt: row.createdAt,
   };
@@ -399,6 +403,7 @@ export class GraphHoleStore {
           scoringPolicyVersion: qualification.scoringPolicyVersion,
           qualificationPolicyVersion: GRAPH_HOLE_POLICY_VERSION,
           snapshot: qualification as unknown as Prisma.InputJsonValue,
+          contextSha256: input.contextSha256 ?? null,
           reason: input.reason ?? (created ? null : 'reassessed'),
         },
       );
@@ -553,6 +558,68 @@ export class GraphHoleStore {
     return row ? toGraphHoleRecord(row) : null;
   }
 
+  /**
+   * Bounded, case-scoped ACTIVE-hole listing (deterministic order: createdAt
+   * asc, then id asc). PR6's "no case-wide scans" convention is preserved by
+   * the hard `take` bound — consumers (PR12 affected-set resolution) always
+   * combine this with a per-region/per-candidate filter, never the inverse.
+   */
+  async listActiveByCase(
+    caseId: string,
+    options: { limit: number; status?: readonly GraphHolePersistenceStatus[] },
+  ): Promise<readonly GraphHoleRecord[]> {
+    const statuses = options.status ?? ['ACTIVE'];
+    const rows = await this.prisma.graphHole.findMany({
+      where: { caseId, status: { in: [...statuses] } },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: options.limit,
+    });
+    return rows.map(toGraphHoleRecord);
+  }
+
+  /** Case-scoped holes bound to ONE region (supersession/affected-candidate targets). */
+  async listByRegionId(input: {
+    readonly caseId: string;
+    readonly regionId: string;
+    readonly status?: readonly GraphHolePersistenceStatus[];
+  }): Promise<readonly GraphHoleRecord[]> {
+    const statuses = input.status ?? ['ACTIVE'];
+    const rows = await this.prisma.graphHole.findMany({
+      where: {
+        caseId: input.caseId,
+        regionId: input.regionId,
+        status: { in: [...statuses] },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    return rows.map(toGraphHoleRecord);
+  }
+
+  /**
+   * supportingHypothesisIds per hole (from the detector contributions) —
+   * the PR12 affected-set resolver's manual-scope hypothesis fan-out. Bounded
+   * by the supplied graphHoleIds; case-scoped.
+   */
+  async supportingHypothesisIdsByHole(
+    caseId: string,
+    graphHoleIds: readonly string[],
+  ): Promise<ReadonlyMap<string, readonly string[]>> {
+    const result = new Map<string, readonly string[]>();
+    if (graphHoleIds.length === 0) return result;
+    const rows = await this.prisma.graphHoleDetectorContribution.findMany({
+      where: {
+        caseId,
+        graphHoleId: { in: [...graphHoleIds] },
+      },
+      select: { graphHoleId: true, supportingHypothesisIds: true },
+    });
+    for (const row of rows) {
+      const ids = row.supportingHypothesisIds as unknown as readonly string[];
+      result.set(row.graphHoleId, [...ids].sort());
+    }
+    return result;
+  }
+
   /** Append-only assessment history for one GraphHole, oldest first. */
   async listAssessments(input: {
     readonly caseId: string;
@@ -611,6 +678,7 @@ export class GraphHoleStore {
       scoringPolicyVersion: string;
       qualificationPolicyVersion: string;
       snapshot: Prisma.InputJsonValue;
+      contextSha256?: string | null;
       reason: string | null;
     },
   ): Promise<GraphHoleAssessmentRecord> {
@@ -626,6 +694,7 @@ export class GraphHoleStore {
       scoringPolicyVersion: data.scoringPolicyVersion,
       qualificationPolicyVersion: data.qualificationPolicyVersion,
       snapshot: data.snapshot,
+      contextSha256: data.contextSha256 ?? null,
       reason: data.reason,
     };
     try {

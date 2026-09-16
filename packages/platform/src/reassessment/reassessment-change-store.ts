@@ -31,12 +31,12 @@
 // ============================================================================
 
 import type { PrismaClient } from '@prisma/client';
-import type { PrismaClient } from '@prisma/client';
 import type { Prisma as PrismaTypes } from '@prisma/client';
 import {
   PR12_REASSESSMENT_POLICY_VERSION,
   deriveReassessmentEffectClass,
-  type EffectClass,
+  ReassessmentTriggerSchema,
+  type ReassessmentEffectClass,
   type ReassessmentTrigger,
 } from '@indago/contracts';
 import { db } from '../db/prisma.js';
@@ -59,7 +59,7 @@ export interface ReassessmentChangeRecord {
   readonly sequence: number;
   readonly changeId: string;
   readonly trigger: ReassessmentTrigger;
-  readonly effectClass: EffectClass;
+  readonly effectClass: ReassessmentEffectClass;
   readonly status: ReassessmentChangeStatus;
   readonly attemptCount: number;
   readonly failureReason: string | null;
@@ -79,6 +79,8 @@ export interface PublishCaseChangeInput {
   readonly caseId: string;
   readonly trigger: ReassessmentTrigger;
   readonly graphVersionId: string | null;
+  /** Deterministic SHA-256 of the canonical change identity (computedAt EXCLUDED). */
+  readonly changeId: string;
 }
 
 export interface PublishCaseChangeResult {
@@ -122,8 +124,8 @@ function decodeChange(row: {
 }): ReassessmentChangeRecord {
   return {
     ...row,
-    trigger: ReassessmentTrigger.parse(row.trigger),
-    effectClass: row.effectClass as EffectClass,
+    trigger: ReassessmentTriggerSchema.parse(row.trigger),
+    effectClass: row.effectClass as ReassessmentEffectClass,
     status: row.status as ReassessmentChangeStatus,
   };
 }

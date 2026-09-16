@@ -251,6 +251,30 @@ export class GraphHoleRegionAnalysisStore {
     });
     return row ? toRecord(row) : null;
   }
+
+  /**
+   * Bounded, case-scoped region listing for PR12 impacted-region resolution:
+   * the LATEST analysis record per DISTINCT regionId (a regionId is content-
+   * addressed, so one row per (regionId, graphVersionId, policies) — newest
+   * analyzedAt wins). Deterministic order: analyzedAt asc. Never a case-wide
+   * scan — hard `take` bound, and consumers immediately filter by the resolved
+   * affected region set.
+   */
+  async listLatestRegionsByCase(
+    caseId: string,
+    options: { limit: number },
+  ): Promise<readonly RegionAnalysisRecord[]> {
+    const rows = await this.prisma.graphHoleRegionAnalysis.findMany({
+      where: { caseId },
+      orderBy: [{ analyzedAt: 'asc' }, { id: 'asc' }],
+      take: options.limit,
+    });
+    const latestById = new Map<string, RegionAnalysisRecord>();
+    for (const row of rows) latestById.set(row.regionId, toRecord(row));
+    return [...latestById.values()].sort((a, b) =>
+      a.regionId < b.regionId ? -1 : a.regionId > b.regionId ? 1 : 0,
+    );
+  }
 }
 
 /** Convenience singleton bound to the platform Prisma client. */
