@@ -10,9 +10,11 @@ import type {
   InvestigativeGap,
 } from "@indago/contracts";
 import type { EvidenceListItem } from "@/lib/api/types";
+import type { ReviewCheckpoint, ReviewOutcome } from "@/lib/providers/types";
 import { toProviderError, type ProviderEvent } from "@/lib/providers/types";
 import { investigationUrl } from "@/lib/workspace/url";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { ConfidenceIndicator } from "@/components/ui/confidence-indicator";
@@ -28,6 +30,9 @@ interface OverviewData {
   readonly entities: Entity[] | null;
   readonly leads: Lead[] | null;
   readonly gaps: InvestigativeGap[] | null;
+  /** Live-only: the run REVIEW_REQUIRED checkpoint, when the platform reports
+   *  the analysis run is at a human-in-the-loop review gate. null = no gate. */
+  readonly checkpoint: ReviewCheckpoint | null;
 }
 
 /** Load one list resource; unsupported/backend failures become an explicit
@@ -53,6 +58,12 @@ export function InvestigationOverview({
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ProviderEvent[]>([]);
   const [live, setLive] = useState(false);
+  // PR-20 run-control state: which control was requested, its busy flag, pause
+  // reason prompt, and any typed failure from the platform.
+  const [runBusy, setRunBusy] = useState<"pause" | "resume" | "review" | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
 
   // Mirror the latest data for the realtime subscription callback (which is
   // stable across renders), so reconnect resync reads current state.
@@ -95,7 +106,7 @@ export function InvestigationOverview({
     try {
      
       const investigation = await workspace.investigations.get(investigationId);
-      const [evidence, entities, leads, gaps] = await Promise.all([
+      const [evidence, entities, leads, gaps, checkpoint] = await Promise.all([
         settleList(() =>
           workspace.evidence.listByInvestigation(investigationId, {
             pageSize: 100,
@@ -116,14 +127,71 @@ export function InvestigationOverview({
             pageSize: 100,
           }),
         ),
+        workspace.investigations.getReviewCheckpoint
+          ? workspace.investigations
+              .getReviewCheckpoint(investigationId)
+              .catch(() => null)
+          : Promise.resolve(null),
       ]);
-      setData({ investigation, evidence, entities, leads, gaps });
+      setData({ investigation, evidence, entities, leads, gaps, checkpoint });
     } catch (err) {
       setError(toProviderError(err).message);
     } finally {
       setLoading(false);
     }
   }, [workspace, investigationId]);
+
+  const investigationProvider = workspace.investigations;
+  const runControlPresent =
+    typeof investigationProvider.pause === "function" &&
+    typeof investigationProvider.resume === "function";
+
+  const handleResume = useCallback(async () => {
+    if (!investigationProvider.resume) return;
+    setRunBusy("resume");
+    setRunError(null);
+    try {
+      await investigationProvider.resume(investigationId);
+      await load();
+    } catch (err) {
+      setRunError(toProviderError(err).message);
+    } finally {
+      setRunBusy(null);
+    }
+  }, [investigationProvider, investigationId, load]);
+
+  const handlePause = useCallback(async () => {
+    if (!investigationProvider.pause) return;
+    setRunBusy("pause");
+    setRunError(null);
+    try {
+      await investigationProvider.pause(investigationId, pauseReason.trim());
+      setPauseOpen(false);
+      setPauseReason("");
+      await load();
+    } catch (err) {
+      setRunError(toProviderError(err).message);
+    } finally {
+      setRunBusy(null);
+    }
+  }, [investigationProvider, investigationId, pauseReason, load]);
+
+  const handleResolveReview = useCallback(
+    async (outcome: ReviewOutcome) => {
+      if (!investigationProvider.resolveReview) return;
+      setRunBusy("review");
+      setRunError(null);
+      try {
+        await investigationProvider.resolveReview(investigationId, outcome);
+        await load();
+      } catch (err) {
+        setRunError(toProviderError(err).message);
+      } finally {
+        setRunBusy(null);
+      }
+    },
+    [investigationProvider, investigationId, load],
+  );
 
   useEffect(() => {
     void load();
@@ -240,7 +308,108 @@ export function InvestigationOverview({
                     Owner {investigation.owner}
                   </span>
                 )}
+                {runControlPresent && investigation.status === "PAUSED" && (
+                  <Button
+                    variant="quiet"
+                    size="sm"
+                    onClick={() => void handleResume()}
+                    disabled={runBusy !== null}
+                  >
+                    {runBusy === "resume" ? "Resuming…" : "Resume run"}
+                  </Button>
+                )}
+                {runControlPresent && investigation.status !== "PAUSED" && (
+                  <Button
+                    variant="quiet"
+                    size="sm"
+                    onClick={() => setPauseOpen((o) => !o)}
+                    disabled={runBusy !== null}
+                  >
+                    Pause run
+                  </Button>
+                )}
               </div>
+
+              {/* PR-20: pause-reason prompt (platform requires a reason). */}
+              {pauseOpen && (
+                <form
+                  className="mt-3 flex flex-wrap items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (pauseReason.trim()) void handlePause();
+                  }}
+                >
+                  <input
+                    autoFocus
+                    value={pauseReason}
+                    onChange={(e) => setPauseReason(e.target.value)}
+                    placeholder="Reason for pausing (required)"
+                    className="min-w-0 flex-1 rounded-md border border-semantic-border bg-semantic-surface px-3 py-1.5 font-mono text-[11px] text-semantic-foreground placeholder:text-semantic-foreground-faint focus:border-semantic-foreground-faint focus:outline-none"
+                  />
+                  <Button
+                    variant="quiet"
+                    size="sm"
+                    type="submit"
+                    disabled={!pauseReason.trim() || runBusy !== null}
+                  >
+                    {runBusy === "pause" ? "Pausing…" : "Confirm"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      setPauseOpen(false);
+                      setPauseReason("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </form>
+              )}
+
+              {/* PR-20: REVIEW_REQUIRED gate banner + typed error surface. */}
+              {data.checkpoint && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-semantic-warning/30 bg-semantic-warning/5 px-4 py-3">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-semantic-warning">
+                    Review required
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm leading-relaxed text-semantic-foreground-muted">
+                    The analysis run is paused at a human-in-the-loop gate
+                    {data.checkpoint.currentStage
+                      ? ` (${data.checkpoint.currentStage})`
+                      : ""}. Approve to continue, or request more evidence.
+                  </span>
+                  {runControlPresent && investigationProvider.resolveReview ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void handleResolveReview("NEEDS_EVIDENCE")}
+                        disabled={runBusy !== null}
+                      >
+                        Needs evidence
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => void handleResolveReview("APPROVED")}
+                        disabled={runBusy !== null}
+                      >
+                        {runBusy === "review" ? "Submitting…" : "Approve"}
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                      Resolution unavailable in this mode
+                    </span>
+                  )}
+                </div>
+              )}
+              {runError && (
+                <p className="mt-2 font-mono text-[10px] text-semantic-contradiction">
+                  {runError}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 flex-col items-end gap-3">
               {investigation.confidence !== undefined && (
