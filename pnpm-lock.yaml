@@ -431,6 +431,9 @@ importers:
       '@indago/entity-resolution':
         specifier: workspace:*
         version: link:../intelligence/entity-resolution
+      '@indago/gap-classification':
+        specifier: workspace:*
+        version: link:../intelligence/gap-classification
       '@indago/graph-hole-analysis':
         specifier: workspace:*
         version: link:../intelligence/graph-hole-analysis
