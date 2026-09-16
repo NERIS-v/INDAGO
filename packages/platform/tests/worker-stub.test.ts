@@ -138,6 +138,12 @@ vi.mock("../src/db/prisma.js", () => ({
     entity: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    // M-A12/PR12 graph-version probe. Default keeps the PR12 reassessment
+    // producer a no-op: no ACTIVE GraphVersion ever exists in the stub DB, so
+    // the NEW_OBSERVATION/NEW_EVIDENCE producers never enqueue a change.
+    graphVersion: {
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
   },
 }));
 
