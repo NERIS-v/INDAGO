@@ -253,6 +253,22 @@ export class GraphHoleRegionAnalysisStore {
   }
 
   /**
+   * Exact case-scoped lookup of the persisted analysis for ONE regionId. Used by
+   * the PR12 runner for a plan item's region — indexed and bounded (no windowing,
+   * so results never depend on case analysis volume).
+   */
+  async findByRegionId(input: {
+    readonly caseId: string;
+    readonly regionId: string;
+  }): Promise<RegionAnalysisRecord | null> {
+    const row = await this.prisma.graphHoleRegionAnalysis.findFirst({
+      where: { regionId: input.regionId, caseId: input.caseId },
+      orderBy: [{ analyzedAt: 'desc' }, { id: 'asc' }],
+    });
+    return row ? toRecord(row) : null;
+  }
+
+  /**
    * Bounded, case-scoped region listing for PR12 impacted-region resolution:
    * the LATEST analysis record per DISTINCT regionId (a regionId is content-
    * addressed, so one row per (regionId, graphVersionId, policies) — newest

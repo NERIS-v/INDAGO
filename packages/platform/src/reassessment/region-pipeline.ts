@@ -465,10 +465,7 @@ export class RegionPipeline {
   // --------------------------------------------------------------------------
 
   private async regionRecordOf(item: RegionPlanItem): Promise<RegionAnalysisRecord | null> {
-    const records = await this.deps.regions.listLatestRegionsByCase(item.caseId, {
-      limit: 100,
-    });
-    return records.find((record) => record.regionId === item.regionId) ?? null;
+    return this.deps.regions.findByRegionId({ caseId: item.caseId, regionId: item.regionId });
   }
 
   private async qualificationFromRecord(
