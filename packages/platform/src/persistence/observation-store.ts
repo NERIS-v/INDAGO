@@ -289,7 +289,33 @@ export class ObservationStore {
       where: {
         caseId: filter.caseId,
         investigationId: filter.investigationId,
-        entityIds: { array_contains: [...entityIds] },
+        // ANY-semantics (intersection): `array_contains: [id]` per candidate id
+        // OR'd together — a row matches when it touches at least one entity id.
+        // `array_contains: [...ids]` would wrongly require ALL ids on one row.
+        OR: entityIds.map((id) => ({ entityIds: { array_contains: [id] } })),
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row) => this.rowToObservation(row));
+  }
+
+  /**
+   * Read seam — fetch observations BY id (bounded id list). Case +
+   * investigation scoped so a cross-case id can never resolve. Used by the
+   * PR12 reassessment runtime to assemble the closed-world observation set of
+   * a bounded region context (region touch observations ∪ hypothesis-referenced
+   * observations).
+   */
+  async listByIds(
+    ids: readonly string[],
+    filter: { investigationId: string; caseId: string },
+  ): Promise<Observation[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.observation.findMany({
+      where: {
+        id: { in: [...new Set(ids)] },
+        caseId: filter.caseId,
+        investigationId: filter.investigationId,
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });

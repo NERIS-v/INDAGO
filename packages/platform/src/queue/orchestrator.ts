@@ -6,6 +6,7 @@ import {
   extractInvestigationIdFromJobData,
 } from "./ingest-evidence.js";
 import { handleLegacyRunStateJob } from "./legacy-pipeline.js";
+import { handleGraphHoleReassessmentJob } from "./reassessment-worker.js";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 // Overridable so tests can claim a dedicated queue: a concurrently-running dev
@@ -24,18 +25,24 @@ export const investigationQueue = new Queue(QUEUE_NAME, {
 });
 
 /**
- * Single worker, two job families:
+ * Single worker, three job families:
  *
- *   ingest-evidence        → durable canonical evidence ingestion
- *                            (ingest-evidence.ts)
- *   anything else          → legacy run-state pipeline, active only when
- *                            LEGACY_PIPELINE_ENABLED=true (legacy-pipeline.ts)
+ *   ingest-evidence            → durable canonical evidence ingestion
+ *                                (ingest-evidence.ts)
+ *   graph-hole-reassessment    → incremental graph-hole reassessment, one
+ *                                bounded batch per case
+ *                                (reassessment-worker.ts)
+ *   anything else              → legacy run-state pipeline, active only when
+ *                                LEGACY_PIPELINE_ENABLED=true (legacy-pipeline.ts)
  */
 export const investigationWorker = new Worker(
   QUEUE_NAME,
   async (job: Job) => {
     if (job.name === "ingest-evidence") {
       return handleIngestEvidenceJob(job);
+    }
+    if (job.name === "graph-hole-reassessment") {
+      return handleGraphHoleReassessmentJob(job);
     }
     return handleLegacyRunStateJob(job);
   },

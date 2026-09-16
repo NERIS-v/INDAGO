@@ -45,6 +45,10 @@ import {
   type GraphRevisionEvent,
   toGraphRevisionMetadata,
 } from "../relations/graph-version-service.js";
+import {
+  entityResolutionAcceptedTrigger,
+  publishCaseChange,
+} from "../reassessment/publish-case-change.js";
 
 /**
  * Entity types that carry a canonical name usable as the Entity.canonicalName.
@@ -227,7 +231,8 @@ export async function materializeCanonicalEntityFromAcceptedHypothesis(
   // without an accepted hypothesis, no temporal history claiming an entity
   // that does not exist. The audit event is emitted by the caller AFTER this
   // transaction commits.
-  return entStore.transaction<MaterializeFromAcceptedHypothesisResult>(
+  let createdVersionId: string | undefined;
+  const materialization = await entStore.transaction<MaterializeFromAcceptedHypothesisResult>(
     async (tx) => {
       const updatedHypothesis = await hypStore.markAccepted(
         hypothesisId,
@@ -287,7 +292,7 @@ export async function materializeCanonicalEntityFromAcceptedHypothesis(
       // The graph-projection service replays these to filter the entity universe
       // at any historical version.
       if (!result.reusedExisting && stores.graphVersionStore) {
-        await stores.graphVersionStore.createVersion(
+        const createdVersion = await stores.graphVersionStore.createVersion(
           {
             caseId,
             investigationId,
@@ -302,6 +307,7 @@ export async function materializeCanonicalEntityFromAcceptedHypothesis(
           },
           tx,
         );
+        createdVersionId = createdVersion.id;
       }
 
       return {
@@ -312,6 +318,33 @@ export async function materializeCanonicalEntityFromAcceptedHypothesis(
       };
     },
   );
+
+  // PR12 producer (GRAPH_AFFECTING): a genuinely fresh canonical entity
+  // materialization is a graph-affecting change anchored at the NEW graph
+  // version committed above. Publish only AFTER the authority transaction
+  // commits — publishCaseChange runs its own transaction on the shared client
+  // and must never nest inside this one. Production swallow: a lost
+  // reassessment change is recovered by the cursor's tail recording; it must
+  // never fail the materialization authority.
+  if (createdVersionId !== undefined) {
+    try {
+      await publishCaseChange({
+        caseId,
+        graphVersionId: createdVersionId,
+        trigger: entityResolutionAcceptedTrigger({
+          caseId,
+          entityHypothesisId: hypothesisId,
+          entityId,
+          graphVersionId: createdVersionId,
+          computedAt: { value: new Date().toISOString(), precision: "exact" },
+        }),
+      });
+    } catch (error) {
+      console.error("PR12 publishCaseChange failed", error);
+    }
+  }
+
+  return materialization;
 }
 
 export class EntityMaterializationError extends Error {

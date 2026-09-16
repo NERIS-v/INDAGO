@@ -38,6 +38,7 @@ export interface PublishCaseChangeInput {
 }
 
 export interface PublishedCaseChange {
+  readonly caseId: string;
   readonly changeId: string;
   readonly sequence: number;
   readonly effectClass: string;
@@ -45,14 +46,27 @@ export interface PublishedCaseChange {
 }
 
 /**
+ * Enqueue strategy: invoked for each FRESH change (never on a deduped
+ * re-publication) so the worker can dip the runner for the case. Defaults to
+ * the shared investigation queue; tests inject a no-op to stay Redis-free.
+ */
+export type ReassessmentEnqueue = (published: PublishedCaseChange) => Promise<void>;
+
+/**
  * Validate, identity, and persist an authoritative change into the PR12 ledger.
  * Returns the deterministic changeId + assigned sequence (+ dedup flag).
+ *
+ * A fresh (non-deduplicated) change enqueues ONE graph-hole-reassessment job
+ * for the case. A deduplicated re-publication (crash-then-rerun, concurrent
+ * duplicate) never enqueues — the change was already enqueued, and the runner
+ * is idempotent.
  *
  * Throws ReassessmentPublishError with a code when the trigger is invalid.
  */
 export async function publishCaseChange(
   input: PublishCaseChangeInput,
   store: ReassessmentChangeStore = new ReassessmentChangeStore(),
+  enqueue: ReassessmentEnqueue = defaultEnqueue,
 ): Promise<PublishedCaseChange> {
   const trigger = ReassessmentTriggerSchema.parse(input.trigger);
   const effectClass = deriveReassessmentEffectClass(trigger);
@@ -62,14 +76,36 @@ export async function publishCaseChange(
     caseId: input.caseId,
     trigger,
     graphVersionId: input.graphVersionId,
+    changeId,
   });
 
-  return {
+  const published: PublishedCaseChange = {
+    caseId: input.caseId,
     changeId: result.changeId,
     sequence: result.sequence,
     effectClass,
     deduplicated: result.deduplicated,
   };
+
+  if (!result.deduplicated) {
+    await enqueue(published);
+  }
+
+  return published;
+}
+
+/**
+ * Production enqueue: add one graph-hole-reassessment job to the shared
+ * investigation queue. Loaded lazily via dynamic import so reassessment never
+ * participates in the orchestrator import graph at module load (no cycles:
+ * orchestrator → ingest-evidence → publish-case-change → orchestrator would be
+ * a static cycle; this stays call-time).
+ */
+async function defaultEnqueue(published: PublishedCaseChange): Promise<void> {
+  const { investigationQueue } = await import('../queue/orchestrator.js');
+  await investigationQueue.add('graph-hole-reassessment', {
+    caseId: published.caseId,
+  });
 }
 
 // ============================================================================

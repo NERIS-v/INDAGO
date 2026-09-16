@@ -60,6 +60,11 @@ import { canonicalizeDeterministic } from './identity-canonicalization.js';
 export const REASSESSMENT_POLICY_VERSION = 'v1' as const;
 export type ReassessmentPolicyVersion = typeof REASSESSMENT_POLICY_VERSION;
 
+// Alias used by platform persistence/cursor/run records and the reassessment
+// policy doc. Same value, kept under both names for source compatibility.
+export const PR12_REASSESSMENT_POLICY_VERSION = REASSESSMENT_POLICY_VERSION;
+export type PR12ReassessmentPolicyVersion = typeof PR12_REASSESSMENT_POLICY_VERSION;
+
 // ============================================================================
 // Bounds Policy — Frozen V1 constants
 //
