@@ -76,18 +76,19 @@ export const CAPABILITY_AVAILABILITY: Record<
   observations: { demo: true, live: true },
   cases: { demo: true, live: true },
   realtime: { demo: true, live: true },
+  // ---- Phase 4 core investigation loop (live-wireable) ---------------------
+  graph: { demo: true, live: true },
+  leads: { demo: true, live: true },
+  crossCase: { demo: true, live: true },
   // ---- Demo-only today (live stays typed-unsupported, never fabricated) ----
   entities: { demo: true, live: false },
-  graph: { demo: true, live: false },
   relations: { demo: true, live: false },
   intelligence: { demo: true, live: false },
   timeline: { demo: true, live: false },
-  leads: { demo: true, live: false },
   gaps: { demo: true, live: false },
   review: { demo: true, live: false },
   robustness: { demo: true, live: false },
   hypotheses: { demo: true, live: false },
-  crossCase: { demo: true, live: false },
   // ---- Network representations --------------------------------------------
   // "graph", "entity pulse", "cross-case matrix" AND "adaptive flow" are
   // implemented (demo); LIVE serving stays typed-unsupported (never

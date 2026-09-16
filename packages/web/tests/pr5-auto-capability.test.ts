@@ -59,7 +59,9 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
 
     expect(providers.mode).toBe("live");
     expect(providers.capabilities.evidence).toBe("live");
-    expect(providers.capabilities.graph).toBe("not-ready");
+    // PR-20: Phase-4 capabilities are live-wired even in a pure live workspace.
+    expect(providers.capabilities.graph).toBe("live");
+    expect(providers.capabilities.leads).toBe("live");
     // F-PR6: an explicit-live Entity Pulse is TYPED not-ready — a live workspace
     // must never silently fall back to the demo pulse visualization.
     expect(providers.capabilities["network.pulse"]).toBe("not-ready");
@@ -85,10 +87,11 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
   it("AUTO + live-unavailable capability -> the demo provider serves real data", async () => {
     const providers = createWorkspaceProviders(autoIdentity, autoEnv);
 
-    expect(providers.capabilities.graph).toBe("demo");
-    const nodes = await providers.graph.getNodes(autoIdentity.investigationId);
-    expect(nodes.items.length).toBeGreaterThan(0);
-    expect(nodes.items[0].id).toBeTruthy();
+    // Gaps have no live implementation — AUTO demo-serves them.
+    expect(providers.capabilities.gaps).toBe("demo");
+    const gaps = await providers.gaps.listByInvestigation(autoIdentity.investigationId);
+    expect(gaps.items.length).toBeGreaterThan(0);
+    expect(gaps.items[0].id).toBeTruthy();
   });
 
   it("AUTO fallback is capability-level, not global — live and demo coexist in ONE bundle", async () => {
@@ -100,10 +103,14 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
     expect(providers.capabilities.cases).toBe("live");
     expect(providers.capabilities.observations).toBe("live");
     expect(providers.capabilities.realtime).toBe("live");
-    expect(providers.capabilities.graph).toBe("demo");
+    // PR-20: Phase-4 capabilities resolve live under AUTO.
+    expect(providers.capabilities.graph).toBe("live");
+    expect(providers.capabilities.leads).toBe("live");
+    expect(providers.capabilities.crossCase).toBe("live");
+    // Demo-only under AUTO:
+    expect(providers.capabilities.gaps).toBe("demo");
     expect(providers.capabilities.timeline).toBe("demo");
     expect(providers.capabilities.intelligence).toBe("demo");
-    expect(providers.capabilities.leads).toBe("demo");
     expect(providers.capabilities["network.graph"]).toBe("demo");
     expect(providers.capabilities["network.pulse"]).toBe("demo");
   });
@@ -111,16 +118,16 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
   it("falling back for one capability does not switch the live ones, and a live failure does not contaminate the demo slot", async () => {
     const providers = createWorkspaceProviders(autoIdentity, autoEnv);
 
-    // The demo fallback for graph does NOT switch the live evidence slot.
-    expect(providers.capabilities.graph).toBe("demo");
+    // The demo fallback for gaps does NOT switch the live evidence slot.
+    expect(providers.capabilities.gaps).toBe("demo");
     expect(providers.capabilities.evidence).toBe("live");
     await expect(
       providers.evidence.listByInvestigation(autoIdentity.investigationId),
     ).rejects.toBeInstanceOf(ProviderError);
 
-    // The live evidence failure does NOT contaminate the demo graph slot.
-    const nodes = await providers.graph.getNodes(autoIdentity.investigationId);
-    expect(nodes.items.length).toBeGreaterThan(0);
+    // The live evidence failure does NOT contaminate the demo gaps slot.
+    const gaps = await providers.gaps.listByInvestigation(autoIdentity.investigationId);
+    expect(gaps.items.length).toBeGreaterThan(0);
     expect(providers.capabilities.evidence).toBe("live");
   });
 
@@ -139,8 +146,8 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
     expect(err).toBeInstanceOf(ProviderError);
     expect((err as ProviderError).code).toBe("SERVER");
 
-    // The demo-served graph capability is untouched afterwards.
-    const nodes = await providers.graph.getNodes(autoIdentity.investigationId);
-    expect(nodes.items.length).toBeGreaterThan(0);
+    // The demo-served gaps capability is untouched afterwards.
+    const gaps = await providers.gaps.listByInvestigation(autoIdentity.investigationId);
+    expect(gaps.items.length).toBeGreaterThan(0);
   });
 });
