@@ -22,11 +22,42 @@ import type { RegionIdentityV1, TemporalInterval } from '@indago/contracts';
 import { buildRegionIdentity, hashRegionIdentity } from '@indago/graph-hole-region';
 import { RESOLUTION_PROPOSAL_THRESHOLD } from '@indago/entity-resolution';
 import { TargetedReblockError } from '@indago/targeted-reblocking';
-import {
-  GraphHoleRegionAnalysisStore,
-  type RegionAnalysisRecord,
-} from '../../src/persistence/graph-hole-region-analysis-store.js';
-import { runTargetedReblockForRegion } from '../../src/services/targeted-reblocking.js';
+import type { GraphHoleRegionAnalysisStore } from '../../src/persistence/graph-hole-region-analysis-store.js';
+
+// Store/service modules are imported DYNAMICALLY inside beforeAll, AFTER
+// process.env.DATABASE_URL is pointed at the test schema: the platform
+// singleton `db` binds DATABASE_URL at module-load time, and the test store
+// below binds TEST_DATABASE_URL explicitly (see m-a10-ingest-http.e2e.test.ts).
+type ReblockRunner = (input: {
+  caseId: string;
+  investigationId: string;
+  graphVersionId: string;
+  regionId: string;
+  regionPolicyVersion: string;
+}) => Promise<{
+  record: {
+    runId: string;
+    caseId: string;
+    graphVersionId: string;
+    regionId: string;
+    policyVersion: string;
+    identityKey: string;
+    truncated: boolean;
+    counts: {
+      pairDraftCount: number;
+      pairCreatedCount: number;
+      pairReusedCount: number;
+      resolverHandoffCount: number;
+      resolverProposedCount: number;
+    };
+    accounting: {
+      membershipRule: string;
+      candidateUniverseProcessed: number;
+      candidateUniverseEligible: number;
+      regionObservationCount: number;
+    };
+  };
+}>;
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -78,6 +109,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
   () => {
     let prisma: PrismaClient;
     let regionStore: GraphHoleRegionAnalysisStore;
+    let runReblock: ReblockRunner;
 
     const caseId = randomUUID();
     const otherCaseId = randomUUID();
@@ -138,7 +170,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
         sourceId,
         investigationId,
         caseId,
-        type: 'EVENT_OCCURRENCE',
+        type: 'FACTUAL',
         content: 'PR11 fixture observation',
         strength: 0.5,
         candidateMentions: [],
@@ -173,7 +205,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
         start: 0,
         end: 12,
         entityType: 'PERSON',
-        extractionMethod: 'HEURISTIC',
+        extractionMethod: 'HEURISTIC_FALLBACK',
         canonicalMatchValue: 'rahul sharma',
         provenance: provenance(),
       }));
@@ -230,8 +262,16 @@ describe.skipIf(!TEST_DATABASE_URL)(
     }
 
     beforeAll(async () => {
+      process.env.DATABASE_URL = TEST_DATABASE_URL!;
       prisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL! } } });
-      regionStore = new GraphHoleRegionAnalysisStore(prisma);
+      const { GraphHoleRegionAnalysisStore: Store } = await import(
+        '../../src/persistence/graph-hole-region-analysis-store.js'
+      );
+      const { runTargetedReblockForRegion } = await import(
+        '../../src/services/targeted-reblocking.js'
+      );
+      regionStore = new Store(prisma);
+      runReblock = runTargetedReblockForRegion as ReblockRunner;
 
       for (const csId of [caseId, otherCaseId]) {
         await prisma.temporalStateChange?.deleteMany({ where: { caseId: csId } });
@@ -263,7 +303,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
     it('rejects an unpersisted region with REGION_NOT_PERSISTED', async () => {
       let error: TargetedReblockError | null = null;
       try {
-        await runTargetedReblockForRegion({
+        await runReblock({
           caseId,
           investigationId,
           graphVersionId,
@@ -282,7 +322,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       await seedEvidenceAndObservations();
       await seedCandidates();
 
-      const output = await runTargetedReblockForRegion({
+      const output = await runReblock({
         caseId,
         investigationId,
         graphVersionId,
@@ -324,14 +364,14 @@ describe.skipIf(!TEST_DATABASE_URL)(
 
     it('identical re-run converges to the same run identity (idempotent)', async () => {
       const region = await persistRegionFixture();
-      const first = await runTargetedReblockForRegion({
+      const first = await runReblock({
         caseId,
         investigationId,
         graphVersionId,
         regionId: region.regionId,
         regionPolicyVersion: 'v1',
       });
-      const second = await runTargetedReblockForRegion({
+      const second = await runReblock({
         caseId,
         investigationId,
         graphVersionId,
@@ -359,7 +399,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       const { regionId: narrowRegionId } = await persistRegionFixture([
         nodeA,
       ]);
-      const output = await runTargetedReblockForRegion({
+      const output = await runReblock({
         caseId,
         investigationId,
         graphVersionId,
