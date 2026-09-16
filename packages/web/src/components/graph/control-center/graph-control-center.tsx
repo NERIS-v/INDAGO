@@ -76,6 +76,7 @@ import { FlowRail } from "./flow/flow-rail";
 import { FlowContextSummary } from "./flow/flow-context-summary";
 import { FlowTemporalNote } from "./flow/flow-temporal-note";
 import { FlowIntelligenceInsight } from "./flow/flow-intelligence-insight";
+import { StructuralSignalsPanel } from "./structural/structural-signals-panel";
 import {
   investigationUrl,
   NETWORK_ENTITY_PARAM,
@@ -615,6 +616,9 @@ export function GraphControlCenter({
                   onFilterChange={handleFilterChange}
                   graphReloadRequest={graphReloadRequest}
                 />
+                {/* PR-20: read-only Phase-4 candidate surfacing. Capability-gated
+                    inside the panel (demo bundles render nothing). */}
+                <StructuralSignalsPanel className="absolute bottom-4 right-4 z-20 w-80" />
               </div>
             ) : presentation.zoneTwo === "matrix" ? (
               <MatrixPanel

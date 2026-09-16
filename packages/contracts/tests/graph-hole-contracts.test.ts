@@ -14,6 +14,13 @@ import {
   GraphEventSchema,
   GapClassificationResultSchema,
   GapClassificationTypeSchema,
+  GapClassificationStatusSchema,
+  GapClassificationReasonCodeSchema,
+  GapClassificationFailureCodeSchema,
+  GapClassificationReferencesSchema,
+  GapClassificationSignalsSchema,
+  GapClassificationContextCompletenessSchema,
+  GAP_CLASSIFICATION_POLICY_VERSION,
 } from '../src/index.js';
 
 // ============================================================================
@@ -390,8 +397,18 @@ describe('GraphHoleDetected event payload', () => {
 
 describe('GapClassificationResult tightening', () => {
   const result = {
+    graphHoleId: validHole.id,
     gapId: GAP_ID,
     type: 'MISSING_INVESTIGATION',
+    status: 'CONFIDENT',
+    reasonCodes: ['INVESTIGATION_NOT_CONCLUDED'],
+    supportingReferences: {
+      supportingObservationIds: [] as const,
+      supportingHypothesisIds: [] as const,
+      structuralSignalIds: [NODE_A, NODE_B],
+    },
+    contextSha256: 'a'.repeat(64),
+    classificationPolicyVersion: 'v1',
     priority: 'HIGH',
     impact: 0.6,
     expectedInformationValue: 0.7,
@@ -403,6 +420,11 @@ describe('GapClassificationResult tightening', () => {
 
   it('accepts a valid Phase 5 classification result', () => {
     expect(GapClassificationResultSchema.safeParse(result).success).toBe(true);
+  });
+
+  it('accepts a valid Phase 5 classification result without the legacy gapId', () => {
+    const { gapId: _gapId, ...withoutGapId } = result;
+    expect(GapClassificationResultSchema.safeParse(withoutGapId).success).toBe(true);
   });
 
   it('rejects an untyped / bare-string classification', () => {
@@ -417,12 +439,248 @@ describe('GapClassificationResult tightening', () => {
       'MISSING_DATA',
       'MISSING_COMPARISON',
       'INFRASTRUCTURE_GAP',
-      'CONCEALMENT_CONSISTENT',
+      'CONCEALMENT_CONSISTENT_PATTERN',
     ]);
   });
 
   it('rejects a non-enum priority', () => {
     expect(GapClassificationResultSchema.safeParse({ ...result, priority: 'URGENT' }).success)
       .toBe(false);
+  });
+
+  it('recognizes the four epistemic statuses', () => {
+    expect(Object.values(GapClassificationStatusSchema.enum)).toEqual([
+      'CONFIDENT',
+      'SUPPORTED',
+      'AMBIGUOUS',
+      'INSUFFICIENT_CONTEXT',
+    ]);
+  });
+
+  it('rejects a missing graphHoleId', () => {
+    const { graphHoleId: _graphHoleId, ...withoutHole } = result;
+    expect(GapClassificationResultSchema.safeParse(withoutHole).success).toBe(false);
+  });
+
+  it('rejects a missing status', () => {
+    const { status: _status, ...withoutStatus } = result;
+    expect(GapClassificationResultSchema.safeParse(withoutStatus).success).toBe(false);
+  });
+
+  it('rejects an unknown / out-of-vocabulary reason code', () => {
+    expect(
+      GapClassificationResultSchema.safeParse({ ...result, reasonCodes: ['RETROACTIVE_CONCEALMENT'] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown failure code', () => {
+    expect(GapClassificationFailureCodeSchema.safeParse('MADE_UP_FAILURE').success).toBe(false);
+    expect(GapClassificationFailureCodeSchema.safeParse('INVALID_INPUT').success).toBe(true);
+    expect(GapClassificationFailureCodeSchema.safeParse('CONTEXT_MISMATCH').success).toBe(true);
+  });
+});
+
+describe('GapClassificationResult epistemic invariants (PR14)', () => {
+  const result = {
+    graphHoleId: 'cand-123',
+    gapId: GAP_ID,
+    type: 'MISSING_INVESTIGATION',
+    status: 'CONFIDENT',
+    reasonCodes: ['INVESTIGATION_NOT_CONCLUDED'],
+    supportingReferences: {
+      supportingObservationIds: [],
+      supportingHypothesisIds: [],
+      structuralSignalIds: [NODE_A, NODE_B],
+    },
+    contextSha256: 'b'.repeat(64),
+    classificationPolicyVersion: 'v1',
+    priority: 'HIGH',
+    impact: 0.6,
+    expectedInformationValue: 0.7,
+    relatedEntityIds: [],
+    relatedHypothesisIds: [],
+    suggestedActions: ['evaluate the framed investigative question'],
+    computedAt: OBSERVED_AT,
+  } as const;
+
+  it('forbids a type together with INSUFFICIENT_CONTEXT status', () => {
+    expect(
+      GapClassificationResultSchema.safeParse({ ...result, status: 'INSUFFICIENT_CONTEXT', type: 'MISSING_DATA' }).success,
+    ).toBe(false);
+  });
+
+  it('accepts INSUFFICIENT_CONTEXT with no type and the matching reason code', () => {
+    const insufficient = {
+      ...result,
+      status: 'INSUFFICIENT_CONTEXT',
+      type: undefined,
+      reasonCodes: ['INSUFFICIENT_CONTEXT'],
+    };
+    expect(GapClassificationResultSchema.safeParse(insufficient).success).toBe(true);
+  });
+
+  it('requires a type for every status other than INSUFFICIENT_CONTEXT', () => {
+    const { type: _type, ...withoutType } = result;
+    expect(GapClassificationResultSchema.safeParse(withoutType).success).toBe(false);
+  });
+
+  it('accepts AMBIGUOUS only together with CONTRADICTION_PRESERVED', () => {
+    const ambiguous = { ...result, status: 'AMBIGUOUS', reasonCodes: ['CONTRADICTION_PRESERVED'] };
+    expect(GapClassificationResultSchema.safeParse(ambiguous).success).toBe(true);
+    expect(
+      GapClassificationResultSchema.safeParse({ ...result, status: 'AMBIGUOUS', reasonCodes: ['INVESTIGATION_NOT_CONCLUDED'] }).success,
+    ).toBe(false);
+  });
+
+  it('caps CONCEALMENT_CONSISTENT_PATTERN at SUPPORTED status (never CONFIDENT)', () => {
+    const concealment = {
+      ...result,
+      type: 'CONCEALMENT_CONSISTENT_PATTERN',
+      reasonCodes: ['CONCEALMENT_PATTERN_COMPATIBLE'],
+    };
+    expect(GapClassificationResultSchema.safeParse({ ...concealment, status: 'SUPPORTED' }).success).toBe(true);
+    expect(GapClassificationResultSchema.safeParse({ ...concealment, status: 'CONFIDENT' }).success).toBe(false);
+  });
+
+  it('never lets CONTRADICTION_PRESERVED collapse into MISSING_DATA or CONCEALMENT_CONSISTENT_PATTERN', () => {
+    expect(
+      GapClassificationResultSchema.safeParse({
+        ...result,
+        type: 'MISSING_DATA',
+        status: 'AMBIGUOUS',
+        reasonCodes: ['CONTRADICTION_PRESERVED', 'REQUIRED_INFORMATION_ABSENT'],
+      }).success,
+    ).toBe(false);
+    expect(
+      GapClassificationResultSchema.safeParse({
+        ...result,
+        type: 'CONCEALMENT_CONSISTENT_PATTERN',
+        status: 'SUPPORTED',
+        reasonCodes: ['CONTRADICTION_PRESERVED'],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('forbids INSUFFICIENT_CONTEXT reason code outside INSUFFICIENT_CONTEXT status', () => {
+    expect(
+      GapClassificationResultSchema.safeParse({ ...result, reasonCodes: ['INSUFFICIENT_CONTEXT'] }).success,
+    ).toBe(false);
+  });
+});
+
+describe('GapClassificationSignals normalization layer (PR14)', () => {
+  const signals = {
+    candidateId: validHole.id,
+    caseId: CASE_ID,
+    graphVersionId: GRAPH_VERSION_ID,
+    regionId: 'region-1',
+    holeType: 'MISSING_EDGE',
+    expectedRelationshipType: 'communication',
+    structuralBasis: 'actor-communication expectation',
+    regionStatus: 'SATURATED',
+    regionTruncated: false,
+    regionLimited: false,
+    nodeIds: [NODE_A, NODE_B],
+    temporalScopeDeclared: true,
+    temporalContextDeclared: true,
+    structuralScore: 0.65,
+    evidenceSupportScore: 0.8,
+    expectedInformationValue: 0.25,
+    significance: 0.7,
+    independentSupportUnitCount: 0,
+    supportingObservationCount: 0,
+    contradictingObservationCount: 0,
+    supportingHypothesisCount: 0,
+    inScopeObservationCount: 3,
+    inScopeAtomicHypothesisCount: 2,
+    inScopeGroupCount: 1,
+    contradictionPresence: false,
+    contradictionCount: 0,
+    comparisonBaselinePresent: false,
+    alternativeCoverage: 0,
+    endpointObservationPresence: true,
+    inScopeObservationTypes: ['RELATIONAL'],
+    contextCompleteness: {
+      semanticRetrievalTruncated: false,
+      observationContextLimited: false,
+      hypothesisContextLimited: false,
+      hypothesisGroupingTruncated: false,
+      temporalContextLimited: false,
+      contextBudgetLimited: false,
+    },
+  } as const;
+
+  it('accepts a valid normalized signal set', () => {
+    expect(GapClassificationSignalsSchema.safeParse(signals).success).toBe(true);
+  });
+
+  it('rejects an unknown region status', () => {
+    expect(GapClassificationSignalsSchema.safeParse({ ...signals, regionStatus: 'UNKNOWN' }).success)
+      .toBe(false);
+  });
+
+  it('rejects an unknown observation type in inScopeObservationTypes', () => {
+    expect(GapClassificationSignalsSchema.safeParse({ ...signals, inScopeObservationTypes: ['INFERRED'] }).success)
+      .toBe(false);
+  });
+
+  it('rejects extra contextCompleteness keys (strict, closed completeness model)', () => {
+    expect(
+      GapClassificationSignalsSchema.safeParse({
+        ...signals,
+        contextCompleteness: { ...signals.contextCompleteness, inventedKey: true },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unexpected key in supportingReferences (strict provenance)', () => {
+    expect(
+      GapClassificationReferencesSchema.safeParse({
+        supportingObservationIds: [],
+        supportingHypothesisIds: [],
+        structuralSignalIds: [NODE_A],
+        inventedKey: 1,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('freezes the policy version literal', () => {
+    expect(GAP_CLASSIFICATION_POLICY_VERSION).toBe('v1');
+    expect(
+      GapClassificationResultSchema.safeParse({
+        ...({
+          graphHoleId: 'cand-123',
+          type: 'MISSING_INVESTIGATION',
+          status: 'CONFIDENT',
+          reasonCodes: ['INVESTIGATION_NOT_CONCLUDED'],
+          supportingReferences: {
+            supportingObservationIds: [],
+            supportingHypothesisIds: [],
+            structuralSignalIds: [],
+          },
+          contextSha256: 'c'.repeat(64),
+          priority: 'LOW',
+          impact: 0.1,
+          expectedInformationValue: 0.1,
+          relatedEntityIds: [],
+          relatedHypothesisIds: [],
+          suggestedActions: [],
+          computedAt: OBSERVED_AT,
+        }),
+        classificationPolicyVersion: 'v2',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('exposes the frozen context-completeness flags', () => {
+    const flags = Object.keys(GapClassificationContextCompletenessSchema.shape);
+    expect(flags).toEqual([
+      'semanticRetrievalTruncated',
+      'observationContextLimited',
+      'hypothesisContextLimited',
+      'hypothesisGroupingTruncated',
+      'temporalContextLimited',
+      'contextBudgetLimited',
+    ]);
   });
 });

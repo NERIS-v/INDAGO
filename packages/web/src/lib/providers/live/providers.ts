@@ -39,6 +39,10 @@ import type {
   RealtimeProvider,
   WorkspaceIdentity,
   GraphRealtimeCatalog,
+  InvestigationRunSnapshotView,
+  ReviewOutcome,
+  ReviewCheckpoint,
+  GenerateLeadsResult,
 } from "../types";
 import { ProviderError } from "../types";
 import type {
@@ -47,6 +51,19 @@ import type {
   Case,
   EvidenceSubmissionRequest,
   UploadedFileReference,
+  GraphVersion,
+  GraphNode,
+  GraphEdge,
+  GraphHole,
+  Lead,
+  LeadEvidenceLink,
+  CrossCaseMatch,
+  AttachLeadEvidenceRequest,
+  LeadStatus,
+  TemporalBurstCandidateDTO,
+  CommunityCandidateDTO,
+  BridgeCandidateDTO,
+  ConnectingPathCandidateDTO,
 } from "@indago/contracts";
 import type {
   EvidenceSubmissionResponse,
@@ -54,12 +71,23 @@ import type {
   EvidenceListItem,
   ObservationsResponse,
   CasesResponse,
+  GraphVersionListResponse,
+  GraphVersionDetailsResponse,
+  GraphVersionListItemDTO,
+  LeadListResponse,
+  LeadDetailResponse,
 } from "@/lib/api/types";
 import { createCapabilityStatusTable } from "../capabilities";
 import { createLiveRealtimeProvider } from "./realtime";
 import { providerUnsupported, providerUnsupportedPaginated } from "./unsupported";
 import { toLiveProviderError } from "./errors";
 import { projectRunStatusToInvestigation } from "./run-projection";
+import { projectGraphVersionFromListItem, projectGraphNode, projectGraphEdge } from "./graph-projection";
+import {
+  projectLeadFromDto,
+  projectLeadEvidenceLinkFromDto,
+  type LeadProjectionContext,
+} from "./lead-projection";
 import {
   getInvestigationStatus,
   startInvestigation as apiStartInvestigation,
@@ -68,8 +96,45 @@ import {
   listEvidence as apiListEvidence,
   listCases as apiListCases,
   deleteCase as apiDeleteCase,
+  getInvestigationGraph as apiGetInvestigationGraph,
+  listGraphVersions as apiListGraphVersions,
+  getGraphVersionDetails as apiGetGraphVersionDetails,
+  getTemporalBursts as apiListTemporalBursts,
+  getCommunityCandidates as apiListCommunityCandidates,
+  getBridgeCandidates as apiListBridgeCandidates,
+  traverseGraph as apiTraverseGraph,
+  getConnectingPaths as apiListConnectingPaths,
+  listLeads as apiListLeads,
+  getLead as apiGetLead,
+  generateLeads as apiGenerateLeads,
+  attachLeadEvidence as apiAttachLeadEvidence,
+  transitionLeadStatus as apiTransitionLeadStatus,
+  listCrossCaseLinks as apiListCrossCaseLinks,
+  pauseInvestigation as apiPauseInvestigation,
+  resumeInvestigation as apiResumeInvestigation,
+  resolveInvestigationReview as apiResolveInvestigationReview,
 } from "@/lib/api/server-action";
 import { uploadEvidence } from "@/lib/upload/uploadthing";
+
+/**
+ * Page an in-memory array into the canonical Paginated<T> shape. Live
+ * endpoints return bounded/complete sets; the platform variants that support
+ * server-side paging (graph versions) are paged on their own.
+ */
+function paginateItems<T>(items: readonly T[], query?: ProviderQuery): Paginated<T> {
+  if (query?.signal?.aborted) throw ProviderError.cancelled();
+  const page = query?.page ?? 1;
+  const pageSize = query?.pageSize ?? 20;
+  const start = (page - 1) * pageSize;
+  const slice = items.slice(start, start + pageSize);
+  return {
+    items: slice,
+    page,
+    pageSize,
+    totalItems: items.length,
+    hasMore: start + pageSize < items.length,
+  };
+}
 
 /**
  * Live implementation of InvestigationProvider.
@@ -121,6 +186,76 @@ export class LiveInvestigationProvider implements InvestigationProvider {
     } catch (err) {
       throw toLiveProviderError(err);
     }
+  }
+
+  private mapRunSnapshot(
+    run: { id: string; status: string; state: string; currentStage: string | null },
+    investigationId: string,
+  ): InvestigationRunSnapshotView {
+    return {
+      runId: run.id,
+      investigationId,
+      caseId: this.caseId,
+      status: run.status,
+      state: run.state,
+      currentStage: run.currentStage,
+    };
+  }
+
+  /** POST /investigations/:id/pause — the platform requires a non-empty reason. */
+  async pause(id: string, reason?: string): Promise<InvestigationRunSnapshotView> {
+    if (!reason || reason.trim().length === 0) {
+      throw ProviderError.validation(
+        "A pause reason is required (the platform pause endpoint rejects an empty reason).",
+      );
+    }
+    try {
+      const response = await apiPauseInvestigation(id, reason);
+      return this.mapRunSnapshot(response.run, id);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async resume(id: string): Promise<InvestigationRunSnapshotView> {
+    try {
+      const response = await apiResumeInvestigation(id);
+      return this.mapRunSnapshot(response.run, id);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async resolveReview(
+    id: string,
+    outcome: ReviewOutcome,
+    notes?: string,
+  ): Promise<InvestigationRunSnapshotView> {
+    try {
+      const response = await apiResolveInvestigationReview(id, outcome, notes);
+      return this.mapRunSnapshot(response.run, id);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** Presence-only review checkpoint: non-null ONLY while state === REVIEW_REQUIRED. */
+  async getReviewCheckpoint(id: string): Promise<ReviewCheckpoint | null> {
+    let status: Awaited<ReturnType<typeof getInvestigationStatus>>;
+    try {
+      status = await getInvestigationStatus(id, this.caseId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    if (status.state !== "REVIEW_REQUIRED") return null;
+    return {
+      runId: status.id,
+      investigationId: id,
+      caseId: this.caseId,
+      status: status.status,
+      state: status.state,
+      currentStage: status.currentStage ?? null,
+    };
   }
 }
 
@@ -306,27 +441,253 @@ class UnsupportedEntityProvider implements EntityProvider {
   }
 }
 
-class UnsupportedGraphProvider implements GraphProvider {
-  getVersion(): Promise<never> {
-    return providerUnsupported("graph.getVersion");
+/**
+ * Live implementation of GraphProvider (Phase 4).
+ *
+ * The platform's graph surface:
+ *   - GET /investigations/:id/graph  → the CURRENT projected graph (nodes/
+ *     edges/truncation), rebuilt on demand from canonical entities + relations;
+ *   - GET /cases/:caseId/graph/versions → the historical version list,
+ *     ordered by versionNumber ascending (metadata only — case-scoped).
+ *
+ * getVersion() resolves the LATEST recorded version via the version list
+ * (limit=1 probe for total, then offset=total-1) and projects it into the
+ * canonical GraphVersion. When the case has NO recorded version (no entities/
+ * relations materialized), getVersion throws typed UNSUPPORTED — never
+ * fabricates a version identity.
+ *
+ * getNodes()/getEdges() stream the current projection from the graph endpoint.
+ * getGraphHoles() returns an authoritative EMPTY list: the platform exposes no
+ * graph-hole endpoint (holes are derived during analysis and surface through
+ * the leads/candidates seam), so absence is the honest datum — exactly the
+ * same rule that keeps getOverlayCatalog() → {}. Requesting nodes/edges/holes
+ * in parallel (as graph-panel does) therefore never fails on a missing seam.
+ *
+ * The P4 structural-candidate methods hit the candidate endpoints and are
+ * typed on the canonical candidate DTOs.
+ */
+export class LiveGraphProvider implements GraphProvider {
+  constructor(private readonly caseId: string) {}
+
+  private async fetchLatestVersion(): Promise<GraphVersionListItemDTO> {
+    const probe = await apiListGraphVersions(this.caseId, { limit: 1 });
+    if (probe.total === 0) {
+      throw ProviderError.unsupported(
+        "graph.getVersion: the platform has no recorded graph version for this case yet (no entities/relations have materialized).",
+      );
+    }
+    const page = await apiListGraphVersions(this.caseId, {
+      limit: 1,
+      offset: probe.total - 1,
+    });
+    const latest = page.versions[0];
+    if (!latest) {
+      throw ProviderError.server(
+        "The graph version list returned an empty latest page.",
+      );
+    }
+    return latest;
   }
-  listVersions(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("graph.listVersions");
+
+  async getVersion(investigationId: string): Promise<GraphVersion> {
+    let latest: GraphVersionListItemDTO;
+    try {
+      latest = await this.fetchLatestVersion();
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    try {
+      return projectGraphVersionFromListItem(latest, investigationId);
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live graph version projection failed for the latest recorded version.",
+        err,
+      );
+    }
   }
-  getVersionById(): Promise<never> {
-    return providerUnsupported("graph.getVersionById");
+
+  async listVersions(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<GraphVersion>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    const page = query?.page ?? 1;
+    const pageSize = Math.min(query?.pageSize ?? 20, 100);
+    try {
+      const response: GraphVersionListResponse = await apiListGraphVersions(
+        this.caseId,
+        { limit: pageSize, offset: (page - 1) * pageSize },
+      );
+      const items = response.versions.map((v) =>
+        projectGraphVersionFromListItem(v, investigationId),
+      );
+      return {
+        items,
+        page,
+        pageSize,
+        totalItems: response.total,
+        hasMore: (page - 1) * pageSize + items.length < response.total,
+      };
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
   }
-  getNodes(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("graph.getNodes");
+
+  async getVersionById(
+    investigationId: string,
+    graphVersionId: string,
+  ): Promise<GraphVersion> {
+    let response: GraphVersionDetailsResponse;
+    try {
+      response = await apiGetGraphVersionDetails(this.caseId, graphVersionId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    if (!response.version) {
+      throw ProviderError.notFound("Graph version not found.");
+    }
+    try {
+      return projectGraphVersionFromListItem(
+        { ...response.version, caseId: response.caseId },
+        investigationId,
+      );
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live graph version projection failed for the requested version.",
+        err,
+      );
+    }
   }
-  getEdges(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("graph.getEdges");
+
+  async getNodes(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<GraphNode>> {
+    let current: { versionId: string; nodes: GraphNode[] };
+    try {
+      const latest = await this.fetchLatestVersion();
+      const graph = await apiGetInvestigationGraph(investigationId);
+      current = {
+        versionId: latest.id,
+        nodes: graph.graph.nodes.map((n) =>
+          projectGraphNode(n, { investigationId, versionId: latest.id }),
+        ),
+      };
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return paginateItems(current.nodes, query);
   }
-  getGraphHoles(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("graph.getGraphHoles");
+
+  async getEdges(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<GraphEdge>> {
+    let current: { versionId: string; edges: GraphEdge[] };
+    try {
+      const latest = await this.fetchLatestVersion();
+      const graph = await apiGetInvestigationGraph(investigationId);
+      current = {
+        versionId: latest.id,
+        edges: graph.graph.edges.map((e) =>
+          projectGraphEdge(e, { investigationId, versionId: latest.id }),
+        ),
+      };
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return paginateItems(current.edges, query);
   }
+
+  getGraphHoles(
+    _investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<GraphHole>> {
+    return Promise.resolve({
+      items: [],
+      page: query?.page ?? 1,
+      pageSize: query?.pageSize ?? 20,
+      totalItems: 0,
+      hasMore: false,
+    });
+  }
+
   getOverlayCatalog(): Promise<GraphRealtimeCatalog> {
     return Promise.resolve({});
+  }
+
+  async getTemporalBursts(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<TemporalBurstCandidateDTO>> {
+    try {
+      const response = await apiListTemporalBursts(investigationId);
+      return paginateItems(response.bursts, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async getCommunities(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CommunityCandidateDTO>> {
+    try {
+      const response = await apiListCommunityCandidates(investigationId);
+      return paginateItems(response.candidates, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async getBridges(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<BridgeCandidateDTO>> {
+    try {
+      const response = await apiListBridgeCandidates(investigationId);
+      return paginateItems(response.bridges, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async traverse(
+    investigationId: string,
+    startEntityId: string,
+    hops?: number,
+    maxPaths?: number,
+  ): Promise<Paginated<ConnectingPathCandidateDTO>> {
+    try {
+      const response = await apiTraverseGraph(
+        investigationId,
+        startEntityId,
+        hops,
+        maxPaths,
+      );
+      return paginateItems(response.paths);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async connectingPaths(
+    investigationId: string,
+    fromEntityId: string,
+    toEntityId: string,
+    hops?: number,
+  ): Promise<Paginated<ConnectingPathCandidateDTO>> {
+    try {
+      const response = await apiListConnectingPaths(
+        investigationId,
+        fromEntityId,
+        toEntityId,
+        hops,
+      );
+      return paginateItems(response.paths);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
   }
 }
 
@@ -393,15 +754,6 @@ class UnsupportedTimelineProvider implements TimelineProvider {
   }
 }
 
-class UnsupportedLeadProvider implements LeadProvider {
-  listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("leads.listByInvestigation");
-  }
-  get(): Promise<never> {
-    return providerUnsupported("leads.get");
-  }
-}
-
 class UnsupportedGapProvider implements GapProvider {
   listByInvestigation(): Promise<Paginated<never>> {
     return providerUnsupportedPaginated("gaps.listByInvestigation");
@@ -435,10 +787,148 @@ class UnsupportedHypothesisProvider implements HypothesisProvider {
   }
 }
 
-class UnsupportedCrossCaseProvider implements CrossCaseProvider {
-  listMatches(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("crossCase.listMatches");
+/**
+ * Live implementation of LeadProvider (Phase 4).
+ *
+ * The platform lead routes serialize DurableLead rows; this provider projects
+ * them into the canonical Lead (see lead-projection.ts). get() reconstructs
+ * the single-lead read against THIS workspace's investigation (the canonical
+ * Lead covers the envelope's event history implicitly via provenance).
+ */
+export class LiveLeadProvider implements LeadProvider {
+  constructor(private readonly ctx: LeadProjectionContext) {}
+
+  async listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<Lead>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: LeadListResponse;
+    try {
+      response = await apiListLeads(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return paginateItems(
+      response.leads.map((dto) => projectLeadFromDto(dto, this.ctx)),
+      query,
+    );
   }
+
+  async get(id: string): Promise<Lead> {
+    let response: LeadDetailResponse;
+    try {
+      response = await apiGetLead(this.ctx.investigationId, id);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    try {
+      return projectLeadFromDto(response.lead, this.ctx);
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live lead projection failed for the requested lead.",
+        err,
+      );
+    }
+  }
+
+  async generate(investigationId: string): Promise<GenerateLeadsResult> {
+    try {
+      const response = await apiGenerateLeads(investigationId);
+      return {
+        candidatesConsidered: response.candidatesConsidered,
+        leadsCreated: response.leadsCreated,
+        leadsAlreadyExisted: response.leadsAlreadyExisted,
+        skipped: response.skipped,
+        reviewTriggered: response.reviewTriggered,
+      };
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async attachEvidence(
+    investigationId: string,
+    leadId: string,
+    request: AttachLeadEvidenceRequest,
+  ): Promise<LeadEvidenceLink> {
+    try {
+      const response = await apiAttachLeadEvidence(
+        investigationId,
+        leadId,
+        request,
+      );
+      return projectLeadEvidenceLinkFromDto(response.link);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  async transitionStatus(
+    investigationId: string,
+    leadId: string,
+    toStatus: LeadStatus,
+  ): Promise<Lead> {
+    let response: Awaited<ReturnType<typeof apiTransitionLeadStatus>>;
+    try {
+      response = await apiTransitionLeadStatus(investigationId, leadId, toStatus);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    try {
+      return projectLeadFromDto(response.lead, this.ctx);
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live lead projection failed for the transitioned lead.",
+        err,
+      );
+    }
+  }
+}
+
+/**
+ * Live implementation of CrossCaseProvider (Phase 4).
+ *
+ * listMatches() enumerates the authenticated case catalogue, then reads the
+ * read-only shared-entity preview (GET /investigations/:id/cross-case-links)
+ * against every OTHER case boundary, all-or-nothing: a failure to read one
+ * target case MUST NOT be presented as a complete cross-case surface, so the
+ * first typed failure rejects the whole call.
+ *
+ * listForeignOverlays() has no backend route and stays UNSUPPORTED (never
+ * fabricates or reuses demo islands).
+ */
+export class LiveCrossCaseProvider implements CrossCaseProvider {
+  constructor(private readonly identity: WorkspaceIdentity) {}
+
+  async listMatches(
+    caseId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CrossCaseMatch>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let all: Case[];
+    try {
+      all = (await apiListCases()).cases;
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    const targets = all.filter((c) => c.id !== caseId);
+    const perCase = await Promise.all(
+      targets.map(async (target) => {
+        try {
+          const response = await apiListCrossCaseLinks(
+            this.identity.investigationId,
+            target.id,
+          );
+          return response.matches;
+        } catch (err) {
+          throw toLiveProviderError(err);
+        }
+      }),
+    );
+    return paginateItems(perCase.flat(), query);
+  }
+
   listForeignOverlays(): Promise<Paginated<never>> {
     return providerUnsupportedPaginated("crossCase.listForeignOverlays");
   }
@@ -469,14 +959,14 @@ export function createLiveWorkspaceProviders(
     evidence: new LiveEvidenceProvider(),
     observations: new LiveObservationProvider(),
     entities: new UnsupportedEntityProvider(),
-    graph: new UnsupportedGraphProvider(),
+    graph: new LiveGraphProvider(identity.caseId),
     timeline: new UnsupportedTimelineProvider(),
-    leads: new UnsupportedLeadProvider(),
+    leads: new LiveLeadProvider({ investigationId: identity.investigationId }),
     gaps: new UnsupportedGapProvider(),
     review: new UnsupportedReviewProvider(),
     robustness: new UnsupportedRobustnessProvider(),
     hypotheses: new UnsupportedHypothesisProvider(),
-    crossCase: new UnsupportedCrossCaseProvider(),
+    crossCase: new LiveCrossCaseProvider(identity),
     relations: new UnsupportedRelationProvider(),
     intelligence: new UnsupportedIntelligenceProvider(),
     realtime,

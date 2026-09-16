@@ -11,6 +11,15 @@ import type {
   EvidenceStatus,
   EvidenceType,
   Observation,
+  ProjectedGraph,
+  TemporalBurstCandidateDTO,
+  CommunityCandidateDTO,
+  BridgeCandidateDTO,
+  ConnectingPathCandidateDTO,
+  CrossCaseMatch,
+  LeadStatus,
+  LeadPriority,
+  LeadEvidenceVerdict,
 } from "@indago/contracts";
 
 export interface InvestigationStatusResponse {
@@ -162,4 +171,252 @@ export interface CasesResponse {
 export interface DeleteCaseResponse {
   readonly deleted: true;
   readonly caseId: string;
+}
+
+// ============================================================================
+// Phase 4 — Graph (M-A10 / M-A13, PR3)
+//
+// Shapes returned by the platform Phase 4 graph endpoints. The envelopes are
+// platform API response shapes (local types); the inner `graph` / candidate /
+// match payloads are canonical contracts from @indago/contracts.
+// ============================================================================
+
+/** GET /investigations/:id/graph — the derived ProjectedGraph envelope. */
+export interface ProjectedGraphResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly graph: ProjectedGraph;
+}
+
+/** One historical graph version as listed by GET /cases/:caseId/graph/versions.
+ *  `caseId` is carried by the platform item; `investigationId` is NOT exposed
+ *  by this route and is backfilled by the provider from the workspace identity. */
+export interface GraphVersionListItemDTO {
+  readonly id: string;
+  readonly caseId: string;
+  readonly versionNumber: number;
+  readonly status: string;
+  readonly projectionStatus: string;
+  readonly parentGraphVersionId: string | null;
+  readonly checkpointId: string | null;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly reason: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** The `version` half of GET /cases/:caseId/graph/versions/:vid — the same
+ *  metadata as GraphVersionListItemDTO with `caseId` carried at the top level
+ *  instead of on the item. */
+export type GraphVersionMetadataDTO = Omit<GraphVersionListItemDTO, "caseId">;
+
+/** GET /cases/:caseId/graph/versions — paginated (limit ∈ [1,100], offset ≥ 0),
+ *  ordered by versionNumber ascending (the deterministic replay seam). */
+export interface GraphVersionListResponse {
+  readonly caseId: string;
+  readonly total: number;
+  readonly offset: number;
+  readonly limit: number;
+  readonly count: number;
+  readonly versions: GraphVersionListItemDTO[];
+}
+
+/** GET /cases/:caseId/graph/versions/:vid — a single historical graph version
+ *  (versionNumber or UUID) with its projected graph. The response `version`
+ *  metadata carries no caseId (it is at the top level). */
+export interface GraphVersionDetailsResponse {
+  readonly caseId: string;
+  readonly version: GraphVersionMetadataDTO | null;
+  readonly graph: ProjectedGraph;
+}
+
+// ============================================================================
+// Phase 4 — Structural candidate endpoints
+// ============================================================================
+
+/** GET /investigations/:id/graph/bursts — temporal burst candidates. */
+export interface TemporalBurstCandidatesResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly burstCount: number;
+  readonly bursts: TemporalBurstCandidateDTO[];
+}
+
+/** GET /investigations/:id/graph/community-candidates — cohesion candidates. */
+export interface CommunityCandidatesResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly candidateCount: number;
+  readonly candidates: CommunityCandidateDTO[];
+}
+
+/** GET /investigations/:id/graph/bridges — bridge/connector candidates. */
+export interface BridgeCandidatesResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly bridgeCount: number;
+  readonly bridges: BridgeCandidateDTO[];
+}
+
+/** GET /investigations/:id/graph/traversal — bounded N-hop traversal paths. */
+export interface TraversalResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly startEntityId: string;
+  readonly pathCount: number;
+  readonly paths: ConnectingPathCandidateDTO[];
+}
+
+/** GET /investigations/:id/graph/paths — bounded paths between two entities. */
+export interface ConnectingPathsResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly from: string;
+  readonly to: string;
+  readonly pathCount: number;
+  readonly paths: ConnectingPathCandidateDTO[];
+}
+
+// ============================================================================
+// Phase 4 — Leads
+//
+// The platform lead routes serialize DurableLead rows directly (dates as ISO
+// strings). This is the honest wire shape — the provider projects it into the
+// canonical LeadSchema (see lib/providers/live/lead-projection.ts). `status` /
+// `priority` / `posture` / `sourceCandidateType` are the canonical unions; the
+// JSON blobs stay opaque (`unknown[]`-free records) because the routes carry
+// them verbatim.
+// ============================================================================
+
+export interface DurableLeadDTO {
+  readonly id: string;
+  readonly caseId: string;
+  readonly investigationId: string | null;
+  readonly title: string;
+  readonly description: string;
+  readonly status: LeadStatus;
+  readonly priority: LeadPriority;
+  readonly confidence: number;
+  readonly posture: string;
+  readonly relatedEntityIds: readonly string[];
+  readonly supportingObservationIds: readonly string[];
+  readonly contradictingObservationIds: readonly string[];
+  readonly relatedEvidenceIds: readonly string[];
+  readonly gapIds: readonly string[];
+  readonly sourceCandidateType: string;
+  readonly sourceCandidateKey: string;
+  readonly sourceCandidateSnapshot: unknown;
+  readonly alternativeExplanations: unknown;
+  readonly provenance: unknown;
+  readonly assignedTo: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly closedAt: string | null;
+}
+
+export interface DurableLeadEvidenceLinkDTO {
+  readonly id: string;
+  readonly leadId: string;
+  readonly observationId: string;
+  readonly verdict: LeadEvidenceVerdict;
+  readonly rationale: string | null;
+  readonly addedBy: string;
+  readonly createdAt: string;
+}
+
+export interface DurableLeadEventDTO {
+  readonly id: string;
+  readonly leadId: string;
+  readonly caseId: string;
+  readonly eventType: string;
+  readonly actor: string;
+  readonly payload: unknown;
+  readonly sequence: number;
+  readonly createdAt: string;
+}
+
+/** GET /investigations/:id/leads — full case-scoped lead list. */
+export interface LeadListResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly leadCount: number;
+  readonly leads: DurableLeadDTO[];
+}
+
+/** GET /investigations/:id/leads/:leadId — lead + event history + evidence links. */
+export interface LeadDetailResponse {
+  readonly lead: DurableLeadDTO;
+  readonly events: DurableLeadEventDTO[];
+  readonly evidence: DurableLeadEvidenceLinkDTO[];
+}
+
+/** POST /investigations/:id/leads/generate — structural lead generation result. */
+export interface GenerateLeadsResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly candidatesConsidered: number;
+  readonly leadsCreated: number;
+  readonly leadsAlreadyExisted: number;
+  readonly skipped: number;
+  readonly reviewTriggered: boolean;
+}
+
+/** POST /investigations/:id/leads/:leadId/evidence — evidence attach result. */
+export interface AttachLeadEvidenceResponse {
+  readonly lead: DurableLeadDTO;
+  readonly link: DurableLeadEvidenceLinkDTO;
+  readonly created: boolean;
+}
+
+/** POST /investigations/:id/leads/:leadId/status — transition result. */
+export interface TransitionLeadStatusResponse {
+  readonly lead: DurableLeadDTO;
+}
+
+// ============================================================================
+// Phase 4 — Cross-case discovery
+// ============================================================================
+
+/** GET /investigations/:id/cross-case-links — read-only shared-entity preview. */
+export interface CrossCaseLinksResponse {
+  readonly caseId: string;
+  readonly targetCaseId: string;
+  readonly matchCount: number;
+  readonly matches: CrossCaseMatch[];
+}
+
+/** POST /investigations/:id/cross-case-links/generate — persisted cross-case leads. */
+export interface GenerateCrossCaseLeadsResponse {
+  readonly caseId: string;
+  readonly targetCaseId: string;
+  readonly candidatesConsidered: number;
+  readonly leadsCreated: number;
+  readonly leadsAlreadyExisted: number;
+  readonly skipped: number;
+  readonly reviewTriggered: boolean;
+}
+
+// ============================================================================
+// Phase 4 — Run control (pause / resume / review resolution)
+//
+// POST /investigations/:id/pause, /resume, /review/resolve all return
+// `{ run: RunSnapshot }` — the same {id, investigationId, caseId, status,
+// state, currentStage} shape the run-status endpoint exposes (minus the
+// timestamps), never a canonical Investigation.
+// ============================================================================
+
+export interface InvestigationRunSnapshotDTO {
+  readonly id: string;
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly status: string;
+  readonly state: string;
+  readonly currentStage: string | null;
+}
+
+export interface RunCommandResponse {
+  readonly run: InvestigationRunSnapshotDTO;
 }

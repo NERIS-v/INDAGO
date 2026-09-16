@@ -1,5 +1,9 @@
 "use client";
 
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { Button } from "@/components/ui/button";
+
 export interface GapMock {
   id: string;
   holeType: "ISOLATED_NODE" | "MISSING_COMPARISON" | "INFRASTRUCTURE_GAP";
@@ -13,6 +17,10 @@ interface GapsListProps {
   gaps: GapMock[];
   onSelectGap: (id: string) => void;
   loading?: boolean;
+  error?: string | null;
+  /** Live bundle surfaces an explicit "not available" state instead of pretending. */
+  unavailable?: boolean;
+  onRetry?: () => void;
 }
 
 const IMPACT_CLASS: Record<GapMock["impact"], string> = {
@@ -27,13 +35,29 @@ const STATUS_META: Record<GapMock["status"], { label: string; className: string 
   RESOLVED: { label: "Resolved", className: "text-semantic-foreground-faint border-semantic-border bg-semantic-surface" },
 };
 
-export function GapsList({ gaps, onSelectGap, loading }: GapsListProps) {
+export function GapsList({ gaps, onSelectGap, loading, error, unavailable, onRetry }: GapsListProps) {
   if (loading) {
     return (
       <div className="flex h-48 flex-col items-center justify-center gap-3">
         <div className="h-5 w-5 rounded-full border-2 border-semantic-border border-t-accent-amber animate-spin" />
         <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">Reviewing unknowns...</span>
       </div>
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <EmptyState
+        title="Gap analysis not available in this mode"
+        description="Structural gap analysis is not served for this investigation in the current data mode."
+        action={onRetry ? <Button variant="ghost" size="sm" onClick={onRetry}>Retry</Button> : undefined}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorDisplay title="Could not load gaps" message={error} retry={onRetry} />
     );
   }
 

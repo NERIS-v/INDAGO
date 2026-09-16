@@ -15,12 +15,16 @@ function config(
 
 describe("F-PR5 — capability availability registry", () => {
   it("declares exactly the documented demo/live availability", () => {
-    for (const live of ["investigation", "evidence", "observations", "cases", "realtime"] as const) {
+    for (const live of [
+      "investigation", "evidence", "observations", "cases", "realtime",
+      // PR-20: Phase-4 capabilities are now live-available.
+      "graph", "leads", "crossCase",
+    ] as const) {
       expect(CAPABILITY_AVAILABILITY[live], live).toEqual({ demo: true, live: true });
     }
     for (const demoOnly of [
-      "entities", "graph", "relations", "intelligence", "timeline",
-      "leads", "gaps", "review", "robustness", "hypotheses", "crossCase",
+      "entities", "relations", "intelligence", "timeline",
+      "gaps", "review", "robustness", "hypotheses",
     ] as const) {
       expect(CAPABILITY_AVAILABILITY[demoOnly], demoOnly).toEqual({ demo: true, live: false });
     }
@@ -42,7 +46,7 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
 
   it("live workspace + explicit config.mode live: never a silent demo", () => {
     expect(resolveCapabilityStatus("evidence", config("live", true), "live")).toBe("live");
-    expect(resolveCapabilityStatus("graph", config("live", true), "live")).toBe("not-ready");
+    expect(resolveCapabilityStatus("graph", config("live", true), "live")).toBe("live");
     expect(resolveCapabilityStatus("timeline", config("live", true), "live")).toBe("not-ready");
     expect(resolveCapabilityStatus("network.pulse", config("live", false), "live")).toBe("not-ready");
   });
@@ -50,13 +54,15 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
   it("live workspace + config.mode demo is still never -demo- served", () => {
     // A config.mode of "demo" does not unlock live capabilities: the workspace
     // is live and the capability is not live-available -> typed not-ready.
-    expect(resolveCapabilityStatus("graph", config("demo", true), "live")).toBe("not-ready");
+    // A live-available capability is ALWAYS served live, regardless of config.
+    expect(resolveCapabilityStatus("graph", config("demo", true), "live")).toBe("live");
     expect(resolveCapabilityStatus("timeline", config("demo", true), "live")).toBe("not-ready");
   });
 
   it("live workspace + AUTO: live wins, demo-only is served by demo, nothing-available is not-ready", () => {
     expect(resolveCapabilityStatus("evidence", config("auto", true), "live")).toBe("live");
-    expect(resolveCapabilityStatus("graph", config("auto", true), "live")).toBe("demo");
+    expect(resolveCapabilityStatus("graph", config("auto", true), "live")).toBe("live");
+    expect(resolveCapabilityStatus("gaps", config("auto", true), "live")).toBe("demo");
     expect(resolveCapabilityStatus("timeline", config("auto", true), "live")).toBe("demo");
     // The Cross-Case Matrix is implemented in demo, so AUTO demo-serves it.
     expect(resolveCapabilityStatus("network.matrix", config("auto", true), "live")).toBe("demo");
@@ -69,10 +75,12 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
       const here = config("auto", isDev);
       // Live-implemented capabilities stay live in both.
       expect(resolveCapabilityStatus("evidence", here, "live")).toBe("live");
+      expect(resolveCapabilityStatus("graph", here, "live")).toBe("live");
+      expect(resolveCapabilityStatus("leads", here, "live")).toBe("live");
       // Demo-only capabilities fall back to the demo provider in both (the
       // AUTO bundle genuinely serves them; never merely declared). The Entity
       // Pulse joined the demo-served representations with the others.
-      expect(resolveCapabilityStatus("graph", here, "live")).toBe("demo");
+      expect(resolveCapabilityStatus("gaps", here, "live")).toBe("demo");
       expect(resolveCapabilityStatus("timeline", here, "live")).toBe("demo");
       expect(resolveCapabilityStatus("network.pulse", here, "live")).toBe("demo");
       expect(resolveCapabilityStatus("network.matrix", here, "live")).toBe("demo");
@@ -92,13 +100,14 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
 
     const live = createCapabilityStatusTable(config("live", false), "live");
     expect(live["evidence"]).toBe("live");
-    expect(live["graph"]).toBe("not-ready");
+    expect(live["graph"]).toBe("live");
     expect(live["timeline"]).toBe("not-ready");
     expect(live["network.graph"]).toBe("not-ready");
 
     const autoDevLive = createCapabilityStatusTable(config("auto", true), "live");
     expect(autoDevLive["evidence"]).toBe("live");
-    expect(autoDevLive["graph"]).toBe("demo");
+    expect(autoDevLive["graph"]).toBe("live");
+    expect(autoDevLive["gaps"]).toBe("demo");
     expect(autoDevLive["network.pulse"]).toBe("demo");
     expect(autoDevLive["network.matrix"]).toBe("demo");
     expect(autoDevLive["network.flow"]).toBe("demo");

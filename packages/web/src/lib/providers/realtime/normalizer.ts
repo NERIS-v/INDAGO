@@ -31,11 +31,18 @@ export function eventIdentity(event: ProviderEvent): string {
 //   - canonical-shaped events (audit records, demo events) that ALREADY carry
 //     `action` / `description` — passed through unchanged;
 //   - control frames: { type: "CONNECTED" | "EVIDENCE_SUBMITTED", ... };
-//   - run-progress frames: { state, message, ... } (ProgressPayload).
+//   - run-progress frames: { state, message, ... } (ProgressPayload);
+//   - typed frames: { type: "OBSERVATION_EXTRACTED" | "ANALYSIS_PROGRESS", ... }.
 //
 // The Activity Feed renders `action` (the main line) and `description` (the
 // sub-line), so live frames without those fields are mapped here at the
 // provider boundary — UI components do NOT branch on payload shape or mode.
+//
+// ANALYSIS_PROGRESS frames (P4-PR3) carry a `phase` (ANALYSIS_STARTED /
+// CANDIDATES_DETECTED / LEAD_CREATED / ANALYSIS_COMPLETED) and a `message`;
+// they are surfaced with the deterministic action "ANALYSIS_PROGRESS_<PHASE>".
+// OBSERVATION_EXTRACTED frames (M-A06 metadata-only) surface the observation
+// count against the originating evidenceId.
 // ============================================================================
 
 /**
@@ -66,6 +73,11 @@ export function evidenceSubmittedDescription(raw: SseEvent): string {
  *                                      targetType "EVIDENCE", targetId = operationId
  *   { state, message }              → action "RUN_PHASE_<STATE>",
  *                                      description = message
+ *   { type: "OBSERVATION_EXTRACTED" } → action "OBSERVATION_EXTRACTED",
+ *                                      description = observation count vs the
+ *                                      originating evidence, targetId = evidenceId
+ *   { type: "ANALYSIS_PROGRESS" }   → action "ANALYSIS_PROGRESS_<PHASE>",
+ *                                      description = message
  */
 export function normalizeEvent(
   raw: SseEvent,
@@ -89,6 +101,15 @@ export function normalizeEvent(
   } else if (isType("EVIDENCE_SUBMITTED")) {
     action = "EVIDENCE_SUBMITTED";
     description = evidenceSubmittedDescription(raw);
+  } else if (isType("OBSERVATION_EXTRACTED")) {
+    action = "OBSERVATION_EXTRACTED";
+    const count =
+      typeof raw.observationCount === "number" ? raw.observationCount : 0;
+    description = `${count} observation${count === 1 ? "" : "s"} extracted`;
+  } else if (isType("ANALYSIS_PROGRESS")) {
+    const phase = typeof raw.phase === "string" ? raw.phase : "UNKNOWN";
+    action = `ANALYSIS_PROGRESS_${phase}`;
+    description = typeof raw.message === "string" ? raw.message : "";
   } else if (isProgress) {
     const state = raw.state as string;
     action = runStateAction(state);
@@ -101,10 +122,16 @@ export function normalizeEvent(
     ...base,
     action,
     description,
-    targetType: isType("EVIDENCE_SUBMITTED") ? "EVIDENCE" : base.targetType,
+    targetType: isType("EVIDENCE_SUBMITTED")
+      ? "EVIDENCE"
+      : isType("OBSERVATION_EXTRACTED")
+        ? "OBSERVATION"
+        : base.targetType,
     targetId: isType("EVIDENCE_SUBMITTED")
       ? (typeof raw.operationId === "string" ? raw.operationId : id)
-      : base.targetId,
+      : isType("OBSERVATION_EXTRACTED") && typeof raw.evidenceId === "string"
+        ? raw.evidenceId
+        : base.targetId,
   };
 }
 

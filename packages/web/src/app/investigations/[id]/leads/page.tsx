@@ -1,39 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useWorkspace } from "@/lib/providers/workspace/context";
+import { toProviderError } from "@/lib/providers";
+import { mapLeadToLeadMock } from "@/lib/intel/lead-adapter";
 import { LeadsList, type LeadMock } from "@/components/intel/leads-list";
 import { LeadDrawer } from "@/components/drawers/lead-drawer";
-
-// Deterministic mock data for the Operation Financial Shadow demo case
-const DEMO_LEADS: LeadMock[] = [
-  {
-    id: "lead-victor-meridian",
-    claim: "Victor Aldridge exercises covert ownership of Meridian Transit via intermediary accounts.",
-    structuralSignal: "HIGH",
-    relevance: "MODERATE-HIGH",
-    confidence: 0.87,
-    coverage: 0.81,
-    supportCount: 6,
-    againstCount: 1,
-    status: "REVIEW",
-  },
-  {
-    id: "lead-shell-pattern",
-    claim: "Northbridge Capital Ltd and Aldridge Holdings S.A. operate as a coordinated shell cluster.",
-    structuralSignal: "MODERATE",
-    relevance: "MODERATE",
-    confidence: 0.65,
-    coverage: 0.54,
-    supportCount: 3,
-    againstCount: 0,
-    status: "AUTHORIZED",
-  }
-];
+import { Button } from "@/components/ui/button";
 
 export default function LeadsPage() {
+  const workspace = useWorkspace();
+  const [leads, setLeads] = useState<LeadMock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
-  const pendingReview = DEMO_LEADS.filter((l) => l.status === "REVIEW").length;
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setUnavailable(false);
+    try {
+      const page = await workspace.leads.listByInvestigation(
+        workspace.investigationId,
+        { pageSize: 100 },
+      );
+      setLeads(page.items.map(mapLeadToLeadMock));
+    } catch (err) {
+      const pe = toProviderError(err);
+      if (pe.code === "UNSUPPORTED") {
+        setUnavailable(true);
+        setLeads([]);
+      } else {
+        setError(pe.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [workspace]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const generate = workspace.leads.generate;
+  const handleGenerate = useCallback(async () => {
+    if (!generate) return;
+    setGenerating(true);
+    try {
+      await generate(workspace.investigationId);
+      await load();
+    } catch (err) {
+      setError(toProviderError(err).message);
+    } finally {
+      setGenerating(false);
+    }
+  }, [generate, workspace.investigationId, load]);
+
+  const pendingReview = leads.filter((l) => l.status === "REVIEW").length;
 
   return (
     <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
@@ -53,9 +78,23 @@ export default function LeadsPage() {
                 {pendingReview} pending review
               </span>
             )}
-            <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
-              {String(DEMO_LEADS.length).padStart(2, "0")} total
-            </span>
+            {leads.length > 0 && (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
+                {String(leads.length).padStart(2, "0")} total
+              </span>
+            )}
+            {generate && (
+              <span className="ml-auto">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleGenerate()}
+                  disabled={generating}
+                >
+                  {generating ? "Generating..." : "Generate leads"}
+                </Button>
+              </span>
+            )}
           </div>
           <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
             Leads are candidate lines of inquiry derived from the case graph.
@@ -65,7 +104,11 @@ export default function LeadsPage() {
 
         <div className="flex w-full flex-col pt-6">
           <LeadsList
-            leads={DEMO_LEADS}
+            leads={leads}
+            loading={loading}
+            error={error}
+            unavailable={unavailable}
+            onRetry={() => void load()}
             onSelectLead={setSelectedLeadId}
           />
         </div>

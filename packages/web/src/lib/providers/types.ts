@@ -42,6 +42,13 @@ import type {
   CandidatePair,
   CandidateResolution,
   EntityHypothesis,
+  TemporalBurstCandidateDTO,
+  CommunityCandidateDTO,
+  BridgeCandidateDTO,
+  ConnectingPathCandidateDTO,
+  LeadStatus,
+  LeadEvidenceLink,
+  AttachLeadEvidenceRequest,
 } from "@indago/contracts";
 import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
@@ -771,12 +778,68 @@ export type RealtimeStatus = "disconnected" | "connecting" | "connected" | "erro
 // Provider Interfaces
 // ============================================================================
 
+// ============================================================================
+// Phase 4 — Live extension types
+//
+// Canonical payloads surfaced by the Phase 4 endpoints that have no canonical
+// contracts equivalent. The provider boundary owns these shapes; UI consumes
+// them only through the provider seams.
+// ============================================================================
+
+/** POST /investigations/:id/leads/generate — structural lead generation result. */
+export interface GenerateLeadsResult {
+  readonly candidatesConsidered: number;
+  readonly leadsCreated: number;
+  readonly leadsAlreadyExisted: number;
+  readonly skipped: number;
+  readonly reviewTriggered: boolean;
+}
+
+/** Run-control responses (pause / resume / review resolution) project the
+ *  platform RunSnapshot — {id, investigationId, caseId, status, state,
+ *  currentStage} — NOT a canonical Investigation (the platform never returns
+ *  one for these commands). */
+export interface InvestigationRunSnapshotView {
+  readonly runId: string;
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly status: string;
+  readonly state: string;
+  readonly currentStage: string | null;
+}
+
+/** Human resolution of a REVIEW_REQUIRED checkpoint. APPROVED lets the run
+ *  continue; NEEDS_EVIDENCE returns it to evidence gathering. */
+export type ReviewOutcome = "APPROVED" | "NEEDS_EVIDENCE";
+
+/** A run-level review checkpoint: present ONLY when the run is waiting on a
+ *  human (state REVIEW_REQUIRED), else null. It carries run identity only —
+ *  consumers read the lead queue separately via the LeadProvider. */
+export type ReviewCheckpoint = InvestigationRunSnapshotView;
+
 export interface InvestigationProvider {
   get(id: string): Promise<Investigation>;
   listByCase(caseId: string, query?: ProviderQuery): Promise<Paginated<Investigation>>;
   /** Create/start an investigation for a case. Deterministic in demo; maps to
    *  the platform POST /investigations/start in live. */
   start(caseId: string, investigationId: string): Promise<{ runId: string }>;
+  /** Optional: pause the run (human-invoked hold). Absent method → run-state
+   *  controls render an honest "unavailable on this seam" state. Live maps to
+   *  platform POST /investigations/:id/pause. */
+  pause?(id: string, reason?: string): Promise<InvestigationRunSnapshotView>;
+  /** Optional: resume a PAUSED run. Live maps to POST /investigations/:id/resume. */
+  resume?(id: string): Promise<InvestigationRunSnapshotView>;
+  /** Optional: resolve a REVIEW_REQUIRED checkpoint (APPROVED → run continues,
+   *  NEEDS_EVIDENCE → returns to evidence gathering). Live maps to
+   *  POST /investigations/:id/review/resolve. */
+  resolveReview?(
+    id: string,
+    outcome: ReviewOutcome,
+    notes?: string,
+  ): Promise<InvestigationRunSnapshotView>;
+  /** Optional: read the run's review checkpoint — present ONLY while the run is
+   *  waiting on a human (state REVIEW_REQUIRED), otherwise null. */
+  getReviewCheckpoint?(id: string): Promise<ReviewCheckpoint | null>;
 }
 
 export interface EvidenceProvider {
@@ -842,6 +905,38 @@ export interface GraphProvider {
     investigationId: string,
     graphVersionId: string,
   ): Promise<GraphVersion>;
+  /** Optional: P4 temporal-burst candidates (structural signal spikes) derived
+   *  from the case's projected graph. Absent method → consumers render an
+   *  honest "structural signals unavailable" state (the P4 detectors are not
+   *  exposed on this seam). */
+  getTemporalBursts?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<TemporalBurstCandidateDTO>>;
+  /** Optional: P4 cohesion-scored community candidates. */
+  getCommunities?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CommunityCandidateDTO>>;
+  /** Optional: P4 bridge/connector candidates. */
+  getBridges?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<BridgeCandidateDTO>>;
+  /** Optional: P4 bounded N-hop traversal from a canonical entity. */
+  traverse?(
+    investigationId: string,
+    startEntityId: string,
+    hops?: number,
+    maxPaths?: number,
+  ): Promise<Paginated<ConnectingPathCandidateDTO>>;
+  /** Optional: P4 bounded connecting paths between two canonical entities. */
+  connectingPaths?(
+    investigationId: string,
+    fromEntityId: string,
+    toEntityId: string,
+    hops?: number,
+  ): Promise<Paginated<ConnectingPathCandidateDTO>>;
 }
 
 export interface RelationProvider {
@@ -929,6 +1024,26 @@ export interface TimelineProvider {
 export interface LeadProvider {
   listByInvestigation(investigationId: string, query?: ProviderQuery): Promise<Paginated<Lead>>;
   get(id: string): Promise<Lead>;
+  /** Optional: P4 structural lead generation (idempotent over unchanged graph
+   *  state). Absent method → the "Generate leads" action renders honest
+   *  "unavailable on this seam". Live maps to POST /investigations/:id/leads/generate. */
+  generate?(investigationId: string): Promise<GenerateLeadsResult>;
+  /** Optional: attach an observation to a lead with an EVIDENTIARY RELEVANCE
+   *  verdict (FOR / AGAINST — never a truth/guilt verdict). Live maps to
+   *  POST /investigations/:id/leads/:leadId/evidence. */
+  attachEvidence?(
+    investigationId: string,
+    leadId: string,
+    request: AttachLeadEvidenceRequest,
+  ): Promise<LeadEvidenceLink>;
+  /** Optional: guarded lead status transition. Live maps to
+   *  POST /investigations/:id/leads/:leadId/status (transition rules enforced
+   *  server-side). */
+  transitionStatus?(
+    investigationId: string,
+    leadId: string,
+    toStatus: LeadStatus,
+  ): Promise<Lead>;
 }
 
 export interface GapProvider {

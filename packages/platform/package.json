@@ -18,6 +18,7 @@
   "dependencies": {
     "@indago/contracts": "workspace:*",
     "@indago/entity-resolution": "workspace:*",
+    "@indago/gap-classification": "workspace:*",
     "@indago/graph-hole-detection": "workspace:*",
     "@indago/graph-hole-qualification": "workspace:*",
     "@indago/graph-hole-reassessment": "workspace:*",

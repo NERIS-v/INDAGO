@@ -8,6 +8,24 @@ import {
   listEvidence as apiListEvidence,
   listCases as apiListCases,
   deleteCase as apiDeleteCase,
+  getInvestigationGraph as apiGetGraph,
+  listGraphVersions as apiListGraphVersions,
+  getGraphVersionDetails as apiGetGraphVersionDetails,
+  listTemporalBursts as apiListTemporalBursts,
+  listCommunityCandidates as apiListCommunityCandidates,
+  listBridgeCandidates as apiListBridgeCandidates,
+  traverseGraph as apiTraverseGraph,
+  listConnectingPaths as apiListConnectingPaths,
+  listLeads as apiListLeads,
+  getLead as apiGetLead,
+  generateLeads as apiGenerateLeads,
+  attachLeadEvidence as apiAttachLeadEvidence,
+  transitionLeadStatus as apiTransitionLeadStatus,
+  listCrossCaseLinks as apiListCrossCaseLinks,
+  generateCrossCaseLeads as apiGenerateCrossCaseLeads,
+  pauseInvestigation as apiPauseInvestigation,
+  resumeInvestigation as apiResumeInvestigation,
+  resolveInvestigationReview as apiResolveInvestigationReview,
 } from "@/lib/api/server";
 import type {
   StartInvestigationResponse,
@@ -18,7 +36,24 @@ import type {
   EvidenceListResponse,
   CasesResponse,
   DeleteCaseResponse,
+  ProjectedGraphResponse,
+  GraphVersionListResponse,
+  GraphVersionDetailsResponse,
+  TemporalBurstCandidatesResponse,
+  CommunityCandidatesResponse,
+  BridgeCandidatesResponse,
+  TraversalResponse,
+  ConnectingPathsResponse,
+  LeadListResponse,
+  LeadDetailResponse,
+  GenerateLeadsResponse,
+  AttachLeadEvidenceResponse,
+  TransitionLeadStatusResponse,
+  CrossCaseLinksResponse,
+  GenerateCrossCaseLeadsResponse,
+  RunCommandResponse,
 } from "@/lib/api/types";
+import type { LeadStatus } from "@indago/contracts";
 
 export async function startInvestigation(params: {
   caseId: string;
@@ -59,4 +94,142 @@ export async function listCases(): Promise<CasesResponse> {
 
 export async function deleteCase(caseId: string): Promise<DeleteCaseResponse> {
   return apiDeleteCase(caseId);
+}
+
+// ============================================================================
+// Phase 4 server actions (graph, structural candidates, leads, cross-case,
+// run control). Thin "use server" wrappers over lib/api/server — auth stays
+// behind the server boundary.
+// ============================================================================
+
+export async function getInvestigationGraph(
+  investigationId: string,
+): Promise<ProjectedGraphResponse> {
+  return apiGetGraph(investigationId);
+}
+
+export async function listGraphVersions(
+  caseId: string,
+  params?: { limit?: number; offset?: number },
+): Promise<GraphVersionListResponse> {
+  return apiListGraphVersions(caseId, params);
+}
+
+export async function getGraphVersionDetails(
+  caseId: string,
+  versionId: string,
+): Promise<GraphVersionDetailsResponse> {
+  return apiGetGraphVersionDetails(caseId, versionId);
+}
+
+export async function getTemporalBursts(
+  investigationId: string,
+): Promise<TemporalBurstCandidatesResponse> {
+  return apiListTemporalBursts(investigationId);
+}
+
+export async function getCommunityCandidates(
+  investigationId: string,
+): Promise<CommunityCandidatesResponse> {
+  return apiListCommunityCandidates(investigationId);
+}
+
+export async function getBridgeCandidates(
+  investigationId: string,
+  maxResults?: number,
+): Promise<BridgeCandidatesResponse> {
+  return apiListBridgeCandidates(investigationId, maxResults);
+}
+
+export async function traverseGraph(
+  investigationId: string,
+  startEntityId: string,
+  hops?: number,
+  maxPaths?: number,
+): Promise<TraversalResponse> {
+  return apiTraverseGraph(investigationId, startEntityId, hops, maxPaths);
+}
+
+export async function getConnectingPaths(
+  investigationId: string,
+  fromEntityId: string,
+  toEntityId: string,
+  hops?: number,
+): Promise<ConnectingPathsResponse> {
+  return apiListConnectingPaths(investigationId, fromEntityId, toEntityId, hops);
+}
+
+export async function listLeads(
+  investigationId: string,
+  status?: LeadStatus,
+): Promise<LeadListResponse> {
+  return apiListLeads(investigationId, status);
+}
+
+export async function getLead(
+  investigationId: string,
+  leadId: string,
+): Promise<LeadDetailResponse> {
+  return apiGetLead(investigationId, leadId);
+}
+
+export async function generateLeads(
+  investigationId: string,
+): Promise<GenerateLeadsResponse> {
+  return apiGenerateLeads(investigationId);
+}
+
+export async function attachLeadEvidence(
+  investigationId: string,
+  leadId: string,
+  request: {
+    observationId: string;
+    verdict: "FOR" | "AGAINST";
+    rationale?: string;
+  },
+): Promise<AttachLeadEvidenceResponse> {
+  return apiAttachLeadEvidence(investigationId, leadId, request);
+}
+
+export async function transitionLeadStatus(
+  investigationId: string,
+  leadId: string,
+  toStatus: LeadStatus,
+): Promise<TransitionLeadStatusResponse> {
+  return apiTransitionLeadStatus(investigationId, leadId, toStatus);
+}
+
+export async function listCrossCaseLinks(
+  investigationId: string,
+  targetCaseId: string,
+): Promise<CrossCaseLinksResponse> {
+  return apiListCrossCaseLinks(investigationId, targetCaseId);
+}
+
+export async function generateCrossCaseLeads(
+  investigationId: string,
+  targetCaseId: string,
+): Promise<GenerateCrossCaseLeadsResponse> {
+  return apiGenerateCrossCaseLeads(investigationId, targetCaseId);
+}
+
+export async function pauseInvestigation(
+  investigationId: string,
+  reason: string,
+): Promise<RunCommandResponse> {
+  return apiPauseInvestigation(investigationId, reason);
+}
+
+export async function resumeInvestigation(
+  investigationId: string,
+): Promise<RunCommandResponse> {
+  return apiResumeInvestigation(investigationId);
+}
+
+export async function resolveInvestigationReview(
+  investigationId: string,
+  outcome: "APPROVED" | "NEEDS_EVIDENCE",
+  notes?: string,
+): Promise<RunCommandResponse> {
+  return apiResolveInvestigationReview(investigationId, outcome, notes);
 }
