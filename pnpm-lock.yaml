@@ -409,18 +409,27 @@ importers:
       '@indago/entity-resolution':
         specifier: workspace:*
         version: link:../intelligence/entity-resolution
+      '@indago/graph-hole-analysis':
+        specifier: workspace:*
+        version: link:../intelligence/graph-hole-analysis
       '@indago/graph-hole-detection':
         specifier: workspace:*
         version: link:../intelligence/graph-hole-detection
       '@indago/graph-hole-qualification':
         specifier: workspace:*
         version: link:../intelligence/graph-hole-qualification
+      '@indago/graph-hole-reassessment':
+        specifier: workspace:*
+        version: link:../intelligence/graph-hole-reassessment
       '@indago/graph-hole-region':
         specifier: workspace:*
         version: link:../intelligence/graph-hole-region
       '@indago/graphology-projection':
         specifier: workspace:*
         version: link:../intelligence/graphology-projection
+      '@indago/hypothesis-context':
+        specifier: workspace:*
+        version: link:../intelligence/hypothesis-context
       '@indago/ingestion':
         specifier: workspace:*
         version: link:../intelligence/ingestion
