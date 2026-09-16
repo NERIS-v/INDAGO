@@ -54,6 +54,10 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 - **5B backend-loop markers moved to `🟡 [ ]`:** "Handle evidence arrival event" and "Re-trigger reassessment" now carry PR12 as the backend trigger loop (evidence arrival and accepted entity/relation resolutions enqueue reassessment). Full 5B/5C workflow + UI surfacing remains outstanding — these stay partial, NOT complete.
 - **Post-delivery quality pass (3 fix commits, working tree clean):** runner doc/ternary (`d151441`), undirected-edge canonicalization in `graph-shapes` (`37cbe19`), exact indexed `findByRegionId` in `regionRecordOf` (`55f645f`). All suites re-run green after the fixes.
 
+## Tracker Update — Phase 5A-PR13 (17 Sep 2026)
+
+**PR13 (Phase 5A end-to-end verification / certification) landed 2026-09-17 on `feat/m-a13-graph-hole-region`.** Certification-only: **zero production-code changes** (Gate A), no fake-green (Gate B). Real-Postgres E2E suites certify the deterministic graph-hole chain (region expansion → detection → qualification → persistence → incremental reassessment → supersession → lifecycle) and the frozen V1.1 score surface, reproduced bit-for-bit by the production chain (structural 0.782667, evidence 0.866025, EIV 0.25, significance 0.723606, `failureReasons []`). PR13 suite additions: full-pipeline 5/5, incremental supersession 3/3, isolation/authority 3/3, lifecycle transitions 4/4, concurrency 2/2, determinism 8/8; scoped regression matrix **57/57 across 10 files** (incl. pr6-persistence 19, pr12 6, pr11 4, ownership-boundary 3). Status **CERTIFIED WITH DOCUMENTED LIMITATIONS** — see `docs/architecture/pr13-verification-certification.md`.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
