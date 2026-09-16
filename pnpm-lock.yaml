@@ -59,6 +59,28 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
+  packages/intelligence/gap-classification:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@indago/graph-hole-region':
+        specifier: workspace:*
+        version: link:../graph-hole-region
+      '@indago/hypothesis-context':
+        specifier: workspace:*
+        version: link:../hypothesis-context
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
   packages/intelligence/graph-hole-analysis:
     dependencies:
       '@indago/ai-agent-runtime':
