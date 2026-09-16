@@ -1,5 +1,9 @@
 "use client";
 
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { Button } from "@/components/ui/button";
+
 export interface LeadMock {
   id: string;
   claim: string;
@@ -16,6 +20,10 @@ interface LeadsListProps {
   leads: LeadMock[];
   onSelectLead: (id: string) => void;
   loading?: boolean;
+  error?: string | null;
+  /** Live bundle surfaces an explicit "not available" state instead of pretending. */
+  unavailable?: boolean;
+  onRetry?: () => void;
 }
 
 const STATUS_META: Record<LeadMock["status"], { label: string; className: string }> = {
@@ -24,9 +32,25 @@ const STATUS_META: Record<LeadMock["status"], { label: string; className: string
   REJECTED: { label: "Rejected", className: "text-semantic-foreground-faint border-semantic-border bg-semantic-surface" },
 };
 
-export function LeadsList({ leads, onSelectLead, loading }: LeadsListProps) {
+export function LeadsList({ leads, onSelectLead, loading, error, unavailable, onRetry }: LeadsListProps) {
   if (loading) {
     return <div className="flex items-center justify-center py-16 font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">Loading leads...</div>;
+  }
+
+  if (unavailable) {
+    return (
+      <EmptyState
+        title="Leads not available in this mode"
+        description="Lead generation is not served for this investigation in the current data mode."
+        action={onRetry ? <Button variant="ghost" size="sm" onClick={onRetry}>Retry</Button> : undefined}
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorDisplay title="Could not load leads" message={error} retry={onRetry} />
+    );
   }
 
   if (!leads.length) {
