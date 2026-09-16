@@ -1154,6 +1154,7 @@ model GraphHoleAssessment {
   scoringPolicyVersion          String
   qualificationPolicyVersion    String
   snapshot                      Json // qualified output (assessment) or current-state summary (state event)
+  contextSha256                 String? // bounded analysis context digest (PR12 AI-skip gate)
   reason                        String?
   createdAt                     DateTime @default(now())
 
