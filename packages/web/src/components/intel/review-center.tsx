@@ -16,6 +16,13 @@ export interface ReviewTaskMock {
 
 interface ReviewCenterProps {
   initialTasks: ReviewTaskMock[];
+  /** PR-20: when provided, an action resolves through this hook (the live
+   *  REVIEW_REQUIRED gate) instead of the local cinematic. The task enters the
+   *  processing state while the promise settles; a rejection returns it to
+   *  PENDING and reports through onResolveError. Absent → the existing local
+   *  demo completion behavior is unchanged. */
+  onResolve?: (id: string, action: "APPROVE" | "REJECT") => Promise<void> | void;
+  onResolveError?: (id: string, message: string) => void;
 }
 
 const PRIORITY_COLORS = {
@@ -30,7 +37,7 @@ const PRIORITY_CLASSES = {
   LOW: "border-l-info text-info",
 };
 
-export function ReviewCenter({ initialTasks }: ReviewCenterProps) {
+export function ReviewCenter({ initialTasks, onResolve, onResolveError }: ReviewCenterProps) {
   const [tasks, setTasks] = useState<ReviewTaskMock[]>(
     initialTasks.map((t) => ({ ...t, status: "PENDING" }))
   );
@@ -47,14 +54,30 @@ export function ReviewCenter({ initialTasks }: ReviewCenterProps) {
       )
     );
 
-    // 2. Cinematic delay for the cryptographic handshake
-    setTimeout(() => {
+    const finish = (approved: boolean) =>
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === id ? { ...t, status: action === "APPROVE" ? "APPROVED" : "REJECTED" } : t
+          t.id === id ? { ...t, status: approved ? "APPROVED" : "REJECTED" } : t
         )
       );
-    }, 1800);
+    const fail = (message: string) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: "PENDING" } : t))
+      );
+      onResolveError?.(id, message);
+    };
+
+    if (onResolve) {
+      Promise.resolve(onResolve(id, action))
+        .then(() => finish(action === "APPROVE"))
+        .catch((err) =>
+          fail(err instanceof Error ? err.message : String(err))
+        );
+      return;
+    }
+
+    // Local (demo) path: cinematic delay for the cryptographic handshake.
+    setTimeout(() => finish(action === "APPROVE"), 1800);
   };
 
   if (tasks.length === 0) {
