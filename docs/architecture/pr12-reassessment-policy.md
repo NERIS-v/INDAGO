@@ -4,7 +4,7 @@
 `packages/intelligence/graph-hole-reassessment` (pure) +
 `packages/platform/src/reassessment` (orchestration)
 
-Status: **FROZEN (Contract + Policy) — implementation phase active.**
+Status: **FROZEN (Contract + Policy) — runtime now implemented** (landed 2026-09-16, `feat/m-a13-graph-hole-region`; platform change ledger + `ReassessmentRunner` + producers + orchestrator job; real-Postgres integration suite green 6/6).
 
 > This is the authoritative V1 policy for the incremental graph-hole
 > reassessment mechanism. It freezes the trigger taxonomy, effect classes,
