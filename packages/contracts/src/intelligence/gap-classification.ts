@@ -132,8 +132,9 @@ export type GapClassificationFailureCode = z.infer<typeof GapClassificationFailu
 export const GapClassificationReferencesSchema = z.object({
   supportingObservationIds: z.array(ObservationIdSchema)
     .describe('Observed-fact ids the predicates leaned on (all exist in supplied context).'),
-  supportingHypothesisIds: z.array(HypothesisIdSchema)
-    .describe('Candidate raw grounded-hypothesis ids (PR3), all exist in supplied context.'),
+  supportingHypothesisIds: z.array(z.string().min(1))
+    .describe('Candidate raw grounded-hypothesis ids (PR3 atomic derivedIds, e.g. ' +
+      'atomic:RELATION_HYPOTHESIS:<id>), all exist in supplied context.'),
   structuralSignalIds: z.array(GraphNodeIdSchema)
     .describe('Candidate anchor node ids (all exist in supplied context).'),
 }).strict();
