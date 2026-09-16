@@ -221,25 +221,34 @@ Classification identity is derived from content: `contextSha256` = SHA-256(canon
 
 ## End — Final Verification Matrix (PR14)
 
+Exact counts (17 Sep 2026, `feat/m-a13-graph-hole-region`):
+
 | Test / Area | Expected | Observed | Status |
 |---|---|---|---|
-| Contract correctness (schema parse/reject) | see contracts tests | see §Verification | ✅ |
-| Category semantics (5 positives, 5 negatives) | deterministic | ✅ | ✅ |
-| Determinism (order permutations → byte-stable) | ✅ | ✅ | ✅ |
-| Ambiguity (mutual-exclusion policy, contradiction) | deterministic | ✅ | ✅ |
-| Insufficient context (not → MISSING_DATA) | ✅ | ✅ | ✅ |
-| Temporal handling (eventTime/validity; never updatedAt) | ✅ | ✅ | ✅ |
-| Contradiction handling (preserved; not resolved) | ✅ | ✅ | ✅ |
-| Provenance (every ref exists in supplied context) | ✅ | ✅ | ✅ |
-| Case isolation | ✅ | ✅ | ✅ |
-| GraphVersion isolation | ✅ | ✅ | ✅ |
-| Identity/context binding (contextSha256 + graphHoleId) | ✅ | ✅ | ✅ |
-| Bounds (linear, bounded inputs) | ✅ | ✅ | ✅ |
-| Authority boundaries (no mutation capability) | ✅ | ✅ | ✅ |
-| Persistence (none added; derived only) | ✅ N/A | ✅ | ✅ |
-| Real-Postgres integration | ✅ | ✅ | ✅ |
-| Regressions (PR6–PR13 re-run) | green | ✅ | ✅ |
-| `pnpm -r typecheck` | green | ✅ | ✅ |
-| Build (`pnpm -r build`) | green | ✅ | ✅ |
+| Contract correctness (`@indago/contracts` suite) | green | **445 tests / 21 files** | ✅ |
+| Category semantics (5 positives, 5 negatives) | deterministic | unit suite (§4/§6) | ✅ |
+| Determinism (order permutations → byte-stable) | ✅ | unit suite | ✅ |
+| Ambiguity (mutual-exclusion policy, contradiction) | deterministic | unit suite | ✅ |
+| Insufficient context (not → MISSING_DATA) | ✅ | unit suite | ✅ |
+| Temporal handling (eventTime/validity; never updatedAt) | ✅ | unit suite | ✅ |
+| Contradiction handling (preserved; not resolved) | ✅ | unit suite | ✅ |
+| Provenance (every ref exists in supplied context) | ✅ | unit suite | ✅ |
+| Case isolation | ✅ | unit + integration (T4 `CONTEXT_MISMATCH`) | ✅ |
+| GraphVersion isolation | ✅ | unit suite | ✅ |
+| Identity/context binding (`contextSha256` + graphHoleId) | ✅ | unit + integration (T2 HEX64 digest) | ✅ |
+| Bounds (linear, bounded inputs) | ✅ | unit suite | ✅ |
+| Authority boundaries (no mutation capability) | ✅ | unit suite | ✅ |
+| Persistence (none added; derived only) | N/A | no model/migration/endpoint in PR14 | ✅ |
+| Package unit suite (`@indago/gap-classification`) | green | **49 tests / 2 files** | ✅ |
+| Real-Postgres integration (`pr14-gap-classification.integration.test.ts`) | green | **5/5** (T1 T2 T3 T4 T5) | ✅ |
+| Region limitation (`CONTEXT_OBSERVATION_BOUND_REACHED` → `INFRASTRUCTURE_GAP`) | ✅ | integration T5 (`REGION_REPRESENTATION_LIMITED`) | ✅ |
+| Typed boundary failures (`INVALID_INPUT`/`UNSUPPORTED_POLICY`/`CONTEXT_MISMATCH`) | ✅ | integration T4 | ✅ |
+| Regression — Phase 5A real Postgres (PR6/PR11/PR12/PR13 + M-A12 + PR1.5) | green | **113 tests / 14 files** (pr6+pr11+pr13-reblocking 27; pr12 6; pr13-isolation+incremental 6; pr13-full-pipeline+concurrency 7; m-a12×5 + pr1.5 67) | ✅ |
+| `pnpm -r typecheck` (repo-wide) | green | exit 0 | ✅ |
+| Build (`pnpm -r build`, repo-wide) | green | exit 0 | ✅ |
 
-(Exact counts reported in the delivery summary / tracker entry.)
+### PR14-6 — real contract defect found by the integration test (fixed)
+
+`GapClassificationReferencesSchema.supportingHypothesisIds` was typed `z.array(HypothesisIdSchema)` (UUID), but the PR3 candidate chain emits **derived atomic ids** of the form `atomic:RELATION_HYPOTHESIS:<uuid>` for hypothesis-sourced candidates. Every non-empty classification was therefore rejected at the frozen contract boundary. Fixed to `z.array(z.string().min(1))`, mirroring `RawGraphHoleCandidateSchema` in `graph-hole-detection.ts`. `HypothesisIdSchema` remains in use for `relatedHypothesisIds` (canonical hypothesis references). The integration test is what surfaced this — the unit suite had used UUID-only fixtures.
+
+> Note: one full-sweep run of the PR12 suite produced a single failure of a load-sensitive cross-case timing assertion (T4 line 767, parallel-isolation `graphHole.count`); re-run in isolation PR12 is **6/6 green**, confirming a concurrency-under-load flake, not a PR14 regression. No PR14 code executes on the PR12 path.
