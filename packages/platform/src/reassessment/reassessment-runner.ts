@@ -15,7 +15,10 @@
 //
 // The worker (orchestrator job) calls runBatch for the case id in the job. The
 // runner returns empty when nothing is pending, and coalesces the tail of the
-// drained batch as SKIPPED (they re-enter a future run).
+// drained batch as SKIPPED — terminal no-ops (locked by T1): a subsequent
+// drain is idle for them and they are never re-picked. Only the cursor
+// boundary advances past the highest APPLIED sequence, so fresh work published
+// after the skip window is always processed.
 //
 // RESOLVED / SUPERSEDED are ALWAYS derived deterministically (never from AI).
 // AI is an enrichment stage at the region pipeline boundary (not wired in V1).
@@ -174,7 +177,8 @@ export class ReassessmentRunner {
         };
 
         const plan = buildReassessmentPlan(affectedSet, {
-          recomputeIdentityRegionIds: head.effectClass === 'GRAPH_AFFECTING' ? undefined : undefined,
+          recomputeIdentityRegionIds:
+            head.effectClass === 'GRAPH_AFFECTING' ? affectedSet.affectedRegionIds : undefined,
           candidatesByRegion: candidateIdsByRegion,
         });
 
