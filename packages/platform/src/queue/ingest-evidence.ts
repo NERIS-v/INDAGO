@@ -94,6 +94,7 @@ import { candidatePairStore } from "../persistence/candidate-pair-store.js";
 import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
 import { entityStore } from "../persistence/entity-store.js";
 import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
+import { graphVersionStore } from "../persistence/graph-version-store.js";
 import { temporalStateChangeStore } from "../persistence/temporal-state-change-store.js";
 import {
   TemporalValidationError,
@@ -114,6 +115,46 @@ import {
   transitionRunToAnalyzing,
   transitionRunToPermanentFailure,
 } from "./transitions.js";
+import {
+  newEvidenceTrigger,
+  newObservationTrigger,
+  publishCaseChange,
+} from "../reassessment/publish-case-change.js";
+
+/**
+ * PR12 producer: enqueue a reassessment change for a NEW_EVIDENCE /
+ * NEW_OBSERVATION trigger. There is nothing to reassess before the first graph
+ * version exists, so a missing ACTIVE version is a healthy no-op (bounded
+ * work). Fire-and-forget: a producer failure must never fail ingestion.
+ */
+async function publishReassessmentChange(input: {
+  caseId: string;
+  investigationId: string | undefined;
+  graphVersionId: string;
+  trigger: Parameters<typeof publishCaseChange>[0]["trigger"];
+}): Promise<void> {
+  try {
+    await publishCaseChange({
+      caseId: input.caseId,
+      graphVersionId: input.graphVersionId,
+      trigger: input.trigger,
+    });
+  } catch (error) {
+    emitProgressEvent(
+      input.investigationId ?? "unknown",
+      "ANALYZING",
+      `PR12 reassessment change not enqueued (${input.trigger.triggerType}); will be retried on the next write to the case`,
+      { operationId: input.caseId },
+    );
+    // eslint-disable-next-line no-console
+    console.error("PR12 publishCaseChange failed", error);
+  }
+}
+
+async function activeGraphVersionId(caseId: string): Promise<string | null> {
+  const version = await graphVersionStore.latestActiveByCase(caseId, {});
+  return version ? version.id : null;
+}
 
 export function extractInvestigationIdFromJobData(data: unknown): string {
   if (typeof data === "object" && data !== null && "investigationId" in data) {
@@ -689,6 +730,23 @@ async function completeMA06(params: {
     artifactId,
   });
 
+  // PR12 producer (EVIDENCE_AFFECTING): the durable evidence itself is a
+  // reassessment trigger. Resolved against the ACTIVE graph version; skipped
+  // before any graph version exists.
+  const evidenceVersionId = await activeGraphVersionId(caseId);
+  if (evidenceVersionId !== null && payload.observedAt?.precision === "exact") {
+    await publishReassessmentChange({
+      caseId,
+      investigationId,
+      graphVersionId: evidenceVersionId,
+      trigger: newEvidenceTrigger({
+        caseId,
+        evidenceId,
+        computedAt: { value: payload.observedAt.value, precision: "exact" },
+      }),
+    });
+  }
+
   // 3. Observations — only extract when none durable yet.
   const existing = await observationStore.countObservationsByEvidence(evidenceId);
   if (existing > 0) {
@@ -747,6 +805,26 @@ async function completeMA06(params: {
     caseId,
   });
   if (created === 0) return; // a concurrent pass already made this durable
+
+  // PR12 producer (EVIDENCE_AFFECTING): a NEW_OBSERVATION trigger per durable
+  // observation. Deduped by deterministic change identity, so re-publishing
+  // entries from a concurrent pass is a harmless no-op.
+  const observationVersionId = await activeGraphVersionId(caseId);
+  if (observationVersionId !== null) {
+    for (const entry of entries) {
+      if (entry.observation.observedAt?.precision !== "exact") continue;
+      await publishReassessmentChange({
+        caseId,
+        investigationId,
+        graphVersionId: observationVersionId,
+        trigger: newObservationTrigger({
+          caseId,
+          observationId: entry.observation.id,
+          observedAt: { value: entry.observation.observedAt.value, precision: "exact" },
+        }),
+      });
+    }
+  }
 
   // 4a. M-A12-D6: append immutable temporal history for each observation
   //     created THIS pass. recordChange is idempotent (deterministic id), so a

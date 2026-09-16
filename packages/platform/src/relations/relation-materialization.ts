@@ -43,6 +43,10 @@ import {
   temporalStateChangeStore,
   type TemporalStateChangeStore,
 } from "../persistence/temporal-state-change-store.js";
+import {
+  relationAcceptedTrigger,
+  publishCaseChange,
+} from "../reassessment/publish-case-change.js";
 import { assertValidTemporalInterval } from "../temporal/interval-validation.js";
 import {
   GRAPH_CHANGE_ACCEPTED,
@@ -188,7 +192,8 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
   // no canonical relation without an accepted hypothesis, no accepted state
   // without its canonical relation. The audit event is emitted by the caller
   // AFTER this transaction commits (so no audit claims success on rollback).
-  return relStore.transaction<AcceptRelationResult>(async (tx) => {
+  let createdGraphVersionId: string | undefined;
+  const materialization = await relStore.transaction<AcceptRelationResult>(async (tx) => {
     const updatedHypothesis = await hypStore.acceptHypothesis(
       hypothesisId,
       { caseId },
@@ -253,6 +258,7 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
         tx,
       );
       createdVersionNumber = createdVersion.versionNumber;
+      createdGraphVersionId = createdVersion.id;
     }
 
     // Seed the ORIGINAL temporal assertion with the actual version number
@@ -305,6 +311,31 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
       reused: result.reusedExisting,
     };
   });
+
+  // PR12 producer (GRAPH_AFFECTING): a genuinely new canonical ACTIVE relation
+  // is anchored at the NEW graph version committed above. Publish only AFTER
+  // the authority transaction commits (publishCaseChange opens its own
+  // transaction on the shared client — never nest). Production swallow: a lost
+  // change is recovered by the cursor's tail recording.
+  if (createdGraphVersionId !== undefined) {
+    try {
+      await publishCaseChange({
+        caseId,
+        graphVersionId: createdGraphVersionId,
+        trigger: relationAcceptedTrigger({
+          caseId,
+          relationHypothesisId: hypothesisId,
+          relationId,
+          graphVersionId: createdGraphVersionId,
+          computedAt: { value: new Date().toISOString(), precision: "exact" },
+        }),
+      });
+    } catch (error) {
+      console.error("PR12 publishCaseChange failed", error);
+    }
+  }
+
+  return materialization;
 }
 
 /**
