@@ -203,11 +203,13 @@ One region may produce several candidates. Multiple detector paths must converge
 2. `MISSING_DATA`
 3. `MISSING_COMPARISON`
 4. `INFRASTRUCTURE_GAP`
-5. `CONCEALMENT_CONSISTENT`
+5. `CONCEALMENT_CONSISTENT_PATTERN`
 
-⚠️ **CONCEALMENT_CONSISTENT is hypothesis-oriented only.** It must NEVER become an assertion of concealment. It means "the available pattern is consistent with concealment as ONE possible explanation" — no legal or factual meaning on its own.
+⚠️ **CONCEALMENT_CONSISTENT_PATTERN is hypothesis-oriented only.** It must NEVER become an assertion of concealment. It means "the available pattern is consistent with concealment as ONE possible explanation" — no legal or factual meaning on its own.
 
 `GapPrioritySchema` — canonical domain enum: `LOW` | `MEDIUM` | `HIGH` | `CRITICAL`.
+
+The Phase 5A runtime classifier (PR14, `@indago/gap-classification`) is a **pure derived layer**: it supplies `GapClassificationResult` with a single `type` from the five categories above, an epistemic `status` (`CONFIDENT` | `SUPPORTED` | `AMBIGUOUS` | `INSUFFICIENT_CONTEXT`), deterministic `reasonCodes`, auditable `supportingReferences`, and a `contextSha256` content digest. It consumes only already-certified PR1/PR3/PR5/PR13 outputs, pursues NO persistence, and follows the frozen policy in `docs/architecture/pr14-gap-classification.md`.
 
 ---
 
