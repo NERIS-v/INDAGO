@@ -237,7 +237,6 @@ function deriveSignals(input: GapClassificationInput): GapClassificationSignals 
     inScopeObservationTypes,
     contextCompleteness: {
       semanticRetrievalTruncated,
-      regionLimited,
       observationContextLimited,
       hypothesisContextLimited: false,
       hypothesisGroupingTruncated,
@@ -259,6 +258,12 @@ function deriveSignals(input: GapClassificationInput): GapClassificationSignals 
 export function buildClassificationSignals(input: GapClassificationInput): DerivedClassificationFacts {
   if (input === null || typeof input !== 'object') {
     throw new GapClassificationError(GapClassificationErrorCodes.INVALID_INPUT, 'input must be an object');
+  }
+  if (typeof input.classificationPolicyVersion !== 'string') {
+    throw new GapClassificationError(
+      GapClassificationErrorCodes.INVALID_INPUT,
+      'classificationPolicyVersion is required',
+    );
   }
   if (input.classificationPolicyVersion !== CONSUMED_GAP_CLASSIFICATION_POLICY_VERSION) {
     throw new GapClassificationError(
