@@ -92,8 +92,10 @@ export function projectRegionEdges(
     .map<GraphEdge>((id) => {
       const attrs = built.graph.getEdgeAttributes(id) as ProjectedEdgeAttrs;
       const [a, b] = built.graph.extremities(id) as readonly [string, string];
+      // Canonical endpoint assignment: direction kept for directed edges,
+      // lexicographic for undirected (order-independent, deterministic).
       const [sourceNodeId, targetNodeId] =
-        built.graph.isDirected(id) ? [a, b] : [a, b];
+        built.graph.isDirected(id) || a <= b ? [a, b] : [b, a];
       return {
         id,
         investigationId: scope.investigationId,
