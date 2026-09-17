@@ -32,9 +32,13 @@ describe("F-PR5 — capability availability registry", () => {
       expect(CAPABILITY_AVAILABILITY[demoOnly], demoOnly).toEqual({ demo: true, live: false });
     }
     expect(CAPABILITY_AVAILABILITY["network.graph"]).toEqual({ demo: true, live: false });
-    expect(CAPABILITY_AVAILABILITY["network.pulse"]).toEqual({ demo: true, live: false });
-    expect(CAPABILITY_AVAILABILITY["network.matrix"]).toEqual({ demo: true, live: false });
-    expect(CAPABILITY_AVAILABILITY["network.flow"]).toEqual({ demo: true, live: false });
+    // PR-23: Pulse / Matrix / Flow are frontend-derived visualizations whose
+    // authoritative INPUTS resolve through the live provider seams in a live
+    // workspace, so they are genuinely live-served (distinct from any claimed
+    // backend "pulse/flow/matrix" analytics API, which does not exist).
+    expect(CAPABILITY_AVAILABILITY["network.pulse"]).toEqual({ demo: true, live: true });
+    expect(CAPABILITY_AVAILABILITY["network.matrix"]).toEqual({ demo: true, live: true });
+    expect(CAPABILITY_AVAILABILITY["network.flow"]).toEqual({ demo: true, live: true });
   });
 });
 
@@ -51,7 +55,9 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
     expect(resolveCapabilityStatus("evidence", config("live", true), "live")).toBe("live");
     expect(resolveCapabilityStatus("graph", config("live", true), "live")).toBe("live");
     expect(resolveCapabilityStatus("timeline", config("live", true), "live")).toBe("not-ready");
-    expect(resolveCapabilityStatus("network.pulse", config("live", false), "live")).toBe("not-ready");
+    // PR-23: network.pulse is live-served in explicit live (its live provider
+    // seams drive it), so it is "live" — never a silent demo fallback.
+    expect(resolveCapabilityStatus("network.pulse", config("live", false), "live")).toBe("live");
   });
 
   it("live workspace + config.mode demo is still never -demo- served", () => {
@@ -67,10 +73,11 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
     expect(resolveCapabilityStatus("graph", config("auto", true), "live")).toBe("live");
     expect(resolveCapabilityStatus("gaps", config("auto", true), "live")).toBe("demo");
     expect(resolveCapabilityStatus("timeline", config("auto", true), "live")).toBe("demo");
-    // The Cross-Case Matrix is implemented in demo, so AUTO demo-serves it.
-    expect(resolveCapabilityStatus("network.matrix", config("auto", true), "live")).toBe("demo");
-    // The Adaptive Flow is also implemented in demo, so AUTO demo-serves it.
-    expect(resolveCapabilityStatus("network.flow", config("auto", true), "live")).toBe("demo");
+    // PR-23: the Cross-Case Matrix is frontend-derived but live-served, so AUTO
+    // serves it LIVE (a live implementation exists), never demo.
+    expect(resolveCapabilityStatus("network.matrix", config("auto", true), "live")).toBe("live");
+    // The Adaptive Flow is similarly live-served under AUTO.
+    expect(resolveCapabilityStatus("network.flow", config("auto", true), "live")).toBe("live");
   });
 
   it("live workspace + AUTO: capability-level, uniform in dev AND prod", () => {
@@ -81,14 +88,15 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
       expect(resolveCapabilityStatus("graph", here, "live")).toBe("live");
       expect(resolveCapabilityStatus("leads", here, "live")).toBe("live");
       // Demo-only capabilities fall back to the demo provider in both (the
-      // AUTO bundle genuinely serves them; never merely declared). The Entity
-      // Pulse joined the demo-served representations with the others.
+      // AUTO bundle genuinely serves them; never merely declared). The
+      // network representations are frontend-derived but live-served, so they
+      // stay live in both dev and prod.
       expect(resolveCapabilityStatus("gaps", here, "live")).toBe("demo");
       expect(resolveCapabilityStatus("timeline", here, "live")).toBe("demo");
-      expect(resolveCapabilityStatus("network.pulse", here, "live")).toBe("demo");
-      expect(resolveCapabilityStatus("network.matrix", here, "live")).toBe("demo");
-      // The Adaptive Flow is demo-implemented, so AUTO serves it demo as well.
-      expect(resolveCapabilityStatus("network.flow", here, "live")).toBe("demo");
+      expect(resolveCapabilityStatus("network.pulse", here, "live")).toBe("live");
+      expect(resolveCapabilityStatus("network.matrix", here, "live")).toBe("live");
+      // The Adaptive Flow is frontend-derived and live-served, so it stays live.
+      expect(resolveCapabilityStatus("network.flow", here, "live")).toBe("live");
     }
   });
 
@@ -111,9 +119,10 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
     expect(autoDevLive["evidence"]).toBe("live");
     expect(autoDevLive["graph"]).toBe("live");
     expect(autoDevLive["gaps"]).toBe("demo");
-    expect(autoDevLive["network.pulse"]).toBe("demo");
-    expect(autoDevLive["network.matrix"]).toBe("demo");
-    expect(autoDevLive["network.flow"]).toBe("demo");
+    // PR-23: network representations are live-served in AUTO (live wins).
+    expect(autoDevLive["network.pulse"]).toBe("live");
+    expect(autoDevLive["network.matrix"]).toBe("live");
+    expect(autoDevLive["network.flow"]).toBe("live");
 
     // Every declared capability key resolves to a valid status.
     for (const key of Object.keys(CAPABILITY_AVAILABILITY)) {
@@ -121,32 +130,18 @@ describe("F-PR5 — resolveCapabilityStatus matrix", () => {
     }
   });
 
-  it("keeps representations honest: flow joins pulse/matrix as demo-served under AUTO; explicit live stays not-ready", () => {
-    // Flow is implemented in demo only: explicit live mode stays typed
-    // not-ready; AUTO demo-serves it. Matrix and pulse behave identically.
+  it("keeps representations honest: flow/pulse/matrix are live-served in live and AUTO (frontend-derived but live-input driven)", () => {
+    // PR-23: these are frontend-derived visualizations whose authoritative
+    // INPUTS resolve through live provider seams, so both explicit live and
+    // AUTO serve them LIVE. They are NOT claimed as backend analytics APIs.
     for (const mode of ["live", "auto"] as const) {
       for (const isDev of [true, false]) {
         const cfg = config(mode, isDev);
         const flow = resolveCapabilityStatus("network.flow", cfg, "live");
-        if (mode === "live") {
-          expect(flow, "network.flow in explicit live").toBe("not-ready");
-        } else {
-          expect(flow, "network.flow in AUTO").toBe("demo");
-        }
-      }
-    }
-    for (const mode of ["live", "auto"] as const) {
-      for (const isDev of [true, false]) {
-        const cfg = config(mode, isDev);
+        expect(flow, "network.flow in " + mode).toBe("live");
         for (const cap of ["network.pulse", "network.matrix", "network.flow"] as const) {
           const status = resolveCapabilityStatus(cap, cfg, "live");
-          if (mode === "live") {
-            expect(["live", "not-ready"], cap + " in explicit live").toContain(status);
-            expect(status, cap + " in explicit live").toBe("not-ready");
-          } else {
-            expect(["live", "demo"], cap + " in AUTO").toContain(status);
-            expect(status, cap + " in AUTO").toBe("demo");
-          }
+          expect(status, cap + " in " + mode).toBe("live");
         }
       }
     }

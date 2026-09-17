@@ -19,7 +19,7 @@
 // it renders an honest unavailable note, and it never fabricates a projection.
 // ============================================================================
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { toProviderError } from "@/lib/providers";
 import {
@@ -53,6 +53,9 @@ export function ValidAtPanel({
     nodeCount: number;
     edgeCount: number;
   } | null>(null);
+  // PR-23 race hardening: latest-requested-timestamp wins. Rapid changes to the
+  // requested `at` must never let an older response overwrite a newer request.
+  const requestRef = useRef(0);
 
   const selection = selectionProp ?? localSelection;
 
@@ -78,25 +81,31 @@ export function ValidAtPanel({
       setError("Valid-at projection is not available on this provider seam.");
       return;
     }
+    const requestId = ++requestRef.current;
     setPending(true);
     setError(null);
     setResult(null);
     commitSelection({ mode: "valid-at", at });
     try {
       const response = await workspace.graph.getValidAt(workspace.caseId, at);
+      // Latest-requested-context wins: an older response is dropped entirely.
+      if (requestId !== requestRef.current) return;
       setResult({
         at: response.at,
         nodeCount: response.nodeCount,
         edgeCount: response.edgeCount,
       });
     } catch (err) {
+      if (requestId !== requestRef.current) return;
       setError(toProviderError(err).message);
     } finally {
-      setPending(false);
+      if (requestId === requestRef.current) setPending(false);
     }
   };
 
   const returnCurrent = () => {
+    // Supersede any in-flight request when returning to current.
+    requestRef.current += 1;
     commitSelection({ mode: "current", at: null });
     setResult(null);
     setError(null);

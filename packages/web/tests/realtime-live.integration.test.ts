@@ -136,4 +136,36 @@ describe("LiveRealtimeProvider (integration)", () => {
     expect(events[0]?.targetId).toBe("ev-1");
     expect(events[0]?.description).toBe("Ingested ledger");
   });
+
+  it("normalizes OBSERVATION_EXTRACTED + ANALYSIS_PROGRESS frames end-to-end through the SSE transport (activity feed live input)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        createMockResponse([
+          `data: ${JSON.stringify({ investigationId: INVESTIGATION_ID, type: "OBSERVATION_EXTRACTED", evidenceId: "ev-7", observationCount: 3, observationIds: ["obs-a", "obs-b", "obs-c"], timestamp: "2026-01-01T00:00:00.000Z" })}`,
+          `data: ${JSON.stringify({ investigationId: INVESTIGATION_ID, type: "ANALYSIS_PROGRESS", phase: "CANDIDATES_DETECTED", message: "Detected 3 bridge candidates", detail: { bridges: 3 }, timestamp: "2026-01-01T00:00:01.000Z" })}`,
+        ]),
+      ),
+    );
+
+    const realtime = createLiveRealtimeProvider();
+    const { events, unsubscribe } = collect(realtime);
+    realtime.connect(INVESTIGATION_ID);
+
+    await vi.waitFor(() => expect(events).toHaveLength(2));
+    unsubscribe();
+    realtime.disconnect();
+
+    const [observations, analysis] = events;
+
+    expect(observations.action).toBe("OBSERVATION_EXTRACTED");
+    expect(observations.description).toBe("3 observations extracted");
+    expect(observations.targetType).toBe("OBSERVATION");
+    expect(observations.targetId).toBe("ev-7");
+    expect(observations.investigationId).toBe(INVESTIGATION_ID);
+
+    expect(analysis.action).toBe("ANALYSIS_PROGRESS_CANDIDATES_DETECTED");
+    expect(analysis.description).toBe("Detected 3 bridge candidates");
+    expect(analysis.investigationId).toBe(INVESTIGATION_ID);
+  });
 });

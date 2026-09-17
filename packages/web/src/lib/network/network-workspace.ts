@@ -2,19 +2,20 @@
 // F-PR5 — Network Workspace State (pure model)
 //
 // The Network workspace is a SINGLE five-zone Control Center (the Graph route).
-// Future representation PRs (Entity Pulse, Matrix, Adaptive Flow) will render
-// inside Zone 2 and change the contextual meaning of the supporting zones while
-// the five-zone shell stays stable. This module is the PURE shared-state model
-// those representations consume:
+// Entity Pulse, Matrix and Adaptive Flow render inside Zone 2 and change the
+// contextual meaning of the supporting zones while the five-zone shell stays
+// stable. This module is the PURE shared-state model those representations
+// consume:
 //
-//   - activeNetworkView  which representation is active (only "graph" exists)
+//   - activeNetworkView  which representation is active
 //   - timeRange          the workspace-wide temporal scope (promoted from the
 //                        previously page-local Graph time range)
 //   - focusEntityId      the durable deep-link graph focus target
 //
 // Invariants:
-//   - "graph" is the ONLY implemented representation; the rest are typed atoms
-//     with declared not-ready status. No fake visualization is rendered.
+//   - Every representation render is gated on the workspace capability
+//     resolution; a declared-but-unavailable representation is never given a
+//     fake visualization.
 //   - timeRange preserves the existing contract ([start, end] epoch ms | null).
 //   - This module is PURE: no React, no providers, no URL, no D3. URL parsing/
 //     serialization lives in lib/workspace/url.ts; the runtime owner lives in
@@ -24,7 +25,9 @@
 /** The representation rendered in Zone 2 of the Network workspace. */
 export type NetworkView = "graph" | "pulse" | "matrix" | "flow";
 
-/** Declared representation space. "graph" is the only implemented value. */
+/** Declared representation space. All four values are implemented, but each is
+ *  only rendered when the capability resolution says the effective mode (DEMO
+ *  or LIVE) can serve it. */
 export const NETWORK_VIEWS: readonly NetworkView[] = [
   "graph",
   "pulse",
@@ -32,7 +35,7 @@ export const NETWORK_VIEWS: readonly NetworkView[] = [
   "flow",
 ] as const;
 
-/** The default (and currently only implemented) representation. */
+/** The default representation. */
 export const DEFAULT_NETWORK_VIEW: NetworkView = "graph";
 
 export function isNetworkView(value: unknown): value is NetworkView {
