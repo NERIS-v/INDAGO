@@ -171,9 +171,8 @@ describe("PR-1 — no silent live -> demo fallback (unsupported capabilities sta
     });
   });
 
-  it("live entities.get and gaps.listByInvestigation reject with ProviderError UNSUPPORTED", async () => {
+  it("live gaps.listByInvestigation rejects with ProviderError UNSUPPORTED", async () => {
     const providers = createLiveWorkspaceProviders(identity("pr1:live"), config);
-    await expect(providers.entities.get("any")).rejects.toMatchObject({ code: "UNSUPPORTED" });
     await expect(providers.gaps.listByInvestigation(INVESTIGATION_ID)).rejects.toMatchObject({ code: "UNSUPPORTED" });
   });
 

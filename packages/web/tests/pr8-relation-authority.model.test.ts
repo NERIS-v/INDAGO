@@ -77,11 +77,10 @@ describe("PR-8 — the demo/live authority gate", () => {
     expect(gate.unavailableReason).toBeUndefined();
   });
 
-  it("closes authority honestly in live mode with a named reason", () => {
+  it("opens authority honestly in live mode (PR-21 — live authority is genuinely wired)", () => {
     const gate = relationAuthorityAvailable("live");
-    expect(gate.available).toBe(false);
-    expect(gate.unavailableReason).toContain("live mode");
-    expect(gate.unavailableReason).toContain("unsupported");
+    expect(gate.available).toBe(true);
+    expect(gate.unavailableReason).toBeUndefined();
   });
 });
 

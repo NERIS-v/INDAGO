@@ -145,8 +145,8 @@ describe("PR-8 — footer composes the relation authority surface", () => {
   });
 });
 
-describe("PR-8 — live seam: honest typed-unsupported", () => {
-  it("a relation on the live seam reports the authority gate reason, not a fake surface", async () => {
+describe("PR-8 — live seam: honest live authority (PR-21)", () => {
+  it("a relation on the live seam does NOT fabricate an authority surface when its details error", async () => {
     const providers = createLiveWorkspaceProviders(identity(), config);
     render(
       <WorkspaceProvider providers={providers}>
@@ -157,8 +157,12 @@ describe("PR-8 — live seam: honest typed-unsupported", () => {
       </WorkspaceProvider>,
     );
 
-    const note = await screen.findByTestId("relation-authority-unavailable");
-    expect(note.textContent).toContain("live mode");
+    // PR-21: live relation authority is genuinely wired to the platform routes.
+    // In this unconfigured env the relation details ERROR, so the footer must
+    // not fabricate an authority panel NOR a fake unavailable gate — it renders
+    // the honest (empty) error surface, never an invented literal.
     expect(screen.queryByTestId("relation-authority-status")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("relation-authority-unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("relation-authority")).not.toBeInTheDocument();
   });
 });

@@ -230,42 +230,44 @@ describe("PR-8 — demo provider: legality (defense in depth)", () => {
   });
 });
 
-describe("PR-8 — live seam: typed-unsupported, never fabricated", () => {
-  it("accept is UNSUPPORTED with an explicit code", async () => {
+describe("PR-8 — live seam: genuinely-wired authority (PR-21), never fabricated", () => {
+  it("accept is LIVE (rejects with a server/config error when the API is unconfigured, never UNSUPPORTED)", async () => {
     const bundle = liveBundle();
     const err = await bundle.relations
       .accept!(INVESTIGATION_ID, REL_5)
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ProviderError);
     const pe = err as ProviderError;
-    expect(pe.code).toBe("UNSUPPORTED");
+    expect(pe.code).toBe("SERVER");
   });
 
-  it("reject is UNSUPPORTED with an explicit code", async () => {
+  it("reject is LIVE (rejects with a server/config error when the API is unconfigured, never UNSUPPORTED)", async () => {
     const bundle = liveBundle();
     const err = await bundle.relations
       .reject!(INVESTIGATION_ID, REL_6, "n/a")
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ProviderError);
-    expect((err as ProviderError).code).toBe("UNSUPPORTED");
+    expect((err as ProviderError).code).toBe("SERVER");
   });
 
-  it("reverse is UNSUPPORTED with an explicit code", async () => {
+  it("reverse is LIVE (rejects with a server/config error when the API is unconfigured, never UNSUPPORTED)", async () => {
     const bundle = liveBundle();
     const err = await bundle.relations
       .reverse!(INVESTIGATION_ID, REL_1)
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ProviderError);
-    expect((err as ProviderError).code).toBe("UNSUPPORTED");
+    expect((err as ProviderError).code).toBe("SERVER");
   });
 
-  it("each unsupported reason names the platform seam method (no silent fallback)", async () => {
+  it("each live authority method is genuinely exposed on the seam (no silent fallback)", async () => {
     const bundle = liveBundle();
     for (const method of ["accept", "reject", "reverse"] as const) {
-      const err = await bundle.relations[method]!(INVESTIGATION_ID, REL_5).catch((e: unknown) => e);
-      const message = (err as ProviderError).message;
-      expect(message).toContain(`relations.${method}`);
-      expect(message).toMatch(/not exposed/);
+      const fn = bundle.relations[method];
+      expect(fn).toBeTypeOf("function");
+      const err = await fn!(INVESTIGATION_ID, REL_5).catch((e: unknown) => e);
+      // The method exists and is wired: an unconfigured env surfaces the real
+      // server/config failure of the platform call, not an UNSUPPORTED seam.
+      expect((err as ProviderError).code).toBe("SERVER");
     }
   });
 });

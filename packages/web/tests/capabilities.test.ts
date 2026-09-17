@@ -19,11 +19,14 @@ describe("F-PR5 — capability availability registry", () => {
       "investigation", "evidence", "observations", "cases", "realtime",
       // PR-20: Phase-4 capabilities are now live-available.
       "graph", "leads", "crossCase",
+      // PR-21: entities + relations (entity hypotheses, canonical relations and
+      // relation authority) are genuinely live-wired.
+      "entities", "relations",
     ] as const) {
       expect(CAPABILITY_AVAILABILITY[live], live).toEqual({ demo: true, live: true });
     }
     for (const demoOnly of [
-      "entities", "relations", "intelligence", "timeline",
+      "intelligence", "timeline",
       "gaps", "review", "robustness", "hypotheses",
     ] as const) {
       expect(CAPABILITY_AVAILABILITY[demoOnly], demoOnly).toEqual({ demo: true, live: false });
