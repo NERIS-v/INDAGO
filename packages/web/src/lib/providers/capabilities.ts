@@ -101,13 +101,20 @@ export const CAPABILITY_AVAILABILITY: Record<
   robustness: { demo: true, live: false },
   hypotheses: { demo: true, live: false },
   // ---- Network representations --------------------------------------------
-  // "graph", "entity pulse", "cross-case matrix" AND "adaptive flow" are
-  // implemented (demo); LIVE serving stays typed-unsupported (never
-  // fabricated).
+  // PR-23: Pulse / Matrix / Flow are FRONTEND-DERIVED visualizations — NOT
+  // backend analytics capabilities. Their LIVE-serving is genuine because their
+  // authoritative INPUTS resolve through the live provider seams that already
+  // exist in a live workspace (bursts for Pulse, relations/edges for Flow,
+  // cross-case matches for Matrix). A live workspace therefore renders them and
+  // drives the live provider seams — never demo data. Demo still serves them
+  // deterministically. This is distinct from claiming any backend "pulse/flow/
+  // matrix" API, which does not exist. "network.graph" stays demo-only: the
+  // graph representation is the canonical graph surface, not a distinct
+  // representation the audit realigned.
   "network.graph": { demo: true, live: false },
-  "network.pulse": { demo: true, live: false },
-  "network.matrix": { demo: true, live: false },
-  "network.flow": { demo: true, live: false },
+  "network.pulse": { demo: true, live: true },
+  "network.matrix": { demo: true, live: true },
+  "network.flow": { demo: true, live: true },
   // ---- PR-22 — authoritative backend analytics + temporal projection. Live
   // only (no demo equivalent; demo must not be marked available so a live
   // workspace resolving these stays typed live, never demo-served).

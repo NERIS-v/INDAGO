@@ -32,6 +32,7 @@
 // ============================================================================
 
 import type {
+  ConnectingPathCandidateDTO,
   GraphNode,
   Observation,
   RelationHypothesis,
@@ -134,7 +135,7 @@ function observationFlowGap(observation: Observation): boolean {
 // Domain mapping (relation type / observation type → flow domain)
 // ---------------------------------------------------------------------------
 
-function relationTypeToFlowDomain(type: RelationType): FlowDomain | null {
+export function relationTypeToFlowDomain(type: RelationType): FlowDomain | null {
   switch (type) {
     case "financial":
       return "FINANCIAL";
@@ -278,6 +279,14 @@ export interface FlowMeta {
   readonly entityCount: number;
   readonly pathCount: number;
   readonly crossCaseCount: number;
+  /** Live backend path corroboration (PR-23): number of connecting paths the
+   *  backend itself confirmed between flow segment endpoint pairs, or null when
+   *  NO live backend path seam was available (clean integration, never treated
+   *  as a verdict — a null count is "not queried", NOT "zero paths"). */
+  readonly backendPathCount: number | null;
+  /** Distinct canonical entity ids appearing across backend-confirmed paths,
+   *  sorted deterministically. Empty when the backend corroboration is absent. */
+  readonly backendPathEntityIds: readonly string[];
   readonly summary: string;
   readonly emptyMessage: string | null;
 }
@@ -290,6 +299,9 @@ export interface FlowModelInput {
   readonly selectedMode: FlowDomain | null;
   readonly roleFilter: FlowRoleFilter;
   readonly crossCaseEntityIds: ReadonlySet<string>;
+  /** PR-23 live backend path corroboration. null = no live path seam (demo,
+   *  unavailable). Empty array = backend responded but confirmed zero paths. */
+  readonly backendPaths?: readonly ConnectingPathCandidateDTO[] | null;
 }
 
 const NODE_W = 132;
@@ -901,6 +913,8 @@ export function buildFlowModel(input: FlowModelInput): FlowMeta {
       entityCount: 0,
       pathCount: 0,
       crossCaseCount: 0,
+      backendPathCount: null,
+      backendPathEntityIds: [],
       summary: "No directional flow evidence was found for this case.",
       emptyMessage: "No flow data",
     };
@@ -936,6 +950,8 @@ export function buildFlowModel(input: FlowModelInput): FlowMeta {
       entityCount: 0,
       pathCount: 0,
       crossCaseCount: 0,
+      backendPathCount: null,
+      backendPathEntityIds: [],
       summary: `No ${FLOW_DOMAIN_LABELS[mode].toLowerCase()} flow sits inside the selected window.`,
       emptyMessage: "No flow in selected window",
     };
@@ -1053,10 +1069,28 @@ export function buildFlowModel(input: FlowModelInput): FlowMeta {
           .join(" + ")} observed`
       : "";
 
+  // ---- PR-23 live backend path corroboration (narration only) --------------
+  // backendPaths is null when the live path seam was absent/unavailable; an
+  // empty array is an authoritative "no connecting path" answer and IS counted.
+  const backendPaths = input.backendPaths === null || input.backendPaths === undefined
+    ? null
+    : input.backendPaths;
+  const backendPathCount = backendPaths === null ? null : backendPaths.length;
+  const backendPathEntityIds = backendPaths === null
+    ? []
+    : [...new Set(backendPaths.flatMap((path) =>
+        [path.startNodeId, path.targetNodeId, ...path.nodes.map((n) => n.nodeId)]
+      ))].sort((a, b) => a.localeCompare(b));
+
+  const backendLabel =
+    backendPathCount === null
+      ? ""
+      : ` \u00B7 ${backendPathCount} backend-confirmed path${backendPathCount === 1 ? "" : "s"}`;
+
   const summary =
     `${FLOW_DOMAIN_LABELS[mode]} \u00B7 ${segmentCount} flow segment` +
     `${segmentCount === 1 ? "" : "s"} \u00B7 ${pathCount} active path` +
-    `${pathCount === 1 ? "" : "s"}${amountsLabel}`;
+    `${pathCount === 1 ? "" : "s"}${amountsLabel}${backendLabel}`;
 
   return {
     status: "ready",
@@ -1075,6 +1109,8 @@ export function buildFlowModel(input: FlowModelInput): FlowMeta {
     entityCount,
     pathCount,
     crossCaseCount,
+    backendPathCount,
+    backendPathEntityIds,
     summary,
     emptyMessage: null,
   };

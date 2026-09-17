@@ -166,3 +166,114 @@ describe("platform payload normalization (Prompt 2/3 live convergence)", () => {
     ).toBe("Evidence submitted: Docs (2 file(s))");
   });
 });
+
+describe("PR-23 — OBSERVATION_EXTRACTED + ANALYSIS_PROGRESS frame verification", () => {
+  it("normalizes an OBSERVATION_EXTRACTED frame: action, count, investigation association, targetId=evidenceId", () => {
+    const out = normalizeEvent(
+      {
+        investigationId: "",
+        type: "OBSERVATION_EXTRACTED",
+        caseId: "case-1",
+        evidenceId: "ev-7",
+        sourceId: "src-9",
+        observationCount: 3,
+        observationIds: ["obs-a", "obs-b", "obs-c"],
+        timestamp: "2026-01-01T00:00:00.000Z",
+      },
+      INVESTIGATION_ID,
+    );
+    expect(out.action).toBe("OBSERVATION_EXTRACTED");
+    expect(out.description).toBe("3 observations extracted");
+    expect(out.targetType).toBe("OBSERVATION");
+    expect(out.targetId).toBe("ev-7");
+    expect(out.investigationId).toBe(INVESTIGATION_ID);
+  });
+
+  it("retains ids/count metadata after normalization (no lossy reshaping)", () => {
+    const out = normalizeEvent(
+      {
+        investigationId: INVESTIGATION_ID,
+        type: "OBSERVATION_EXTRACTED",
+        evidenceId: "ev-7",
+        observationCount: 2,
+        observationIds: ["obs-a", "obs-b"],
+      },
+      INVESTIGATION_ID,
+    );
+    expect(out.observationCount).toBe(2);
+    expect(out.observationIds).toEqual(["obs-a", "obs-b"]);
+    expect(out.evidenceId).toBe("ev-7");
+  });
+
+  it("dedupes identical OBSERVATION_EXTRACTED frames after normalization (no duplication)", () => {
+    const dedupe = new EventDeduplicator();
+    const frame = (): SseEvent => ({
+      investigationId: INVESTIGATION_ID,
+      type: "OBSERVATION_EXTRACTED",
+      evidenceId: "ev-7",
+      observationCount: 3,
+      observationIds: ["obs-a", "obs-b", "obs-c"],
+      timestamp: "2026-01-01T00:00:00.000Z",
+    });
+    const first = normalizeEvent(frame(), INVESTIGATION_ID);
+    const second = normalizeEvent(frame(), INVESTIGATION_ID);
+    expect(dedupe.accept(first)).toBe(true);
+    expect(dedupe.accept(second)).toBe(false);
+  });
+
+  it("normalizes an ANALYSIS_PROGRESS frame: phase retained in action, message retained as description", () => {
+    const out = normalizeEvent(
+      {
+        investigationId: "",
+        type: "ANALYSIS_PROGRESS",
+        caseId: "case-1",
+        phase: "CANDIDATES_DETECTED",
+        message: "Detected 3 bridge candidates",
+        detail: { bridges: 3 },
+        timestamp: "2026-01-01T00:00:00.000Z",
+      },
+      INVESTIGATION_ID,
+    );
+    expect(out.action).toBe("ANALYSIS_PROGRESS_CANDIDATES_DETECTED");
+    expect(out.description).toBe("Detected 3 bridge candidates");
+    expect(out.phase).toBe("CANDIDATES_DETECTED");
+    expect(out.investigationId).toBe(INVESTIGATION_ID);
+  });
+
+  it("handles repeated ANALYSIS_PROGRESS frames deterministically (no duplicate activity entries)", () => {
+    const dedupe = new EventDeduplicator();
+    const frame = (phase: string): SseEvent => ({
+      investigationId: INVESTIGATION_ID,
+      type: "ANALYSIS_PROGRESS",
+      phase,
+      message: `phase ${phase}`,
+      timestamp: "2026-01-01T00:00:00.000Z",
+    });
+    const started = normalizeEvent(frame("ANALYSIS_STARTED"), INVESTIGATION_ID);
+    const detected = normalizeEvent(frame("CANDIDATES_DETECTED"), INVESTIGATION_ID);
+    const completed = normalizeEvent(frame("ANALYSIS_COMPLETED"), INVESTIGATION_ID);
+    // All distinct phases accepted.
+    expect(dedupe.accept(started)).toBe(true);
+    expect(dedupe.accept(detected)).toBe(true);
+    expect(dedupe.accept(completed)).toBe(true);
+    // The same phase re-sent (a repeated progress event) is dropped after dedupe.
+    expect(dedupe.accept(normalizeEvent(frame("ANALYSIS_COMPLETED"), INVESTIGATION_ID))).toBe(false);
+  });
+
+  it("maps an ANALYSIS_PROGRESS phase to a stable, distinct action per phase", () => {
+    expect(normalizeEvent({ investigationId: INVESTIGATION_ID, type: "ANALYSIS_PROGRESS", phase: "LEAD_CREATED" }).action)
+      .toBe("ANALYSIS_PROGRESS_LEAD_CREATED");
+    expect(normalizeEvent({ investigationId: INVESTIGATION_ID, type: "ANALYSIS_PROGRESS", phase: "ANALYSIS_STARTED" }).action)
+      .toBe("ANALYSIS_PROGRESS_ANALYSIS_STARTED");
+  });
+
+  it("handles a malformed/unknown frame without inventing vocabulary", () => {
+    const out = normalizeEvent(
+      { investigationId: INVESTIGATION_ID, type: "UNKNOWN_THING", foo: 1 },
+      INVESTIGATION_ID,
+    );
+    expect(out.action).toBeUndefined();
+    // investigation association still backfilled.
+    expect(out.investigationId).toBe(INVESTIGATION_ID);
+  });
+});

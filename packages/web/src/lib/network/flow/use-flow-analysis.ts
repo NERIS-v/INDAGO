@@ -17,14 +17,25 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
-import { buildFlowModel } from "./flow-model";
+import { buildFlowModel, relationTypeToFlowDomain } from "./flow-model";
 import type { FlowDomain, FlowMeta, FlowRoleFilter } from "./flow-model";
 import type { NetworkTimeRange } from "@/lib/network/network-workspace";
-import type { GraphNode, Observation, RelationHypothesis, CrossCaseMatch } from "@indago/contracts";
+import type { GraphProvider } from "@/lib/providers/types";
+import type {
+  ConnectingPathCandidateDTO,
+  GraphNode,
+  Observation,
+  RelationHypothesis,
+  CrossCaseMatch,
+} from "@indago/contracts";
 
 const PAGE_SIZE = 100;
+// PR-23 bounded backend path corroboration (single load cycle, deterministic).
+const BACKEND_PATH_PAIR_CAP = 8;
+const BACKEND_PATH_HOPS = 3;
+const BACKEND_PATH_TOTAL_CAP = 64;
 
 export type FlowLoadState =
   | { readonly status: "idle"; readonly meta: null; readonly error: null }
@@ -47,6 +58,68 @@ interface FlowData {
   readonly observations: Observation[];
   readonly relations: RelationHypothesis[];
   readonly matches: CrossCaseMatch[];
+  /** PR-23: live backend path corroboration. null = seam absent or a pair
+   *  query failed (unavailable, NOT a verdict); array = backend answered. */
+  readonly backendPaths: ConnectingPathCandidateDTO[] | null;
+}
+
+/**
+ * Deterministic bounded set of connecting-path queries: the directed segment
+ * endpoint pairs from flow-domain relations (PROPOSED/ACCEPTED only, matching
+ * the model's segment rules), in stable relation-id order, capped. The result
+ * order is a pure function of the input, keeping the load cycle reproducible.
+ */
+function backendPathPairs(
+  relations: readonly RelationHypothesis[],
+): { from: string; to: string }[] {
+  const seen = new Set<string>();
+  const pairs: { from: string; to: string }[] = [];
+  for (const relation of [...relations].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!relation.directed) continue;
+    if (relation.status !== "PROPOSED" && relation.status !== "ACCEPTED") continue;
+    if (relationTypeToFlowDomain(relation.relationType) === null) continue;
+    const key = `${relation.sourceEntityId}\u0000${relation.targetEntityId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({
+      from: relation.sourceEntityId,
+      to: relation.targetEntityId,
+    });
+    if (pairs.length >= BACKEND_PATH_PAIR_CAP) break;
+  }
+  return pairs;
+}
+
+/**
+ * Queries the live connecting-paths seam for each bounded pair. Returns null
+ * when the seam is absent or ANY pair query fails (the backend did not give an
+ * authoritative answer → nothing is claimed); a real (possibly empty) array is
+ * only returned when every query enumerated by the backend. Paths are
+ * de-duplicated by their node sequence and capped.
+ */
+async function loadBackendPaths(
+  seam: NonNullable<GraphProvider["connectingPaths"]>,
+  investigationId: string,
+  pairs: readonly { from: string; to: string }[],
+): Promise<ConnectingPathCandidateDTO[] | null> {
+  const perPair = await Promise.all(
+    pairs.map((pair) =>
+      seam(investigationId, pair.from, pair.to, BACKEND_PATH_HOPS)
+        .then((page) => page.items)
+        .catch(() => null),
+    ),
+  );
+  if (perPair.some((result) => result === null)) return null;
+  const byKey = new Map<string, ConnectingPathCandidateDTO>();
+  for (const result of perPair as ConnectingPathCandidateDTO[][]) {
+    for (const path of result) {
+      byKey.set(
+        `${path.startNodeId}\u0000${path.targetNodeId}\u0000${path.nodes.map((n) => n.nodeId).join(",")}`,
+        path,
+      );
+    }
+  }
+  return [...byKey.values()].slice(0, BACKEND_PATH_TOTAL_CAP);
 }
 
 async function fetchAllPages<T>(
@@ -75,6 +148,7 @@ export function useFlowAnalysis({
   const workspace = useWorkspace();
   const [data, setData] = useState<FlowData | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const requestRef = useRef(0);
 
   useEffect(() => {
     if (!enabled) {
@@ -83,30 +157,49 @@ export function useFlowAnalysis({
       return;
     }
     let active = true;
+    // PR-23 race hardening: latest-requested-context wins. A newer effect run
+    // supersedes an older one even if the older resolves later; only the newest
+    // request id may commit state.
+    const requestId = ++requestRef.current;
     setData(null);
     setError(null);
-    Promise.all([
-      fetchAllPages<GraphNode>((query) =>
-        workspace.graph.getNodes(workspace.investigationId, query),
-      ),
-      fetchAllPages<Observation>((query) =>
-        workspace.observations.listByInvestigation(workspace.investigationId, query),
-      ),
-      fetchAllPages<RelationHypothesis>((query) =>
-        workspace.relations.listByInvestigation(workspace.investigationId, query),
-      ),
-      workspace.crossCase
-        .listMatches(workspace.caseId, { pageSize: PAGE_SIZE })
-        .catch(() => ({ items: [] as CrossCaseMatch[] })),
-    ])
-      .then(([nodes, observations, relations, matches]) => {
-        if (!active) return;
-        setData({ nodes, observations, relations, matches: matches.items });
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
+    (async () => {
+      try {
+        const [nodes, observations, relations, matches] = await Promise.all([
+          fetchAllPages<GraphNode>((query) =>
+            workspace.graph.getNodes(workspace.investigationId, query),
+          ),
+          fetchAllPages<Observation>((query) =>
+            workspace.observations.listByInvestigation(workspace.investigationId, query),
+          ),
+          fetchAllPages<RelationHypothesis>((query) =>
+            workspace.relations.listByInvestigation(workspace.investigationId, query),
+          ),
+          workspace.crossCase
+            .listMatches(workspace.caseId, { pageSize: PAGE_SIZE })
+            .catch(() => ({ items: [] as CrossCaseMatch[] })),
+        ]);
+        if (!active || requestId !== requestRef.current) return;
+
+        // PR-23 bounded path corroboration: only when the live seam exists on
+        // the graph provider (demo providers expose no seam → skipped, so the
+        // demo stays provider-faithful and continues to work unchanged).
+        const pathSeam = workspace.graph.connectingPaths;
+        let backendPaths: ConnectingPathCandidateDTO[] | null = null;
+        if (typeof pathSeam === "function") {
+          const pairs = backendPathPairs(relations);
+          if (pairs.length > 0) {
+            backendPaths = await loadBackendPaths(pathSeam, workspace.investigationId, pairs);
+          }
+        }
+        if (!active || requestId !== requestRef.current) return;
+
+        setData({ nodes, observations, relations, matches: matches.items, backendPaths });
+      } catch (err: unknown) {
+        if (!active || requestId !== requestRef.current) return;
         setError(err instanceof Error ? err : new Error("Failed to load the flow data"));
-      });
+      }
+    })();
     return () => {
       active = false;
     };
@@ -125,6 +218,7 @@ export function useFlowAnalysis({
       selectedMode: mode,
       roleFilter,
       crossCaseEntityIds,
+      backendPaths: data.backendPaths,
     });
   }, [data, timeRange, mode, roleFilter]);
 

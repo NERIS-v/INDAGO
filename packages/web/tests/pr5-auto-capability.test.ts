@@ -62,9 +62,11 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
     // PR-20: Phase-4 capabilities are live-wired even in a pure live workspace.
     expect(providers.capabilities.graph).toBe("live");
     expect(providers.capabilities.leads).toBe("live");
-    // F-PR6: an explicit-live Entity Pulse is TYPED not-ready — a live workspace
-    // must never silently fall back to the demo pulse visualization.
-    expect(providers.capabilities["network.pulse"]).toBe("not-ready");
+    // PR-23: an explicit-live Entity Pulse is LIVE-typed — its authoritative
+    // input (TEMPORAL BURSTS) resolves typed through the live seam exactly
+    // like graph/leads; a live workspace NEVER slides to the demo pulse
+    // visualization, and it is never silently not-ready.
+    expect(providers.capabilities["network.pulse"]).toBe("live");
 
     // A demo-only capability in a pure live workspace fails typed (never demo).
     await expect(providers.graph.getNodes("any")).rejects.toBeInstanceOf(ProviderError);
@@ -112,7 +114,10 @@ describe("F-PR5 — AUTO capability-level provider semantics", () => {
     expect(providers.capabilities.timeline).toBe("demo");
     expect(providers.capabilities.intelligence).toBe("demo");
     expect(providers.capabilities["network.graph"]).toBe("demo");
-    expect(providers.capabilities["network.pulse"]).toBe("demo");
+    // PR-23: network.pulse is LIVE-typed even in a pure live workspace — its
+    // authoritative input (TEMPORAL BURSTS) resolves through the live seam, so
+    // a live workspace PLACES it, never not-ready and never demo.
+    expect(providers.capabilities["network.pulse"]).toBe("live");
   });
 
   it("falling back for one capability does not switch the live ones, and a live failure does not contaminate the demo slot", async () => {
