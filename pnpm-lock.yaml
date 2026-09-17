@@ -93,6 +93,9 @@ importers:
         specifier: workspace:*
         version: link:../gap-classification
     devDependencies:
+      '@indago/competing-explanations':
+        specifier: workspace:*
+        version: link:../competing-explanations
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
