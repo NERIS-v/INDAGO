@@ -309,13 +309,18 @@ describe("F-PR4 live stubs", () => {
     simulateLatency: false,
   });
 
-  it("relations/listByInvestigation and get are UNSUPPORTED", async () => {
+  it("relations/listByInvestigation, get and listCanonical are LIVE (reject with SERVER when the API is unconfigured)", async () => {
+    // PR-21: relations are genuinely live-wired. Without NEXT_PUBLIC_API_URL the
+    // live route fails as a server/config error — never a fabricated UNSUPPORTED.
     await expect(
       providers.relations.listByInvestigation(INVESTIGATION_ID),
-    ).rejects.toMatchObject({ code: "UNSUPPORTED" });
+    ).rejects.toMatchObject({ code: "SERVER" });
     await expect(providers.relations.get("any-id")).rejects.toMatchObject({
-      code: "UNSUPPORTED",
+      code: "SERVER",
     });
+    await expect(
+      providers.relations.listCanonical?.(INVESTIGATION_ID),
+    ).rejects.toMatchObject({ code: "SERVER" });
   });
 
   it("intelligence methods are UNSUPPORTED with an explicit message", async () => {

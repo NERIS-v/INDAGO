@@ -80,9 +80,14 @@ export const CAPABILITY_AVAILABILITY: Record<
   graph: { demo: true, live: true },
   leads: { demo: true, live: true },
   crossCase: { demo: true, live: true },
-  // ---- Demo-only today (live stays typed-unsupported, never fabricated) ----
-  entities: { demo: true, live: false },
-  relations: { demo: true, live: false },
+  // ---- PR-21 — entities, relations + concrete entity/relation hypothesis
+  // reads are genuinely live-wired (real HTTP routes). The generic
+  // IntelligenceProvider (intelligence) stays demo-only — there is NO generic
+  // Intelligence API, so only the concrete capabilities backed by routes are
+  // marked live. timeline/gaps/review/robustness/hypotheses (the canonical
+  // Hypothesis store) have no live route and stay typed-unsupported. -------
+  entities: { demo: true, live: true },
+  relations: { demo: true, live: true },
   intelligence: { demo: true, live: false },
   timeline: { demo: true, live: false },
   gaps: { demo: true, live: false },

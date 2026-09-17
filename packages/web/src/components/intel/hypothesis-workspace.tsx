@@ -5,6 +5,7 @@ import { useWorkspace } from "@/lib/providers/workspace/context";
 import { HypothesisEngine } from "./hypothesis-engine";
 import { ReverseHypothesisEngine } from "./reverse-hypothesis-engine";
 import { Phase2HypothesisSurface } from "./phase2-hypothesis-surface";
+import { LiveHypothesisWorkspace } from "./live-hypothesis-workspace";
 
 type Mode = "generated" | "reverse";
 
@@ -23,6 +24,14 @@ export function HypothesisWorkspace() {
   // existing experience unchanged (no fabricated phase-2).
   const isRealCasePhase2 =
     workspace.mode === "demo" && Boolean(workspace.phase2AssessmentFreeze);
+
+  // PR-21 — honest LIVE seam: a live workspace renders the honest LIVE
+  // hypothesis surface (platform-data projections through the entity/relation
+  // provider seams) and is NEVER offered the reverse/fabricated surface. The
+  // reverse engine stays demo/OFS-only; live never renders it at any mode.
+  if (workspace.mode === "live") {
+    return <LiveHypothesisWorkspace />;
+  }
 
   return (
     <div className="flex w-full flex-col gap-5">

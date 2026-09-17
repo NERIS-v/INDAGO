@@ -6,7 +6,9 @@
 //   - Accept (PROPOSED only) executes immediately (single click).
 //   - Reject / Reverse run as an inline two-step confirmation with an optional
 //     reason that passes through to the provider seam.
-//   - The gate (demo/live) renders an honest unsupported state before anything.
+//   - The gate (demo/live) opens the authority surface; there is no longer any
+//     mode that fabricates an "unsupported" gate (PR-21 — live authority is
+//     genuinely wired, never typed-unsupported).
 //   - Every mutation goes through onMutate (never a frontend setStatus);
 //     success is verified against the expected lifecycle target, with a
 //     stale-conflict note when the result diverges.
@@ -23,7 +25,7 @@ import { REL_1 } from "@/lib/providers/demo/demo-fixtures/lookup";
 import type { RelationHypothesis } from "@indago/contracts";
 
 const gate = relationAuthorityAvailable("demo");
-const unsupportedGate = relationAuthorityAvailable("live");
+const liveGate = relationAuthorityAvailable("live");
 
 function relation(status: RelationHypothesis["status"]): RelationHypothesis {
   return {
@@ -40,17 +42,17 @@ function relation(status: RelationHypothesis["status"]): RelationHypothesis {
 afterEach(() => cleanup());
 
 describe("PR-8 — gate honesty", () => {
-  it("renders an honest unsupported note before any authority surface", () => {
+  it("opens the authority surface for a live gate (PR-21 — live authority is genuinely wired)", () => {
     render(
       <RelationAuthorityPanel
         relation={relation("PROPOSED")}
-        gate={unsupportedGate}
+        gate={liveGate}
         onMutate={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("relation-authority")).toHaveAttribute("data-authority-state", "unsupported");
-    expect(screen.getByTestId("relation-authority-unavailable").textContent).toContain("live mode");
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("relation-authority")).toHaveAttribute("data-authority-state", "ready");
+    expect(screen.queryByTestId("relation-authority-unavailable")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("button").length).toBeGreaterThan(0);
   });
 });
 

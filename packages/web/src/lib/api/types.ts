@@ -20,6 +20,7 @@ import type {
   LeadStatus,
   LeadPriority,
   LeadEvidenceVerdict,
+  EntityHypothesis,
 } from "@indago/contracts";
 
 export interface InvestigationStatusResponse {
@@ -419,4 +420,154 @@ export interface InvestigationRunSnapshotDTO {
 
 export interface RunCommandResponse {
   readonly run: InvestigationRunSnapshotDTO;
+}
+
+// ============================================================================
+// Phase 4 — Entities, Entity Hypotheses, Relations (PR-21)
+//
+// Shapes returned by the PR-21 read/authority endpoints. The platform serializes
+// Durable entity/relation rows directly (entity-store.ts / relation-hypothesis-
+// store.ts / relation-store.ts rowTo*); this is the honest wire shape the live
+// providers project into canonical contracts (lib/providers/live/*-projection.ts).
+// The entity-hypotheses endpoint returns ALREADY-canonical EntityHypothesis
+// objects (validated via EntityHypothesisSchema at the platform boundary), so
+// they pass straight through the provider seam.
+// ============================================================================
+
+/** GET /investigations/:id/entities — a Durable canonical Entity row subset
+ *  (entity-store.ts rowToEntity). `investigationId` is nullable on the wire and
+ *  is backfilled by the provider from the workspace identity. */
+export interface EntityListItemDTO {
+  readonly id: string;
+  readonly caseId: string;
+  readonly investigationId: string | null;
+  readonly canonicalName: string;
+  readonly entityType?: string | null;
+  readonly status: string;
+  readonly observationIds: readonly string[];
+  readonly hypothesisIds: readonly string[];
+  readonly sourceIdentifiers?:
+    | readonly { readonly sourceId: string; readonly identifier: string }[]
+    | null;
+  readonly provenance?: unknown;
+  readonly metadata?: unknown;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** GET /investigations/:id/entities envelope. */
+export interface EntitiesResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly entityCount: number;
+  readonly mentionCount: number;
+  readonly entities: EntityListItemDTO[];
+}
+
+/** GET /investigations/:id/entity-hypotheses — ALREADY-canonical EntityHypothesis
+ *  objects (the platform validates them through EntityHypothesisSchema). */
+export interface EntityHypothesesResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly count: number;
+  readonly hypotheses: EntityHypothesis[];
+}
+
+/** POST /investigations/:id/entity-hypotheses/:hid/accept — M-A09.5 materialization
+ *  result. `entityId` is the (possibly reused) canonical entity that resulted. */
+export interface EntityAcceptResponse {
+  readonly entityId: string;
+  readonly hypothesisId: string;
+  readonly status: string;
+  readonly materialized: boolean;
+  readonly reusedExisting: boolean;
+}
+
+/** GET /investigations/:id/relations — a Durable RelationHypothesis row subset
+ *  (relation-hypothesis-store.ts rowToRelationHypothesis). `validityInterval`
+ *  is the platform column name (NOT canonical `temporalInterval`); the provider
+ *  projects it. `evidenceStrength` is relationship quality, NOT the canonical
+ *  structural `strength`, and is intentionally not mapped. */
+export interface RelationHypothesisDTO {
+  readonly id: string;
+  readonly caseId: string;
+  readonly investigationId: string | null;
+  readonly sourceEntityId: string;
+  readonly targetEntityId: string;
+  readonly relationType: string;
+  readonly support: number;
+  readonly evidenceBasis: readonly string[];
+  readonly contradictions: readonly string[];
+  readonly status: string;
+  readonly scoreModelVersion?: string;
+  readonly evidenceCount?: number;
+  readonly evidenceStrength?: number;
+  readonly sourceCoverage?: number;
+  readonly temporalCoverage?: number;
+  readonly directed: boolean;
+  readonly provenance?: unknown;
+  readonly metadata?: unknown;
+  readonly validityInterval?: unknown;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** GET /investigations/:id/relations envelope. */
+export interface RelationsResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly count: number;
+  readonly relations: RelationHypothesisDTO[];
+}
+
+/** GET /investigations/:id/canonical-relations — the ACCEPTED, materialized
+ *  relations (relation-store.ts rowToRelation). No canonical contracts shape
+ *  exists for a materialized relation, so this is the provider-owned DTO the UI
+ *  consumes through the RelationProvider.listCanonical seam. */
+export interface CanonicalRelationDTO {
+  readonly id: string;
+  readonly caseId: string;
+  readonly investigationId: string | null;
+  readonly sourceEntityId: string;
+  readonly targetEntityId: string;
+  readonly relationType: string;
+  readonly directed: boolean;
+  readonly support: number;
+  readonly evidenceBasis: readonly string[];
+  readonly contradictions: readonly string[];
+  readonly status: string;
+  readonly scoreModelVersion?: string;
+  readonly evidenceCount?: number;
+  readonly provenance?: unknown;
+  readonly hypothesisId: string;
+  readonly validityInterval?: unknown;
+  readonly temporalAssertions?: unknown;
+  readonly createdAt: string;
+  readonly reversedAt: string | null;
+}
+
+/** GET /investigations/:id/canonical-relations envelope. */
+export interface CanonicalRelationsResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly count: number;
+  readonly relations: CanonicalRelationDTO[];
+}
+
+/** POST /investigations/:id/relation-hypotheses/:hid/accept — M-A10 accept
+ *  materialization result. */
+export interface RelationAcceptResponse {
+  readonly relationId: string;
+  readonly hypothesisId: string;
+  readonly status: string;
+  readonly materialized: boolean;
+  readonly reusedExisting: boolean;
+}
+
+/** POST /investigations/:id/relation-hypotheses/:hid/reject | /reverse —
+ *  status-only responses (the reject/reverse routes return the durable status
+ *  and hypothesis id; no canonical relation is created on reject). */
+export interface RelationDecisionResponse {
+  readonly status: string;
+  readonly hypothesisId: string;
 }

@@ -26,6 +26,14 @@ import {
   pauseInvestigation as apiPauseInvestigation,
   resumeInvestigation as apiResumeInvestigation,
   resolveInvestigationReview as apiResolveInvestigationReview,
+  listEntities as apiListEntities,
+  listEntityHypotheses as apiListEntityHypotheses,
+  acceptEntityHypothesis as apiAcceptEntityHypothesis,
+  listRelations as apiListRelations,
+  listCanonicalRelations as apiListCanonicalRelations,
+  acceptRelationHypothesis as apiAcceptRelationHypothesis,
+  rejectRelationHypothesis as apiRejectRelationHypothesis,
+  reverseRelationHypothesis as apiReverseRelationHypothesis,
 } from "@/lib/api/server";
 import type {
   StartInvestigationResponse,
@@ -52,6 +60,13 @@ import type {
   CrossCaseLinksResponse,
   GenerateCrossCaseLeadsResponse,
   RunCommandResponse,
+  EntitiesResponse,
+  EntityHypothesesResponse,
+  EntityAcceptResponse,
+  RelationsResponse,
+  CanonicalRelationsResponse,
+  RelationAcceptResponse,
+  RelationDecisionResponse,
 } from "@/lib/api/types";
 import type { LeadStatus } from "@indago/contracts";
 
@@ -232,4 +247,60 @@ export async function resolveInvestigationReview(
   notes?: string,
 ): Promise<RunCommandResponse> {
   return apiResolveInvestigationReview(investigationId, outcome, notes);
+}
+
+// ============================================================================
+// PR-21 — entities, entity hypotheses, relations (reads + authority)
+// ============================================================================
+
+export async function listEntities(
+  investigationId: string,
+): Promise<EntitiesResponse> {
+  return apiListEntities(investigationId);
+}
+
+export async function listEntityHypotheses(
+  investigationId: string,
+): Promise<EntityHypothesesResponse> {
+  return apiListEntityHypotheses(investigationId);
+}
+
+export async function acceptEntityHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<EntityAcceptResponse> {
+  return apiAcceptEntityHypothesis(investigationId, hypothesisId);
+}
+
+export async function listRelations(
+  investigationId: string,
+): Promise<RelationsResponse> {
+  return apiListRelations(investigationId);
+}
+
+export async function listCanonicalRelations(
+  investigationId: string,
+): Promise<CanonicalRelationsResponse> {
+  return apiListCanonicalRelations(investigationId);
+}
+
+export async function acceptRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationAcceptResponse> {
+  return apiAcceptRelationHypothesis(investigationId, hypothesisId);
+}
+
+export async function rejectRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationDecisionResponse> {
+  return apiRejectRelationHypothesis(investigationId, hypothesisId);
+}
+
+export async function reverseRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationDecisionResponse> {
+  return apiReverseRelationHypothesis(investigationId, hypothesisId);
 }
