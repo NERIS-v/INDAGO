@@ -7,6 +7,7 @@
 // ============================================================================
 
 // ---- Public API ----
+export { generateErSplitExplanations } from './pipeline/generate.js';
 export { buildBoundContext } from './pipeline/boundary.js';
 export type { ErSplitBoundContext } from './pipeline/boundary.js';
 export { buildStructuralFit } from './pipeline/structural-fit.js';
@@ -18,6 +19,14 @@ export {
   hasAcceptedHypothesis,
 } from './pipeline/identity-evidence.js';
 export type { IdentityEvidence } from './pipeline/identity-evidence.js';
+export {
+  computeExplanationId,
+  dedupeByExplanationId,
+  explanationIdentityFor,
+} from './pipeline/dedupe.js';
+export type { ErSplitExplanationIdentityTuple } from './pipeline/dedupe.js';
+export { rankingKeyFor, sortByRankingKey } from './pipeline/rank.js';
+export type { RankingInput } from './pipeline/rank.js';
 export { ErSplitExplanationError, ErSplitExplanationErrorCodes } from './pipeline/errors.js';
 export type { ErSplitExplanationErrorCode } from './pipeline/errors.js';
 export { sha256Hex } from './pipeline/sha256.js';
