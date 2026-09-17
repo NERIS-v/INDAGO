@@ -481,6 +481,9 @@ importers:
       '@indago/entity-resolution':
         specifier: workspace:*
         version: link:../intelligence/entity-resolution
+      '@indago/entity-split-analysis':
+        specifier: workspace:*
+        version: link:../intelligence/entity-split-analysis
       '@indago/gap-classification':
         specifier: workspace:*
         version: link:../intelligence/gap-classification
