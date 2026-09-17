@@ -20,6 +20,7 @@ import {
 } from "@/lib/context/temporal-workspace";
 import { TemporalActivityFeed } from "./temporal/activity-feed";
 import { TemporalVersionsPanel } from "./temporal/versions-panel";
+import { ValidAtPanel } from "./temporal/valid-at-panel";
 import { PanelErrorBoundary } from "@/components/ui/panel-error-boundary";
 
 interface TemporalContextPanelProps {
@@ -113,6 +114,11 @@ export function TemporalContextPanel({ tab, onTabChange, children, selection: se
               onSelectVersion={(versionId) => commitSelection({ mode: "historical", versionId })}
               onReturnCurrent={() => commitSelection(CURRENT_VERSION_SELECTION)}
             />
+            <div className="mt-4 border-t border-surface-200/40 pt-4">
+              <PanelErrorBoundary label="Valid-at projection">
+                <ValidAtPanel />
+              </PanelErrorBoundary>
+            </div>
           </PanelErrorBoundary>
         )}
       </div>

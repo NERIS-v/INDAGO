@@ -51,7 +51,13 @@ export type CapabilityKey =
   | "network.graph"
   | "network.pulse"
   | "network.matrix"
-  | "network.flow";
+  | "network.flow"
+  // ---- PR-22 — authoritative graph analytics + temporal projection. These are
+  // LIVE-only backend capabilities (centrality, community detection, valid-at
+  // projection); demo has no equivalent and must not be marked demo-available.
+  | "graph.centrality"
+  | "graph.communities"
+  | "graph.validAt";
 
 /** Structural DataModeConfig (avoids an import cycle with types.ts). */
 export type NetworkDataMode = "demo" | "live" | "auto";
@@ -102,6 +108,12 @@ export const CAPABILITY_AVAILABILITY: Record<
   "network.pulse": { demo: true, live: false },
   "network.matrix": { demo: true, live: false },
   "network.flow": { demo: true, live: false },
+  // ---- PR-22 — authoritative backend analytics + temporal projection. Live
+  // only (no demo equivalent; demo must not be marked available so a live
+  // workspace resolving these stays typed live, never demo-served).
+  "graph.centrality": { demo: false, live: true },
+  "graph.communities": { demo: false, live: true },
+  "graph.validAt": { demo: false, live: true },
 };
 
 /**
