@@ -96,7 +96,25 @@ export function toLeadDrawerFields(lead: Lead) {
     sourceCandidateType: lead.sourceCandidateType,
     supportCount: lead.supportingObservationIds.length,
     againstCount: lead.contradictingObservationIds.length,
-    alternatives: lead.alternativeExplanations.map((a) => a.statement),
+    alternatives: lead.alternativeExplanations.map((a) => ({
+      kind: a.kind,
+      statement: a.statement,
+      plausibility: a.plausibility,
+      requiresAdditionalEvidence: a.requiresAdditionalEvidence,
+    })),
     gapCount: (lead.gapIds ?? []).length,
+    provenance: lead.provenance
+      ? {
+          entries: lead.provenance.entries.map((e) => ({
+            sourceId: e.sourceId,
+            artifactId: e.artifactId,
+            documentRef: e.documentRef,
+            pageRef: e.pageRef,
+            extractor: e.extractor,
+            derivedFrom: e.derivedFrom,
+          })),
+          createdAt: lead.provenance.createdAt.value,
+        }
+      : null,
   };
 }

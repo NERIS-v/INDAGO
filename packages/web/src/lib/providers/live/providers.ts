@@ -86,6 +86,11 @@ import type {
   RelationsResponse,
   CanonicalRelationsResponse,
   CanonicalRelationDTO,
+  CentralityResponse,
+  CommunitiesResponse,
+  ValidAtGraphResponse,
+  CentralityResultDTO,
+  CommunityDetectionDTO,
 } from "@/lib/api/types";
 import { createCapabilityStatusTable } from "../capabilities";
 import { createLiveRealtimeProvider } from "./realtime";
@@ -113,6 +118,9 @@ import {
   getGraphVersionDetails as apiGetGraphVersionDetails,
   getTemporalBursts as apiListTemporalBursts,
   getCommunityCandidates as apiListCommunityCandidates,
+  getCommunities as apiGetGraphCommunities,
+  getCentrality as apiGetGraphCentrality,
+  getValidAtGraph as apiGetGraphValidAt,
   getBridgeCandidates as apiListBridgeCandidates,
   traverseGraph as apiTraverseGraph,
   getConnectingPaths as apiListConnectingPaths,
@@ -737,13 +745,58 @@ export class LiveGraphProvider implements GraphProvider {
     }
   }
 
+  /** PR-22: AUTHORITATIVE community detection (deterministic Louvain) →
+   *  GET /graph/communities. Distinct from community CANDIDATES. */
   async getCommunities(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CommunityDetectionDTO>> {
+    try {
+      const response: CommunitiesResponse = await apiGetGraphCommunities(investigationId);
+      return paginateItems(response.communities, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** PR-22: P4 cohesion-scored community CANDIDATES →
+   *  GET /graph/community-candidates. Kept separate from authoritative
+   *  getCommunities(). */
+  async getCommunityCandidates(
     investigationId: string,
     query?: ProviderQuery,
   ): Promise<Paginated<CommunityCandidateDTO>> {
     try {
       const response = await apiListCommunityCandidates(investigationId);
       return paginateItems(response.candidates, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** PR-22: authoritative degree centrality rank → GET /graph/centrality.
+   *  Structural metric (relation volume), never culpability. */
+  async getCentrality(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CentralityResultDTO>> {
+    try {
+      const response: CentralityResponse = await apiGetGraphCentrality(investigationId);
+      return paginateItems(response.centrality, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** PR-22: authoritative graph projection valid at a domain instant →
+   *  GET /cases/:caseId/graph/valid-at?at=<ISO> (case-scoped). The investigation
+   *  is resolved server-side from the persisted run; the CASE scope comes from
+   *  this provider's resolved caseId — never an arbitrary browser value, so the
+   *  caller-supplied caseId is intentionally ignored for authorization. */
+  async getValidAt(_caseId: string, at: string): Promise<ValidAtGraphResponse> {
+    try {
+      const response = await apiGetGraphValidAt(this.caseId, at);
+      return response;
     } catch (err) {
       throw toLiveProviderError(err);
     }
