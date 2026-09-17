@@ -12,7 +12,7 @@ export { buildExplanationSignals } from './pipeline/signals.js';
 export type { DerivedExplanationSignals } from './pipeline/signals.js';
 export { CompetingExplanationError, CompetingExplanationErrorCodes } from './pipeline/errors.js';
 export type { CompetingExplanationErrorCode } from './pipeline/errors.js';
-export { explanationIdentityFor, computeExplanationId } from './pipeline/dedupe.js';
+export { explanationIdentityFor, computeExplanationId, dedupeByExplanationId } from './pipeline/dedupe.js';
 export type { ExplanationSetContext } from './pipeline/dedupe.js';
 
 // ---- Input surface ----

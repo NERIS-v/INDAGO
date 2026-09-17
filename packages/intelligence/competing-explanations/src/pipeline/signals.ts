@@ -21,7 +21,8 @@
 // ============================================================================
 
 import type { GapClassificationInput, GapClassificationResult } from '@indago/gap-classification';
-import { buildClassificationSignals, classifyGap } from '@indago/gap-classification';
+import { buildClassificationSignals, classifyGap, GapClassificationError } from '@indago/gap-classification';
+import { GapClassificationErrorCodes } from '@indago/gap-classification';
 import type { DerivedClassificationFacts } from '@indago/gap-classification';
 import type { TemporalInterval } from '@indago/contracts';
 
@@ -221,10 +222,51 @@ export function buildExplanationSignals(input: CompetingExplanationInput): Deriv
 
   // Re-run the deterministic classifier: supplies every authority check AND
   // produces the classification the supplied result must equal (policy §7).
-  const recomputed = classifyGap(input.context);
+  // PR14's GapClassificationError at this boundary is surfaced as a
+  // CompetingExplanationError with a closed code (QUALIFIED_CANDIDATE_REQUIRED
+  // maps to CONTEXT_MISMATCH — the candidate is not qulified in context).
+  let recomputed: GapClassificationResult;
+  try {
+    recomputed = classifyGap(input.context);
+  } catch (err) {
+    if (err instanceof CompetingExplanationError) throw err;
+    if (err instanceof GapClassificationError) {
+      const code =
+        err.code === GapClassificationErrorCodes.QUALIFIED_CANDIDATE_REQUIRED ||
+        err.code === GapClassificationErrorCodes.CONTEXT_MISMATCH
+          ? CompetingExplanationErrorCodes.CONTEXT_MISMATCH
+          : err.code === GapClassificationErrorCodes.UNSUPPORTED_POLICY
+            ? CompetingExplanationErrorCodes.UNSUPPORTED_POLICY
+            : CompetingExplanationErrorCodes.INVALID_INPUT;
+      throw new CompetingExplanationError(code, err.message);
+    }
+    throw new CompetingExplanationError(
+      CompetingExplanationErrorCodes.INVALID_INPUT,
+      `context validation failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
   enforceClassificationBinding(recomputed, input.gapClassification);
 
-  const facts = buildClassificationSignals(input.context);
+  let facts: ReturnType<typeof buildClassificationSignals>;
+  try {
+    facts = buildClassificationSignals(input.context);
+  } catch (err) {
+    if (err instanceof GapClassificationError) {
+      const code =
+        err.code === GapClassificationErrorCodes.CONTEXT_MISMATCH
+          ? CompetingExplanationErrorCodes.CONTEXT_MISMATCH
+          : err.code === GapClassificationErrorCodes.UNSUPPORTED_POLICY
+            ? CompetingExplanationErrorCodes.UNSUPPORTED_POLICY
+            : err.code === GapClassificationErrorCodes.QUALIFIED_CANDIDATE_REQUIRED
+              ? CompetingExplanationErrorCodes.CONTEXT_MISMATCH
+              : CompetingExplanationErrorCodes.INVALID_INPUT;
+      throw new CompetingExplanationError(code, err.message);
+    }
+    throw new CompetingExplanationError(
+      CompetingExplanationErrorCodes.INVALID_INPUT,
+      `signal derivation failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
   const rc = input.context.qualifiedCandidate.rawCandidate;
 
   const candidateEntityIds = deriveCandidateEntityIds(input.context);
