@@ -68,6 +68,12 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 
 ---
 
+## 5A-PR16 (ER-split-explains-hole) — PARTIAL 🟡 (policy frozen V1 + pure runtime; real-Postgres execution deferred — ENVIRONMENTAL)
+
+**PR16 (detect/rank/explain when a fragmentation of a canonical entity could create a Graph Hole) landed 2026-09-17 on `feat/m-a13-graph-hole-region` — policy frozen V1 + pure deterministic runtime; NO LLM, NO hypothesis lifecycle authority, NO reblocking, NO persistence, no hidden retrieval.** `@indago/entity-split-analysis` consumes the certified PR1/PR3/PR5/PR13/PR14/PR15 chain (input binds to the REAL PR14 classification by re-running `classifyGap`; PR15 competing set binds by re-running `generateCompetingExplanations` — `CONTEXT_MISMATCH` otherwise). It detects **boundary splits**: a pair of candidate observations whose canonical entities are distinct (`A1 ≈ A2`-compatible, `E1 ≠ E2` per PR14) and split an otherwise-unbroken hole boundary — `bridging = true`, no path, no hypothesis. Emits `ER_SplitExplainedGraphHole` rows with frozen `ER_SPLIT_EXPLANATION_POLICY_VERSION = 'v1'`, deterministic content-addressed `explanationId`, identity-support score (identity formula), status from frozen enum, `requiresTargetedReblocking` handoff on SUPPORTED only, and `missingDiscriminatingSignals` (superset: all absent discriminator codes incl. `OBSERVATION_OVERLAP_ABSENT` — see §28 Scenario B superset note). Bounded: `MAX_ER_SPLIT_EXPLANATIONS = 5`, `MAX_CANDIDATE_PAIRS_PER_QUERY = 250`, `MAX_ENTITY_HYPOTHESES_PER_QUERY = 500`. Typed failures only (`INVALID_INPUT`, `UNSUPPORTED_POLICY`, `CONTEXT_MISMATCH`, `INVALID_REFERENCE`, `INVALID_INVARIANT`). **Verification:** contracts 515/15 (40 PR16 contract tests incl. §31 closed-world, determinism, ceiling, bounds, contradictions); `@indago/entity-split-analysis` 41/2 (19 generation + 19 boundaries + 3 PR15-integration); rankingKey-before-validation +#24 boundary defects fixed at test time; platform typecheck/build green; real-Postgres integration suite 5 tests (T0–T4) written + typechecked + committed with clean-skip guard — **execution deferred: Neon DB unreachable (environmental, affects PR13/PR14/PR15/PR16 suites identically)**.
+
+---
+
 ## Phase 0 — Architecture & Scope Lock
 
 **Date:** 25 Aug | **Owner:** Both | **Gate:** Scope + ownership locked
