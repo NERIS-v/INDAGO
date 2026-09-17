@@ -153,6 +153,14 @@ export function buildBoundContext(input: ErSplitExplanationInput): ErSplitBoundC
   if (input.entityHypotheses.length > MAX_ENTITY_HYPOTHESES_BOUND) {
     fail(ErSplitExplanationErrorCodes.INVALID_INPUT, `entityHypotheses exceeds the bound of ${String(MAX_ENTITY_HYPOTHESES_BOUND)}`);
   }
+  // Duplicate detection MUST run on the raw array, before sortedUnique hides it.
+  const seenPairIds = new Set<string>();
+  for (const p of input.candidatePairs) {
+    if (seenPairIds.has(p.id)) {
+      fail(ErSplitExplanationErrorCodes.INVALID_INPUT, `duplicate candidatePair id: ${p.id}`);
+    }
+    seenPairIds.add(p.id);
+  }
 
   // Re-run the deterministic classifier: supplies every authority check AND
   // produces the classification the supplied result must equal (policy §7).
@@ -190,15 +198,10 @@ export function buildBoundContext(input: ErSplitExplanationInput): ErSplitBoundC
   for (const n of input.context.nodes) nodesById.set(n.id, n);
 
   const pairs = sortedUnique(input.candidatePairs, (p) => p.id);
-  const seenPairIds = new Set<string>();
   for (const p of pairs) {
     if (p.caseId !== input.context.caseId) {
       fail(ErSplitExplanationErrorCodes.CONTEXT_MISMATCH, `candidatePair ${p.id} carries a different caseId`);
     }
-    if (seenPairIds.has(p.id)) {
-      fail(ErSplitExplanationErrorCodes.INVALID_INPUT, `duplicate candidatePair id: ${p.id}`);
-    }
-    seenPairIds.add(p.id);
     assertReferencePresent(universeById, p.leftCandidateId, `candidatePair ${p.id}.leftCandidateId`);
     assertReferencePresent(universeById, p.rightCandidateId, `candidatePair ${p.id}.rightCandidateId`);
     const left = universeById.get(p.leftCandidateId)!;

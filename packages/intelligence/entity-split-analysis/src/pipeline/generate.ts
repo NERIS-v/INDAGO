@@ -196,6 +196,19 @@ export function generateErSplitExplanations(input: ErSplitExplanationInput): ErS
       }),
     );
 
+    const rankingKey = rankingKeyFor(
+      {
+        explanationStatus: status,
+        structuralFitScore: structural.structuralFitScore,
+        identitySupportScore: identity.identitySupportScore,
+        supportingObservationIds: identity.supportingObservationIds,
+        candidateAId,
+        candidateBId,
+        explanationId,
+      },
+      bound.sourceByObservation,
+    );
+
     const row: ErSplitExplanation = {
       explanationId,
       graphHoleId: bound.graphHoleId,
@@ -246,7 +259,7 @@ export function generateErSplitExplanations(input: ErSplitExplanationInput): ErS
         'Distinct canonical entities on the two sides of a boundary make fragmentation a structural possibility, not a fact.',
         'Temporal comparison uses domain validity only; absence of temporal facts is uninformative (ABSENT ≠ DIFFERENT).',
       ],
-      rankingKey: '',
+      rankingKey,
       contextSha256: bound.contextSha256,
       policyVersion: 'v1',
     };
@@ -262,22 +275,8 @@ export function generateErSplitExplanations(input: ErSplitExplanationInput): ErS
     unranked.push(parsed.data);
   }
 
-  // Identity + dedupe, rank, bound.
+  // Identity + dedupe, then rank.
   const deduped = dedupeByExplanationId(unranked);
-  for (const row of deduped) {
-    row.rankingKey = rankingKeyFor(
-      {
-        explanationStatus: row.explanationStatus,
-        structuralFitScore: row.structuralFitScore,
-        identitySupportScore: row.identitySupportScore,
-        supportingObservationIds: row.supportingObservationIds,
-        candidateAId: row.candidateAId,
-        candidateBId: row.candidateBId,
-        explanationId: row.explanationId,
-      },
-      bound.sourceByObservation,
-    );
-  }
   const ranked = deduped.slice().sort(sortByRankingKey);
   const truncated = ranked.length > MAX_ER_SPLIT_EXPLANATIONS_BOUND;
   const explanations = truncated ? ranked.slice(0, MAX_ER_SPLIT_EXPLANATIONS_BOUND) : ranked;
