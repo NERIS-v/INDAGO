@@ -54,6 +54,9 @@ import type {
   EvidenceSubmissionResponse,
   EvidenceListItem,
   CanonicalRelationDTO,
+  CentralityResultDTO,
+  CommunityDetectionDTO,
+  ValidAtGraphResponse,
 } from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
 import type { CapabilityStatusTable } from "./capabilities";
@@ -945,11 +948,38 @@ export interface GraphProvider {
     investigationId: string,
     query?: ProviderQuery,
   ): Promise<Paginated<TemporalBurstCandidateDTO>>;
-  /** Optional: P4 cohesion-scored community candidates. */
+  /** PR-22: AUTHORITATIVE community detection (deterministic Louvain over the
+   *  accepted-relation undirected derivative) → GET /graph/communities. This is
+   *  the detected community MEMBERSHIP (structural grouping), DISTINCT from
+   *  community CANDIDATES (getCommunityCandidates → /graph/community-candidates,
+   *  cohesion-scored candidate signals). Never conflate the two. */
   getCommunities?(
     investigationId: string,
     query?: ProviderQuery,
+  ): Promise<Paginated<CommunityDetectionDTO>>;
+  /** PR-22: P4 cohesion-scored community CANDIDATES → GET /graph/community-candidates.
+   *  Kept separate from authoritative getCommunities(); distinct capability. */
+  getCommunityCandidates?(
+    investigationId: string,
+    query?: ProviderQuery,
   ): Promise<Paginated<CommunityCandidateDTO>>;
+  /** PR-22: authoritative degree centrality rank → GET /graph/centrality.
+   *  Structural metric (relation volume), never culpability. */
+  getCentrality?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CentralityResultDTO>>;
+  /** PR-22: the authoritative graph projection valid at a domain instant →
+   *  GET /cases/:caseId/graph/valid-at?at=<ISO> (case-scoped; the investigation
+   *  is resolved server-side from the persisted run). Returns the same M-A13
+   *  ProjectedGraph contract as current/version projections — a true backend
+   *  projection, never a client-side filter. The temporal UI uses this when the
+   *  analyst requests a historical domain time. Absent method → the valid-at
+   *  temporal control renders an honest unavailable state. */
+  getValidAt?(
+    caseId: string,
+    at: string,
+  ): Promise<ValidAtGraphResponse>;
   /** Optional: P4 bridge/connector candidates. */
   getBridges?(
     investigationId: string,
