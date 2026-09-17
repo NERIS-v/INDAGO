@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",
+    "@indago/competing-explanations": "workspace:*",
     "@indago/entity-resolution": "workspace:*",
     "@indago/gap-classification": "workspace:*",
     "@indago/graph-hole-detection": "workspace:*",

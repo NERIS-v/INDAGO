@@ -450,6 +450,9 @@ importers:
 
   packages/platform:
     dependencies:
+      '@indago/competing-explanations':
+        specifier: workspace:*
+        version: link:../intelligence/competing-explanations
       '@indago/contracts':
         specifier: workspace:*
         version: link:../contracts
