@@ -258,10 +258,10 @@ Reuses the PR14 pure interval-overlap check (M-A12 `TemporalInterval` semantics;
 
 ## 14. Ranking (deterministic, frozen V1)
 
-Rank order is produced by sorting a canonicalized `rankingKey` **ascending**. The fields below are normalized (DESC fields negated) so ascending lexicographic order equals rank priority:
+Rank order is produced by sorting a canonicalized `rankingKey` **ascending**. The fields below are normalized (DESC fields flipped to fixed-width zero-padded digits) so ascending lexicographic order equals rank priority — note that negated JSON numbers sort lexically in the wrong direction (`"-4" < "-5"`), so V1 emits fixed-width flipped strings instead of a negated numeric tuple:
 
 1. **support level** DESC (`SUPPORTED > PLAUSIBLE > WEAKLY_SUPPORTED > CONTRADICTED`; the only stronger-than-PLAUSIBLE level is `SUPPORTED`, reserved for primary families).
-2. **family priority** DESC: primary (classification-matching) family first; alternatives in a **frozen order**: `MISSING_COMPARISON`-adjacent genuine alternatives before representation/temporal alternatives (frozen: primary → `ENTITY_FRAGMENTATION_EXPLANATION` → `RELATION_REPRESENTATION_EXPLANATION` → `TEMPORAL_EXPLANATION` → `INNOCENT_ALTERNATIVE_EXPLANATION`; concealment primary never emits alternatives that would contradict its epistemic ceiling — see §16 ceiling rule).
+2. **family priority** ASC: primary (classification-matching) family first; alternatives in a **frozen order**: `MISSING_COMPARISON`-adjacent genuine alternatives before representation/temporal alternatives (frozen: primary → `ENTITY_FRAGMENTATION_EXPLANATION` → `RELATION_REPRESENTATION_EXPLANATION` → `TEMPORAL_EXPLANATION` → `INNOCENT_ALTERNATIVE_EXPLANATION`; concealment primary never emits alternatives that would contradict its epistemic ceiling — see §16 ceiling rule).
 3. **evidence diversity** DESC — count of distinct `sourceId` values among supporting observations (more independent sources rank higher; bounded ≤ 30).
 4. **structural coverage** DESC — `supportingObservationIds.length + supportingHypothesisIds.length`.
 5. `explanationId` ASC (tie-break; deterministic hex, lexical).
@@ -362,18 +362,18 @@ Every PR15 constant and basis code namespaces itself with `CompetingExplanation`
 
 | Check | Expected |
 |---|---|
-| type — no single-label constraint violation | hidden |
-| id — no invented id (all refs exist in context) | hidden |
-| id — no cross-case / cross-version refs | hidden |
-| basis — every code emitted matches its family's grounded signal | hidden |
-| time — no clock in the generator | hidden |
-| determinism — equal input → equal bytes | hidden |
-| bound — explanations ≤ 5 and truncated reflects overflow | hidden |
-| ceiling — no explanation exceeds its classification ceiling (§16) | hidden |
-| concealment wording — pattern-compatible only | hidden |
-| no LLM invocation | hidden |
+| type — no single-label constraint violation | PASS — primary family per classification type is exactly the PR14-selected label (generation tests) |
+| id — no invented id (all refs exist in context) | PASS — closed-world reference test + binding tests |
+| id — no cross-case / cross-version refs | PASS — classification binding (CONTEXT_MISMATCH) + identity tuple-scoped to case/version |
+| basis — every code emitted matches its family's grounded signal | PASS — per-family basis assertions |
+| time — no clock in the generator | PASS — no clock/randomness; `computedAt` is caller-supplied; byte-determinism tests |
+| determinism — equal input → equal bytes | PASS — reordered-input + repeated-call byte-identical tests |
+| bound — explanations ≤ 5 and truncated reflects overflow | PASS — contract bound + runtime cap tests |
+| ceiling — no explanation exceeds its classification ceiling (§16) | PASS — SUPPORTED primary / PLAUSIBLE alternatives / CONTRADICTED under AMBIGUOUS |
+| concealment wording — pattern-compatible only | PASS — statement template assertions |
+| no LLM invocation | PASS — pure deterministic generator (no LLM import/usage) |
 
-(The verification matrix is completed after implementation+tests.)
+(V1 verification is complete for unit + boundary coverage. Platform-integration evidence (PR15-7) is written + typechecked; its live execution is pending Neon DB availability.)
 
 ## 35. Upstream Requirements & Dependencies
 
@@ -407,14 +407,14 @@ This document and the V1 constants it references are **frozen** for V1. Any beha
 
 | Stage | Status |
 |---|---|
-| Policy freeze (PR15-1) | COMPLETE |
-| Contract schemas + tests (PR15-2) | PENDING |
-| Runtime scaffold + generation (PR15-3) | PENDING |
-| Support/contradiction evaluation (PR15-4) | PENDING |
-| Ranking + identity (PR15-5) | PENDING |
-| Unit tests (PR15-6) | PENDING |
-| Platform integration (PR15-7) | PENDING |
-| Fixes (PR15-8) | PENDING |
-| Docs + tracker (PR15-9) | PENDING |
-| Regression matrix (PR6–PR15) | PENDING |
-| **Final status** | **PENDING — CERTIFIED / CERTIFIED WITH DOCUMENTED LIMITATIONS / BLOCKED (choose at §End update)** |
+| Policy freeze (PR15-1) | COMPLETE — `5b702eb` |
+| Contract schemas + tests (PR15-2) | COMPLETE — `894dad0` (contracts 475 tests / 22 files) |
+| Runtime scaffold + generation (PR15-3) | COMPLETE — `50a2649` |
+| Support/contradiction evaluation (PR15-4) | COMPLETE — `2958efb` |
+| Ranking + identity (PR15-5) | COMPLETE — `b153cf1` |
+| Unit tests (PR15-6) | COMPLETE — `0172fa2` (29 tests / 2 files) |
+| Platform integration (PR15-7) | IN PROGRESS — written + typechecked + workspace dep (`f72a664`); live execution DEFERRED (Neon DB unreachable — environmental, affects PR13/PR14 suites identically) |
+| Fixes (PR15-8) | COMPLETE — the two runtime defects surfaced by the PR15-6 tests (ranking-key encoding; PR14→PR15 error mapping) were folded into `0172fa2`; no standalone fix commit was needed |
+| Docs + tracker (PR15-9) | IN PROGRESS — this update |
+| Regression matrix (PR6–PR15) | PARTIAL — non-DB regression green: contracts 475/22, Phase 5A intelligence packages 635 tests (incl. competing-explanations 29), platform units 212; DB-gated integration suites (PR6/PR11/PR12/PR13/PR14/PR15 …) run once Neon is reachable |
+| **Final status** | **CERTIFIED WITH DOCUMENTED LIMITATIONS** — V1 runtime implemented + unit-verified; the only missing evidence is live integration execution (blocked by Neon DB unreachability from the dev machine — environmental, affects PR13/PR14/PR15 suites identically; integration test is written + typechecked, see PR15-7) |
