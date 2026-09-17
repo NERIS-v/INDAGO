@@ -19,6 +19,7 @@
     "@indago/contracts": "workspace:*",
     "@indago/competing-explanations": "workspace:*",
     "@indago/entity-resolution": "workspace:*",
+    "@indago/entity-split-analysis": "workspace:*",
     "@indago/gap-classification": "workspace:*",
     "@indago/graph-hole-detection": "workspace:*",
     "@indago/graph-hole-qualification": "workspace:*",

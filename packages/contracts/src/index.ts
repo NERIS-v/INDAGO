@@ -81,6 +81,7 @@ export * from './intelligence/normalization.js';
 export * from './intelligence/targeted-reblock.js';
 export * from './intelligence/reassessment.js';
 export * from './intelligence/competing-explanations.js';
+export * from './intelligence/entity-split.js';
 
 // Execution contracts
 export * from './execution/investigation-run.js';
