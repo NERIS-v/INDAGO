@@ -327,6 +327,44 @@ export function LiveHypothesisWorkspace() {
                     ) : null,
                   )}
                 </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="font-mono text-[0.625rem] font-bold uppercase tracking-widest text-semantic-foreground-faint">
+                      Evidence basis
+                    </p>
+                    {r.evidenceBasis.length > 0 ? (
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {r.evidenceBasis.map((obsId) => (
+                          <li key={obsId} className="font-mono text-[0.625rem] text-semantic-foreground-muted">
+                            {obsId}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 font-mono text-[0.625rem] text-semantic-foreground-faint">
+                        None recorded.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-mono text-[0.625rem] font-bold uppercase tracking-widest text-semantic-foreground-faint">
+                      Contradictions
+                    </p>
+                    {(r.contradictions ?? []).length > 0 ? (
+                      <ul className="mt-1 flex flex-col gap-1">
+                        {(r.contradictions ?? []).map((obsId) => (
+                          <li key={obsId} className="font-mono text-[0.625rem] text-semantic-foreground-muted">
+                            {obsId}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-1 font-mono text-[0.625rem] text-semantic-foreground-faint">
+                        None recorded.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
