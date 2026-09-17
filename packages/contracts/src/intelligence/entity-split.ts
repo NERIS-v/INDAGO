@@ -62,6 +62,18 @@ export const MAX_ENTITY_HYPOTHESES_PER_QUERY = 500;
 export const RESOLUTION_MATCH_SCORE_THRESHOLD = 0.5;
 
 /**
+ * Typed failure codes for the deterministic generator boundary (policy §7).
+ * `INSUFFICIENT_CONTEXT` as a RESULT is an empty set, not an error.
+ */
+export const ErSplitExplanationFailureCodeSchema = z.enum([
+  'INVALID_INPUT',
+  'UNSUPPORTED_POLICY',
+  'CONTEXT_MISMATCH',
+  'INVALID_REFERENCE',
+]);
+export type ErSplitExplanationFailureCode = z.infer<typeof ErSplitExplanationFailureCodeSchema>;
+
+/**
  * Epistemic support status of an ER-split explanation (frozen V1, policy §10.2).
  *
  * Reuses the PR15 support-level vocabulary BY REFERENCE, excluding the

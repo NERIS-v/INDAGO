@@ -6,6 +6,7 @@ import {
   MAX_ENTITY_HYPOTHESES_PER_QUERY,
   RESOLUTION_MATCH_SCORE_THRESHOLD,
   ErSplitExplanationStatusSchema,
+  ErSplitExplanationFailureCodeSchema,
   TemporalCompatibilitySchema,
   SharedSignalCodeSchema,
   DiscriminatingGapCodeSchema,
@@ -143,6 +144,17 @@ describe('ErSplitExplanationStatusSchema', () => {
     expect(ErSplitExplanationStatusSchema.safeParse('CONFIDENT').success).toBe(false);
     expect(ErSplitExplanationStatusSchema.safeParse('AMBIGUOUS').success).toBe(false);
     expect(ErSplitExplanationStatusSchema.safeParse('ACCEPTED').success).toBe(false);
+  });
+});
+
+describe('ErSplitExplanationFailureCodeSchema', () => {
+  it('freezes the typed boundary failures (policy §7)', () => {
+    expect(ErSplitExplanationFailureCodeSchema.options).toEqual([
+      'INVALID_INPUT',
+      'UNSUPPORTED_POLICY',
+      'CONTEXT_MISMATCH',
+      'INVALID_REFERENCE',
+    ]);
   });
 });
 

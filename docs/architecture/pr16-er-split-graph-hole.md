@@ -119,7 +119,7 @@ Boundary constraints (§7):
 - `context.qualifiedCandidate` MUST be `qualified === true` (mirrors PR14/PR15).
 - `context.classificationPolicyVersion` MUST be `'v1'`.
 - `gapClassification` MUST match the deterministic recomputation of `classifyGap(context)` on `contextSha256`, `type`, `status`, and `reasonCodes`.
-- `competingExplanationSet` (when supplied) MUST have `competingExplanationPolicyVersion === 'v1'`, MUST target the same `graphHoleId`, and its `contextSha256` MUST equal the recomputed package digest (§7).
+- `competingExplanationSet` (when supplied) MUST have `competingExplanationPolicyVersion === 'v1'`, MUST target the same `graphHoleId`, and its **embedded `classification` projection** (`type`/`status`/`classificationPolicyVersion`) MUST match the recomputed classification (§7). Note: PR15's set-level `contextSha256` is a digest of PR15's *derived signals* — not the raw closed-pack package digest — so it is echoed as `competingExplanationSetContextSha256` and never compared against PR16's package digest.
 - Every `candidatePair.caseId` MUST equal `context.caseId`; every pair's `leftCandidateId`/`rightCandidateId` MUST exist in `candidateUniverse`; every `entityHypothesis.candidatePairId` MUST reference a supplied pair; every referenced observation id MUST exist in `context.observations`.
 - `candidatePairs.length <= MAX_CANDIDATE_PAIRS_PER_QUERY` (250) and `entityHypotheses.length <= MAX_ENTITY_HYPOTHESES_PER_QUERY` (500) — hard bounds, rejected with `INVALID_INPUT`.
 
@@ -156,7 +156,7 @@ No fabricated fields, no content-semantic inference, no missing-data invention (
 |---|---|---|
 | `INVALID_INPUT` | `ErSplitExplanationErrorCode.INVALID_INPUT` | structurally malformed input / missing required fields; bound exceeded; runtime output rejected by the frozen contract schema |
 | `UNSUPPORTED_POLICY` | `ErSplitExplanationErrorCode.UNSUPPORTED_POLICY` | `erSplitPolicyVersion !== 'v1'` (or supplied `competingExplanationSet.competingExplanationPolicyVersion !== 'v1'`); `classificationPolicyVersion !== 'v1'` |
-| `CONTEXT_MISMATCH` | `ErSplitExplanationErrorCode.CONTEXT_MISMATCH` | recomputed classification disagrees with supplied `gapClassification`; supplied `competingExplanationSet` targets a different hole or its `contextSha256` disagrees; candidate not qualified; a pair/hypothesis carries a different `caseId`; a candidate-referenced id absent from the supplied context/universe |
+| `CONTEXT_MISMATCH` | `ErSplitExplanationErrorCode.CONTEXT_MISMATCH` | recomputed classification disagrees with supplied `gapClassification`; supplied `competingExplanationSet` targets a different hole or its embedded `classification` projection disagrees with the recomputed classification; candidate not qualified; a pair/hypothesis carries a different `caseId`; a candidate-referenced id absent from the supplied context/universe |
 | `INVALID_REFERENCE` | `ErSplitExplanationErrorCode.INVALID_REFERENCE` | an emitted explanation would reference an id not in the supplied package (defensive; generation never constructs such refs) |
 
 Runtime output is validated against the frozen contract schema after generation; drift is surfaced as `INVALID_INPUT` (mirror PR14/PR15), never silently passed.
@@ -184,7 +184,7 @@ Runtime output is validated against the frozen contract schema after generation;
 
 1. **validate** boundary (§7) and hard bounds (§5);
 2. **classify**: `recomputed = classifyGap(context)`; enforce equality vs supplied `gapClassification` (CONTEXT_MISMATCH otherwise);
-3. **digest**: `contextSha256 = sha256Hex(canonicalizeDeterministic(context))`; when a PR15 set is supplied, enforce its `contextSha256 === contextSha256` (CONTEXT_MISMATCH otherwise);
+3. **digest**: `contextSha256 = sha256Hex(canonicalizeDeterministic(context))`; when a PR15 set is supplied, enforce the equivalence of its embedded `classification` projection (`type`/`status`/`classificationPolicyVersion`) with the recomputed classification and echo the set's own digest as `competingExplanationSetContextSha256` (CONTEXT_MISMATCH otherwise);
 4. **index** the universe (candidate id → candidate), hypotheses (by `candidatePairId`), observations (by id) — sorted-first construction, no unbounded memory;
 5. **generate candidates** — for each supplied `CandidatePair` (ordered by id): resolve the pair, require `!unifiedPair` (§9.5), derive signals (§6), require identity evidence AND structural fit (§9b), compute identity + status + scores, preserve contradictions;
 6. **identity + dedupe** (§8, §15);
