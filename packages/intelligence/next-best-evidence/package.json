@@ -15,12 +15,16 @@
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",
+    "@indago/evidence-request-generation": "workspace:*",
     "@indago/graph-hole-analysis": "workspace:*",
     "@indago/graph-hole-judge": "workspace:*",
     "@indago/graph-hole-qualification": "workspace:*",
     "@indago/graph-hole-validation": "workspace:*"
   },
   "devDependencies": {
+    "@indago/competing-explanations": "workspace:*",
+    "@indago/entity-split-analysis": "workspace:*",
+    "@indago/gap-classification": "workspace:*",
     "@types/node": "^26.2.0",
     "typescript": "^5.7.0",
     "vitest": "^3.2.0"
