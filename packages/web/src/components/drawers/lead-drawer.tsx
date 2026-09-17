@@ -152,15 +152,51 @@ export function LeadDrawer({ leadId, onClose }: LeadDrawerProps) {
                   <span className="mb-3 block text-[11px] uppercase tracking-widest text-surface-500">Alternative Explanations</span>
                   {fields.alternatives.length ? (
                     <ul className="flex flex-col gap-3 text-sm text-surface-700">
-                      {fields.alternatives.map((statement, i) => (
+                      {fields.alternatives.map((alt, i) => (
                         <li key={i} className="flex gap-2">
                           <span className="text-surface-400">→</span>
-                          {statement}
+                          <div className="min-w-0">
+                            <p>{alt.statement}</p>
+                            <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-surface-400">
+                              {alt.kind} · plausibility {(alt.plausibility * 100).toFixed(0)}%
+                            </p>
+                            {alt.requiresAdditionalEvidence.length > 0 && (
+                              <p className="mt-0.5 text-xs text-surface-400">
+                                Would require: {alt.requiresAdditionalEvidence.join("; ")}
+                              </p>
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>
                   ) : (
                     <p className="text-sm text-surface-500">None recorded.</p>
+                  )}
+                </div>
+
+                {/* PROVENANCE */}
+                <div className="p-6">
+                  <span className="mb-3 block text-[11px] uppercase tracking-widest text-surface-500">Provenance</span>
+                  {fields.provenance && fields.provenance.entries.length ? (
+                    <ul className="flex flex-col gap-3 text-sm text-surface-700">
+                      {fields.provenance.entries.map((entry, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-surface-400">→</span>
+                          <div className="min-w-0">
+                            <p className="font-mono text-xs text-surface-800">
+                              Source {entry.sourceId}
+                            </p>
+                            <p className="font-mono text-[10px] uppercase tracking-widest text-surface-400">
+                              {entry.extractor}
+                              {entry.documentRef ? ` · ${entry.documentRef}` : ""}
+                              {entry.pageRef ? ` · p.${entry.pageRef}` : ""}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-surface-500">No provenance recorded.</p>
                   )}
                 </div>
 
