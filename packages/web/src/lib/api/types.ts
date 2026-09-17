@@ -281,6 +281,58 @@ export interface ConnectingPathsResponse {
   readonly paths: ConnectingPathCandidateDTO[];
 }
 
+/** GET /investigations/:id/graph/centrality — authoritative degree centrality.
+ *  One row per canonical entity with incident accepted-relation edges, ordered
+ *  descending by degree (the M-A10 degree centrality rank). The wire shape is
+ *  the graphology-projection CentralityResult; there is no canonical contracts
+ *  equivalent, so it is a provider-owned DTO. */
+export interface CentralityResultDTO {
+  readonly nodeId: string;
+  readonly degree: number;
+  /** Normalized degree in [0,1] over the projection's max degree. */
+  readonly centrality: number;
+}
+
+/** GET /investigations/:id/graph/centrality envelope. */
+export interface CentralityResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly centrality: CentralityResultDTO[];
+}
+
+/** GET /investigations/:id/graph/communities — AUTHORITATIVE community
+ *  detection (deterministic Louvain over the accepted-relation undirected
+ *  derivative). Each row is a detected community group; distinct from the P4
+ *  cohesion-scored community CANDIDATES (/graph/community-candidates). */
+export interface CommunityDetectionDTO {
+  readonly communityId: number;
+  readonly memberNodeIds: readonly string[];
+  /** Actual community size before the member-list reporting bound applied. */
+  readonly size: number;
+  /** Whether the reported member list was truncated by the bound. */
+  readonly truncated: boolean;
+}
+
+/** GET /investigations/:id/graph/communities envelope. */
+export interface CommunitiesResponse {
+  readonly investigationId: string;
+  readonly caseId: string;
+  readonly communityCount: number;
+  readonly communities: CommunityDetectionDTO[];
+}
+
+/** GET /cases/:caseId/graph/valid-at?at=<ISO> — the graph projection of ACTIVE
+ *  canonical relations whose persisted validityInterval contains the domain
+ *  instant `at` (dimension B — domain validity, never revision order). Returns
+ *  the same M-A13 ProjectedGraph contract as the current/version projections. */
+export interface ValidAtGraphResponse {
+  readonly caseId: string;
+  readonly at: string;
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly graph: import("@indago/contracts").ProjectedGraph;
+}
+
 // ============================================================================
 // Phase 4 — Leads
 //

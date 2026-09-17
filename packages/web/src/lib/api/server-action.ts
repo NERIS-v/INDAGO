@@ -16,6 +16,9 @@ import {
   listBridgeCandidates as apiListBridgeCandidates,
   traverseGraph as apiTraverseGraph,
   listConnectingPaths as apiListConnectingPaths,
+  getGraphCentrality as apiGetGraphCentrality,
+  getGraphCommunities as apiGetGraphCommunities,
+  getGraphValidAt as apiGetGraphValidAt,
   listLeads as apiListLeads,
   getLead as apiGetLead,
   generateLeads as apiGenerateLeads,
@@ -52,6 +55,9 @@ import type {
   BridgeCandidatesResponse,
   TraversalResponse,
   ConnectingPathsResponse,
+  CentralityResponse,
+  CommunitiesResponse,
+  ValidAtGraphResponse,
   LeadListResponse,
   LeadDetailResponse,
   GenerateLeadsResponse,
@@ -172,6 +178,26 @@ export async function getConnectingPaths(
   hops?: number,
 ): Promise<ConnectingPathsResponse> {
   return apiListConnectingPaths(investigationId, fromEntityId, toEntityId, hops);
+}
+
+export async function getCentrality(
+  investigationId: string,
+  maxResults?: number,
+): Promise<CentralityResponse> {
+  return apiGetGraphCentrality(investigationId, maxResults);
+}
+
+export async function getCommunities(
+  investigationId: string,
+): Promise<CommunitiesResponse> {
+  return apiGetGraphCommunities(investigationId);
+}
+
+export async function getValidAtGraph(
+  caseId: string,
+  at: string,
+): Promise<ValidAtGraphResponse> {
+  return apiGetGraphValidAt(caseId, at);
 }
 
 export async function listLeads(

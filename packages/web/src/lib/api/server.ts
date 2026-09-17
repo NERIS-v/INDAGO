@@ -26,6 +26,9 @@ import type {
   BridgeCandidatesResponse,
   TraversalResponse,
   ConnectingPathsResponse,
+  CentralityResponse,
+  CommunitiesResponse,
+  ValidAtGraphResponse,
   LeadListResponse,
   LeadDetailResponse,
   GenerateLeadsResponse,
@@ -295,6 +298,43 @@ export async function listConnectingPaths(
   if (hops !== undefined) q.set("hops", String(hops));
   return platformFetch<ConnectingPathsResponse>(
     `/api/v1/investigations/${investigationId}/graph/paths?${q.toString()}`,
+  );
+}
+
+/** GET /investigations/:id/graph/centrality — authoritative degree centrality
+ *  rank (maxResults bounded server-side, default platform cap). */
+export async function getGraphCentrality(
+  investigationId: string,
+  maxResults?: number,
+): Promise<CentralityResponse> {
+  const query =
+    maxResults !== undefined
+      ? `?maxResults=${encodeURIComponent(maxResults)}`
+      : "";
+  return platformFetch<CentralityResponse>(
+    `/api/v1/investigations/${investigationId}/graph/centrality${query}`,
+  );
+}
+
+/** GET /investigations/:id/graph/communities — AUTHORITATIVE community
+ *  detection (deterministic Louvain). Distinct from community-candidates. */
+export async function getGraphCommunities(
+  investigationId: string,
+): Promise<CommunitiesResponse> {
+  return platformFetch<CommunitiesResponse>(
+    `/api/v1/investigations/${investigationId}/graph/communities`,
+  );
+}
+
+/** GET /cases/:caseId/graph/valid-at?at=<ISO> — the graph projection valid at
+ *  the given domain instant (case-scoped; the investigation is resolved
+ *  server-side from the persisted run — never client-supplied). */
+export async function getGraphValidAt(
+  caseId: string,
+  at: string,
+): Promise<ValidAtGraphResponse> {
+  return platformFetch<ValidAtGraphResponse>(
+    `/api/v1/cases/${caseId}/graph/valid-at?at=${encodeURIComponent(at)}`,
   );
 }
 
