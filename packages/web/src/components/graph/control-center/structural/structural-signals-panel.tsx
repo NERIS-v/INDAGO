@@ -28,6 +28,10 @@ import type {
   BridgeCandidateDTO,
   GraphNode,
 } from "@indago/contracts";
+import type {
+  CommunityDetectionDTO,
+  CentralityResultDTO,
+} from "@/lib/api/types";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Badge } from "@/components/ui/badge";
 
@@ -55,14 +59,18 @@ type SectionState<T> =
 
 interface SignalsState {
   bursts: SectionState<TemporalBurstCandidateDTO>;
-  communities: SectionState<CommunityCandidateDTO>;
+  communities: SectionState<CommunityDetectionDTO>;
+  communityCandidates: SectionState<CommunityCandidateDTO>;
   bridges: SectionState<BridgeCandidateDTO>;
+  centrality: SectionState<CentralityResultDTO>;
 }
 
 const EMPTY_STATE: SignalsState = {
   bursts: { status: "loading" },
   communities: { status: "loading" },
+  communityCandidates: { status: "loading" },
   bridges: { status: "loading" },
+  centrality: { status: "loading" },
 };
 
 function formatWindow(isoStart: string, isoEnd: string): string {
@@ -88,8 +96,10 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
   const graph = workspace.graph;
   const hasBursts = typeof graph.getTemporalBursts === "function";
   const hasCommunities = typeof graph.getCommunities === "function";
+  const hasCommunityCandidates = typeof graph.getCommunityCandidates === "function";
   const hasBridges = typeof graph.getBridges === "function";
-  const gated = hasBursts || hasCommunities || hasBridges;
+  const hasCentrality = typeof graph.getCentrality === "function";
+  const gated = hasBursts || hasCommunities || hasCommunityCandidates || hasBridges || hasCentrality;
 
   const load = useCallback(async () => {
     const next: SignalsState = { ...EMPTY_STATE };
@@ -136,6 +146,20 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
               },
             )
         : Promise.resolve(),
+      hasCommunityCandidates && graph.getCommunityCandidates
+        ? graph
+            .getCommunityCandidates(workspace.investigationId, { pageSize: 50 })
+            .then(
+              (page) => {
+                next.communityCandidates = { status: "ready", items: page.items };
+                setState({ ...next });
+              },
+              (err) => {
+                next.communityCandidates = { status: "error", message: toProviderError(err).message };
+                setState({ ...next });
+              },
+            )
+        : Promise.resolve(),
       hasBridges && graph.getBridges
         ? graph
             .getBridges(workspace.investigationId, { pageSize: 50 })
@@ -150,8 +174,22 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
               },
             )
         : Promise.resolve(),
+      hasCentrality && graph.getCentrality
+        ? graph
+            .getCentrality(workspace.investigationId, { pageSize: 50 })
+            .then(
+              (page) => {
+                next.centrality = { status: "ready", items: page.items };
+                setState({ ...next });
+              },
+              (err) => {
+                next.centrality = { status: "error", message: toProviderError(err).message };
+                setState({ ...next });
+              },
+            )
+        : Promise.resolve(),
     ]);
-  }, [graph, workspace.investigationId, hasBursts, hasCommunities, hasBridges]);
+  }, [graph, workspace.investigationId, hasBursts, hasCommunities, hasCommunityCandidates, hasBridges, hasCentrality]);
 
   const refresh = useCallback(() => setLoadNonce((n) => n + 1), []);
 
@@ -170,12 +208,16 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
   const hasAnyData =
     (state.bursts.status === "ready" && state.bursts.items.length > 0) ||
     (state.communities.status === "ready" && state.communities.items.length > 0) ||
-    (state.bridges.status === "ready" && state.bridges.items.length > 0);
+    (state.communityCandidates.status === "ready" && state.communityCandidates.items.length > 0) ||
+    (state.bridges.status === "ready" && state.bridges.items.length > 0) ||
+    (state.centrality.status === "ready" && state.centrality.items.length > 0);
 
   const stillLoading =
     state.bursts.status === "loading" ||
     state.communities.status === "loading" ||
-    state.bridges.status === "loading";
+    state.communityCandidates.status === "loading" ||
+    state.bridges.status === "loading" ||
+    state.centrality.status === "loading";
 
   return (
     <div
@@ -223,28 +265,30 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
                 No structural signals
               </p>
               <p className="mt-1 text-xs text-surface-400">
-                The platform computed no bridge, burst, or community candidates.
+                The platform computed no centrality, community, bridge, or burst signals.
               </p>
             </div>
           )}
 
-          {!stillLoading && hasBursts && (
+          {!stillLoading && hasCentrality && (
             <SignalSection
-              title="Temporal bursts"
-              count={countOf(state.bursts)}
-              state={state.bursts}
+              title="Centrality"
+              count={countOf(state.centrality)}
+              state={state.centrality}
             >
               {(items) => (
                 <ul className="flex flex-col gap-2">
-                  {items.map((b) => (
-                    <li key={`${b.nodeId}-${b.windowStart}`} className="rounded-lg border border-surface-200/60 bg-surface-50 px-3 py-2">
+                  {items.map((c) => (
+                    <li key={c.nodeId} className="rounded-lg border border-surface-200/60 bg-surface-50 px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-medium text-surface-800">{label(b.nodeId)}</span>
-                        <Badge variant="accent">{b.burstScore.toFixed(1)}×</Badge>
+                        <span className="truncate text-[13px] font-medium text-surface-800">
+                          {label(c.nodeId)}
+                        </span>
+                        <Badge variant="accent">{c.centrality.toFixed(2)}</Badge>
                       </div>
                       <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-surface-500">
-                        <span>{formatWindow(b.windowStart, b.windowEnd)}</span>
-                        <span>{b.eventCount} events</span>
+                        <span>Degree</span>
+                        <span>{c.degree} edges</span>
                       </div>
                     </li>
                   ))}
@@ -255,9 +299,41 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
 
           {!stillLoading && hasCommunities && (
             <SignalSection
-              title="Communities"
+              title="Detected communities"
               count={countOf(state.communities)}
               state={state.communities}
+            >
+              {(items) => (
+                <ul className="flex flex-col gap-2">
+                  {items.map((c) => (
+                    <li key={c.communityId} className="rounded-lg border border-surface-200/60 bg-surface-50 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[13px] font-medium text-surface-800">
+                          {c.truncated ? (
+                            <span>
+                              {c.size} members
+                              <Badge variant="muted" className="ml-2">truncated</Badge>
+                            </span>
+                          ) : (
+                            `${c.size} members`
+                          )}
+                        </span>
+                        <span className="font-mono text-[10px] text-surface-500">
+                          {c.memberNodeIds.length} reported
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SignalSection>
+          )}
+
+          {!stillLoading && hasCommunityCandidates && (
+            <SignalSection
+              title="Community candidates"
+              count={countOf(state.communityCandidates)}
+              state={state.communityCandidates}
             >
               {(items) => (
                 <ul className="flex flex-col gap-2">
@@ -281,6 +357,31 @@ export function StructuralSignalsPanel({ className = "" }: StructuralSignalsPane
                       <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-surface-500">
                         <span>Cohesion</span>
                         <span>{c.cohesion.toFixed(2)}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </SignalSection>
+          )}
+
+          {!stillLoading && hasBursts && (
+            <SignalSection
+              title="Temporal bursts"
+              count={countOf(state.bursts)}
+              state={state.bursts}
+            >
+              {(items) => (
+                <ul className="flex flex-col gap-2">
+                  {items.map((b) => (
+                    <li key={`${b.nodeId}-${b.windowStart}`} className="rounded-lg border border-surface-200/60 bg-surface-50 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[13px] font-medium text-surface-800">{label(b.nodeId)}</span>
+                        <Badge variant="accent">{b.burstScore.toFixed(1)}×</Badge>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-surface-500">
+                        <span>{formatWindow(b.windowStart, b.windowEnd)}</span>
+                        <span>{b.eventCount} events</span>
                       </div>
                     </li>
                   ))}
