@@ -9,6 +9,15 @@
 // ---- Public API ----
 export { buildBoundContext } from './pipeline/boundary.js';
 export type { ErSplitBoundContext } from './pipeline/boundary.js';
+export { buildStructuralFit } from './pipeline/structural-fit.js';
+export type { StructuralFitEvidence } from './pipeline/structural-fit.js';
+export {
+  buildIdentityEvidence,
+  computeIdentitySupportScore,
+  highestScoringHypothesis,
+  hasAcceptedHypothesis,
+} from './pipeline/identity-evidence.js';
+export type { IdentityEvidence } from './pipeline/identity-evidence.js';
 export { ErSplitExplanationError, ErSplitExplanationErrorCodes } from './pipeline/errors.js';
 export type { ErSplitExplanationErrorCode } from './pipeline/errors.js';
 export { sha256Hex } from './pipeline/sha256.js';
