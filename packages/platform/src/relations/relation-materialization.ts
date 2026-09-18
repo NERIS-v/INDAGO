@@ -173,6 +173,12 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
     scoreModelVersion: hypothesis.scoreModelVersion,
   });
 
+  // ProvenanceSchema (strict) allows NO per-entry authority-linkage keys —
+  // the hypothesis linkage is already durable in the relation's own
+  // hypothesisId column, so the materialized provenance must stay conformant
+  // (sourceId / derivedFrom / extractor / extractionMethod only). A prior
+  // version embedded `hypothesisId` here; that rendered every lead built from
+  // this provenance unreadable through the strict LeadSchema boundary.
   const provenance = {
     ...(hypothesis.provenance !== undefined &&
     typeof hypothesis.provenance === "object" &&
@@ -184,7 +190,6 @@ export async function materializeCanonicalRelationFromAcceptedHypothesis(
     derivedFrom: hypothesis.evidenceBasis,
     extractor: "indago:relation-materialization:authority",
     extractionMethod: params.actor,
-    hypothesisId,
   };
 
   // ONE atomic boundary: the hypothesis ACCEPT decision AND the canonical
