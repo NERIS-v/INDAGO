@@ -73,18 +73,34 @@ function canonicalMatchValueOf(text: string): string {
  * Cull overlapping/duplicate spans deterministically. First-occurrence wins,
  * ties by earlier start; identical (start, end, type) collapse naturally.
  * Only the first 100 drafts are kept (bounded output).
+ *
+ * PATTERN_MATCH is the highest-precision stage and is emitted before the
+ * guessed stages: when a pattern span and a capitalized/contextual span
+ * overlap (e.g. "Meridian Trading LLP" vs a shorter "Meridian Trading" guess),
+ * the typed pattern span wins so a precise classification is never displaced
+ * by a weaker one. Output is returned in document order.
  */
 function dedupeAndBound(spans: Span[]): Span[] {
-  spans.sort((a, b) => a.start - b.start || a.end - b.end);
+  const byStart = (a: Span, b: Span): number => a.start - b.start || a.end - b.end;
+  const pattern = spans.filter((s) => s.extractionMethod === 'PATTERN_MATCH').sort(byStart);
+  const guessed = spans.filter((s) => s.extractionMethod !== 'PATTERN_MATCH').sort(byStart);
+
   const out: Span[] = [];
-  let lastEnd = -1;
-  for (const s of spans) {
+  const overlaps = (s: Span): boolean =>
+    out.some((kept) => s.start < kept.end && kept.start < s.end);
+
+  for (const s of pattern) {
     if (out.length >= ENTITY_MENTION_BOUNDS.maxMentions) break;
-    if (s.start < lastEnd) continue; // overlaps an already-emitted mention
+    if (overlaps(s)) continue;
     out.push(s);
-    lastEnd = s.end;
   }
-  return out;
+  for (const s of guessed) {
+    if (out.length >= ENTITY_MENTION_BOUNDS.maxMentions) break;
+    if (overlaps(s)) continue;
+    out.push(s);
+  }
+
+  return out.sort(byStart);
 }
 
 /**

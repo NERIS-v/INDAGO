@@ -36,7 +36,12 @@ export interface ArtifactWriteRecord {
   providerMetadata: Record<string, unknown> | undefined;
 }
 
-export type AttemptStatus = "RUNNING" | "SUCCEEDED" | "FAILED";
+// QUEUED is written by the submission boundary at enqueue time, before any
+// worker touches the attempt. It is the durable "expected work" registry that
+// lets the run-completion predicate distinguish "this investigation has a job
+// still to run" from "every job has durably succeeded". RUNNING/SUCCEEDED/FAILED
+// are written by the worker as it advances the attempt.
+export type AttemptStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
 
 export interface AttemptRevision {
   investigationId: string;
@@ -183,6 +188,17 @@ export class IngestionStore {
         format: rev.format ?? null,
         error: rev.error ? (toJson(rev.error) as Prisma.InputJsonObject) : Prisma.JsonNull,
       },
+    });
+  }
+
+  /**
+   * Remove an enqueue-time QUEUED placeholder when the corresponding job could
+   * not be enqueued (best-effort rollback so a failed submission never leaves a
+   * durable "expected work" marker that would block run completion forever).
+   */
+  async deleteAttempt(investigationId: string, idempotencyKey: string) {
+    return this.prisma.ingestionAttempt.deleteMany({
+      where: { investigationId, idempotencyKey },
     });
   }
 

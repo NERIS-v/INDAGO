@@ -31,6 +31,8 @@ export type { MergeableSpan, MergedSpan } from './observation-rules.js';
 export {
   canonicalizeContent,
   isAssertiveContent,
+  isMeaningfulStructuredToken,
+  repairKnownMojibake,
   isMeaningfulLeafPath,
   extractCandidateMentions,
   detectObservedAt,

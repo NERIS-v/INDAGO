@@ -214,8 +214,15 @@ export function scoreRelationPair(params: {
 
   // Relation type signal: any co-occurrence observation is a member of this
   // relation type's signal set (classified by the deterministic classifier).
+  //
+  // A type signal is only awarded for a CONCRETE relation type. The `other`
+  // fallback means the content did NOT directly classify a relationship, so it
+  // must never award the type-signal weight — otherwise the absence of a type
+  // would masquerade as positive evidence (false precision). Generic
+  // co-occurrence scores on co-occurrence/repetition/source/temporal only.
   let hasTypeSignal = false;
-  const typeSignalIds = observationsByType?.get(relationType);
+  const typeSignalIds =
+    relationType === 'other' ? undefined : observationsByType?.get(relationType);
   if (typeSignalIds && typeSignalIds.size > 0) {
     for (const o of coOccurrenceObservations) {
       if (typeSignalIds.has(o.id)) {

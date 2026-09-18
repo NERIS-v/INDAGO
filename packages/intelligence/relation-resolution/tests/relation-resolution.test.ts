@@ -190,6 +190,30 @@ describe('M-A10: scoring model v1 — weights & settlement', () => {
     expect(score).toBeCloseTo(expected, 6);
   });
 
+  it('`other` is the absence of a type — it NEVER awards typeSignal (no false precision)', () => {
+    // A generic FACTUAL observation classifies to `other` and is indexed under
+    // the `other` bucket by buildObservationsByType. Scoring an `other` pair
+    // must NOT read that bucket: otherwise "no type" would be counted as a
+    // positive type signal. Regression guard for the false-precision defect.
+    const obs = [
+      makeObservation(1, { type: 'FACTUAL', content: 'generic', entityIds: [ENT_ID(1), ENT_ID(2)] }),
+    ];
+    const byType = buildObservationsByType(obs);
+    expect(byType.get('other')).toEqual(new Set([OBS_ID(1)]));
+    const { score } = scoreRelationPair({
+      coOccurrenceObservations: obs,
+      allObservations: obs,
+      relationType: 'other',
+      observationsByType: byType,
+      temporalWindowMs: RELATION_RESOLUTION_BOUNDS.temporalProximityWindowMs,
+    });
+    expect(score).toBeCloseTo(
+      RELATION_SCORING_V1.baseline + RELATION_SCORING_V1.coOccurrence,
+      6,
+    );
+    expect(score).toBeLessThan(RELATION_PROPOSAL_THRESHOLD);
+  });
+
   it('score is clamped to [0, 1] and never exceeds bounds', () => {
     const big = settleRelationScore([0.6, 0.5, 0.5, 0.5]);
     expect(big).toBe(RELATION_SCORING_V1.maxScore);
@@ -530,10 +554,13 @@ describe('M-A10: end-to-end case resolution', () => {
     });
 
     expect(result.metrics.pairsConsidered).toBe(2);
-    // Both pairs propose: pair1 gets co-occurrence + repeated + temporal + type-signal;
-    // pair2 gets co-occurrence + type-signal (generic FACTUAL → 'other' type-signal = +0.15).
-    expect(result.metrics.hypothesesProposed).toBe(2);
-    expect(result.metrics.hypothesesRejected).toBe(0);
+    // pair1 gets co-occurrence + repeated + temporal + type-signal (FINANCIAL)
+    // → 0.6, well above threshold, and proposes.
+    // pair2 is a single generic FACTUAL co-occurrence (relation type `other`)
+    // → co-occurrence only (0.2). `other` is the ABSENCE of a type signal, so
+    // it never awards the type-signal weight: 0.2 < 0.25 → no proposition.
+    expect(result.metrics.hypothesesProposed).toBe(1);
+    expect(result.metrics.hypothesesRejected).toBe(1);
     expect(result.metrics.lowEvidenceCount).toBe(0);
 
     const resolutions = result.resolutions;

@@ -140,7 +140,7 @@ model IngestionAttempt {
   operationId     String
   correlationId   String
   attemptNumber   Int
-  status          String // RUNNING, SUCCEEDED, FAILED
+  status          String // QUEUED, RUNNING, SUCCEEDED, FAILED
   sourceId        String?
   artifactId      String?
   parserId        String?

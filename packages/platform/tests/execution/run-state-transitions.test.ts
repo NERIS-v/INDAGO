@@ -15,6 +15,10 @@ describe("run-state-transitions (pure)", () => {
       expect(isLegalTransition("CREATED", "INGESTING")).toBe(true);
     });
 
+    it("accepts the canonical terminal ANALYZING -> COMPLETED edge (PR-26)", () => {
+      expect(isLegalTransition("ANALYZING", "COMPLETED")).toBe(true);
+    });
+
     it("rejects a transition not in the contract", () => {
       expect(isLegalTransition("CREATED", "COMPLETED")).toBe(false);
       expect(isLegalTransition("REVIEW_REQUIRED", "PAUSED")).toBe(false);
@@ -38,6 +42,12 @@ describe("run-state-transitions (pure)", () => {
 
     it("returns undefined for an illegal edge", () => {
       expect(findTransition("COMPLETED", "ANALYZING")).toBeUndefined();
+    });
+
+    it("exposes INVESTIGATION_COMPLETE on ANALYZING -> COMPLETED (PR-26)", () => {
+      expect(findTransition("ANALYZING", "COMPLETED")?.trigger).toBe(
+        "INVESTIGATION_COMPLETE",
+      );
     });
   });
 
