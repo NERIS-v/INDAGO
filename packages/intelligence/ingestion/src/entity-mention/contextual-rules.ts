@@ -37,6 +37,7 @@ export const CONTEXTUAL_RULES: readonly ContextualRule[] = [
       'mr', 'mrs', 'ms', 'dr', 'prof', 'sri', 'smt', 'shri',
       'surname', 'alias', 'identified as', 'named', 'known as',
       'contact', 'caller', 'callee', 'interviewee',
+      'involving', 'records',
     ],
   },
   {
@@ -70,7 +71,22 @@ const CONTEXT_STOPWORDS = new Set([
   'that', 'this', 'these', 'those', 'with', 'from', 'into', 'when', 'after',
   'before', 'using', 'based', 'per', 'and', 'the', 'a', 'an', 'who', 'which',
   'what', 'where', 'here', 'there',
+  // Pronouns/determiners: a capitalized pronoun is never an entity mention.
+  'i', 'me', 'my', 'we', 'us', 'our', 'you', 'your', 'he', 'him', 'his',
+  'she', 'her', 'hers', 'it', 'its', 'they', 'them', 'their', 'theirs',
 ]);
+
+/**
+ * Person-indicating verbs checked in the SHORT WINDOW AFTER a candidate. A
+ * category label ("Contact X") sits before its noun; a subject-verb instead
+ * follows its subject ("Neha Kapoor communicated", "Rohan Singh coordinates").
+ * The list is deliberately tiny and high-precision — generic verbs such as
+ * "met"/"was"/"is" are excluded so weak capitalization never becomes a PERSON.
+ */
+const PERSON_AFTER_TRIGGERS: readonly string[] = [
+  'stating', 'appears', 'appeared', 'communicated', 'coordinates',
+  'coordinated', 'paid', 'pays', 'spoke', 'resides', 'lives',
+];
 
 export function isContextStopword(token: string): boolean {
   return CONTEXT_STOPWORDS.has(token.toLowerCase());
@@ -129,5 +145,20 @@ export function classifyByContext(input: {
       }
     }
   }
+
+  // Person after-window: a curated subject-taking verb unambiguously marks the
+  // preceding capitalized token as an actor. Conservative by construction —
+  // only the fixed PERSON_AFTER_TRIGGERS list fires, and organizations are
+  // already typed by PATTERN_MATCH (which takes precedence).
+  const after = input.content.slice(
+    Math.min(input.content.length, input.end),
+    Math.min(input.content.length, input.end + window),
+  );
+  for (const trigger of PERSON_AFTER_TRIGGERS) {
+    if (hasPhrase(after, trigger)) {
+      return { entityType: 'PERSON', extractionMethod: 'CONTEXTUAL_RULE' };
+    }
+  }
+
   return undefined;
 }
