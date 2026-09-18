@@ -54,6 +54,34 @@ function isProvenance(value: unknown): value is Provenance {
   );
 }
 
+/**
+ * The P4 lead is at the STRICT ProvenanceSchema boundary: lead provenance
+ * entries are validated verbatim by LeadSchema, so a persisted relation/entity
+ * provenance that carries an extra authority-linkage key (e.g. `hypothesisId`)
+ * would render the lead unreadable. Copy ONLY the conformant keys — the
+ * authority linkage itself stays durable in the relation/entity's own columns.
+ */
+const CONFORMANT_PROVENANCE_KEYS = [
+  "sourceId",
+  "artifactId",
+  "documentRef",
+  "pageRef",
+  "spanRef",
+  "rowRef",
+  "extractor",
+  "extractionMethod",
+  "derivedFrom",
+] as const;
+
+export function toConformantProvenance(p: Provenance): Provenance {
+  const out: Record<string, unknown> = {};
+  for (const key of CONFORMANT_PROVENANCE_KEYS) {
+    const value = (p as Record<string, unknown>)[key];
+    if (value !== undefined) out[key] = value;
+  }
+  return out as Provenance;
+}
+
 function dedupeProvenance(entries: readonly Provenance[]): Provenance[] {
   const seen = new Set<string>();
   const out: Provenance[] = [];
@@ -152,7 +180,7 @@ export class LeadRuntime {
           evidenceBasis: relation.evidenceBasis,
           contradictions: relation.contradictions,
           entityName,
-          provenanceEntries: [relation.provenance],
+          provenanceEntries: [toConformantProvenance(relation.provenance)],
         }),
       );
     }
@@ -162,7 +190,10 @@ export class LeadRuntime {
         .map((id) => relationById.get(id))
         .filter((r): r is DurableRelation => r !== undefined);
       const provenanceEntries = dedupeProvenance(
-        contributingRelations.map((r) => r.provenance).filter(isProvenance),
+        contributingRelations
+          .map((r) => r.provenance)
+          .filter(isProvenance)
+          .map(toConformantProvenance),
       );
       if (provenanceEntries.length === 0) {
         skipped.push({ reason: "no resolvable provenance for burst edges", sourceCandidateType: "TEMPORAL_BURST", sourceCandidateKey: `${burst.nodeId}|${burst.windowStart}` });
@@ -186,7 +217,10 @@ export class LeadRuntime {
         (r) => memberSet.has(r.sourceEntityId) && memberSet.has(r.targetEntityId),
       );
       const provenanceEntries = dedupeProvenance(
-        internalRelations.map((r) => r.provenance).filter(isProvenance),
+        internalRelations
+          .map((r) => r.provenance)
+          .filter(isProvenance)
+          .map(toConformantProvenance),
       ).slice(0, COMMUNITY_EVIDENCE_UNION_CAP);
       if (provenanceEntries.length === 0) {
         skipped.push({
@@ -261,7 +295,9 @@ export class LeadRuntime {
       const sourceEntity = entityById.get(match.sourceEntityId);
       const targetEntity = entityById.get(match.targetEntityId);
       const provenanceEntries = dedupeProvenance(
-        [sourceEntity?.provenance, targetEntity?.provenance].filter(isProvenance),
+        [sourceEntity?.provenance, targetEntity?.provenance]
+          .filter(isProvenance)
+          .map(toConformantProvenance),
       );
       if (provenanceEntries.length === 0) {
         skipped.push({
