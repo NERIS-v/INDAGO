@@ -311,6 +311,32 @@ export async function handleIngestEvidenceJob(job: Job): Promise<void> {
       artifactId: alreadyExtracted.artifactId,
       raw,
     });
+
+    // A BullMQ retry that lands here re-established the attempt as RUNNING
+    // (step 3) but takes the re-entrant branch — the forward-path SUCCEEDED
+    // upsert (step 8/9) is NOT reached. Re-affirm the durable conclusion so a
+    // completed job ALWAYS leaves its attempt row SUCCEEDED, regardless of how
+    // many retries preceded it. Preserve the provenance fields a prior
+    // successful pass already recorded.
+    const current = await ingestionStore.findAttempt(
+      payload.investigationId,
+      payload.idempotencyKey,
+    );
+    await ingestionStore.upsertAttempt({
+      investigationId: payload.investigationId,
+      caseId: run.caseId,
+      idempotencyKey: payload.idempotencyKey,
+      operationId: payload.operationId,
+      correlationId: payload.correlationId,
+      attemptNumber,
+      status: "SUCCEEDED",
+      sourceId: current?.sourceId ?? alreadyExtracted.artifactId,
+      artifactId: alreadyExtracted.artifactId,
+      parserId: alreadyExtracted.parserId,
+      parserVersion: alreadyExtracted.parserVersion,
+      format: alreadyExtracted.format,
+      error: undefined,
+    });
     return;
   }
 

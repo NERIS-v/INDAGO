@@ -68,18 +68,26 @@ function toJson(input: unknown): Prisma.InputJsonValue {
 }
 
 /**
- * The `warnings` list travels in its own column and must NOT be embedded in
- * the `extraction` JSON (single source of truth). Strips it if present.
+ * The `extraction` column stores ONLY the format-native body. Provenance base
+ * fields (`artifactId` / `parserId` / `parserVersion` / `extractedAt`) and the
+ * `warnings` digest each travel in their own queryable column (single source
+ * of truth). They must NOT be embedded here: the re-entrant worker path
+ * rehydrates this JSON with `parseStoredRawExtraction`, whose per-format body
+ * schema is `.strict()` and reconstructs the base fields from the columns.
+ * Embedding them corrupts the body contract and makes every retry/reprocess of
+ * an already-persisted RawExtraction fail validation permanently.
  */
 function extractionForStore(extraction: unknown): Prisma.InputJsonValue {
   const body = toJson(extraction);
-  if (
-    body !== null &&
-    typeof body === "object" &&
-    !Array.isArray(body) &&
-    "warnings" in (body as Record<string, unknown>)
-  ) {
-    const { warnings: _removed, ...rest } = body as Record<string, unknown>;
+  if (body !== null && typeof body === "object" && !Array.isArray(body)) {
+    const {
+      warnings: _warnings,
+      artifactId: _artifactId,
+      parserId: _parserId,
+      parserVersion: _parserVersion,
+      extractedAt: _extractedAt,
+      ...rest
+    } = body as Record<string, unknown>;
     return rest as Prisma.InputJsonValue;
   }
   return body;
