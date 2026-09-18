@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { DEFAULT_NORMALIZATION_CONFIG } from "@indago/contracts";
 import type { NormalizedExtraction } from "@indago/contracts";
+import { parseStoredRawExtraction } from "@indago/ingestion";
 import { IngestionStore } from "../../src/persistence/ingestion-store.js";
 import type {
   ArtifactWriteRecord,
@@ -244,7 +245,7 @@ describe.skipIf(!TEST_DATABASE_URL)(
       });
     });
 
-    it("raw extraction round-trips the full JSON with warnings, lossless", async () => {
+    it("raw extraction stores only the format body; provenance travels in columns", async () => {
       const artifact = await store.upsertArtifact(makeArtifact({ id: randomUUID(), contentHash: contentHashOf("rx-bytes-" + Date.now()) }));
       const attempt = await store.upsertAttempt({
         ...makeAttempt("SUCCEEDED", 1),
@@ -282,7 +283,15 @@ describe.skipIf(!TEST_DATABASE_URL)(
       expect(found).not.toBeNull();
       expect(found!.parserId).toBe("txt-parser");
       expect(found!.format).toBe("TXT");
-      expect(found!.extraction as unknown).toEqual({ ...extraction, warnings: undefined });
+      // The extraction column holds ONLY the format body — provenance base
+      // fields and warnings are projected to their own columns.
+      expect(found!.extraction as unknown).toEqual({
+        format: "TXT",
+        lines: ["line one", "line two"],
+        sourceLocations: [
+          { line: 1, startOffset: 0, endOffset: 8, text: "line one" },
+        ],
+      });
       // warnings column round-trips separately
       expect((found!.warnings as unknown)).toEqual([
         { category: "TRUNCATED_OUTPUT", message: "long file", detail: { maxInputLength: 100 } },
@@ -302,6 +311,69 @@ describe.skipIf(!TEST_DATABASE_URL)(
           extractedAt: new Date().toISOString(),
         }),
       ).rejects.toThrow();
+    });
+
+    it("PR-27: persisted real RawExtraction union rehydrates on the re-entrant path", async () => {
+      const artifact = await store.upsertArtifact(
+        makeArtifact({ id: randomUUID(), contentHash: contentHashOf(`rehydrate-${Date.now()}`) }),
+      );
+      const attempt = await store.upsertAttempt({
+        ...makeAttempt("SUCCEEDED", 1),
+        idempotencyKey: `evidence-${investigationId}-rehydrate.txt`,
+        artifactId: artifact.id,
+        parserId: "indago-text-parser",
+        parserVersion: "1.0.0",
+        format: "TXT",
+      });
+
+      // Exactly what the worker hands the store: the full discriminated union
+      // (body + provenance base fields + warnings). A job retry or evidence
+      // reprocessing must be able to rehydrate this row, not fail it.
+      const raw = {
+        format: "TXT" as const,
+        extractionMethod: "text-decode" as const,
+        lines: [
+          {
+            lineNumber: 1,
+            text: "balance 615000.00",
+            sourceLocation: { kind: "txt-line" as const, lineNumber: 1, charStart: 0, charEnd: 18 },
+          },
+        ],
+        artifactId: artifact.id,
+        parserId: "indago-text-parser",
+        parserVersion: "1.0.0",
+        extractedAt: "2026-01-01T00:00:00.000Z",
+        warnings: [],
+      };
+
+      await store.ensureRawExtraction({
+        attemptId: attempt.id,
+        artifactId: artifact.id,
+        parserId: raw.parserId,
+        parserVersion: raw.parserVersion,
+        format: raw.format,
+        extraction: raw,
+        warnings: raw.warnings,
+        extractedAt: raw.extractedAt,
+      });
+
+      const row = await store.findRawExtractionByAttempt(attempt.id);
+      expect(row).not.toBeNull();
+      const rehydrated = parseStoredRawExtraction({
+        attemptId: row!.attemptId,
+        artifactId: row!.artifactId,
+        parserId: row!.parserId,
+        parserVersion: row!.parserVersion,
+        format: row!.format,
+        extraction: row!.extraction,
+        warnings: row!.warnings,
+        extractedAt: row!.extractedAt,
+      });
+      expect(rehydrated.format).toBe("TXT");
+      expect(rehydrated.artifactId).toBe(artifact.id);
+      if (rehydrated.format === "TXT") {
+        expect(rehydrated.lines[0]!.text).toBe("balance 615000.00");
+      }
     });
 
     it("M-A05: upsertNormalizedExtractionByAttempt writes one row per attempt and is idempotent", async () => {
