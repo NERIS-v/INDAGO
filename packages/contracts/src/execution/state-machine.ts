@@ -129,6 +129,13 @@ export const DEFAULT_RUN_STATE_CONFIGURATION: RunStateConfiguration = {
     { from: 'NORMALIZING', to: 'ANALYZING', trigger: 'NORMALIZATION_COMPLETE' },
     { from: 'NORMALIZING', to: 'FAILED', trigger: 'INGESTION_PERMANENT_FAILURE' },
     { from: 'ANALYZING', to: 'DISCOVERING', trigger: 'ANALYSIS_COMPLETE' },
+    {
+      from: 'ANALYZING',
+      to: 'COMPLETED',
+      trigger: 'INVESTIGATION_COMPLETE',
+      guard:
+        'Every expected canonical evidence job for the run has durably succeeded (no queued, running, failed or retrying work remains), and no mandatory human review is pending.',
+    },
     { from: 'DISCOVERING', to: 'REVIEW_REQUIRED', trigger: 'DISCOVERY_REQUIRES_REVIEW' },
     { from: 'DISCOVERING', to: 'WAITING_FOR_EVIDENCE', trigger: 'EVIDENCE_NEEDED' },
     { from: 'WAITING_FOR_EVIDENCE', to: 'REASSESSING', trigger: 'EVIDENCE_RECEIVED' },
