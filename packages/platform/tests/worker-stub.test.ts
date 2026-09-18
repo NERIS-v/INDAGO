@@ -772,12 +772,13 @@ describe("Re-entrant completion (M-A05): RawExtraction persisted + retry", () =>
     await capturedHandler!(makeFakeJob());
 
     expect(h.acquire).not.toHaveBeenCalled();
-    // RUNNING attempt is (re)established — that is idempotent and expected.
-    expect(db.ingestionAttempt.upsert).toHaveBeenCalledTimes(1);
+    // RUNNING attempt is (re)established, then the re-entrant completion
+    // re-affirms SUCCEEDED so a completed job never leaves its attempt RUNNING.
+    expect(db.ingestionAttempt.upsert).toHaveBeenCalledTimes(2);
     const statuses = db.ingestionAttempt.upsert.mock.calls.map(
       (c) => c[0]?.update?.status,
     );
-    expect(statuses).toEqual(["RUNNING"]);
+    expect(statuses).toEqual(["RUNNING", "SUCCEEDED"]);
     // Normalized row already exists → NO re-normalize, NO re-persist,
     // NO NORMALIZATION_STORED re-audit.
     expect(h.normalize).not.toHaveBeenCalled();
