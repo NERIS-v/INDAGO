@@ -168,8 +168,41 @@ function utf8Length(s: string): number {
   return new TextEncoder().encode(s).length;
 }
 
+// ============================================================================
+// Known mojibake repair (M-A05/MA06 data hygiene)
+//
+// Some source PDFs embed UTF-8 punctuation bytes that were decoded as a
+// legacy CJK codepage, yielding a fixed, recognizable 3-code-point sequence
+// for each intended character. The mapping is EXACT and BOUNDED — only these
+// unambiguous sequences are repaired, so no legitimate text is rewritten.
+// Repair happens at the semantic canonicalization boundary only: RawExtraction
+// bytes, spans, offsets, and the durable raw evidence are never touched.
+//
+//   ΓåÆ (U+0393 U+00E5 U+00C6) -> →  (U+2192)
+//   ΓÇ£ (U+0393 U+00C7 U+00A3) -> “  (U+201C)
+//   ΓÇ¥ (U+0393 U+00C7 U+00A5) -> ”  (U+201D)
+//   ΓÇÖ (U+0393 U+00C7 U+00D6) -> ’  (U+2019)
+// ============================================================================
+
+const MOJIBAKE_REPAIRS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\u0393\u00E5\u00C6/g, '\u2192'],
+  [/\u0393\u00C7\u00A3/g, '\u201C'],
+  [/\u0393\u00C7\u00A5/g, '\u201D'],
+  [/\u0393\u00C7\u00D6/g, '\u2019'],
+];
+
+/** Deterministic repair of the exact, known mojibake sequences. Idempotent. */
+export function repairKnownMojibake(text: string): string {
+  let s = text;
+  for (const [pattern, replacement] of MOJIBAKE_REPAIRS) {
+    s = s.replace(pattern, replacement);
+  }
+  return s;
+}
+
 export function canonicalizeContent(raw: string, maxLength: number): string {
-  let s = raw.normalize('NFC');
+  let s = repairKnownMojibake(raw);
+  s = s.normalize('NFC');
   s = s.replace(/\r\n?/g, '\n');
   s = s.replace(/[\t ]+/g, ' ');
   s = s.replace(/\s*\n\s*/g, ' ');
@@ -191,13 +224,45 @@ export function canonicalizeContent(raw: string, maxLength: number): string {
 // ============================================================================
 
 const BOILERPLATE_PATTERN =
-  /\b(confidential|privileged|attorney.client|do.not.forward|internal.use.only|document.generated|auto.generated)\b/i;
+  /\b(confidential|privileged|attorney.client|do.not.forward|internal.use.only|document.generated|auto.generated|synthetic test evidence|fictional data|not a real (?:person|company|organisation|organization|entity|account)|software testing)\b/i;
+
+// ============================================================================
+// Short structured-unit retention (§28)
+//
+// A unit whose prose is short is normally not an assertion — BUT a compact
+// identifier / reference / invoice number / amount-with-reference IS
+// source-supported evidence and must not be discarded just because it carries
+// fewer than `minAssertiveLetters` letters. Only recognizable structured shapes
+// are retained; pure formatting/decoration is still dropped.
+// ============================================================================
+
+/** A self-contained separator-joined identifier: MT-883, ORX-102, MT-SET-119. */
+const STRUCTURED_IDENTIFIER_RE = /^[\s#:]*(?=[A-Z0-9/-]*\d)[A-Z][A-Z0-9]*(?:[-/][A-Z0-9]+)+[\s.,;:]*$/;
+
+/** A labelled reference: "Invoice 7842", "Reference: MT-SET-119". */
+const REFERENCE_LABEL_RE =
+  /\b(?:ref(?:erence)?|invoice|inv|acct|account|txn|transaction|id|no|number|case|evidence)\b[\s:#-]*[A-Za-z0-9-]*\d[A-Za-z0-9-]*/i;
+
+/** A currency amount: "INR 615,000", "₹1,50,000", "USD 200". */
+const CURRENCY_AMOUNT_RE = /(?:INR|USD|EUR|GBP|Rs\.?|[₹$€£])\s?\d[\d,]*(?:\.\d+)?/i;
+
+/** An attached alphanumeric identifier: BLD-551, NW-882. */
+const ATTACHED_IDENTIFIER_RE = /[A-Za-z]{2,}[-/]?\d{2,}/;
+
+export function isMeaningfulStructuredToken(content: string): boolean {
+  const t = content.trim();
+  if (t.length === 0) return false;
+  if (STRUCTURED_IDENTIFIER_RE.test(t)) return true;
+  if (REFERENCE_LABEL_RE.test(t)) return true;
+  if (CURRENCY_AMOUNT_RE.test(t) && ATTACHED_IDENTIFIER_RE.test(t)) return true;
+  return false;
+}
 
 export function isAssertiveContent(content: string): boolean {
-  const letters = content.replace(/[^\p{L}]/gu, '');
-  if (letters.length < OBSERVATION_BOUNDS.minAssertiveLetters) return false;
   if (BOILERPLATE_PATTERN.test(content)) return false;
-  return true;
+  const letters = content.replace(/[^\p{L}]/gu, '');
+  if (letters.length >= OBSERVATION_BOUNDS.minAssertiveLetters) return true;
+  return isMeaningfulStructuredToken(content);
 }
 
 // A single scalar leaf without any relational context is not an assertion
@@ -281,7 +346,7 @@ export function extractCandidateMentions(content: string): string[] {
 // ============================================================================
 
 const OBSERVED_AT_RE =
-  /\b(20\d{2}-\d{2}-\d{2})[T ](\d{1,2}:\d{2}(?::\d{2})?)?(Z|[+-]\d{2}:?\d{2})?\b/;
+  /\b(20\d{2}-\d{2}-\d{2})(?: at |[T ])(\d{1,2}:\d{2}(?::\d{2})?)?(Z|[+-]\d{2}:?\d{2})?\b/;
 
 export function detectObservedAt(content: string): EventTime | undefined {
   const m = OBSERVED_AT_RE.exec(content);
@@ -314,7 +379,7 @@ const COMMUNICATION_RE =
 const FINANCIAL_RE =
   /\b(credited|debited|transfer(?:red)?|transaction|payment|deposit(?:ed)?|withdraw(?:al|n)?|balance|amount|invoice|purchase(?:d)?|refund|UTR|remittan|\$\s?\d|[₹€£]\s?\d)\b/i;
 const SPATIAL_RE =
-  /\b(at the|near\b|located|l[o0]cation|coordinates|gps|address|premises?|building|residence|station|arrived at public)/i;
+  /\b(at the|near\b|located|l[o0]cation|gps|address|premises?|building|residence|station|arrived at public)/i;
 const TEMPORAL_RE =
   /\b(at \d{1,2}:\d{2}|between \d{1,2}:\d{2}|\d{2}:\d{2} hours|duration|time.range|for \d+ (?:min|hour|day)s?)\b/i;
 const IDENTITY_RE =
