@@ -11,7 +11,7 @@
 //              new entities) → relation hypothesis (WJA ↔ FBI Boston,
 //              financial) → graph edge (GN_B_WJA → GN_B_FBI, financial) →
 //              hypothesis refinement (HYP_B3 child of HYP_B2) → gap
-//              reassessment (GAP_B4 → PARTIALLY_ADDRESSED) → evidence-request
+//              reassessment (GAP_B4 → WAITING_FOR_EVIDENCE) → evidence-request
 //              completion (EREQ_B4 → COMPLETED) → post-freeze comparison
 //   reveal   → the Case-A (CT) network materializes at ingest as a realtime
 //              overlay on the Tulsa graph: CT nodes (SOCTF, McGuigan) + overlay
@@ -643,10 +643,11 @@ function buildRefinement(parent: Hypothesis): Hypothesis {
 }
 
 function reassessGap(gap: InvestigativeGap): InvestigativeGap {
-  if (gap.status === "PARTIALLY_ADDRESSED") return gap;
+  if (gap.status === "WAITING_FOR_EVIDENCE") return gap;
+
   return InvestigativeGapSchema.parse({
     ...gap,
-    status: "PARTIALLY_ADDRESSED",
+    status: "WAITING_FOR_EVIDENCE",
     resolution:
       "PARTIAL: ingestion of the WORLD JAI ALAI PURCHASE REPORT (May 11, 1981) establishes the WJA " +
       "security function's institutional financial relationship with the FBI Boston circle (a financial " +
@@ -712,7 +713,7 @@ function buildDelta(
     ],
     hypothesisRefinement: HYP_B3,
     evidenceRequestIdsCompleted: [EREQ_B4],
-    gapStatusChanges: [{ gapId: GAP_B4, from: "IDENTIFIED", to: "PARTIALLY_ADDRESSED" }],
+    gapStatusChanges: [{ gapId: GAP_B4, from: "IDENTIFIED", to: "WAITING_FOR_EVIDENCE" }],
     freezeFingerprintBefore: freeze.fingerprint,
     freezeFingerprintAfter: computePostFreezeFingerprintAfter(freeze, edgeIdsAfter),
     leakSafeClass: BREAKTHROUGH_CLASS,
@@ -732,7 +733,7 @@ function buildRecord(delta: Phase1PostFreezeDelta): BreakthroughRecord {
     edgeId: GE_B_WJA_FBI,
     hypothesisId: HYP_B3,
     gapId: GAP_B4,
-    gapStatus: "PARTIALLY_ADDRESSED",
+    gapStatus: "WAITING_FOR_EVIDENCE",
     evidenceRequestId: EREQ_B4,
     evidenceRequestStatus: "COMPLETED",
     freezeFingerprintBefore: delta.freezeFingerprintBefore,
@@ -787,7 +788,7 @@ export function buildBreakthroughEvents(): readonly DemoStreamEvent[] {
     breakthroughEvent(EVT_BT_06, "GRAPH_EDGE_ADDED", "GRAPH_EDGE", GE_B_WJA_FBI, "Materialized graph edge: WJA → FBI Boston Field Office.", 5, 5),
     breakthroughEvent(EVT_BT_07, "GRAPH_HOLE_RESOLVED", "GRAPH_HOLE", HOLE_B3, "Graph hole partially resolved: the WJA security-function node is no longer isolated from the FBI circle (the case-link to the homicide persons remains open).", 6, 6),
     breakthroughEvent(EVT_BT_08, "HYPOTHESIS_PROMOTED", "HYPOTHESIS", HYP_B3, "Promoted refinement hypothesis HYP_B3 (child of HYP_B2) with new institutional financial grounding.", 7, 7),
-    breakthroughEvent(EVT_BT_09, "GAP_ADDRESSED", "GAP", GAP_B4, "Gap updated: PARTIALLY_ADDRESSED — progress recorded; the residual case-link question remains open.", 8, 8),
+    breakthroughEvent(EVT_BT_09, "GAP_ADDRESSED", "GAP", GAP_B4, "Gap updated: WAITING_FOR_EVIDENCE — progress recorded; the residual case-link question remains open.", 8, 8),
     breakthroughEvent(EVT_BT_10, "FREEZE_COMPARED", "PREDICTION_FREEZE", FREEZE_B1, "Post-ingest state compared to the Phase-1 prediction freeze: fingerprint changed by the new edge.", 9, 9),
     breakthroughEvent(EVT_BT_11, "GRAPH_NODE_ADDED", "GRAPH_NODE", GN_A_SOCTF, "Case-A network reveal: the CT State Police Organized Crime Task Force (SOCTF) materializes as an overlay node on the Tulsa graph.", 10, 10),
     breakthroughEvent(EVT_BT_12, "GRAPH_NODE_ADDED", "GRAPH_NODE", GN_A_MCGUIGAN, "Case-A network reveal: Assistant State's Attorney Austin McGuigan materializes as an overlay node on the Tulsa graph.", 11, 11),

@@ -171,7 +171,7 @@ export function isContextDetailsResolved(
 }
 
 export function isOpenGap(gap: InvestigativeGap): boolean {
-  return gap.status !== "ADDRESSED" && gap.status !== "WONFIX";
+  return gap.status !== "ADDRESSED" && gap.status !== "WONT_FIX";
 }
 
 export function isActiveLead(lead: Lead): boolean {

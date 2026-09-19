@@ -28,7 +28,7 @@ const g1: InvestigativeGap = {
   title: "Unknown counterparties on account 0093",
   description:
     "The ledger export covers only the two known shell counterparties; the full counterparty set is unknown.",
-  status: "WORKING",
+  status: "UNDER_REVIEW",
   priority: "HIGH",
   impact: 0.74,
   expectedInformationValue: 0.66,
@@ -47,7 +47,7 @@ const g2: InvestigativeGap = {
   title: "Principal behind signing authority",
   description:
     "Whether Maria exercises signing authority independently or under Victor's direction is unresolved.",
-  status: "ACKNOWLEDGED",
+  status: "UNDER_REVIEW",
   priority: "MEDIUM",
   impact: 0.58,
   expectedInformationValue: 0.5,

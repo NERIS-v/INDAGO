@@ -1224,10 +1224,10 @@ function reassessHypothesis(
 }
 
 function reassessGap(gap: InvestigativeGap): InvestigativeGap {
-  if (gap.status === "PARTIALLY_ADDRESSED") return gap;
+  if (gap.status === "WAITING_FOR_EVIDENCE") return gap;
   return InvestigativeGapSchema.parse({
     ...gap,
-    status: "PARTIALLY_ADDRESSED",
+    status: "WAITING_FOR_EVIDENCE",
     resolution:
       "PARTIAL: ingestion of the WJA audit / financial account discriminates why Wheeler was killed — the financial-operation exposure reading (H1) posts ahead of the control reading (H2), and the candidate motive-context edge (WJA → Wheeler, financial) is PROPOSED. NOT resolved: the document remains sealed/blocked and no finding has been proved; H2 retains partial overlap and H3 stays weakest.",
     updatedAt: S1_INGEST_AT,
@@ -1293,7 +1293,7 @@ function buildDelta(
     hypothesisPromotedIds: [HYP_P2_H1],
     evidenceRequestIdsCompleted: [EREQ_P2],
     gapStatusChanges: [
-      { gapId: GAP_AG2, from: "IDENTIFIED", to: "PARTIALLY_ADDRESSED" },
+      { gapId: GAP_AG2, from: "IDENTIFIED", to: "WAITING_FOR_EVIDENCE" },
     ],
     holeStatusChanges,
     before,
@@ -1318,7 +1318,7 @@ function buildRecord(delta: Phase2EvidenceDelta): Phase2S1Record {
     edgeId: GE_B_AUDIT_WJA,
     hypothesesPromoted: [HYP_P2_H1],
     gapId: GAP_AG2,
-    gapStatus: "PARTIALLY_ADDRESSED",
+    gapStatus: "WAITING_FOR_EVIDENCE",
     evidenceRequestId: EREQ_P2,
     evidenceRequestStatus: "COMPLETED",
     freezeFingerprintBefore: delta.before.fingerprint,
@@ -1418,7 +1418,7 @@ export function buildPhase2S1Events(): readonly DemoStreamEvent[] {
     s1Event(EVT_P2S_06, "GRAPH_EDGE_ADDED", "GRAPH_EDGE", GE_B_AUDIT_WJA, "Materialized the PROPOSED relation as an ACTIVE candidate motive-context edge: WJA → Wheeler (financial).", 15, 5),
     s1Event(EVT_P2S_07, "REASSESSMENT_RUN", "HYPOTHESIS", HYP_P2_H1, "Post-ingestion re-scoring re-ran the reverse-hypothesis engine on the surviving evidence.", 16, 6),
     s1Event(EVT_P2S_08, "HYPOTHESIS_PROMOTED", "HYPOTHESIS", HYP_P2_H1, "H1 (protect the operation) is the leading derived explanation — supported, not proved.", 17, 7),
-    s1Event(EVT_P2S_09, "GAP_ADDRESSED", "GAP", GAP_AG2, "Gap updated: PARTIALLY_ADDRESSED — motive-discrimination progress recorded; the residual question stays open.", 18, 8),
+    s1Event(EVT_P2S_09, "GAP_ADDRESSED", "GAP", GAP_AG2, "Gap updated: WAITING_FOR_EVIDENCE — motive-discrimination progress recorded; the residual question stays open.", 18, 8),
     s1Event(EVT_P2S_10, "LEDGER_APPENDED", "REASONING_LEDGER", LEDGER_P2, "Reasoning ledger appended with the reassessment, hearsay limitation, and final action.", 19, 9),
   ];
 }

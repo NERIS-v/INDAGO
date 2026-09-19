@@ -316,7 +316,7 @@ describe("PASS 4 — S1 package supply chain (DERIVED, honest, deterministic)", 
   it("gap/ER transition honestly and the hole is PARTIALLY_RESOLVED (not resolved)", () => {
     const pkg = buildPhase2S1Package(derivePhase2());
     expect(pkg.gapReassessment.id).toBe(GAP_AG2);
-    expect(pkg.gapReassessment.status).toBe("PARTIALLY_ADDRESSED");
+    expect(pkg.gapReassessment.status).toBe("WAITING_FOR_EVIDENCE");
     expect(pkg.gapReassessment.resolution).toContain("NOT resolved");
     expect(pkg.evidenceRequestCompletion.id).toBe(EREQ_P2);
     expect(pkg.evidenceRequestCompletion.status).toBe("COMPLETED");
@@ -324,7 +324,7 @@ describe("PASS 4 — S1 package supply chain (DERIVED, honest, deterministic)", 
       { graphHoleId: HOLE_P2_MOTIVE, status: "PARTIALLY_RESOLVED", derivedFromEvidenceIds: [EVID_S1_AUDIT] },
     ]);
     expect(pkg.delta.gapStatusChanges).toEqual([
-      { gapId: GAP_AG2, from: "IDENTIFIED", to: "PARTIALLY_ADDRESSED" },
+      { gapId: GAP_AG2, from: "IDENTIFIED", to: "WAITING_FOR_EVIDENCE" },
     ]);
   });
 
@@ -372,7 +372,7 @@ describe("PASS 4 — live S1 ingestion through DemoEvidenceProvider", () => {
     expect(state.evidenceById.has(EVID_S1_AUDIT)).toBe(true);
     expect(state.observationById.has(OBS_P2_A1)).toBe(true);
     expect(state.hypothesisById.get(HYP_P2_H1)?.status).toBe("SUPPORTED");
-    expect(state.gapById.get(GAP_AG2)?.status).toBe("PARTIALLY_ADDRESSED");
+    expect(state.gapById.get(GAP_AG2)?.status).toBe("WAITING_FOR_EVIDENCE");
     expect(state.evidenceRequestById.get(EREQ_P2)?.status).toBe("COMPLETED");
     expect(state.graphEdgeById.has(GE_B_AUDIT_WJA)).toBe(true);
     expect(listDemoSessionPhase2(INVESTIGATION_B_ID)).toHaveLength(1);

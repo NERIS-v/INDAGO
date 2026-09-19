@@ -48,19 +48,24 @@ function toImpact(priority: InvestigativeGap["priority"]): GapMock["impact"] {
   }
 }
 
-function toStatus(status: InvestigativeGap["status"]): GapMock["status"] {
+function toStatus(
+  status: InvestigativeGap["status"],
+): GapMock["status"] {
   switch (status) {
-    case "ACKNOWLEDGED":
-    case "PARTIALLY_ADDRESSED":
+    case "EVIDENCE_REQUESTED":
+    case "WAITING_FOR_EVIDENCE":
       return "EVIDENCE_REQUESTED";
+
     case "ADDRESSED":
-    case "WONFIX":
+    case "WONT_FIX":
       return "RESOLVED";
+
+    case "UNDER_REVIEW":
+    case "IDENTIFIED":
     default:
       return "OPEN";
   }
 }
-
 /** Resolve a related-entity id to a display label (called with the graph node
  *  label map when available; otherwise the id itself is shown). */
 export type GapEntityLabelResolver = (entityId: string) => string | undefined;
