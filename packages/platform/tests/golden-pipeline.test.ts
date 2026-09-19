@@ -54,6 +54,7 @@ import {
   deterministicRelationHypothesisId,
   computeObservablePresence,
   detectExplicitRelationContradictions,
+  deriveRelationHypothesisStatus,
   RELATION_PROPOSAL_THRESHOLD,
   RELATION_SCORE_MODEL_VERSION,
 } from '@indago/relation-resolution';
@@ -555,6 +556,46 @@ describe('PR-25 golden corpus — MA10 relation resolution', () => {
         expect(r.support).toBeLessThan(RELATION_PROPOSAL_THRESHOLD);
       }
     }
+  }, 60000);
+
+  it('PR-33: the below-threshold grounded pairs derive NEAR_MISS (never silently dropped)', async () => {
+    const run = await golden();
+    // Replay the worker's EXACT durability decision (deriveDurableRelationStatus
+    // is a one-line projection of the engine function over a resolution).
+    const nearMisses = run.relations.resolutions.filter(
+      (r) =>
+        deriveRelationHypothesisStatus(
+          r.support,
+          r.contradictions.length > 0,
+          r.evidenceCount,
+        ) === 'NEAR_MISS',
+    );
+    // The four non-proposals (PR-31 FIX 5) are ALL source-grounded below-
+    // threshold pairs — the PR-32 P4 population that used to be a silent drop.
+    expect(run.relations.metrics.nearMisses).toBe(4);
+    expect(nearMisses).toHaveLength(run.relations.metrics.nearMisses);
+    for (const r of nearMisses) {
+      // Threshold intent intact: below the UNCHANGED 0.25 bar, yet grounded.
+      expect(r.support).toBeLessThan(RELATION_PROPOSAL_THRESHOLD);
+      expect(r.evidenceCount).toBeGreaterThan(0);
+      expect(r.contradictions).toEqual([]);
+    }
+    // Bind the derived population to the exact known candidates of the corpus.
+    const byName = new Map(run.entities.map((e) => [e.id, e.canonicalName]));
+    const namedPair = (a: string, b: string) => [a, b].sort().join('|');
+    const derivedPairs = nearMisses
+      .map((r) =>
+        namedPair(byName.get(r.sourceEntityId)!, byName.get(r.targetEntityId)!),
+      )
+      .sort();
+    expect(derivedPairs).toEqual(
+      [
+        'arjun mehta|meridian trading llp',
+        'ax-4471|mt-883',
+        'blue dusk logistics|northstar warehousing',
+        'mt-883|nw-009',
+      ].sort(),
+    );
   }, 60000);
 
   it('is idempotent — relation hypothesis identity depends only on pair+type+model', async () => {
