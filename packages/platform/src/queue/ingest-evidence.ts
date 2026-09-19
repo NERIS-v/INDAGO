@@ -78,6 +78,7 @@ import {
 import {
   buildRelationHypothesisIdentityKey,
   deterministicRelationHypothesisId,
+  detectExplicitRelationContradictions,
   RELATION_PROPOSAL_THRESHOLD,
   resolveRelationsForCase,
   type RelationResolution,
@@ -1425,12 +1426,17 @@ async function completeMA10(params: {
     observationIds: e.observationIds,
   }));
 
-  // 4a. Explicit contradiction provenance: carry the observation IDs the
-  //     durable store has already recorded as contradicting any relation in
-  //     this case. This is real, persisted evidence (never mere absence) that
-  //     flows back through the engine so the −0.25 hardContradiction weight is
-  //     applied consistently across re-runs.
-  const explicitContradictions = new Set<string>();
+  // 4a. Explicit contradiction provenance. TWO deterministic sources, both
+  //     real evidence — never mere absence:
+  //       (1) PR-31 FIX 7 producer: observations whose free text carries an
+  //           explicit negative claim polarity (denial / dispute / false claim
+  //           / fraudulent). Pre-FIX-7 no producer ever wrote contradictions, so
+  //           the −0.25 hardContradiction weight could never fire on a fresh
+  //           case (PR-30 verdict: "no producer ever writes them").
+  //       (2) contradictions already persisted on this case's relation
+  //           hypotheses, so a re-run keeps the same −0.25 application.
+  const producedContradictions = detectExplicitRelationContradictions(observations);
+  const explicitContradictions = new Set<string>(producedContradictions);
   for (const existing of await relationHypothesisStore.listByCase(caseId, {
     investigationId,
   })) {

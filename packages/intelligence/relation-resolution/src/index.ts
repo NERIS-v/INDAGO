@@ -44,6 +44,11 @@ export {
 } from './classify.js';
 
 export {
+  hasNegativeClaimPolarity,
+  detectExplicitRelationContradictions,
+} from './contradictions.js';
+
+export {
   RELATION_RESOLUTION_BOUNDS,
   RELATION_SCORE_MODEL_VERSION,
   RELATION_PROPOSAL_THRESHOLD,

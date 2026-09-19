@@ -18,6 +18,9 @@ import {
   buildRelationHypothesisIdentityKey,
   indexObservations,
   buildObservationsByType,
+  computeObservablePresence,
+  hasNegativeClaimPolarity,
+  detectExplicitRelationContradictions,
   RELATION_RESOLUTION_BOUNDS,
   RELATION_SCORE_MODEL_VERSION,
   RELATION_PROPOSAL_THRESHOLD,
@@ -224,7 +227,7 @@ describe('M-A10: scoring model v1 — weights & settlement', () => {
   it('score is a ranking signal, NOT a probability — validate bounds semantics', () => {
     // A score above the proposal threshold maps to PROPOSED, never ACCEPTED.
     expect(RELATION_PROPOSAL_THRESHOLD).toBeGreaterThan(0);
-    expect(deriveRelationHypothesisStatus(0.9, false)).toBe('PROPOSED');
+    expect(deriveRelationHypothesisStatus(0.9, false, 2)).toBe('PROPOSED');
   });
 });
 
@@ -285,10 +288,12 @@ describe('M-A10: contradiction handling', () => {
     expect(shouldProposeRelationHypothesis(score, true)).toBe(false);
   });
 
-  it('deriveRelationHypothesisStatus maps score + contradiction deterministically', () => {
-    expect(deriveRelationHypothesisStatus(0.9, false)).toBe('PROPOSED');
-    expect(deriveRelationHypothesisStatus(0.1, false)).toBe('REJECTED');
-    expect(deriveRelationHypothesisStatus(0.9, true)).toBe('REJECTED');
+  it('deriveRelationHypothesisStatus maps score + contradiction + grounding deterministically', () => {
+    expect(deriveRelationHypothesisStatus(0.9, false, 2)).toBe('PROPOSED');
+    expect(deriveRelationHypothesisStatus(0.1, false, 2)).toBe('NEAR_MISS');
+    expect(deriveRelationHypothesisStatus(0.1, false, 0)).toBe('REJECTED');
+    expect(deriveRelationHypothesisStatus(0.9, true, 2)).toBe('REJECTED');
+    expect(deriveRelationHypothesisStatus(0.1, true, 0)).toBe('REJECTED');
   });
 });
 
@@ -560,7 +565,8 @@ describe('M-A10: end-to-end case resolution', () => {
     // → co-occurrence only (0.2). `other` is the ABSENCE of a type signal, so
     // it never awards the type-signal weight: 0.2 < 0.25 → no proposition.
     expect(result.metrics.hypothesesProposed).toBe(1);
-    expect(result.metrics.hypothesesRejected).toBe(1);
+    expect(result.metrics.hypothesesRejected).toBe(0);
+    expect(result.metrics.nearMisses).toBe(1);
     expect(result.metrics.lowEvidenceCount).toBe(0);
 
     const resolutions = result.resolutions;
@@ -716,5 +722,111 @@ describe('M-A10: indexing helpers', () => {
     expect(byType.get('financial')).toEqual(new Set([OBS_ID(1)]));
     expect(byType.get('communication')).toEqual(new Set([OBS_ID(2)]));
     expect(byType.get('other')).toEqual(new Set([OBS_ID(3)]));
+  });
+});
+
+describe('M-A10: PR-31 observable presence (FIX 3/4)', () => {
+  it('reports per-entity observable observation/source coverage without mutation', () => {
+    const entities: EntityEvidence[] = [
+      { id: ENT_ID(1), observationIds: [OBS_ID(1), OBS_ID(2), OBS_ID(1)] },
+      { id: ENT_ID(2), observationIds: [OBS_ID(2), OBS_ID(9)] }, // 9 is dangling
+      { id: ENT_ID(3), observationIds: [] },
+    ];
+    const obs = [
+      makeObservation(1, { source: 1, content: 'a' }),
+      makeObservation(2, { source: 2, content: 'b' }),
+    ];
+    const presence = computeObservablePresence({ entities, observations: obs });
+
+    const p1 = presence.get(ENT_ID(1))!;
+    expect(p1.distinctObservationCount).toBe(2);
+    expect(p1.observableObservationIds).toEqual([OBS_ID(1), OBS_ID(2)]);
+    expect(p1.distinctSourceIds).toEqual([SOURCE_ID(1), SOURCE_ID(2)]);
+
+    // Dangling observation link is NOT observable — never fabricated.
+    const p2 = presence.get(ENT_ID(2))!;
+    expect(p2.distinctObservationCount).toBe(1);
+    expect(p2.observableObservationIds).toEqual([OBS_ID(2)]);
+
+    const p3 = presence.get(ENT_ID(3))!;
+    expect(p3.distinctObservationCount).toBe(0);
+    expect(p3.observableObservationIds).toEqual([]);
+  });
+
+  it('presence is deterministic and derives purely from the inputs', () => {
+    const entities: EntityEvidence[] = [
+      { id: ENT_ID(2), observationIds: [OBS_ID(2), OBS_ID(1)] },
+      { id: ENT_ID(1), observationIds: [OBS_ID(1)] },
+    ];
+    const obs = [
+      makeObservation(2, { source: 2 }),
+      makeObservation(1, { source: 1 }),
+    ];
+    const a = computeObservablePresence({ entities, observations: obs });
+    const b = computeObservablePresence({ entities, observations: obs });
+    expect(a.get(ENT_ID(2))!.observableObservationIds).toEqual([OBS_ID(1), OBS_ID(2)]);
+    expect(a.get(ENT_ID(2))!.observableObservationIds).toEqual(
+      b.get(ENT_ID(2))!.observableObservationIds,
+    );
+    expect(a.get(ENT_ID(1))!.distinctObservationCount).toBe(1);
+  });
+});
+
+describe('M-A10: PR-31 contradiction producer (FIX 7)', () => {
+  it('hasNegativeClaimPolarity flags only explicit denial/dispute/fraud polarity', () => {
+    expect(hasNegativeClaimPolarity('Neha Kapoor denies the transfer was authorized.')).toBe(true);
+    expect(hasNegativeClaimPolarity('Statement disputed by the signatory.')).toBe(true);
+    expect(hasNegativeClaimPolarity('The invoice was fabricated.')).toBe(true);
+    expect(hasNegativeClaimPolarity('contrary to the ledger, no transaction occurred')).toBe(true);
+    // ABSENT ≠ DIFFERENT — neutral / unrelated wording is never a contradiction.
+    expect(hasNegativeClaimPolarity('Ledger shows the standard monthly cycle.')).toBe(false);
+    expect(hasNegativeClaimPolarity('Follow-up sent to the registry.')).toBe(false);
+    expect(hasNegativeClaimPolarity('')).toBe(false);
+    expect(hasNegativeClaimPolarity(undefined)).toBe(false);
+    expect(hasNegativeClaimPolarity(null)).toBe(false);
+  });
+
+  it('detectExplicitRelationContradictions flags only negative-polarity observations', () => {
+    const obs = [
+      makeObservation(1, { content: 'Arjun Mehta denies ever using AX-4471.' }),
+      makeObservation(2, { content: 'Transfer AX-4471 confirmed complete.' }),
+    ];
+    const set = detectExplicitRelationContradictions(obs);
+    expect([...set]).toEqual([OBS_ID(1)]);
+  });
+
+  it('a produced contradiction suppresses the hypothesis with provenance', () => {
+    const obs = [
+      makeObservation(1, {
+        type: 'FINANCIAL',
+        entityIds: [ENT_ID(1), ENT_ID(2)],
+        observedAt: T0,
+        content: 'AX-4471 credit recorded for Arjun Mehta.',
+      }),
+      makeObservation(2, {
+        type: 'FINANCIAL',
+        entityIds: [ENT_ID(1), ENT_ID(2)],
+        observedAt: T1,
+        content: 'Arjun Mehta disputes the AX-4471 transaction.',
+      }),
+    ];
+    const contradictionSet = detectExplicitRelationContradictions(obs);
+    expect([...contradictionSet]).toEqual([OBS_ID(2)]);
+
+    const { resolution, proposed } = resolveRelationPair({
+      candidate: {
+        sourceEntityId: ENT_ID(1),
+        targetEntityId: ENT_ID(2),
+        observationIds: [OBS_ID(1), OBS_ID(2)],
+        sourceIds: [SOURCE_ID(1)],
+        suggestedType: 'financial',
+      },
+      allObservations: obs,
+      explicitContradictions: contradictionSet,
+      temporalWindowMs: RELATION_RESOLUTION_BOUNDS.temporalProximityWindowMs,
+    });
+    expect(proposed).toBe(false);
+    expect(resolution.contradictions).toContain(OBS_ID(2));
+    expect(resolution.support).toBeLessThan(RELATION_PROPOSAL_THRESHOLD);
   });
 });
