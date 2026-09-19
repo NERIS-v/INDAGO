@@ -33,11 +33,17 @@ export interface ContextualRule {
 export const CONTEXTUAL_RULES: readonly ContextualRule[] = [
   {
     entityType: 'PERSON',
+    // RULE-INTERACTION FIX (PR-31): `records` was a document verb ("a memo
+    // records a meeting at Sector 18") — it mis-typed the LOCATION token
+    // "Sector" as PERSON. It is removed; PERSON classification additionally
+    // requires a multi-token name shape (isPersonNameShape) in
+    // classifyByContext, so a single capitalized location token can never be
+    // typed PERSON regardless of window context.
     triggers: [
       'mr', 'mrs', 'ms', 'dr', 'prof', 'sri', 'smt', 'shri',
       'surname', 'alias', 'identified as', 'named', 'known as',
       'contact', 'caller', 'callee', 'interviewee',
-      'involving', 'records',
+      'involving',
     ],
   },
   {
@@ -92,6 +98,22 @@ export function isContextStopword(token: string): boolean {
   return CONTEXT_STOPWORDS.has(token.toLowerCase());
 }
 
+/**
+ * Multi-token person-name shape guard (RULE-INTERACTION FIX, PR-31).
+ *
+ * PERSON classification requires a plausible given+surname shape — two or more
+ * Title-Case words ("Arjun Mehta", "Rohan Singh"), exactly what the
+ * capitalized-run tokenizer produces for a real name. A SINGLE capitalized
+ * token ("Sector", "Invoice", "Gurugram") is never typed PERSON by context,
+ * which kills the locative false positive class while preserving every name in
+ * the golden corpus.
+ */
+const PERSON_NAME_SHAPE_RE = /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+$/;
+
+export function isPersonNameShape(text: string): boolean {
+  return PERSON_NAME_SHAPE_RE.test(text.trim());
+}
+
 /** Escape regex metacharacters in a trigger phrase. */
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -141,6 +163,12 @@ export function classifyByContext(input: {
   for (const rule of CONTEXTUAL_RULES) {
     for (const trigger of rule.triggers) {
       if (hasPhrase(before, trigger)) {
+        // PERSON context alone is not enough: require a multi-token
+        // person-name shape so a location token (Sector) near a category label
+        // is never fabricated into a person (PR-31 fix).
+        if (rule.entityType === 'PERSON' && !isPersonNameShape(input.text)) {
+          continue;
+        }
         return { entityType: rule.entityType, extractionMethod: 'CONTEXTUAL_RULE' };
       }
     }
@@ -156,6 +184,10 @@ export function classifyByContext(input: {
   );
   for (const trigger of PERSON_AFTER_TRIGGERS) {
     if (hasPhrase(after, trigger)) {
+      // Same multi-token shape guard as the before-window (PR-31 fix): a single
+      // capitalized token after a verb (e.g. "stating", "coordinates") is not
+      // a person name on its own.
+      if (!isPersonNameShape(input.text)) continue;
       return { entityType: 'PERSON', extractionMethod: 'CONTEXTUAL_RULE' };
     }
   }

@@ -381,12 +381,25 @@ describe('M-A07 PR-24 classification hardening', () => {
     }
   });
 
-  it('classifies a labelled invoice number as ACCOUNT (PART 9)', async () => {
+  it('does NOT type a labelled invoice number as ACCOUNT — document IDs are not accounts (PART 9, PR-31)', async () => {
+    // RULE-INTERACTION FIX (PR-31): "Invoice 7842" is an EVIDENCE identifier,
+    // not a financial account. Previously typed ACCOUNT here (and repeatedly
+    // in the golden corpus), the number fabricated a canonical account node
+    // that powered a CRITICAL financial lead. Explicitly required NOT to type.
     const { drafts } = await extractEntityMentions(
       makeObservation('Payment against Invoice 7842 was recorded.'),
     );
     const accounts = drafts.filter((d) => d.entityType === 'ACCOUNT').map((d) => d.text);
-    expect(accounts.some((t) => t.includes('Invoice 7842'))).toBe(true);
+    expect(accounts).toHaveLength(0);
+    expect(drafts.some((d) => d.text.includes('Invoice 7842'))).toBe(false);
+  });
+
+  it('does NOT type a labelled Evidence ID as ACCOUNT — labelled document-id guard (PR-31)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Evidence ID: FS-EV-001 maps to the interview note.'),
+    );
+    const accounts = drafts.filter((d) => d.entityType === 'ACCOUNT').map((d) => d.text);
+    expect(accounts).toHaveLength(0);
   });
 
   it('types a subject-verb person via the after-window cue (PART 7)', async () => {
@@ -418,6 +431,95 @@ describe('M-A07 PR-24 classification hardening', () => {
     const a = await extractEntityMentions(makeObservation(content));
     const b = await extractEntityMentions(makeObservation(content));
     expect(a.drafts).toEqual(b.drafts);
+  });
+});
+
+// ============================================================================
+// PR-31 regression — rule-interaction fixes (MA07)
+//
+// These lock in the concrete outcomes of the PR-30 rule-interaction audit:
+//   • a labelling word (records) and category labels can no longer type a
+//     single capitalized LOCATION token ("Sector") as PERSON;
+//   • a person name immediately preceding an organization suffix no longer
+//     collapses into a single ORGANIZATION span (ORG greed cap);
+//   • the gazetteer phrase pass types multi-name run-ons at their TRUE spans
+//     instead of leaving mis-sliced capitalized batches.
+// ============================================================================
+describe('M-A07 PR-31 regression — rule-interaction fixes', () => {
+  it('a locative token near "records"/"involving" is never typed PERSON', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('A synthetic memo records a meeting at Sector 18, Gurugram involving Arjun Mehta.'),
+    );
+    const personMentions = drafts.filter((d) => d.entityType === 'PERSON');
+    expect(personMentions.some((d) => d.text === 'Sector')).toBe(false);
+    expect(personMentions.some((d) => d.text === 'Gurugram')).toBe(false);
+    // The full-name principal still types PERSON.
+    expect(personMentions.some((d) => d.text === 'Arjun Mehta')).toBe(true);
+  });
+
+  it('a person name before an organization suffix does not collapse into one ORGANIZATION', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Neha Kapoor Blue Dusk Logistics arranged the transfer.'),
+    );
+    const orgs = drafts.filter((d) => d.entityType === 'ORGANIZATION').map((d) => d.text);
+    expect(orgs).toEqual(['Blue Dusk Logistics']);
+    // No mis-slice (3-token "Neha Kapoor Blue") and no person/org merge.
+    expect(orgs.some((t) => t.includes('Neha Kapoor'))).toBe(false);
+    expect(drafts.some((d) => d.text === 'Neha Kapoor Blue')).toBe(false);
+    // The person mention is IMPLICITLY unresolved in the bare run-on (the
+    // conservative outcome) until the phrase pass supplies the injected name.
+    expect(drafts.some((d) => d.text === 'Neha Kapoor')).toBe(false);
+  });
+
+  it('with the phrase pass, an injected name inside an ORG run-on is typed at its true span', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Neha Kapoor Blue Dusk Logistics arranged the transfer.'),
+      {
+        gazetteerEntries: [
+          { token: 'Neha Kapoor', entityType: 'PERSON' },
+          { token: 'Arjun Mehta', entityType: 'PERSON' },
+        ],
+      },
+    );
+    const orgs = drafts.filter((d) => d.entityType === 'ORGANIZATION').map((d) => d.text);
+    expect(orgs).toEqual(['Blue Dusk Logistics']);
+    const arjun = drafts.find((d) => d.text === 'Arjun Mehta');
+    expect(arjun).toBeUndefined(); // not present in this content
+    const neha = drafts.find((d) => d.text === 'Neha Kapoor');
+    expect(neha?.extractionMethod).toBe('GAZETTEER_MATCH');
+    expect(neha?.entityType).toBe('PERSON');
+  });
+
+  it('the gazetteer phrase pass types a multi-name run-on at true spans', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Call log 2026-08-07 Arjun Mehta Neha Kapoor Rohan Singh connected.'),
+      {
+        gazetteerEntries: [
+          { token: 'Arjun Mehta', entityType: 'PERSON' },
+          { token: 'Neha Kapoor', entityType: 'PERSON' },
+          { token: 'Rohan Singh', entityType: 'PERSON' },
+        ],
+      },
+    );
+    const gzNames = drafts
+      .filter((d) => d.extractionMethod === 'GAZETTEER_MATCH')
+      .map((d) => d.text)
+      .sort();
+    expect(gzNames).toEqual(['Arjun Mehta', 'Neha Kapoor', 'Rohan Singh']);
+    // No capitalized-run mis-slice of the run-on survives.
+    const texts = drafts.map((d) => d.text);
+    expect(texts.some((t) => t.includes('Kapoor Rohan'))).toBe(false);
+    expect(texts.some((t) => t.includes('Mehta Neha'))).toBe(false);
+    expect(texts.some((t) => t === 'Kapoor' || t === 'Singh')).toBe(false);
+  });
+
+  it('a labelled Evidence ID with a separator-joined serial is not ACCOUNT', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Evidence No: FS-EV-004 and ledger MT-SET-119 both appear.'),
+    );
+    const accounts = drafts.filter((d) => d.entityType === 'ACCOUNT').map((d) => d.text);
+    expect(accounts.some((t) => t.includes('FS-EV'))).toBe(false);
+    expect(accounts).toContain('MT-SET-119');
   });
 });
 

@@ -63,10 +63,19 @@ export const ENTITY_PATTERN_RULES: readonly EntityPatternRule[] = [
     // Bank/card/account-shaped alphanumerics: 9-16 digits; AAAA-1234-5678 style
     // IBAN-like runs; ledger identifiers like ACCT-xxxxx; separator-joined
     // reference IDs that contain a digit (AX-4471, MT-883, ORX-102, MT-SET-119);
-    // and explicitly labelled references (Invoice 7842, Reference: MT-SET-119).
+    // and explicitly labelled transaction references (Reference: MT-SET-119).
     // Every new alternative requires a digit so pure words are never ACCOUNTs.
+    //
+    // RULE-INTERACTION FIX (PR-31): a document serial number such as
+    // "Invoice 7842" is an EVIDENCE identifier, NOT a financial account. The
+    // Invoice/Inv alternative was a dimensionality mistake — it promoted a
+    // document number into the ACCOUNT pool and, in the golden corpus, drove a
+    // CRITICAL financial lead from a fabricated account node. Invoice/Inv are
+    // deliberately NOT account-shaped here; a separate DOCUMENT-ID label guard
+    // (isAccountLikeSpan) suppresses evidence/document identifiers that the
+    // separator-joined alternative would otherwise capture (FS-EV-001…004).
     pattern:
-      /\b(?:ACCT[-_ ]?\d+|IBAN[: ]?[A-Z]{2}\d{2}[A-Z0-9]{11,30}|(?:\d{4}[ -]?){3}\d{2,4}|\d{9,16}|(?=[A-Z0-9/-]*\d)[A-Z]{2,6}(?:[-/][A-Z0-9]+)+|(?:[Ii]nvoice|[Ii]nv|[Tt]xn|[Tt]ransaction)\s*[:#-]?\s*[A-Za-z0-9-]*\d[A-Za-z0-9-]*)\b/g,
+      /\b(?:ACCT[-_ ]?\d+|IBAN[: ]?[A-Z]{2}\d{2}[A-Z0-9]{11,30}|(?:\d{4}[ -]?){3}\d{2,4}|\d{9,16}|(?=[A-Z0-9/-]*\d)[A-Z]{2,6}(?:[-/][A-Z0-9]+)+|(?:[Tt]xn|[Tt]ransaction)\s*[:#-]?\s*[A-Za-z0-9-]*\d[A-Za-z0-9-]*)\b/g,
   },
   {
     entityType: 'ORGANIZATION',
@@ -74,8 +83,20 @@ export const ENTITY_PATTERN_RULES: readonly EntityPatternRule[] = [
     // suffix is the evidence: a bare capitalized pair is NOT typed here (it
     // falls through to CONTEXTUAL/HEURISTIC) so document headings such as
     // "Bank Transfer Report" are never fabricated into organizations.
+    //
+    // RULE-INTERACTION FIX (PR-31): the pre-suffix tail was greedy ({0,3} →
+    // up to 4 tokens) which silently swallowed a preceding person name —
+    // "Neha Kapoor Blue Dusk Logistics" was typed as a single ORGANIZATION and
+    // the Neha Kapoor draft was dropped by span dedupe (a contributor to the
+    // Arjun/Neha drop). The tail is restricted to a single qualifier token
+    // ({0,1}) so a person name plus an organization suffix can NOT collapse
+    // into one span: "Neha Kapoor" stays a separate candidate and only the
+    // capitalized cluster anchored by the suffix ("Blue Dusk Logistics") is
+    // typed ORGANIZATION. This preserves every suffixed name in the corpus
+    // (Orion Exports Pvt. Ltd., Meridian Trading LLP, Blue Dusk Logistics,
+    // Northstar Warehousing).
     pattern:
-      /\b[A-Z][A-Za-z&.'-]+(?:\s+[A-Z][A-Za-z&.'-]+){0,3}\s+(?:LLP|Pvt\.?\s*Ltd\.?|Ltd\.?|Limited|Inc\.?|Corp\.?|Corporation|Company|Co\.?|Enterprises?|Exports?|Logistics|Trading|Warehousing|Solutions|Services|Industries|Technologies|Systems|Holdings|Group)\b/g,
+      /\b[A-Z][A-Za-z&.'-]+(?:\s+[A-Z][A-Za-z&.'-]+){0,1}\s+(?:LLP|Pvt\.?\s*Ltd\.?|Ltd\.?|Limited|Inc\.?|Corp\.?|Corporation|Company|Co\.?|Enterprises?|Exports?|Logistics|Trading|Warehousing|Solutions|Services|Industries|Technologies|Systems|Holdings|Group)\b/g,
   },
   {
     entityType: 'DEVICE',
@@ -106,6 +127,24 @@ export const ENTITY_PATTERN_RULES: readonly EntityPatternRule[] = [
 /** Capitalized word runs (2-3 proper-noun-like tokens) — passed to later stages. */
 export const CAPITALIZED_NAME_RE =
   /\b[A-Z][a-z]+(?:[ ]+[A-Z][a-z]+){0,2}\b/g;
+
+/**
+ * Document-identifier label guard (RULE-INTERACTION FIX, PR-31).
+ *
+ * True when a match's START is immediately preceded (bounded window) by an
+ * explicit evidence/document identifier label such as "Evidence ID",
+ * "Document ID" or "Doc No". An identifier in that syntactic position is a
+ * document reference — it must never be classified as a financial ACCOUNT.
+ * Deterministic: fixed label vocabulary, word-boundary aware, right-anchored
+ * against the match position.
+ */
+const DOCUMENT_ID_LABEL_RE =
+  /\b(?:Evidence|Document|Doc)\s+(?:ID|No\.?|Number)\s*[:|]?\s*$/i;
+
+function isLabeledDocumentId(content: string, start: number): boolean {
+  const prefix = content.slice(Math.max(0, start - 48), start);
+  return DOCUMENT_ID_LABEL_RE.test(prefix);
+}
 
 /**
  * Match all typed patterns over a content string. Deterministic first-offset
@@ -140,6 +179,12 @@ export function matchTypedPatterns(content: string): Array<{
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(content)) !== null) {
+      // RULE-INTERACTION FIX (PR-31): an ACCOUNT-shaped span that is explicitly
+      // labelled an evidence/document identifier ("Evidence ID: FS-EV-001") is
+      // a document reference, not an account. Suppress rather than mis-type.
+      if (rule.entityType === 'ACCOUNT' && isLabeledDocumentId(content, m.index)) {
+        continue;
+      }
       raw.push({
         start: m.index,
         end: m.index + m[0].length,
