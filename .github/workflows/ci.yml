@@ -30,9 +30,25 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # Real Redis (BullMQ) for the queue-backed and API e2e suites. The
+      # express routes import src/queue/orchestrator.ts, which opens ioredis
+      # connections at module load (defaulting to localhost:6379); provisioning
+      # Redis keeps REDIS_URL resolvable so the PR-33 HTTP e2e suites run
+      # instead of silently skipping (m-a33, m-a10, m-a12, real-stack, pr27).
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       DATABASE_URL: postgres://indago:indago@localhost:5432/indago_test
       TEST_DATABASE_URL: postgres://indago:indago@localhost:5432/indago_test
+      REDIS_URL: redis://localhost:6379
 
     steps:
       - name: Checkout Repository
@@ -74,8 +90,11 @@ jobs:
 
       - name: Run Tests (Vitest)
         # Runs the test suites only if the build and types are perfectly valid.
-        # TEST_DATABASE_URL is set so the gated Postgres integration suites run.
+        # TEST_DATABASE_URL + REDIS_URL are set so the gated Postgres/Redis
+        # integration and e2e suites run (including the PR-33 NEAR_MISS
+        # durability and HTTP suites, which are covered by `pnpm -r test`).
         run: pnpm --recursive test
         env:
           TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
           DATABASE_URL: ${{ env.DATABASE_URL }}
+          REDIS_URL: ${{ env.REDIS_URL }}

@@ -61,13 +61,23 @@ describe('M-A10 RelationTypeSchema', () => {
 });
 
 describe('M-A10 RelationStatusSchema (lifecycle)', () => {
-  it('contains the four hypothesis lifecycle states', () => {
+  it('contains the four hypothesis lifecycle states plus the NEAR_MISS grade', () => {
     expect(RelationStatusSchema.options).toEqual([
       'PROPOSED',
       'ACCEPTED',
       'REJECTED',
       'REVERSED',
+      'NEAR_MISS',
     ]);
+  });
+
+  it('NEAR_MISS is an engine-derived grade, distinct from an authority REJECTION', () => {
+    // PR-31 FIX 5: NEAR_MISS surfaces source-grounded but below-threshold pairs.
+    // It must never be conflated with REJECTED (authority/contradiction).
+    const options = RelationStatusSchema.options;
+    expect(options).toContain('NEAR_MISS');
+    expect(options).not.toContain('MERGED');
+    expect(options).not.toContain('DELETED');
   });
 
   it('does not conflate REVERSED with MERGED or deletion', () => {

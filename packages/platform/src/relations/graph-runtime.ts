@@ -59,6 +59,13 @@ function toGraphEdge(relation: DurableRelation) {
     target: relation.targetEntityId,
     provenance: relation.provenance,
     directed: relation.directed,
+    // PR-31 FIX 6: carry the authoritative validityInterval verbatim as
+    // `temporalRange` on runtime edges (mirrors the versioned projection path in
+    // makeProjectionInput). Without this the temporal-burst detector could never
+    // see a validFrom instant on the live graph — the PR-30 timeline verdict.
+    ...(relation.validityInterval !== null && relation.validityInterval !== undefined
+      ? { temporalRange: relation.validityInterval }
+      : {}),
   };
 }
 
@@ -104,6 +111,8 @@ export interface CaseGraphView extends BuiltGraph {
     source: string;
     target: string;
     directed: boolean;
+    /** PR-31 FIX 6: authoritative validityInterval carried verbatim. */
+    temporalRange?: unknown;
   }>;
 }
 
@@ -179,6 +188,7 @@ export class GraphRuntime implements GraphAnalyticsService {
         source: e.source,
         target: e.target,
         directed: e.directed ?? false,
+        ...(e.temporalRange !== undefined ? { temporalRange: e.temporalRange } : {}),
       })),
     };
   }

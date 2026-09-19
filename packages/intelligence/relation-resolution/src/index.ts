@@ -8,8 +8,9 @@ export {
   resolveRelationsForCase,
   indexObservations,
   buildObservationsByType,
+  computeObservablePresence,
 } from './resolver.js';
-export type { RelationResolutionMetrics } from './resolver.js';
+export type { RelationResolutionMetrics, ObservablePresence } from './resolver.js';
 export type{
   RelationCandidatePair,
   RelationResolutionInput,
@@ -41,6 +42,11 @@ export {
   classifyObservationRelationType,
   pickRelationType,
 } from './classify.js';
+
+export {
+  hasNegativeClaimPolarity,
+  detectExplicitRelationContradictions,
+} from './contradictions.js';
 
 export {
   RELATION_RESOLUTION_BOUNDS,

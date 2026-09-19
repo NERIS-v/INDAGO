@@ -28,6 +28,36 @@ export const GOLDEN_BANNER =
   'SYNTHETIC TEST EVIDENCE - FICTIONAL DATA CREATED FOR INDAGO SOFTWARE TESTING. ' +
   'NOT A REAL PERSON, COMPANY, ACCO Page 1';
 
+/**
+ * Case-scoped identity census (PR-31, FIX 2) for the golden case.
+ *
+ * Mirrors what the platform maps into the M-A07 gazetteer from the payload's
+ * optional `identityRoster` — the shared curator-supplied universe of persons,
+ * organizations and ledger references. It seeds GAZETTEER_MATCH recognition
+ * (recall) only; it never authorizes an entity or bypasses resolution.
+ */
+export const GOLDEN_IDENTITY_ROSTER: readonly {
+  readonly text: string;
+  readonly entityType: 'PERSON' | 'ORGANIZATION' | 'ACCOUNT';
+}[] = [
+  // Named principals
+  { text: 'Arjun Mehta', entityType: 'PERSON' },
+  { text: 'Neha Kapoor', entityType: 'PERSON' },
+  { text: 'Rohan Singh', entityType: 'PERSON' },
+  // Organizations
+  { text: 'Orion Exports', entityType: 'ORGANIZATION' },
+  { text: 'Orion Exports Pvt. Ltd', entityType: 'ORGANIZATION' },
+  { text: 'Meridian Trading LLP', entityType: 'ORGANIZATION' },
+  { text: 'Blue Dusk Logistics', entityType: 'ORGANIZATION' },
+  { text: 'Northstar Warehousing', entityType: 'ORGANIZATION' },
+  // Ledger / account references
+  { text: 'AX-4471', entityType: 'ACCOUNT' },
+  { text: 'ORX-102', entityType: 'ACCOUNT' },
+  { text: 'MT-883', entityType: 'ACCOUNT' },
+  { text: 'BDL-210', entityType: 'ACCOUNT' },
+  { text: 'NW-009', entityType: 'ACCOUNT' },
+];
+
 export const GOLDEN_DOCUMENTS: readonly GoldenDocument[] = [
   {
     key: 'bank',

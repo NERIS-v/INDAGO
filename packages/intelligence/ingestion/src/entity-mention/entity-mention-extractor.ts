@@ -130,26 +130,29 @@ export async function extractEntityMentions(
     });
   }
 
-  // ---- 2/3/4. GAZETTEER → CONTEXTUAL → HEURISTIC over capitalized tokens.
+  // ---- 2. GAZETTEER_MATCH — injected phrase pass over the WHOLE content.
+  // A phrase search (not the capitalized-run tokenizer) types multi-name
+  // run-ons at their true spans ("Neha Kapoor Rohan Singh" → "Neha Kapoor" +
+  // "Rohan Singh") and matches single-token entries identically. PATTERN spans
+  // still win via dedupe priority when a gazetteer hit overlaps a typed
+  // pattern span.
+  for (const m of gazetteer.matchAll(content)) {
+    spans.push({
+      text: m.text,
+      start: m.start,
+      end: m.end,
+      entityType: m.entityType,
+      extractionMethod: 'GAZETTEER_MATCH',
+    });
+  }
+
+  // ---- 3/4. CONTEXTUAL → HEURISTIC over capitalized tokens not yet covered.
   CAPITALIZED_NAME_RE.lastIndex = 0;
   let cm: RegExpExecArray | null;
   while ((cm = CAPITALIZED_NAME_RE.exec(content)) !== null) {
     const token = cm[0];
     const start = cm.index;
     const end = start + token.length;
-
-    // Gazetteer stage: case-folded whole-token lookup (injected data only).
-    const gzType = gazetteer.lookup(token);
-    if (gzType !== undefined) {
-      spans.push({
-        text: token,
-        start,
-        end,
-        entityType: gzType,
-        extractionMethod: 'GAZETTEER_MATCH',
-      });
-      continue;
-    }
 
     // Contextual stage: nearby category-label context.
     const ctx = classifyByContext({ text: token, start, end, content });

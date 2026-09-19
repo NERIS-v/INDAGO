@@ -53,6 +53,12 @@ export type RelationType = z.infer<typeof RelationTypeSchema>;
 //   ACCEPTED → REVERSED
 //   REJECTED → REVERSED
 //
+// NEAR_MISS (PR-31 FIX 5) is an engine-derived observability grade, NOT an
+// authority endpoint: a pair that IS source-grounded (real observation
+// co-occurrence) but scores below the proposal threshold. It makes the
+// "could have been a relation" set inspectable without lowering the proposal
+// bar. It is machine-produced only — no authority decision targets it.
+//
 // REVERSED is hypothesis lifecycle reversal — it does NOT erase the original
 // relation hypothesis. It changes lifecycle state and creates audit history.
 // REVERSED ≠ DELETED.
@@ -65,6 +71,7 @@ export const RelationStatusSchema = z.enum([
   'ACCEPTED',
   'REJECTED',
   'REVERSED',
+  'NEAR_MISS',
 ]);
 export type RelationStatus = z.infer<typeof RelationStatusSchema>;
 

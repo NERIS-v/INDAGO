@@ -54,6 +54,7 @@ export const RELATION_STATUS_LABEL: Record<RelationStatus, string> = {
   ACCEPTED: "Accepted",
   REJECTED: "Rejected",
   REVERSED: "Reversed",
+  NEAR_MISS: "Near miss",
 };
 
 /**

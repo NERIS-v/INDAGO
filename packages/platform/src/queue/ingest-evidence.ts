@@ -51,6 +51,7 @@ import {
   type CandidatePair,
   type EntityHypothesis,
   EntityHypothesisSchema,
+  type RelationStatus,
 } from "@indago/contracts";
 import {
   buildObservationIdentityKey,
@@ -67,6 +68,7 @@ import {
   NORMALIZER_ID,
   NORMALIZER_VERSION,
   parseStoredRawExtraction,
+  type GazetteerEntry,
   type RawExtraction,
 } from "@indago/ingestion";
 import {
@@ -76,8 +78,9 @@ import {
 } from "@indago/entity-resolution";
 import {
   buildRelationHypothesisIdentityKey,
+  deriveRelationHypothesisStatus,
   deterministicRelationHypothesisId,
-  RELATION_PROPOSAL_THRESHOLD,
+  detectExplicitRelationContradictions,
   resolveRelationsForCase,
   type RelationResolution,
 } from "@indago/relation-resolution";
@@ -962,16 +965,26 @@ async function completeMA07(params: {
     return;
   }
 
-  // 3. Pure, deterministic extraction (no clock, no I/O). No gazetteer data is
-  //    injected yet — M-A07 ships with the empty gazetteer (all mentions are
-  //    pattern/contextual/heuristic). ENTITY_MENTION_BOUNDS caps output.
+  // 3. Pure, deterministic extraction (no clock, no I/O). The optional
+  //    case-scoped identity roster (PR-31) is mapped 1:1 into gazetteer
+  //    entries — GAZETTEER_MATCH candidates only. No roster in the payload ⇒
+  //    empty gazetteer (pattern/contextual/heuristic only), exactly like the
+  //    pre-roster pipeline. ENTITY_MENTION_BOUNDS caps output.
+  const rosterEntries: GazetteerEntry[] = (payload.identityRoster ?? []).map(
+    (entry) => ({
+      token: entry.text,
+      entityType: entry.entityType,
+    }),
+  );
   const nowIso = new Date().toISOString();
   const candidateEntries: {
     identityKey: string;
     candidate: EntityMentionCandidate;
   }[] = [];
   for (const observation of observations) {
-    const { drafts } = await extractEntityMentions(observation);
+    const { drafts } = await extractEntityMentions(observation, {
+      gazetteerEntries: rosterEntries,
+    });
     for (const draft of drafts) {
       const candidate = await finalizeEntityMention({ draft, nowIso });
       candidateEntries.push({
@@ -1307,7 +1320,7 @@ async function completeMA09(params: {
  * fabricated from graph structure): sourceId/artifactId/derivedFrom trace the
  * supported relation back to source-grounded observations.
  */
-function relationResolutionToHypothesisInput(params: {
+export function relationResolutionToHypothesisInput(params: {
   resolution: RelationResolution;
   id: string;
   identityKey: string;
@@ -1317,8 +1330,9 @@ function relationResolutionToHypothesisInput(params: {
   artifactId: string | undefined;
   derivedFrom: readonly string[];
   validityInterval?: unknown;
+  status: RelationStatus;
 }): import("../persistence/relation-hypothesis-store.js").RelationHypothesisInput {
-  const { resolution, id, identityKey, caseId, investigationId, sourceId, artifactId, derivedFrom } = params;
+  const { resolution, id, identityKey, caseId, investigationId, sourceId, artifactId, derivedFrom, status } = params;
   return {
     id,
     identityKey,
@@ -1330,7 +1344,7 @@ function relationResolutionToHypothesisInput(params: {
     support: resolution.support,
     evidenceBasis: resolution.evidenceBasis,
     contradictions: resolution.contradictions,
-    status: "PROPOSED",
+    status,
     scoreModelVersion: resolution.scoreModelVersion,
     evidenceCount: resolution.evidenceCount,
     evidenceStrength: resolution.evidenceStrength,
@@ -1351,6 +1365,34 @@ function relationResolutionToHypothesisInput(params: {
 }
 
 /**
+ * PR-33 — the SINGLE durable-write decision point shared by completeMA10 and
+ * its regression tests (single source of truth, never duplicated).
+ *
+ * Mirrors the engine's deriveRelationHypothesisStatus over a resolved pair so
+ * the durable write set is exactly { PROPOSED, NEAR_MISS }:
+ *   - hard contradiction        → REJECTED → nothing persisted (never durable,
+ *     exactly like MA09 — no positive proposition from a contradicted pair);
+ *   - no source grounding       → REJECTED → nothing persisted (evidenceCount
+ *     === 0 pairs are silently absent, never fabricated into a row);
+ *   - source-grounded, below the UNCHANGED RELATION_PROPOSAL_THRESHOLD → a
+ *     durable NEAR_MISS observability record (idempotent, queryable, audit-
+ *     logged) instead of a silent drop — the PR-32 P4 durability gap closes;
+ *   - source-grounded, at/above threshold → a durable PROPOSED proposition.
+ *
+ * The threshold itself (0.25) is NEVER lowered — NEAR_MISS makes the "could
+ * have been a relation" population inspectable WITHOUT moving the bar.
+ */
+export function deriveDurableRelationStatus(
+  resolution: RelationResolution,
+): ReturnType<typeof deriveRelationHypothesisStatus> {
+  return deriveRelationHypothesisStatus(
+    resolution.support,
+    resolution.contradictions.length > 0,
+    resolution.evidenceCount,
+  );
+}
+
+/**
  * M-A10 durable canonical-entity relation resolution → reversible hypothesis.
  *
  * Consumes DURABLE canonical Entity rows (M-A09.5) + DURABLE Observations
@@ -1367,16 +1409,21 @@ function relationResolutionToHypothesisInput(params: {
  *   - PER-RELATION processing — no "case already resolved → skip all" gate.
  *     Each write is idempotent (identityKey @unique) and lifecycle-preserving:
  *     an existing ACCEPTED / REJECTED / REVERSED relation is never reset to
- *     PROPOSED.
+ *     PROPOSED. NEAR_MISS is machine-refreshable: a re-run that scores the
+ *     same pair at/above threshold upgrades the row to PROPOSED (and a
+ *     below-threshold re-run of a PROPOSED row demotes it), because NEAR_MISS
+ *     is an engine-grade, NOT an authority decision.
  *   - RELATION_RESOLUTION_PROPOSED is audited ONLY when a fresh PROPOSED row
- *     actually landed (append-only event stays single-valued).
+ *     actually landed; RELATION_NEAR_MISS_RECORDED mirrors that for a fresh
+ *     NEAR_MISS row (append-only events stay single-valued).
  *
  * High score → PROPOSED only; the machine NEVER auto-accepts a relation.
  *
  * Boundary (enforced):
- *   - Only PROPOSED resolutions become durable rows (REJECTED / low-signal /
- *     hard-contradiction resolutions record no positive proposition, exactly
- *     like MA09).
+ *   - Only PROPOSED and NEAR_MISS resolutions become durable rows. REJECTED
+ *     (hard contradiction or absent grounding) records NO row — never a
+ *     positive proposition, exactly like MA09. NEAR_MISS is durable so the
+ *     "could have been a relation" population is queryable (PR-32 P4 gap).
  *   - Never creates canonical Entities, never merges/splits, never writes a
  *     mention/pair id as a canonical EntityId, resolves same-case only.
  */
@@ -1414,12 +1461,17 @@ async function completeMA10(params: {
     observationIds: e.observationIds,
   }));
 
-  // 4a. Explicit contradiction provenance: carry the observation IDs the
-  //     durable store has already recorded as contradicting any relation in
-  //     this case. This is real, persisted evidence (never mere absence) that
-  //     flows back through the engine so the −0.25 hardContradiction weight is
-  //     applied consistently across re-runs.
-  const explicitContradictions = new Set<string>();
+  // 4a. Explicit contradiction provenance. TWO deterministic sources, both
+  //     real evidence — never mere absence:
+  //       (1) PR-31 FIX 7 producer: observations whose free text carries an
+  //           explicit negative claim polarity (denial / dispute / false claim
+  //           / fraudulent). Pre-FIX-7 no producer ever wrote contradictions, so
+  //           the −0.25 hardContradiction weight could never fire on a fresh
+  //           case (PR-30 verdict: "no producer ever writes them").
+  //       (2) contradictions already persisted on this case's relation
+  //           hypotheses, so a re-run keeps the same −0.25 application.
+  const producedContradictions = detectExplicitRelationContradictions(observations);
+  const explicitContradictions = new Set<string>(producedContradictions);
   for (const existing of await relationHypothesisStore.listByCase(caseId, {
     investigationId,
   })) {
@@ -1438,12 +1490,17 @@ async function completeMA10(params: {
   });
 
   let proposedEvents = 0;
+  let nearMissRecordedEvents = 0;
 
   // 5. Per-relation durable write — partial-failure safe, lifecycle-preserving.
   for (const resolution of resolutions) {
-    // Only a PROPOSED, above-threshold resolution becomes a durable positive
-    // proposition (mirrors MA09: UNRESOLVED/CONTRADICTED → no row).
-    if (resolution.support < RELATION_PROPOSAL_THRESHOLD) continue;
+    // PR-33: the durable write set is exactly { PROPOSED, NEAR_MISS } — a
+    // source-grounded below-threshold pair becomes an inspectable NEAR_MISS
+    // record instead of a silent drop (the threshold itself never moves).
+    // REJECTED (hard contradiction / absent grounding) persists nothing, so a
+    // fresh case never fabricates a proposition from a contradicted pair.
+    const durableStatus = deriveDurableRelationStatus(resolution);
+    if (durableStatus === "REJECTED") continue;
 
     // Deterministic identity — same entity pair + type + model ⇒ one row.
     const identityKey = buildRelationHypothesisIdentityKey({
@@ -1498,6 +1555,7 @@ async function completeMA10(params: {
       sourceId,
       artifactId,
       derivedFrom: resolution.evidenceBasis,
+      status: durableStatus,
       ...(validityInterval !== undefined ? { validityInterval } : {}),
     });
 
@@ -1506,25 +1564,37 @@ async function completeMA10(params: {
 
     // 7. Audit ONLY after the durable row exists, with the ACTUAL hypothesis id
     //    as the target. On a preserved authority state the row already exists
-    //    and only machine fields refreshed — audit only when a fresh PROPOSED
-    //    row actually landed.
+    //    and only machine fields refreshed — audit only when a fresh row
+    //    actually landed (PROPOSED or NEAR_MISS — never a preserved decision).
     if (!result.preservedExisting && result.reusedExisting === false) {
-      proposedEvents += 1;
-      await logAuditEvent({
-        investigationId,
-        action: "RELATION_RESOLUTION_PROPOSED",
-        actor: "RELATION_RESOLUTION_PIPELINE",
-        targetType: "RELATION_HYPOTHESIS",
-        targetId: result.hypothesis.id,
-        description: `Proposed relation hypothesis ${result.hypothesis.id} (case ${caseId}, ${resolution.sourceEntityId} → ${resolution.targetEntityId}, type ${resolution.relationType}, support ${resolution.support}, model ${resolution.scoreModelVersion})`,
-      });
+      if (durableStatus === "NEAR_MISS") {
+        nearMissRecordedEvents += 1;
+        await logAuditEvent({
+          investigationId,
+          action: "RELATION_NEAR_MISS_RECORDED",
+          actor: "RELATION_RESOLUTION_PIPELINE",
+          targetType: "RELATION_HYPOTHESIS",
+          targetId: result.hypothesis.id,
+          description: `Recorded near-miss relation hypothesis ${result.hypothesis.id} (case ${caseId}, ${resolution.sourceEntityId} → ${resolution.targetEntityId}, type ${resolution.relationType}, support ${resolution.support}, model ${resolution.scoreModelVersion})`,
+        });
+      } else {
+        proposedEvents += 1;
+        await logAuditEvent({
+          investigationId,
+          action: "RELATION_RESOLUTION_PROPOSED",
+          actor: "RELATION_RESOLUTION_PIPELINE",
+          targetType: "RELATION_HYPOTHESIS",
+          targetId: result.hypothesis.id,
+          description: `Proposed relation hypothesis ${result.hypothesis.id} (case ${caseId}, ${resolution.sourceEntityId} → ${resolution.targetEntityId}, type ${resolution.relationType}, support ${resolution.support}, model ${resolution.scoreModelVersion})`,
+        });
+      }
     }
   }
 
   emitProgressEvent(
     investigationId,
     "ANALYZING",
-    `Relation resolution considered ${metrics.pairsConsidered} pair(s), proposed ${proposedEvents} hypothesis(es) for case ${caseId}.`,
+    `Relation resolution considered ${metrics.pairsConsidered} pair(s), proposed ${proposedEvents} hypothesis(es), near-miss ${metrics.nearMisses} below-threshold grounded pair(s), persisted ${nearMissRecordedEvents} durable NEAR_MISS record(s) for case ${caseId}.`,
     {
       operationId: payload.operationId,
       correlationId: payload.correlationId,
