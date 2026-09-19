@@ -332,3 +332,54 @@ export function resolveRelationsForCase(
     },
   };
 }
+
+/**
+ * Observable-presence summary for one canonical entity (PR-31, FIX 3/4).
+ *
+ * PURE, derived, READ-ONLY: resolves each canonical entity's recorded
+ * observationIds against the real observation universe and reports how many
+ * distinct observations/sources the entity is actually observable in. This is
+ * the observability signal the audit was missing — a relation can only ever be
+ * grounded in observations where BOTH endpoints are observable, so a low
+ * presence number (e.g. an under-typed person absent from the account
+ * document) is the diagnostic cause, distinct from a resolver defect.
+ *
+ * No mutation of Entity / Observation, no schema change. Deterministic.
+ */
+export interface ObservablePresence {
+  readonly entityId: string;
+  /** Observation ids that resolve to a real observation (bounded, sorted). */
+  readonly observableObservationIds: readonly string[];
+  readonly distinctObservationCount: number;
+  readonly distinctSourceIds: readonly string[];
+}
+
+export function computeObservablePresence(params: {
+  readonly entities: readonly EntityEvidence[];
+  readonly observations: readonly Observation[];
+}): Map<string, ObservablePresence> {
+  const { entities, observations } = params;
+  const obsIndex = indexObservations(observations);
+  const out = new Map<string, ObservablePresence>();
+  for (const entity of entities) {
+    const observable = new Set<string>();
+    const sources = new Set<string>();
+    for (const obsId of entity.observationIds) {
+      const o = obsIndex.get(obsId);
+      if (o === undefined) continue; // dangling reference — NOT observable
+      observable.add(obsId);
+      sources.add(o.sourceId);
+    }
+    const sorted = [...observable].sort();
+    out.set(entity.id, {
+      entityId: entity.id,
+      observableObservationIds: sorted.slice(
+        0,
+        RELATION_RESOLUTION_BOUNDS.maxEvidenceBasis,
+      ),
+      distinctObservationCount: sorted.length,
+      distinctSourceIds: [...sources].sort(),
+    });
+  }
+  return out;
+}

@@ -8,8 +8,9 @@ export {
   resolveRelationsForCase,
   indexObservations,
   buildObservationsByType,
+  computeObservablePresence,
 } from './resolver.js';
-export type { RelationResolutionMetrics } from './resolver.js';
+export type { RelationResolutionMetrics, ObservablePresence } from './resolver.js';
 export type{
   RelationCandidatePair,
   RelationResolutionInput,
