@@ -196,7 +196,7 @@ describe('M-A07 raw helpers', () => {
   it('ENTITY_PATTERN_RULES are typed and non-empty', () => {
     expect(ENTITY_PATTERN_RULES.length).toBeGreaterThan(0);
     for (const rule of ENTITY_PATTERN_RULES) {
-      expect(['PERSON','ORGANIZATION','LOCATION','PHONE','EMAIL','ACCOUNT','DEVICE','VEHICLE','ADDRESS','OTHER']).toContain(rule.entityType);
+      expect(['PERSON','ORGANIZATION','LOCATION','DATE','PHONE','EMAIL','ACCOUNT','DEVICE','VEHICLE','ADDRESS','OTHER']).toContain(rule.entityType);
     }
   });
 
@@ -329,6 +329,92 @@ describe('M-A07 pattern precedence (deterministic overlap resolution)', () => {
 
   it('overlapping pattern attempt is deterministic run-to-run', async () => {
     const content = 'a.b@example.com +91-98765-43210 1234567890123456';
+    const a = await extractEntityMentions(makeObservation(content));
+    const b = await extractEntityMentions(makeObservation(content));
+    expect(a.drafts).toEqual(b.drafts);
+  });
+});
+
+// ============================================================================
+// PR-24 (PART 6/7/8/9) — DATE vs PHONE, ORGANIZATION suffix, ACCOUNT ledger
+// and contextual PERSON typing. All fixes are conservative: they add a type
+// only where a deterministic, source-supported cue exists.
+// ============================================================================
+
+describe('M-A07 PR-24 classification hardening', () => {
+  it('ISO dates are typed DATE and never PHONE/ACCOUNT (PART 6)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Transfer dated 2026-08-12 at 08:30 was completed.'),
+    );
+    const date = drafts.find((d) => d.entityType === 'DATE');
+    expect(date?.text).toBe('2026-08-12');
+    for (const d of drafts) {
+      if (d.text.includes('2026-08-12')) {
+        expect(d.entityType).toBe('DATE');
+      }
+    }
+  });
+
+  it('types a capitalized company with a corporate suffix as ORGANIZATION (PART 8)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Neha Kapoor attended Meridian Trading LLP and Northstar Logistics Pvt Ltd.'),
+    );
+    const orgs = drafts.filter((d) => d.entityType === 'ORGANIZATION').map((d) => d.text);
+    expect(orgs).toContain('Meridian Trading LLP');
+    expect(orgs.some((t) => t.startsWith('Northstar Logistics'))).toBe(true);
+  });
+
+  it('does NOT fabricate ORGANIZATION from headings like "Central Bank" (PART 8 negative)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Funds moved via Central Bank to the Police Station.'),
+    );
+    expect(drafts.filter((d) => d.entityType === 'ORGANIZATION')).toHaveLength(0);
+  });
+
+  it('classifies ledger/reference identifiers as ACCOUNT (PART 9)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Ledger refs ORX-102, MT-883, BDL-210, NW-009, MT-SET-119 and AX-4471.'),
+    );
+    const accounts = drafts.filter((d) => d.entityType === 'ACCOUNT').map((d) => d.text);
+    for (const id of ['ORX-102', 'MT-883', 'BDL-210', 'NW-009', 'MT-SET-119', 'AX-4471']) {
+      expect(accounts).toContain(id);
+    }
+  });
+
+  it('classifies a labelled invoice number as ACCOUNT (PART 9)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Payment against Invoice 7842 was recorded.'),
+    );
+    const accounts = drafts.filter((d) => d.entityType === 'ACCOUNT').map((d) => d.text);
+    expect(accounts.some((t) => t.includes('Invoice 7842'))).toBe(true);
+  });
+
+  it('types a subject-verb person via the after-window cue (PART 7)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Neha Kapoor communicated with the vendor on Monday.'),
+    );
+    const person = drafts.find((d) => d.entityType === 'PERSON');
+    expect(person?.text).toBe('Neha Kapoor');
+  });
+
+  it('never types a pronoun as PERSON via the after-window cue (PART 7 negative)', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('They met at the warehouse and waited.'),
+    );
+    expect(drafts.filter((d) => d.entityType === 'PERSON')).toHaveLength(0);
+  });
+
+  it('a typed ORGANIZATION span wins over shorter capitalization guesses', async () => {
+    const { drafts } = await extractEntityMentions(
+      makeObservation('Meridian Trading LLP paid the vendor.'),
+    );
+    const org = drafts.find((d) => d.entityType === 'ORGANIZATION');
+    expect(org?.text).toBe('Meridian Trading LLP');
+  });
+
+  it('is deterministic and idempotent across repeat extraction', async () => {
+    const content =
+      'Neha Kapoor coordinates Meridian Trading LLP. Ref ORX-102 dated 2026-08-12.';
     const a = await extractEntityMentions(makeObservation(content));
     const b = await extractEntityMentions(makeObservation(content));
     expect(a.drafts).toEqual(b.drafts);

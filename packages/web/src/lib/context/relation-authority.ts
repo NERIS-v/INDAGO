@@ -100,16 +100,17 @@ export interface RelationAuthorityGate {
 
 /**
  * Whether the current data mode can drive the relation-authority workflow.
- * Live is typed-unsupported on the web provider seam (capability table:
- * relations = demo only), so the authority surface must NOT fake itself into
- * live — it reports an honest unavailable state there.
+ * Demo drives it through the demo provider's authority (transition legality +
+ * graph reconciliation). PR-21 wires LIVE relation authority to the real
+ * platform accept/reject/reverse routes, so live is now genuinely available
+ * (an absent live provider method renders an honest per-seam unavailable state
+ * rather than a fabricated surface).
  */
 export function relationAuthorityAvailable(mode: "demo" | "live"): RelationAuthorityGate {
   if (mode === "live") {
     return {
-      available: false,
-      unavailableReason:
-        "Relation authority is not available in live mode (typed unsupported on this provider seam).",
+      available: true,
+      unavailableReason: undefined,
     };
   }
   return { available: true, unavailableReason: undefined };

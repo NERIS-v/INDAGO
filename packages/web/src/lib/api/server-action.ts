@@ -16,6 +16,9 @@ import {
   listBridgeCandidates as apiListBridgeCandidates,
   traverseGraph as apiTraverseGraph,
   listConnectingPaths as apiListConnectingPaths,
+  getGraphCentrality as apiGetGraphCentrality,
+  getGraphCommunities as apiGetGraphCommunities,
+  getGraphValidAt as apiGetGraphValidAt,
   listLeads as apiListLeads,
   getLead as apiGetLead,
   generateLeads as apiGenerateLeads,
@@ -26,6 +29,14 @@ import {
   pauseInvestigation as apiPauseInvestigation,
   resumeInvestigation as apiResumeInvestigation,
   resolveInvestigationReview as apiResolveInvestigationReview,
+  listEntities as apiListEntities,
+  listEntityHypotheses as apiListEntityHypotheses,
+  acceptEntityHypothesis as apiAcceptEntityHypothesis,
+  listRelations as apiListRelations,
+  listCanonicalRelations as apiListCanonicalRelations,
+  acceptRelationHypothesis as apiAcceptRelationHypothesis,
+  rejectRelationHypothesis as apiRejectRelationHypothesis,
+  reverseRelationHypothesis as apiReverseRelationHypothesis,
 } from "@/lib/api/server";
 import type {
   StartInvestigationResponse,
@@ -44,6 +55,9 @@ import type {
   BridgeCandidatesResponse,
   TraversalResponse,
   ConnectingPathsResponse,
+  CentralityResponse,
+  CommunitiesResponse,
+  ValidAtGraphResponse,
   LeadListResponse,
   LeadDetailResponse,
   GenerateLeadsResponse,
@@ -52,6 +66,13 @@ import type {
   CrossCaseLinksResponse,
   GenerateCrossCaseLeadsResponse,
   RunCommandResponse,
+  EntitiesResponse,
+  EntityHypothesesResponse,
+  EntityAcceptResponse,
+  RelationsResponse,
+  CanonicalRelationsResponse,
+  RelationAcceptResponse,
+  RelationDecisionResponse,
 } from "@/lib/api/types";
 import type { LeadStatus } from "@indago/contracts";
 
@@ -159,6 +180,26 @@ export async function getConnectingPaths(
   return apiListConnectingPaths(investigationId, fromEntityId, toEntityId, hops);
 }
 
+export async function getCentrality(
+  investigationId: string,
+  maxResults?: number,
+): Promise<CentralityResponse> {
+  return apiGetGraphCentrality(investigationId, maxResults);
+}
+
+export async function getCommunities(
+  investigationId: string,
+): Promise<CommunitiesResponse> {
+  return apiGetGraphCommunities(investigationId);
+}
+
+export async function getValidAtGraph(
+  caseId: string,
+  at: string,
+): Promise<ValidAtGraphResponse> {
+  return apiGetGraphValidAt(caseId, at);
+}
+
 export async function listLeads(
   investigationId: string,
   status?: LeadStatus,
@@ -232,4 +273,60 @@ export async function resolveInvestigationReview(
   notes?: string,
 ): Promise<RunCommandResponse> {
   return apiResolveInvestigationReview(investigationId, outcome, notes);
+}
+
+// ============================================================================
+// PR-21 — entities, entity hypotheses, relations (reads + authority)
+// ============================================================================
+
+export async function listEntities(
+  investigationId: string,
+): Promise<EntitiesResponse> {
+  return apiListEntities(investigationId);
+}
+
+export async function listEntityHypotheses(
+  investigationId: string,
+): Promise<EntityHypothesesResponse> {
+  return apiListEntityHypotheses(investigationId);
+}
+
+export async function acceptEntityHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<EntityAcceptResponse> {
+  return apiAcceptEntityHypothesis(investigationId, hypothesisId);
+}
+
+export async function listRelations(
+  investigationId: string,
+): Promise<RelationsResponse> {
+  return apiListRelations(investigationId);
+}
+
+export async function listCanonicalRelations(
+  investigationId: string,
+): Promise<CanonicalRelationsResponse> {
+  return apiListCanonicalRelations(investigationId);
+}
+
+export async function acceptRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationAcceptResponse> {
+  return apiAcceptRelationHypothesis(investigationId, hypothesisId);
+}
+
+export async function rejectRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationDecisionResponse> {
+  return apiRejectRelationHypothesis(investigationId, hypothesisId);
+}
+
+export async function reverseRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationDecisionResponse> {
+  return apiReverseRelationHypothesis(investigationId, hypothesisId);
 }

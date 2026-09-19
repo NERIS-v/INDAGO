@@ -18,7 +18,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { buildMatrix, matrixBoundaryOptions } from "./matrix-model";
 import type { MatrixBoundaryOption, MatrixMeta, MatrixMode } from "./matrix-model";
@@ -92,6 +92,7 @@ export function useMatrixAnalysis({
   const workspace = useWorkspace();
   const [data, setData] = useState<MatrixData | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const requestRef = useRef(0);
 
   const overlaysKey = useMemo(
     () => overlays.map((overlay) => overlay.ref).sort().join(","),
@@ -113,6 +114,12 @@ export function useMatrixAnalysis({
       return;
     }
     let active = true;
+    // PR-23 race hardening: latest-requested-context wins. A newer effect run
+    // supersedes an older one even if the older resolves later; only the newest
+    // request id may commit state. (Stale-while-revalidate keeps prior meta
+    // mounted while a refetch is in flight; the guard prevents an out-of-order
+    // older response from overwriting the newer context.)
+    const requestId = ++requestRef.current;
     // Stale-while-revalidate: keep the previous ready meta mounted while a
     // refetch (enabled/overlays/boundary change) is in flight so the rail and
     // zones never unmount into the loading frame between fresh data. The first
@@ -139,7 +146,7 @@ export function useMatrixAnalysis({
         .catch(() => ({ items: [] as CrossCaseMatch[] })),
     ])
       .then(([nodes, observations, relations, contradictions, candidates, matches]) => {
-        if (!active) return;
+        if (!active || requestId !== requestRef.current) return;
         setData({
           nodes,
           observations,
@@ -150,7 +157,7 @@ export function useMatrixAnalysis({
         });
       })
       .catch((err: unknown) => {
-        if (!active) return;
+        if (!active || requestId !== requestRef.current) return;
         setError(err instanceof Error ? err : new Error("Failed to load the matrix data"));
       });
     return () => {

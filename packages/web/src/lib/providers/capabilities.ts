@@ -51,7 +51,13 @@ export type CapabilityKey =
   | "network.graph"
   | "network.pulse"
   | "network.matrix"
-  | "network.flow";
+  | "network.flow"
+  // ---- PR-22 — authoritative graph analytics + temporal projection. These are
+  // LIVE-only backend capabilities (centrality, community detection, valid-at
+  // projection); demo has no equivalent and must not be marked demo-available.
+  | "graph.centrality"
+  | "graph.communities"
+  | "graph.validAt";
 
 /** Structural DataModeConfig (avoids an import cycle with types.ts). */
 export type NetworkDataMode = "demo" | "live" | "auto";
@@ -80,9 +86,14 @@ export const CAPABILITY_AVAILABILITY: Record<
   graph: { demo: true, live: true },
   leads: { demo: true, live: true },
   crossCase: { demo: true, live: true },
-  // ---- Demo-only today (live stays typed-unsupported, never fabricated) ----
-  entities: { demo: true, live: false },
-  relations: { demo: true, live: false },
+  // ---- PR-21 — entities, relations + concrete entity/relation hypothesis
+  // reads are genuinely live-wired (real HTTP routes). The generic
+  // IntelligenceProvider (intelligence) stays demo-only — there is NO generic
+  // Intelligence API, so only the concrete capabilities backed by routes are
+  // marked live. timeline/gaps/review/robustness/hypotheses (the canonical
+  // Hypothesis store) have no live route and stay typed-unsupported. -------
+  entities: { demo: true, live: true },
+  relations: { demo: true, live: true },
   intelligence: { demo: true, live: false },
   timeline: { demo: true, live: false },
   gaps: { demo: true, live: false },
@@ -90,13 +101,26 @@ export const CAPABILITY_AVAILABILITY: Record<
   robustness: { demo: true, live: false },
   hypotheses: { demo: true, live: false },
   // ---- Network representations --------------------------------------------
-  // "graph", "entity pulse", "cross-case matrix" AND "adaptive flow" are
-  // implemented (demo); LIVE serving stays typed-unsupported (never
-  // fabricated).
+  // PR-23: Pulse / Matrix / Flow are FRONTEND-DERIVED visualizations — NOT
+  // backend analytics capabilities. Their LIVE-serving is genuine because their
+  // authoritative INPUTS resolve through the live provider seams that already
+  // exist in a live workspace (bursts for Pulse, relations/edges for Flow,
+  // cross-case matches for Matrix). A live workspace therefore renders them and
+  // drives the live provider seams — never demo data. Demo still serves them
+  // deterministically. This is distinct from claiming any backend "pulse/flow/
+  // matrix" API, which does not exist. "network.graph" stays demo-only: the
+  // graph representation is the canonical graph surface, not a distinct
+  // representation the audit realigned.
   "network.graph": { demo: true, live: false },
-  "network.pulse": { demo: true, live: false },
-  "network.matrix": { demo: true, live: false },
-  "network.flow": { demo: true, live: false },
+  "network.pulse": { demo: true, live: true },
+  "network.matrix": { demo: true, live: true },
+  "network.flow": { demo: true, live: true },
+  // ---- PR-22 — authoritative backend analytics + temporal projection. Live
+  // only (no demo equivalent; demo must not be marked available so a live
+  // workspace resolving these stays typed live, never demo-served).
+  "graph.centrality": { demo: false, live: true },
+  "graph.communities": { demo: false, live: true },
+  "graph.validAt": { demo: false, live: true },
 };
 
 /**

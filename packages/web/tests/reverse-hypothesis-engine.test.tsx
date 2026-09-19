@@ -263,19 +263,30 @@ describe("F-PR9 — invalidation and decisions", () => {
   });
 });
 
-describe("F-PR9 — live seam keeps the pipeline and gates the reverse engine", () => {
-  it("the pipeline keeps its pre-seam behavior; the reverse mode renders the typed-unsupported panel", async () => {
+describe("F-PR9 — the live seam renders the honest live surface (no reverse seam on live)", () => {
+  it("live renders the LIVE hypothesis workspace and never offers the reverse engine", async () => {
     const providers = createLiveWorkspaceProviders(identity("pr9-view-live"), config);
     renderWorkspace(providers);
 
-    await awaitLegacyPipeline();
+    // PR-21: the live workspace renders the honest LIVE hypothesis surface —
+    // the platform-data seam — NOT the legacy OFS pipeline and NOT any
+    // fabricated reverse surface.
+    const surface = await screen.findByTestId("live-hypothesis-workspace");
+    expect(surface).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("hypothesis-mode-reverse"));
-    await waitFor(
-      () =>
-        expect(screen.getByTestId("reverse-hypothesis-provider-unavailable")).toBeInTheDocument(),
-      { timeout: 5000 },
-    );
+    // The reverse engine is demo/OFICIAL-only; on a live workspace it is
+    // honestly NOT offered at all (no mode toggle, no input, no seam panel).
+    expect(screen.queryByTestId("hypothesis-mode-reverse")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("reverse-hypothesis-provider-unavailable")).not.toBeInTheDocument();
     expect(screen.queryByTestId("reverse-hypothesis-input")).not.toBeInTheDocument();
+
+// In this unconfigured test env the live workspace honestly surfaces the
+    // platform seam per section (unavailable or error) - it never fabricates.
+    // PR-21: the canonical-relations section is genuinely live, so in an
+    // unconfigured env it honestly reports its server/config error rather than
+    // an unavailable seam or a fabricated literal.
+    expect(
+      screen.getByTestId("section-canonical-relations-error"),
+    ).toBeInTheDocument();
   });
 });

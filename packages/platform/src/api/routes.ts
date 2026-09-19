@@ -12,6 +12,11 @@ import { entityMentionStore } from "../persistence/entity-mention-store.js";
 import { entityHypothesisStore } from "../persistence/entity-hypothesis-store.js";
 import { entityStore } from "../persistence/entity-store.js";
 import { relationHypothesisStore } from "../persistence/relation-hypothesis-store.js";
+import { ingestionStore } from "../persistence/ingestion-store.js";
+import {
+  finalizeRunIfComplete,
+  checkInvestigationAnalysisComplete,
+} from "../queue/run-completion.js";
 import { relationStore } from "../persistence/relation-store.js";
 import { graphRuntime } from "../relations/graph-runtime.js";
 import { graphProjectionService, normalizeBuiltGraph } from "../relations/graph-version-service.js";
@@ -1863,6 +1868,24 @@ apiRouter.post(
         });
       }
 
+      // 3b. Terminal-run guard (PR-26). Evidence submitted after a run has
+      // already reached a terminal lifecycle state must NOT resurrect or
+      // mutate it, and a freshly-registered QUEUED placeholder would reset a
+      // completed attempt and leave the run permanently unable to re-complete.
+      // Mirrors the worker-side terminal guard in ingest-evidence.ts.
+      if (
+        run.state === "COMPLETED" ||
+        run.state === "FAILED" ||
+        run.status === "COMPLETED" ||
+        run.status === "FAILED" ||
+        run.status === "CANCELLED"
+      ) {
+        return res.status(409).json({
+          error: "RUN_TERMINAL",
+          message: `Investigation ${investigationId} is ${run.status}/${run.state}; no further evidence can be submitted`,
+        });
+      }
+
       // 4. Validate payload
       const parsed = EvidenceSubmissionRequestSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1883,50 +1906,109 @@ apiRouter.post(
       const parsedCatalog = SourceCatalogSchema.safeParse(submission.sourceCatalog);
       const resolvedSourceCatalog = parsedCatalog.success ? parsedCatalog.data : "MANUAL";
 
-      // 6. Construct ArtifactReference + enqueue one job per file
-      const jobIds: string[] = [];
+      // 6. Durable expected-work registry + enqueue one job per file.
+      //
+      // PR-26: register a QUEUED IngestionAttempt for EVERY expected file
+      // BEFORE enqueuing ANY job. The completion predicate (run-completion.ts)
+      // reads this registry, so a fast job must never observe "no pending
+      // attempt" merely because its sibling job has not been enqueued yet.
+      // Enqueue-time placeholders are only rolled back for rows this request
+      // created — a pre-existing attempt is left intact.
+      const expectedKeys: string[] = [];
+      const createdKeys = new Set<string>();
       for (const file of submission.files) {
         const idempotencyKey = `evidence-${investigationId}-${file.fileKey}`;
+        expectedKeys.push(idempotencyKey);
 
-        const artifactReference = {
-          url: file.fileUrl,
-          originalFilename: file.fileName,
-          declaredMimeType: file.mimeType,
-          declaredSizeBytes: file.fileSize,
-          ...(file.sha256Hash !== undefined
-            ? { declaredContentHash: file.sha256Hash }
-            : {}),
-          sourceType: "FILE_UPLOAD",
+        const existing = await ingestionStore.findAttempt(investigationId, idempotencyKey);
+        // Never downgrade an already-succeeded file to QUEUED. Re-submitting a
+        // file whose canonical ingestion already completed is a no-op (the
+        // BullMQ jobId dedup returns the retained job), so resetting it would
+        // strand the run in ANALYZING forever. Failed/queued/running attempts
+        // (and brand-new files) are registered as expected work.
+        if (existing?.status === "SUCCEEDED") {
+          continue;
+        }
+        createdKeys.add(idempotencyKey);
+
+        await ingestionStore.upsertAttempt({
+          investigationId,
+          caseId,
           idempotencyKey,
-          providerMetadata: { fileKey: file.fileKey },
-        };
+          operationId,
+          correlationId,
+          attemptNumber: 0,
+          status: "QUEUED",
+          sourceId: undefined,
+          artifactId: undefined,
+          parserId: undefined,
+          parserVersion: undefined,
+          format: undefined,
+          error: undefined,
+        });
+      }
 
-        const job = await investigationQueue.add(
-          "ingest-evidence",
-          {
-            investigationId,
-            caseId,
-            artifactReference,
-            sourceName: submission.sourceName,
-            sourceDescription: submission.sourceDescription,
-            // Source catalog (M-A06): the client string is untrusted. A strict
-            // SourceCatalogSchema match is used; anything else (or absent)
-            // falls back to MANUAL. The verbatim declaration is preserved so
-            // any fallback is auditable on the persisted Source row.
-            sourceCatalog: resolvedSourceCatalog,
-            declaredSourceCatalog: submission.sourceCatalog,
-            evidenceType: submission.evidenceType,
-            evidenceTitle: submission.evidenceTitle,
-            evidenceDescription: submission.evidenceDescription,
-            observedAt: submission.observedAt,
-            operationId,
-            correlationId,
+      const jobIds: string[] = [];
+      let enqueued = 0;
+      try {
+        for (const file of submission.files) {
+          const idempotencyKey = `evidence-${investigationId}-${file.fileKey}`;
+
+          const artifactReference = {
+            url: file.fileUrl,
+            originalFilename: file.fileName,
+            declaredMimeType: file.mimeType,
+            declaredSizeBytes: file.fileSize,
+            ...(file.sha256Hash !== undefined
+              ? { declaredContentHash: file.sha256Hash }
+              : {}),
+            sourceType: "FILE_UPLOAD",
             idempotencyKey,
-          },
-          { jobId: idempotencyKey },
-        );
+            providerMetadata: { fileKey: file.fileKey },
+          };
 
-        jobIds.push(job.id!);
+          const job = await investigationQueue.add(
+            "ingest-evidence",
+            {
+              investigationId,
+              caseId,
+              artifactReference,
+              sourceName: submission.sourceName,
+              sourceDescription: submission.sourceDescription,
+              // Source catalog (M-A06): the client string is untrusted. A strict
+              // SourceCatalogSchema match is used; anything else (or absent)
+              // falls back to MANUAL. The verbatim declaration is preserved so
+              // any fallback is auditable on the persisted Source row.
+              sourceCatalog: resolvedSourceCatalog,
+              declaredSourceCatalog: submission.sourceCatalog,
+              evidenceType: submission.evidenceType,
+              evidenceTitle: submission.evidenceTitle,
+              evidenceDescription: submission.evidenceDescription,
+              observedAt: submission.observedAt,
+              operationId,
+              correlationId,
+              idempotencyKey,
+            },
+            { jobId: idempotencyKey },
+          );
+
+          jobIds.push(job.id!);
+          enqueued += 1;
+        }
+      } catch (enqueueError) {
+        // Best-effort rollback: remove placeholders for files that were never
+        // enqueued so a failed submission cannot leave a dangling expected-work
+        // marker that blocks run completion forever.
+        for (let i = enqueued; i < expectedKeys.length; i += 1) {
+          const key = expectedKeys[i];
+          if (key === undefined || !createdKeys.has(key)) continue;
+          try {
+            await ingestionStore.deleteAttempt(investigationId, key);
+          } catch {
+            // Non-fatal: the retried submission re-registers the placeholder.
+          }
+        }
+        throw enqueueError;
       }
 
       // 7. Audit — EVIDENCE_QUEUED: submission accepted and jobs enqueued
@@ -1958,6 +2040,103 @@ apiRouter.post(
 
     } catch (error: unknown) {
       console.error("Failed to submit evidence:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+);
+
+// 3c. Explicit finalize (PR-26). Completion is a deliberate, authorized act —
+// never automatic. The canonical pipeline rests in ANALYZING after ingesting
+// the current evidence; a human (or an authorized system caller) finalizes once
+// the durable prerequisite check passes: every expected evidence job has
+// durably succeeded and nothing is queued, running or failed. The transition
+// itself is a single guarded UPDATE, so concurrent finalize calls complete the
+// run exactly once.
+apiRouter.post(
+  "/investigations/:investigationId/finalize",
+  requireAuth,
+  requireRole(["INVESTIGATOR", "ADMIN"]),
+  async (req, res) => {
+    try {
+      const investigationId = String(req.params.investigationId);
+      if (!z.string().uuid().safeParse(investigationId).success) {
+        return res.status(400).json({ error: "Invalid investigation ID" });
+      }
+
+      const run = await db.investigationRun.findFirst({ where: { investigationId } });
+      if (!run) {
+        return res.status(404).json({ error: "Investigation not found" });
+      }
+
+      const caseId = run.caseId;
+      if (!caseId) {
+        return res.status(400).json({ error: "Investigation has no associated case" });
+      }
+      if (!req.user || !verifyCaseAccess(req.user, caseId)) {
+        return res.status(403).json({
+          error: `Security Violation: Unauthorized access to case boundary ${caseId}`,
+        });
+      }
+
+      if (
+        run.state === "COMPLETED" ||
+        run.state === "FAILED" ||
+        run.status === "FAILED" ||
+        run.status === "CANCELLED"
+      ) {
+        return res.status(409).json({
+          error: "RUN_TERMINAL",
+          message: `Investigation ${investigationId} is ${run.status}/${run.state}; nothing to finalize`,
+        });
+      }
+      if (run.state !== "ANALYZING") {
+        return res.status(409).json({
+          error: "RUN_NOT_ANALYZING",
+          message: `Investigation ${investigationId} is ${run.state}; only an ANALYZING run can be finalized`,
+        });
+      }
+      if (run.status === "PAUSED") {
+        return res.status(409).json({
+          error: "RUN_PAUSED",
+          message: `Investigation ${investigationId} is PAUSED; resume before finalizing`,
+        });
+      }
+
+      const check = await checkInvestigationAnalysisComplete(investigationId);
+      if (!check.complete) {
+        return res.status(409).json({
+          error: "PREREQUISITES_UNMET",
+          message: check.reason,
+          attemptCount: check.attemptCount,
+          pendingCount: check.pendingCount,
+          failedCount: check.failedCount,
+        });
+      }
+
+      const applied = await finalizeRunIfComplete({
+        runId: run.id,
+        investigationId,
+        actor: req.user.id,
+        reason: `Investigation finalized by ${req.user.id}: ${check.reason}`,
+      });
+      if (!applied) {
+        return res.status(409).json({
+          error: "FINALIZE_CONFLICT",
+          message: "Run state changed concurrently; re-read and retry",
+        });
+      }
+
+      const updated = await db.investigationRun.findFirst({ where: { investigationId } });
+      return res.status(200).json({
+        message: "Investigation finalized",
+        run: {
+          id: updated?.id ?? run.id,
+          state: updated?.state ?? "COMPLETED",
+          status: updated?.status ?? "COMPLETED",
+        },
+      });
+    } catch (error: unknown) {
+      console.error("Failed to finalize investigation run:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   }

@@ -43,6 +43,7 @@ import type {
   ReviewOutcome,
   ReviewCheckpoint,
   GenerateLeadsResult,
+  EntityAcceptResult,
 } from "../types";
 import { ProviderError } from "../types";
 import type {
@@ -64,6 +65,9 @@ import type {
   CommunityCandidateDTO,
   BridgeCandidateDTO,
   ConnectingPathCandidateDTO,
+  EntityHypothesis,
+  Entity,
+  RelationHypothesis,
 } from "@indago/contracts";
 import type {
   EvidenceSubmissionResponse,
@@ -76,6 +80,17 @@ import type {
   GraphVersionListItemDTO,
   LeadListResponse,
   LeadDetailResponse,
+  EntitiesResponse,
+  EntityHypothesesResponse,
+  EntityAcceptResponse,
+  RelationsResponse,
+  CanonicalRelationsResponse,
+  CanonicalRelationDTO,
+  CentralityResponse,
+  CommunitiesResponse,
+  ValidAtGraphResponse,
+  CentralityResultDTO,
+  CommunityDetectionDTO,
 } from "@/lib/api/types";
 import { createCapabilityStatusTable } from "../capabilities";
 import { createLiveRealtimeProvider } from "./realtime";
@@ -83,6 +98,8 @@ import { providerUnsupported, providerUnsupportedPaginated } from "./unsupported
 import { toLiveProviderError } from "./errors";
 import { projectRunStatusToInvestigation } from "./run-projection";
 import { projectGraphVersionFromListItem, projectGraphNode, projectGraphEdge } from "./graph-projection";
+import { projectEntityFromDto, type EntityProjectionContext } from "./entity-projection";
+import { projectRelationFromDto } from "./relation-projection";
 import {
   projectLeadFromDto,
   projectLeadEvidenceLinkFromDto,
@@ -101,6 +118,9 @@ import {
   getGraphVersionDetails as apiGetGraphVersionDetails,
   getTemporalBursts as apiListTemporalBursts,
   getCommunityCandidates as apiListCommunityCandidates,
+  getCommunities as apiGetGraphCommunities,
+  getCentrality as apiGetGraphCentrality,
+  getValidAtGraph as apiGetGraphValidAt,
   getBridgeCandidates as apiListBridgeCandidates,
   traverseGraph as apiTraverseGraph,
   getConnectingPaths as apiListConnectingPaths,
@@ -113,6 +133,14 @@ import {
   pauseInvestigation as apiPauseInvestigation,
   resumeInvestigation as apiResumeInvestigation,
   resolveInvestigationReview as apiResolveInvestigationReview,
+  listEntities as apiListEntities,
+  listEntityHypotheses as apiListEntityHypotheses,
+  acceptEntityHypothesis as apiAcceptEntityHypothesis,
+  listRelations as apiListRelations,
+  listCanonicalRelations as apiListCanonicalRelations,
+  acceptRelationHypothesis as apiAcceptRelationHypothesis,
+  rejectRelationHypothesis as apiRejectRelationHypothesis,
+  reverseRelationHypothesis as apiReverseRelationHypothesis,
 } from "@/lib/api/server-action";
 import { uploadEvidence } from "@/lib/upload/uploadthing";
 
@@ -432,12 +460,101 @@ export class LiveCaseProvider implements CaseProvider {
   }
 }
 
-class UnsupportedEntityProvider implements EntityProvider {
-  listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("entities.listByInvestigation");
+/**
+ * Live implementation of EntityProvider (PR-21).
+ *
+ *   - listByInvestigation() → GET /investigations/:id/entities, projected into
+ *     the canonical Entity (see ./entity-projection.ts). `investigationId` is
+ *     backfilled from the workspace identity when the wire row is nullable.
+ *   - get() has no single-entity endpoint, so it resolves an id against the
+ *     case-scoped entity list (authoritative, no fabrication); an absent id
+ *     rejects typed NOT_FOUND.
+ *   - listEntityHypotheses() → GET /investigations/:id/entity-hypotheses, which
+ *     returns ALREADY-canonical EntityHypothesis objects (validated through
+ *     EntityHypothesisSchema at the platform boundary) — passed through verbatim.
+ *   - acceptEntityHypothesis() → POST /investigations/:id/entity-hypotheses/
+ *     :hid/accept (M-A09.5), mapping the materialization result.
+ *
+ * The platform exposes NO entity reject/reverse authority — those actions are
+ * never offered, so the provider does not expose them either.
+ */
+export class LiveEntityProvider implements EntityProvider {
+  constructor(private readonly context: EntityProjectionContext) {}
+
+  async listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<Entity>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: EntitiesResponse;
+    try {
+      response = await apiListEntities(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    try {
+      return paginateItems(
+        response.entities.map((dto) => projectEntityFromDto(dto, this.context)),
+        query,
+      );
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live entity projection failed for the entities response.",
+        err,
+      );
+    }
   }
-  get(): Promise<never> {
-    return providerUnsupported("entities.get");
+
+  async get(id: string): Promise<Entity> {
+    let response: EntitiesResponse;
+    try {
+      response = await apiListEntities(this.context.investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    const dto = response.entities.find((e) => e.id === id);
+    if (!dto) throw ProviderError.notFound("Entity not found.");
+    try {
+      return projectEntityFromDto(dto, this.context);
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live entity projection failed for the requested entity.",
+        err,
+      );
+    }
+  }
+
+  async listEntityHypotheses(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<EntityHypothesis>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: EntityHypothesesResponse;
+    try {
+      response = await apiListEntityHypotheses(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return paginateItems(response.hypotheses, query);
+  }
+
+  async acceptEntityHypothesis(
+    investigationId: string,
+    hypothesisId: string,
+  ): Promise<EntityAcceptResult> {
+    let response: EntityAcceptResponse;
+    try {
+      response = await apiAcceptEntityHypothesis(investigationId, hypothesisId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return {
+      entityId: response.entityId,
+      hypothesisId: response.hypothesisId,
+      status: response.status,
+      materialized: response.materialized,
+      reusedExisting: response.reusedExisting,
+    };
   }
 }
 
@@ -628,13 +745,58 @@ export class LiveGraphProvider implements GraphProvider {
     }
   }
 
+  /** PR-22: AUTHORITATIVE community detection (deterministic Louvain) →
+   *  GET /graph/communities. Distinct from community CANDIDATES. */
   async getCommunities(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CommunityDetectionDTO>> {
+    try {
+      const response: CommunitiesResponse = await apiGetGraphCommunities(investigationId);
+      return paginateItems(response.communities, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** PR-22: P4 cohesion-scored community CANDIDATES →
+   *  GET /graph/community-candidates. Kept separate from authoritative
+   *  getCommunities(). */
+  async getCommunityCandidates(
     investigationId: string,
     query?: ProviderQuery,
   ): Promise<Paginated<CommunityCandidateDTO>> {
     try {
       const response = await apiListCommunityCandidates(investigationId);
       return paginateItems(response.candidates, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** PR-22: authoritative degree centrality rank → GET /graph/centrality.
+   *  Structural metric (relation volume), never culpability. */
+  async getCentrality(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CentralityResultDTO>> {
+    try {
+      const response: CentralityResponse = await apiGetGraphCentrality(investigationId);
+      return paginateItems(response.centrality, query);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+  }
+
+  /** PR-22: authoritative graph projection valid at a domain instant →
+   *  GET /cases/:caseId/graph/valid-at?at=<ISO> (case-scoped). The investigation
+   *  is resolved server-side from the persisted run; the CASE scope comes from
+   *  this provider's resolved caseId — never an arbitrary browser value, so the
+   *  caller-supplied caseId is intentionally ignored for authorization. */
+  async getValidAt(_caseId: string, at: string): Promise<ValidAtGraphResponse> {
+    try {
+      const response = await apiGetGraphValidAt(this.caseId, at);
+      return response;
     } catch (err) {
       throw toLiveProviderError(err);
     }
@@ -691,21 +853,172 @@ export class LiveGraphProvider implements GraphProvider {
   }
 }
 
-class UnsupportedRelationProvider implements RelationProvider {
-  listByInvestigation(): Promise<Paginated<never>> {
-    return providerUnsupportedPaginated("relations.listByInvestigation");
+/**
+ * Live implementation of RelationProvider (PR-21).
+ *
+ *   - listByInvestigation() → GET /investigations/:id/relations, projected into
+ *     the canonical RelationHypothesis (see ./relation-projection.ts).
+ *   - get() has no single-relation endpoint, so it resolves an id against BOTH
+ *     the relation-hypothesis list and the canonical-relation list (a graph-edge
+ *     canonical relation id reverse-looks-up to its hypothesis), authoritative
+ *     and never fabricated; an unknown id rejects typed NOT_FOUND.
+ *   - listCanonical() → GET /investigations/:id/canonical-relations, the ACCEPTED
+ *     materialized relations (provider-owned CanonicalRelationDTO).
+ *   - accept()/reject()/reverse() POST the authority route, then RE-READ the
+ *     relation hypothesis so the returned status always reflects the durable
+ *     platform state (never an optimistic assumption).
+ */
+export class LiveRelationProvider implements RelationProvider {
+  constructor(private readonly investigationId: string) {}
+
+  private async readHypothesis(
+    investigationId: string,
+    id: string,
+  ): Promise<RelationHypothesis | null> {
+    let response: RelationsResponse;
+    try {
+      response = await apiListRelations(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    const dto = response.relations.find((r) => r.id === id);
+    if (!dto) return null;
+    return projectRelationFromDto(dto);
   }
-  get(): Promise<never> {
-    return providerUnsupported("relations.get");
+
+  private async readCanonical(
+    investigationId: string,
+    id: string,
+  ): Promise<CanonicalRelationDTO | null> {
+    let response: CanonicalRelationsResponse;
+    try {
+      response = await apiListCanonicalRelations(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return response.relations.find((r) => r.id === id) ?? null;
   }
-  accept(): Promise<never> {
-    return providerUnsupported("relations.accept");
+
+  async listByInvestigation(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<RelationHypothesis>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: RelationsResponse;
+    try {
+      response = await apiListRelations(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    try {
+      return paginateItems(
+        response.relations.map((dto) => projectRelationFromDto(dto)),
+        query,
+      );
+    } catch (err) {
+      throw ProviderError.validation(
+        "Live relation projection failed for the relations response.",
+        err,
+      );
+    }
   }
-  reject(): Promise<never> {
-    return providerUnsupported("relations.reject");
+
+  async get(id: string): Promise<RelationHypothesis> {
+    const investigationId = this.investigationId;
+    // First try the relation-hypothesis universe directly.
+    const direct = await this.readHypothesis(investigationId, id);
+    if (direct) return direct;
+    // Fall back to reverse-looking-up a graph-edge canonical relation id.
+    const canonical = await this.readCanonical(investigationId, id);
+    if (canonical) {
+      const viaCanonical = await this.readHypothesis(
+        investigationId,
+        canonical.hypothesisId,
+      );
+      if (viaCanonical) return viaCanonical;
+      throw ProviderError.notFound("Relation hypothesis not found.");
+    }
+    throw ProviderError.notFound("Relation hypothesis not found.");
   }
-  reverse(): Promise<never> {
-    return providerUnsupported("relations.reverse");
+
+  async listCanonical(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CanonicalRelationDTO>> {
+    if (query?.signal?.aborted) throw ProviderError.cancelled();
+    let response: CanonicalRelationsResponse;
+    try {
+      response = await apiListCanonicalRelations(investigationId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    return paginateItems(response.relations, query);
+  }
+
+  async accept(
+    investigationId: string,
+    relationHypothesisId: string,
+  ): Promise<RelationHypothesis> {
+    try {
+      await apiAcceptRelationHypothesis(investigationId, relationHypothesisId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    // RE-READ so the returned status reflects the durable platform state.
+    const updated = await this.readHypothesis(
+      investigationId,
+      relationHypothesisId,
+    );
+    if (!updated) {
+      throw ProviderError.server(
+        "The accepted relation hypothesis could not be re-read.",
+      );
+    }
+    return updated;
+  }
+
+  async reject(
+    investigationId: string,
+    relationHypothesisId: string,
+    _reason?: string,
+  ): Promise<RelationHypothesis> {
+    try {
+      await apiRejectRelationHypothesis(investigationId, relationHypothesisId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    const updated = await this.readHypothesis(
+      investigationId,
+      relationHypothesisId,
+    );
+    if (!updated) {
+      throw ProviderError.server(
+        "The rejected relation hypothesis could not be re-read.",
+      );
+    }
+    return updated;
+  }
+
+  async reverse(
+    investigationId: string,
+    relationHypothesisId: string,
+    _reason?: string,
+  ): Promise<RelationHypothesis> {
+    try {
+      await apiReverseRelationHypothesis(investigationId, relationHypothesisId);
+    } catch (err) {
+      throw toLiveProviderError(err);
+    }
+    const updated = await this.readHypothesis(
+      investigationId,
+      relationHypothesisId,
+    );
+    if (!updated) {
+      throw ProviderError.server(
+        "The reversed relation hypothesis could not be re-read.",
+      );
+    }
+    return updated;
   }
 }
 
@@ -958,7 +1271,7 @@ export function createLiveWorkspaceProviders(
     investigations: new LiveInvestigationProvider(identity.caseId),
     evidence: new LiveEvidenceProvider(),
     observations: new LiveObservationProvider(),
-    entities: new UnsupportedEntityProvider(),
+    entities: new LiveEntityProvider({ investigationId: identity.investigationId }),
     graph: new LiveGraphProvider(identity.caseId),
     timeline: new UnsupportedTimelineProvider(),
     leads: new LiveLeadProvider({ investigationId: identity.investigationId }),
@@ -967,7 +1280,7 @@ export function createLiveWorkspaceProviders(
     robustness: new UnsupportedRobustnessProvider(),
     hypotheses: new UnsupportedHypothesisProvider(),
     crossCase: new LiveCrossCaseProvider(identity),
-    relations: new UnsupportedRelationProvider(),
+    relations: new LiveRelationProvider(identity.investigationId),
     intelligence: new UnsupportedIntelligenceProvider(),
     realtime,
   };

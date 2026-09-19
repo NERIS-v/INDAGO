@@ -332,7 +332,7 @@ export function PulsePanel({
             </h3>
             {markerList.map((marker) => (
               <div
-                key={`${marker.kind}:${marker.label}:${marker.entityId ?? "global"}`}
+                key={`${marker.kind}:${marker.label}:${marker.entityId ?? "global"}:${marker.detail}`}
                 className="flex items-start gap-2"
                 data-pulse-marker={marker.kind}
               >

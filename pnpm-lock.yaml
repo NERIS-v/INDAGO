@@ -87,6 +87,53 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
+  packages/intelligence/entity-split-analysis:
+    dependencies:
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@indago/gap-classification':
+        specifier: workspace:*
+        version: link:../gap-classification
+    devDependencies:
+      '@indago/competing-explanations':
+        specifier: workspace:*
+        version: link:../competing-explanations
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
+  packages/intelligence/evidence-request-generation:
+    dependencies:
+      '@indago/competing-explanations':
+        specifier: workspace:*
+        version: link:../competing-explanations
+      '@indago/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@indago/entity-split-analysis':
+        specifier: workspace:*
+        version: link:../entity-split-analysis
+      '@indago/gap-classification':
+        specifier: workspace:*
+        version: link:../gap-classification
+    devDependencies:
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.0
+        version: 3.2.7(@types/node@26.2.0)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
   packages/intelligence/gap-classification:
     dependencies:
       '@indago/contracts':
@@ -377,6 +424,9 @@ importers:
       '@indago/contracts':
         specifier: workspace:*
         version: link:../../contracts
+      '@indago/evidence-request-generation':
+        specifier: workspace:*
+        version: link:../evidence-request-generation
       '@indago/graph-hole-analysis':
         specifier: workspace:*
         version: link:../graph-hole-analysis
@@ -390,6 +440,15 @@ importers:
         specifier: workspace:*
         version: link:../graph-hole-validation
     devDependencies:
+      '@indago/competing-explanations':
+        specifier: workspace:*
+        version: link:../competing-explanations
+      '@indago/entity-split-analysis':
+        specifier: workspace:*
+        version: link:../entity-split-analysis
+      '@indago/gap-classification':
+        specifier: workspace:*
+        version: link:../gap-classification
       '@types/node':
         specifier: ^26.2.0
         version: 26.2.0
@@ -465,6 +524,12 @@ importers:
       '@indago/entity-resolution':
         specifier: workspace:*
         version: link:../intelligence/entity-resolution
+      '@indago/entity-split-analysis':
+        specifier: workspace:*
+        version: link:../intelligence/entity-split-analysis
+      '@indago/evidence-request-generation':
+        specifier: workspace:*
+        version: link:../intelligence/evidence-request-generation
       '@indago/gap-classification':
         specifier: workspace:*
         version: link:../intelligence/gap-classification
@@ -495,6 +560,9 @@ importers:
       '@indago/lead-generation':
         specifier: workspace:*
         version: link:../intelligence/lead-generation
+      '@indago/next-best-evidence':
+        specifier: workspace:*
+        version: link:../intelligence/next-best-evidence
       '@indago/relation-resolution':
         specifier: workspace:*
         version: link:../intelligence/relation-resolution

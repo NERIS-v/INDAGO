@@ -3,6 +3,11 @@ import {
   mergeSameLineSpans,
   Y_TOLERANCE,
   canonicalizeContent,
+  repairKnownMojibake,
+  isAssertiveContent,
+  isMeaningfulStructuredToken,
+  detectObservedAt,
+  inferObservationType,
 } from '../../src/observation/index.js';
 
 // ============================================================================
@@ -141,5 +146,93 @@ describe('mergeSameLineSpans', () => {
 
   it('returns no units for an empty input', () => {
     expect(mergeSameLineSpans([], Y_TOLERANCE)).toEqual([]);
+  });
+});
+
+// ============================================================================
+// M-A06 hardening (PR-24, PART 1/3/4/5/11) — canonicalization retention,
+// mojibake repair, boilerplate exclusion, timestamp precision, type inference
+// ============================================================================
+
+describe('repairKnownMojibake (PART 4)', () => {
+  it('repairs the exact known 3-code-point mojibake sequences', () => {
+    expect(repairKnownMojibake('A \u0393\u00E5\u00C6 B')).toBe('A \u2192 B');
+    expect(repairKnownMojibake('\u0393\u00C7\u00A3quoted\u0393\u00C7\u00A5')).toBe(
+      '\u201Cquoted\u201D',
+    );
+    expect(repairKnownMojibake("Neha\u0393\u00C7\u00D6s")).toBe('Neha\u2019s');
+  });
+
+  it('is idempotent and leaves clean text untouched', () => {
+    const clean = 'Normal text → with real unicode — and “quotes”.';
+    expect(repairKnownMojibake(repairKnownMojibake(clean))).toBe(clean);
+  });
+
+  it('is applied at the canonicalization boundary', () => {
+    expect(canonicalizeContent('Paid \u0393\u00E5\u00C6 onward', 200)).toBe('Paid → onward');
+  });
+});
+
+describe('isAssertiveContent / retention (PART 1, PART 5)', () => {
+  it('rejects the synthetic-test-evidence banner boilerplate', () => {
+    expect(
+      isAssertiveContent(
+        'SYNTHETIC TEST EVIDENCE - FICTIONAL DATA CREATED FOR INDAGO SOFTWARE TESTING. NOT A REAL PERSON, COMPANY, ACCO Page 1',
+      ),
+    ).toBe(false);
+  });
+
+  it('retains short units that are meaningful structured tokens', () => {
+    for (const token of [
+      'ORX-102',
+      'MT-883',
+      'MT-SET-119',
+      'BLD-551',
+      'NW-882',
+      'AX-4471',
+      'Invoice 7842',
+      'INR 615,000 BLD-551',
+    ]) {
+      expect(isMeaningfulStructuredToken(token)).toBe(true);
+      expect(isAssertiveContent(token)).toBe(true);
+    }
+  });
+
+  it('still drops short non-structured formatting noise', () => {
+    for (const noise of ['OK', 'Nr.', '—', '#', '12', 'Page 1']) {
+      expect(isAssertiveContent(noise)).toBe(false);
+    }
+  });
+});
+
+describe('detectObservedAt (PART 3)', () => {
+  it('preserves minute precision for "at HH:MM"', () => {
+    expect(detectObservedAt('On 2026-08-12 at 08:30 the meeting began.')).toEqual({
+      value: '2026-08-12T08:30',
+      precision: 'minute',
+    });
+  });
+
+  it('preserves full ISO timestamps and day-only precision', () => {
+    expect(detectObservedAt('Logged 2026-08-12T08:30:00Z.')).toEqual({
+      value: '2026-08-12T08:30:00Z',
+      precision: 'exact',
+    });
+    expect(detectObservedAt('Dated 2026-08-12 and filed.')).toEqual({
+      value: '2026-08-12T00:00:00Z',
+      precision: 'day',
+    });
+  });
+});
+
+describe('inferObservationType (PART 11)', () => {
+  it('does not treat the verb "coordinates" as a spatial cue', () => {
+    expect(inferObservationType('Rohan Singh coordinates Northstar Warehousing.')).not.toBe(
+      'SPATIAL',
+    );
+  });
+
+  it('still classifies genuine spatial content as SPATIAL', () => {
+    expect(inferObservationType('The bag was located at the station.')).toBe('SPATIAL');
   });
 });

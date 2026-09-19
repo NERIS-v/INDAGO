@@ -18,7 +18,7 @@
 // PURE module: no React, no provider imports (source-guard safe).
 // ============================================================================
 
-import type { GraphNode, Observation } from "@indago/contracts";
+import type { GraphNode, Observation, TemporalBurstCandidateDTO } from "@indago/contracts";
 import type { NetworkTimeRange } from "@/lib/network/network-workspace";
 import type {
   ForeignCaseOverlay,
@@ -400,7 +400,8 @@ export type PulseMarkerKind =
   | "observation-cluster"
   | "contradiction"
   | "identity-resolution"
-  | "cross-case";
+  | "cross-case"
+  | "temporal-burst";
 
 export interface PulseMarker {
   readonly kind: PulseMarkerKind;
@@ -481,6 +482,10 @@ export interface EntityPulseInput {
   readonly contradictions?: readonly ObservationContradiction[];
   readonly candidates?: readonly IntelligenceCandidateView[];
   readonly overlays?: readonly ForeignCaseOverlay[];
+  /** PR-23: authoritative backend temporal bursts (LiveGraphProvider.getTemporalBursts)
+   *  in LIVE mode. Transformed into pulse markers, never re-detected on the
+   *  client. Absent in demo (bursts remain observation-derived there). */
+  readonly bursts?: readonly TemporalBurstCandidateDTO[];
   readonly timeRange: NetworkTimeRange;
 }
 
@@ -832,6 +837,7 @@ export function buildEntityPulseOverview(
     input.contradictions ?? [],
     input.candidates ?? [],
     input.overlays ?? [],
+    input.bursts ?? [],
   );
 
   let summary = `Entity Pulse: ${fields.length} ${fields.length === 1 ? "entity" : "entities"}, ${totalObservationsInWindow} ${totalObservationsInWindow === 1 ? "observation" : "observations"} in ${windowLabel}.`;
@@ -874,6 +880,7 @@ function buildMarkers(
   contradictions: readonly ObservationContradiction[],
   candidates: readonly IntelligenceCandidateView[],
   overlays: readonly ForeignCaseOverlay[],
+  bursts: readonly TemporalBurstCandidateDTO[],
 ): PulseMarker[] {
   const placedById = new Map(fields.map((field) => [field.entityId, field]));
   const observationById = new Map(
@@ -936,6 +943,30 @@ function buildMarkers(
       detail: overlay.summary,
       entityId: null,
       entityLabel: null,
+    });
+  }
+
+  // PR-23: authoritative backend temporal bursts (LIVE only). Rendered as
+  // structural markers anchored to their owning entity — a deterministic
+  // transformation of backend burst data, never a client-side re-detection.
+  // Each burst is keyed by (nodeId, windowStart, windowEnd) for stable identity
+  // across repeated renders; ordering is stable by node + window.
+  for (const burst of bursts
+    .slice()
+    .sort(
+      (a, b) =>
+        a.nodeId.localeCompare(b.nodeId) ||
+        a.windowStart.localeCompare(b.windowStart) ||
+        a.windowEnd.localeCompare(b.windowEnd),
+    )) {
+    const entity = placedById.get(burst.nodeId);
+    if (!entity) continue;
+    markers.push({
+      kind: "temporal-burst",
+      label: `Temporal burst · ${burst.burstScore.toFixed(1)}×`,
+      detail: `${entity.label}: ${burst.eventCount} events clustered in ${burst.windowStart.slice(0, 10)} → ${burst.windowEnd.slice(0, 10)}.`,
+      entityId: entity.entityId,
+      entityLabel: entity.label,
     });
   }
 

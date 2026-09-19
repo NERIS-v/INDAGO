@@ -17,7 +17,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { buildEntityPulseOverview } from "./pulse-model";
 import type { EntityPulseOverview } from "./pulse-model";
@@ -27,7 +27,7 @@ import type {
   IntelligenceCandidateView,
   ObservationContradiction,
 } from "@/lib/providers/types";
-import type { GraphNode, Observation } from "@indago/contracts";
+import type { GraphNode, Observation, TemporalBurstCandidateDTO } from "@indago/contracts";
 
 const PAGE_SIZE = 100;
 
@@ -49,6 +49,10 @@ interface EntityPulseData {
   readonly observations: Observation[];
   readonly contradictions: ObservationContradiction[];
   readonly candidates: IntelligenceCandidateView[];
+  /** PR-23: authoritative backend bursts (LIVE). null = no live burst answer
+   *  (no seam in demo, or the seam call failed — never confused with a backend
+   *  "no bursts" reply, which is an empty array). */
+  readonly bursts: TemporalBurstCandidateDTO[] | null;
 }
 
 async function fetchAllPages<T>(
@@ -76,6 +80,7 @@ export function useEntityPulseAnalysis({
   const workspace = useWorkspace();
   const [data, setData] = useState<EntityPulseData | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const requestRef = useRef(0);
 
   const overlaysKey = useMemo(
     () => overlays.map((overlay) => overlay.ref).sort().join(","),
@@ -89,11 +94,16 @@ export function useEntityPulseAnalysis({
       return;
     }
     let active = true;
+    // PR-23 race hardening: latest-requested-context wins. A newer effect run
+    // supersedes an older one even if the older resolves later; only the newest
+    // request id may commit state.
+    const requestId = ++requestRef.current;
     // Stale-while-revalidate: keep the previous ready overview mounted while a
     // refetch (enabled/overlays/workspace change) is in flight so the rail and
     // zones never unmount into the loading frame between fresh data. The first
     // load still shows loading (data starts null); failures still surface.
     setError(null);
+    const hasBurstSeam = typeof workspace.graph.getTemporalBursts === "function";
     Promise.all([
       fetchAllPages<GraphNode>((query) =>
         workspace.graph.getNodes(workspace.investigationId, query),
@@ -107,18 +117,27 @@ export function useEntityPulseAnalysis({
       workspace.intelligence
         .listCandidates(workspace.investigationId, { pageSize: PAGE_SIZE })
         .catch(() => ({ items: [] as IntelligenceCandidateView[] })),
+      // PR-23 honesty: a failed burst query is "bursts unavailable" (null),
+      // never an authoritative "no bursts" (empty array).
+      hasBurstSeam && workspace.graph.getTemporalBursts
+        ? workspace.graph
+            .getTemporalBursts(workspace.investigationId, { pageSize: PAGE_SIZE })
+            .then((page) => page.items)
+            .catch(() => null)
+        : Promise.resolve(null as TemporalBurstCandidateDTO[] | null),
     ])
-      .then(([nodes, observations, contradictions, candidates]) => {
-        if (!active) return;
+      .then(([nodes, observations, contradictions, candidates, bursts]) => {
+        if (!active || requestId !== requestRef.current) return;
         setData({
           nodes,
           observations,
           contradictions: contradictions.items,
           candidates: candidates.items,
+          bursts: bursts,
         });
       })
       .catch((err: unknown) => {
-        if (!active) return;
+        if (!active || requestId !== requestRef.current) return;
         setError(err instanceof Error ? err : new Error("Failed to load the entity pulse data"));
       });
     return () => {
@@ -134,6 +153,7 @@ export function useEntityPulseAnalysis({
       contradictions: data.contradictions,
       candidates: data.candidates,
       overlays,
+      bursts: data.bursts ?? undefined,
       timeRange,
     });
   }, [data, overlays, timeRange]);

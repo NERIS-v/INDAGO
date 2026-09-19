@@ -100,6 +100,21 @@ export type {
   GateFailureReason,
 } from './errors.js';
 
+// ---- PR18 candidate-driven utility selection (Phase 5A) ----
+export { selectBestEvidenceFromCandidates } from './pr18/select.js';
+export { buildDerivedCandidateContext } from './pr18/context.js';
+export { scoreCandidate } from './pr18/score.js';
+export type {
+  CandidateEvidenceSelectionInput,
+  CandidateEvidenceSelectionResult,
+  CandidateUtilityContext,
+  CandidateScoreInput,
+  ScoredCandidateRequest,
+  RankedCandidateRequest,
+  CandidateSelectionAccounting,
+  RepresentedExplanation,
+} from './pr18/types.js';
+
 // ---- Runtime derivation parameters (documented, runtime-owned) ----
 export {
   EIG_SUBWEIGHTS,

@@ -399,16 +399,32 @@ describe("PASS 4 — Case-B hypothesis route: real Phase-2 hypotheses as cards",
     expect(screen.queryByTestId("phase2-hypothesis-surface")).not.toBeInTheDocument();
   });
 
-  it("never fabricates Phase-2 on a live workspace (keeps the existing surface)", async () => {
+  it("never fabricates Phase-2 on a live workspace (honest live surface instead)", async () => {
     const providers = createLiveWorkspaceProviders(caseBIdentity("p4-route-live"), config);
     expect(providers.phase2AssessmentFreeze).toBeUndefined();
 
     renderWorkspace(providers);
-    await awaitLegacyPipeline();
 
-    // Existing OFS pipeline remains the default for live.
+    // PR-21: live renders the LIVE hypothesis workspace — the honest platform
+    // surface that surfaces the platform's data-mode seam, NOT the legacy OFS
+    // pipeline and NOT any fabricated Phase-2 surface.
+    const surface = await screen.findByTestId("live-hypothesis-workspace");
+    expect(surface).toBeInTheDocument();
+
     expect(screen.queryByTestId("phase2-hypothesis-surface")).not.toBeInTheDocument();
-    expect(screen.getByText("Operation Financial Shadow")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Initialize Investigative Synthesis/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Operation Financial Shadow")).not.toBeInTheDocument();
+
+// In this unconfigured test env the live workspace honestly surfaces the
+    // platform seam per section (unavailable or error) - it never fabricates.
+    // PR-21: the canonical-relations section is genuinely live, so in an
+    // unconfigured env it honestly reports its server/config error rather than
+    // an unavailable seam or a fabricated literal.
+    expect(
+      screen.getByTestId("section-canonical-relations-error"),
+    ).toBeInTheDocument();
   });
 
   it("keeps the previous OFS pipeline for non-real-case workspaces", async () => {

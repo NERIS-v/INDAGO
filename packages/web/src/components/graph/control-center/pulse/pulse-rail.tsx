@@ -195,7 +195,7 @@ export function PulseRail({
                     </h4>
                     {selectedMarkers.map((marker) => (
                       <span
-                        key={`${marker.kind}:${marker.label}`}
+                        key={`${marker.kind}:${marker.label}:${marker.detail}`}
                         data-pulse-rail-marker={marker.kind}
                         className="truncate font-mono text-[10px] text-surface-600"
                         title={marker.detail}

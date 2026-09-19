@@ -40,6 +40,7 @@ export const EntityTypeSchema = z.enum([
   'PERSON',
   'ORGANIZATION',
   'LOCATION',
+  'DATE',
   'PHONE',
   'EMAIL',
   'ACCOUNT',

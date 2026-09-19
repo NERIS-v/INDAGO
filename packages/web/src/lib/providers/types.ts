@@ -50,7 +50,14 @@ import type {
   LeadEvidenceLink,
   AttachLeadEvidenceRequest,
 } from "@indago/contracts";
-import type { EvidenceSubmissionResponse, EvidenceListItem } from "@/lib/api/types";
+import type {
+  EvidenceSubmissionResponse,
+  EvidenceListItem,
+  CanonicalRelationDTO,
+  CentralityResultDTO,
+  CommunityDetectionDTO,
+  ValidAtGraphResponse,
+} from "@/lib/api/types";
 import type { SseEvent as ContractSseEvent } from "@/lib/realtime/sse-client";
 import type { CapabilityStatusTable } from "./capabilities";
 import type {
@@ -878,9 +885,37 @@ export interface ObservationProvider {
   listByEntity(entityId: string, query?: ProviderQuery): Promise<Paginated<Observation>>;
 }
 
+/** PR-21 — result of accepting a PROPOSED entity hypothesis (M-A09.5). Maps the
+ *  platform accept response; `entityId` is the (possibly reused) canonical entity
+ *  that resulted. */
+export interface EntityAcceptResult {
+  readonly entityId: string;
+  readonly hypothesisId: string;
+  readonly status: string;
+  readonly materialized: boolean;
+  readonly reusedExisting: boolean;
+}
+
 export interface EntityProvider {
   listByInvestigation(investigationId: string, query?: ProviderQuery): Promise<Paginated<Entity>>;
   get(id: string): Promise<Entity>;
+  /** PR-21 — the case-scoped entity-hypothesis universe (candidate identity
+   *  propositions). The endpoint returns already-canonical EntityHypothesis
+   *  objects. OPTIONAL: an absent method means "entity hypotheses unavailable on
+   *  this provider seam" and consumers render an honest unavailable state. */
+  listEntityHypotheses?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<EntityHypothesis>>;
+  /** PR-21 — deliberate analyst decision: accept a PROPOSED entity hypothesis,
+   *  materializing a canonical entity (M-A09.5). OPTIONAL: an absent method
+   *  means "entity acceptance unavailable on this provider seam" and consumers
+   *  do not render the accept action. NOTE: the platform exposes NO entity
+   *  reject/reverse authority — those actions are never offered. */
+  acceptEntityHypothesis?(
+    investigationId: string,
+    hypothesisId: string,
+  ): Promise<EntityAcceptResult>;
 }
 
 export interface GraphProvider {
@@ -913,11 +948,38 @@ export interface GraphProvider {
     investigationId: string,
     query?: ProviderQuery,
   ): Promise<Paginated<TemporalBurstCandidateDTO>>;
-  /** Optional: P4 cohesion-scored community candidates. */
+  /** PR-22: AUTHORITATIVE community detection (deterministic Louvain over the
+   *  accepted-relation undirected derivative) → GET /graph/communities. This is
+   *  the detected community MEMBERSHIP (structural grouping), DISTINCT from
+   *  community CANDIDATES (getCommunityCandidates → /graph/community-candidates,
+   *  cohesion-scored candidate signals). Never conflate the two. */
   getCommunities?(
     investigationId: string,
     query?: ProviderQuery,
+  ): Promise<Paginated<CommunityDetectionDTO>>;
+  /** PR-22: P4 cohesion-scored community CANDIDATES → GET /graph/community-candidates.
+   *  Kept separate from authoritative getCommunities(); distinct capability. */
+  getCommunityCandidates?(
+    investigationId: string,
+    query?: ProviderQuery,
   ): Promise<Paginated<CommunityCandidateDTO>>;
+  /** PR-22: authoritative degree centrality rank → GET /graph/centrality.
+   *  Structural metric (relation volume), never culpability. */
+  getCentrality?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CentralityResultDTO>>;
+  /** PR-22: the authoritative graph projection valid at a domain instant →
+   *  GET /cases/:caseId/graph/valid-at?at=<ISO> (case-scoped; the investigation
+   *  is resolved server-side from the persisted run). Returns the same M-A13
+   *  ProjectedGraph contract as current/version projections — a true backend
+   *  projection, never a client-side filter. The temporal UI uses this when the
+   *  analyst requests a historical domain time. Absent method → the valid-at
+   *  temporal control renders an honest unavailable state. */
+  getValidAt?(
+    caseId: string,
+    at: string,
+  ): Promise<ValidAtGraphResponse>;
   /** Optional: P4 bridge/connector candidates. */
   getBridges?(
     investigationId: string,
@@ -963,6 +1025,15 @@ export interface RelationProvider {
     relationHypothesisId: string,
     reason?: string,
   ): Promise<RelationHypothesis>;
+  /** PR-21 — the ACCEPTED, materialized canonical relations the graph projection
+   *  consumes. No canonical contracts shape exists for a materialized relation,
+   *  so this returns the provider-owned CanonicalRelationDTO. OPTIONAL: an absent
+   *  method means "canonical relation reads unavailable on this provider seam"
+   *  and consumers render an honest unavailable state. */
+  listCanonical?(
+    investigationId: string,
+    query?: ProviderQuery,
+  ): Promise<Paginated<CanonicalRelationDTO>>;
 }
 
 export interface IntelligenceProvider {

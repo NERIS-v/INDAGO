@@ -26,6 +26,9 @@ import type {
   BridgeCandidatesResponse,
   TraversalResponse,
   ConnectingPathsResponse,
+  CentralityResponse,
+  CommunitiesResponse,
+  ValidAtGraphResponse,
   LeadListResponse,
   LeadDetailResponse,
   GenerateLeadsResponse,
@@ -34,6 +37,13 @@ import type {
   CrossCaseLinksResponse,
   GenerateCrossCaseLeadsResponse,
   RunCommandResponse,
+  EntitiesResponse,
+  EntityHypothesesResponse,
+  EntityAcceptResponse,
+  RelationsResponse,
+  CanonicalRelationsResponse,
+  RelationAcceptResponse,
+  RelationDecisionResponse,
 } from "./types.js";
 import { EvidenceSubmissionRequestSchema, AttachLeadEvidenceRequestSchema, type LeadStatus } from "@indago/contracts";
 
@@ -291,6 +301,43 @@ export async function listConnectingPaths(
   );
 }
 
+/** GET /investigations/:id/graph/centrality — authoritative degree centrality
+ *  rank (maxResults bounded server-side, default platform cap). */
+export async function getGraphCentrality(
+  investigationId: string,
+  maxResults?: number,
+): Promise<CentralityResponse> {
+  const query =
+    maxResults !== undefined
+      ? `?maxResults=${encodeURIComponent(maxResults)}`
+      : "";
+  return platformFetch<CentralityResponse>(
+    `/api/v1/investigations/${investigationId}/graph/centrality${query}`,
+  );
+}
+
+/** GET /investigations/:id/graph/communities — AUTHORITATIVE community
+ *  detection (deterministic Louvain). Distinct from community-candidates. */
+export async function getGraphCommunities(
+  investigationId: string,
+): Promise<CommunitiesResponse> {
+  return platformFetch<CommunitiesResponse>(
+    `/api/v1/investigations/${investigationId}/graph/communities`,
+  );
+}
+
+/** GET /cases/:caseId/graph/valid-at?at=<ISO> — the graph projection valid at
+ *  the given domain instant (case-scoped; the investigation is resolved
+ *  server-side from the persisted run — never client-supplied). */
+export async function getGraphValidAt(
+  caseId: string,
+  at: string,
+): Promise<ValidAtGraphResponse> {
+  return platformFetch<ValidAtGraphResponse>(
+    `/api/v1/cases/${caseId}/graph/valid-at?at=${encodeURIComponent(at)}`,
+  );
+}
+
 // ============================================================================
 // Phase 4 — Leads
 // ============================================================================
@@ -431,6 +478,97 @@ export async function resolveInvestigationReview(
   return platformFetch<RunCommandResponse>(
     `/api/v1/investigations/${investigationId}/review/resolve`,
     { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+// ============================================================================
+// Phase 4 — Entities, Entity Hypotheses, Relations (PR-21)
+// ============================================================================
+
+/** GET /investigations/:id/entities — the case-scoped canonical entities. */
+export async function listEntities(
+  investigationId: string,
+): Promise<EntitiesResponse> {
+  return platformFetch<EntitiesResponse>(
+    `/api/v1/investigations/${investigationId}/entities`,
+  );
+}
+
+/** GET /investigations/:id/entity-hypotheses — the already-canonical entity
+ *  hypothesis universe for the investigation. */
+export async function listEntityHypotheses(
+  investigationId: string,
+): Promise<EntityHypothesesResponse> {
+  return platformFetch<EntityHypothesesResponse>(
+    `/api/v1/investigations/${investigationId}/entity-hypotheses`,
+  );
+}
+
+/** POST /investigations/:id/entity-hypotheses/:hid/accept — materialize a
+ *  canonical entity from a PROPOSED entity hypothesis (M-A09.5). */
+export async function acceptEntityHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<EntityAcceptResponse> {
+  return platformFetch<EntityAcceptResponse>(
+    `/api/v1/investigations/${investigationId}/entity-hypotheses/${encodeURIComponent(hypothesisId)}/accept`,
+    { method: "POST" },
+  );
+}
+
+/** GET /investigations/:id/relations — the relation-hypothesis universe. */
+export async function listRelations(
+  investigationId: string,
+): Promise<RelationsResponse> {
+  return platformFetch<RelationsResponse>(
+    `/api/v1/investigations/${investigationId}/relations`,
+  );
+}
+
+/** GET /investigations/:id/canonical-relations — the ACCEPTED, materialized
+ *  relations the graph projection consumes. */
+export async function listCanonicalRelations(
+  investigationId: string,
+): Promise<CanonicalRelationsResponse> {
+  return platformFetch<CanonicalRelationsResponse>(
+    `/api/v1/investigations/${investigationId}/canonical-relations`,
+  );
+}
+
+/** POST /investigations/:id/relation-hypotheses/:hid/accept — materialize a
+ *  canonical relation from a PROPOSED relation hypothesis (M-A10). */
+export async function acceptRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationAcceptResponse> {
+  return platformFetch<RelationAcceptResponse>(
+    `/api/v1/investigations/${investigationId}/relation-hypotheses/${encodeURIComponent(hypothesisId)}/accept`,
+    { method: "POST" },
+  );
+}
+
+/** POST /investigations/:id/relation-hypotheses/:hid/reject — dismiss a
+ *  PROPOSED relation hypothesis; no canonical relation is created. */
+export async function rejectRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationDecisionResponse> {
+  return platformFetch<RelationDecisionResponse>(
+    `/api/v1/investigations/${investigationId}/relation-hypotheses/${encodeURIComponent(hypothesisId)}/reject`,
+    { method: "POST" },
+  );
+}
+
+/** POST /investigations/:id/relation-hypotheses/:hid/reverse — repeal a prior
+ *  ACCEPTED/REJECTED decision (REVERSED keeps history; any ACTIVE canonical
+ *  relation is flipped to REVERSED). */
+export async function reverseRelationHypothesis(
+  investigationId: string,
+  hypothesisId: string,
+): Promise<RelationDecisionResponse> {
+  return platformFetch<RelationDecisionResponse>(
+    `/api/v1/investigations/${investigationId}/relation-hypotheses/${encodeURIComponent(hypothesisId)}/reverse`,
+    { method: "POST" },
   );
 }
 

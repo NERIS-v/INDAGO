@@ -30,6 +30,14 @@ export interface EntityPatternRule {
  */
 export const ENTITY_PATTERN_RULES: readonly EntityPatternRule[] = [
   {
+    entityType: 'DATE',
+    // ISO-8601 calendar dates, optionally with a time component. FIRST rule:
+    // a 4-2-2 numeric triple is a DATE, never a phone/account digit run. This
+    // prevents the PHONE grouped alternative from swallowing "2026-08-12".
+    pattern:
+      /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)?\b/g,
+  },
+  {
     entityType: 'EMAIL',
     // Single, self-contained email address (no surrounding word chars).
     pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
@@ -52,9 +60,22 @@ export const ENTITY_PATTERN_RULES: readonly EntityPatternRule[] = [
   },
   {
     entityType: 'ACCOUNT',
-    // Bank/card/account-shaped alphanumerics: 9-16 digits, or AAAA-1234-5678
-    // style IBAN-like runs, or ledger identifiers like ACCT-xxxxx.
-    pattern: /\b(?:ACCT[-_ ]?\d+|IBAN[: ]?[A-Z]{2}\d{2}[A-Z0-9]{11,30}|(?:\d{4}[ -]?){3}\d{2,4}|\d{9,16})\b/g,
+    // Bank/card/account-shaped alphanumerics: 9-16 digits; AAAA-1234-5678 style
+    // IBAN-like runs; ledger identifiers like ACCT-xxxxx; separator-joined
+    // reference IDs that contain a digit (AX-4471, MT-883, ORX-102, MT-SET-119);
+    // and explicitly labelled references (Invoice 7842, Reference: MT-SET-119).
+    // Every new alternative requires a digit so pure words are never ACCOUNTs.
+    pattern:
+      /\b(?:ACCT[-_ ]?\d+|IBAN[: ]?[A-Z]{2}\d{2}[A-Z0-9]{11,30}|(?:\d{4}[ -]?){3}\d{2,4}|\d{9,16}|(?=[A-Z0-9/-]*\d)[A-Z]{2,6}(?:[-/][A-Z0-9]+)+|(?:[Ii]nvoice|[Ii]nv|[Tt]xn|[Tt]ransaction)\s*[:#-]?\s*[A-Za-z0-9-]*\d[A-Za-z0-9-]*)\b/g,
+  },
+  {
+    entityType: 'ORGANIZATION',
+    // Capitalized proper-noun runs ending in a corporate/industry suffix. The
+    // suffix is the evidence: a bare capitalized pair is NOT typed here (it
+    // falls through to CONTEXTUAL/HEURISTIC) so document headings such as
+    // "Bank Transfer Report" are never fabricated into organizations.
+    pattern:
+      /\b[A-Z][A-Za-z&.'-]+(?:\s+[A-Z][A-Za-z&.'-]+){0,3}\s+(?:LLP|Pvt\.?\s*Ltd\.?|Ltd\.?|Limited|Inc\.?|Corp\.?|Corporation|Company|Co\.?|Enterprises?|Exports?|Logistics|Trading|Warehousing|Solutions|Services|Industries|Technologies|Systems|Holdings|Group)\b/g,
   },
   {
     entityType: 'DEVICE',
