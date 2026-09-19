@@ -83,6 +83,7 @@ export interface GraphHoleRecord {
   readonly expectedInformationValue: number;
   readonly significance: number;
   readonly supersedesGraphHoleId: string | null;
+  readonly investigationGapId: string | null; // 5B Link
   readonly supersededAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -166,6 +167,7 @@ function toGraphHoleRecord(row: GraphHoleRow): GraphHoleRecord {
     expectedInformationValue: row.expectedInformationValue,
     significance: row.significance,
     supersedesGraphHoleId: row.supersedesGraphHoleId,
+    investigationGapId: row.investigationGapId, // 5B Link
     supersededAt: row.supersededAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -532,6 +534,51 @@ export class GraphHoleStore {
       });
       return toGraphHoleRecord(updated);
     });
+  }
+
+  // --------------------------------------------------------------------------
+  // Phase 5B: Link Investigative Gap
+  // --------------------------------------------------------------------------
+
+  /**
+   * 5B: Safely links an InvestigativeGap to a GraphHole.
+   * Retries are safe, but linking to a DIFFERENT gap throws to protect integrity.
+   */
+  async attachInvestigationGap(input: {
+    readonly caseId: string;
+    readonly candidateId: string;
+    readonly investigationGapId: string;
+  }): Promise<{ attached: boolean; record: GraphHoleRecord }> {
+    const existing = await this.prisma.graphHole.findUnique({
+      where: { caseId_candidateId: { caseId: input.caseId, candidateId: input.candidateId } }
+    });
+
+    if (!existing) {
+      throw new GraphHoleStoreError(
+        'NOT_FOUND',
+        `GraphHole not found for candidate ${input.candidateId}`
+      );
+    }
+
+    // Idempotent retry: already linked to this exact gap
+    if (existing.investigationGapId === input.investigationGapId) {
+      return { attached: false, record: toGraphHoleRecord(existing) };
+    }
+
+    // Integrity guard: already linked to a different gap
+    if (existing.investigationGapId !== null) {
+      throw new GraphHoleStoreError(
+        'INVALID_TRANSITION',
+        `GraphHole ${input.candidateId} is already attached to gap ${existing.investigationGapId}`
+      );
+    }
+
+    const updated = await this.prisma.graphHole.update({
+      where: { id: existing.id },
+      data: { investigationGapId: input.investigationGapId }
+    });
+
+    return { attached: true, record: toGraphHoleRecord(updated) };
   }
 
   // --------------------------------------------------------------------------
