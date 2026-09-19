@@ -167,6 +167,9 @@ const RELATION_HYPOTHESIS_TRANSITIONS: Readonly<
   REVERSED: new Set(["ACCEPTED", "REJECTED"]),
   // PROPOSED is machine-produced; no authority decision targets it.
   PROPOSED: new Set([]),
+  // NEAR_MISS (PR-31 FIX 5) is an engine-derived observability grade for
+  // source-grounded-but-below-threshold pairs; it is never an authority target.
+  NEAR_MISS: new Set([]),
 };
 
 export class RelationHypothesisTransitionError extends Error {

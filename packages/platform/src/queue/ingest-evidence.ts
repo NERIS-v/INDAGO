@@ -1535,7 +1535,7 @@ async function completeMA10(params: {
   emitProgressEvent(
     investigationId,
     "ANALYZING",
-    `Relation resolution considered ${metrics.pairsConsidered} pair(s), proposed ${proposedEvents} hypothesis(es) for case ${caseId}.`,
+    `Relation resolution considered ${metrics.pairsConsidered} pair(s), proposed ${proposedEvents} hypothesis(es), near-miss ${metrics.nearMisses} below-threshold grounded pair(s) for case ${caseId}.`,
     {
       operationId: payload.operationId,
       correlationId: payload.correlationId,

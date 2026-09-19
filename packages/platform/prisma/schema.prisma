@@ -411,7 +411,8 @@ model CandidatePair {
 //     PURE resolver. The platform NEVER recalculates or re-weights them.
 //   - status is the hypothesis LIFECYCLE state (PROPOSED at machine proposal;
 //     ACCEPTED / REJECTED / REVERSED are authority/lifecycle states that a
-//     re-resolution MUST NOT clobber).
+//     re-resolution MUST NOT clobber; NEAR_MISS is the PR-31 FIX 5 engine-
+//     derived observability grade for source-grounded-below-threshold pairs).
 //   - supportingObservationIds / contradictingObservationIds are stored as
 //     bounded JSON arrays; their non-overlap is guaranteed by the resolver.
 //
@@ -503,7 +504,8 @@ model Entity {
 //     NEVER recalculates or re-weights it.
 //   - status is the hypothesis LIFECYCLE state (PROPOSED at machine proposal;
 //     ACCEPTED / REJECTED / REVERSED are authority/lifecycle states that a
-//     re-resolution MUST NOT clobber).
+//     re-resolution MUST NOT clobber; NEAR_MISS is the PR-31 FIX 5 engine-
+//     derived observability grade for source-grounded-below-threshold pairs).
 //   - evidenceBasis / contradictions are stored as bounded JSON arrays of
 //     Observation IDs; their semantics are guaranteed by the pure engine.
 //   - scoreModelVersion records the scoring model for historical interpretability.

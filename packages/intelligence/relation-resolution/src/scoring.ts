@@ -134,13 +134,23 @@ export function settleRelationScore(evidenceWeights: readonly number[]): number 
  * the reversibility product requirement. Low-signal pairs do not propose a
  * positive relation hypothesis. Human acceptance is a separate, explicit
  * decision path.
+ *
+ * PR-31 FIX 5 — near-miss observability: a pair whose support is below the
+ * proposal threshold but which IS source-grounded in real observation
+ * co-occurrence (groundingEvidenceCount > 0) receives the NEAR_MISS grade
+ * instead of silent rejection. REJECTED is thereby reserved for truly
+ * negative outcomes: a hard contradiction or the ABSENCE of grounding. This
+ * makes the "could have been a relation" population inspectable WITHOUT
+ * lowering RELATION_PROPOSAL_THRESHOLD.
  */
 export function deriveRelationHypothesisStatus(
   score: number,
   hasHardContradiction: boolean,
+  groundingEvidenceCount: number,
 ): RelationStatus {
   if (hasHardContradiction) return 'REJECTED';
-  if (score < RELATION_PROPOSAL_THRESHOLD) return 'REJECTED';
+  if (groundingEvidenceCount === 0) return 'REJECTED';
+  if (score < RELATION_PROPOSAL_THRESHOLD) return 'NEAR_MISS';
   return 'PROPOSED';
 }
 

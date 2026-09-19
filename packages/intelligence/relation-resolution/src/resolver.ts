@@ -33,6 +33,7 @@ import type { EntityId, Observation, RelationType } from '@indago/contracts';
 import {
   RELATION_RESOLUTION_BOUNDS,
   RELATION_SCORE_MODEL_VERSION,
+  RELATION_PROPOSAL_THRESHOLD,
   type EntityEvidence,
   type RelationCandidatePair,
   type RelationResolution,
@@ -239,6 +240,7 @@ export function resolveRelationPair(params: {
   const status = deriveRelationHypothesisStatus(
     settled.score,
     settled.hasHardContradiction,
+    candidate.observationIds.length,
   );
   const proposed = shouldProposeRelationHypothesis(
     settled.score,
@@ -265,11 +267,16 @@ export function resolveRelationPair(params: {
 
 /**
  * Metrics for a multi-pair resolution pass (case-level).
+ *
+ * PR-31 FIX 5: `nearMisses` counts pairs that ARE source-grounded but score
+ * below the proposal threshold (grade NEAR_MISS) — the inspectable "could
+ * have been a relation" population, distinct from hard REJECTIONS.
  */
 export interface RelationResolutionMetrics {
   pairsConsidered: number;
   hypothesesProposed: number;
   hypothesesRejected: number;
+  nearMisses: number;
   lowEvidenceCount: number;
 }
 
@@ -301,6 +308,7 @@ export function resolveRelationsForCase(
   const resolutions: RelationResolution[] = [];
   let hypothesesProposed = 0;
   let hypothesesRejected = 0;
+  let nearMisses = 0;
   let lowEvidenceCount = 0;
 
   for (const candidate of candidates) {
@@ -317,6 +325,8 @@ export function resolveRelationsForCase(
       hypothesesProposed += 1;
     } else if (resolution.evidenceCount === 0) {
       lowEvidenceCount += 1;
+    } else if (resolution.support < RELATION_PROPOSAL_THRESHOLD) {
+      nearMisses += 1;
     } else {
       hypothesesRejected += 1;
     }
@@ -328,6 +338,7 @@ export function resolveRelationsForCase(
       pairsConsidered: candidates.length,
       hypothesesProposed,
       hypothesesRejected,
+      nearMisses,
       lowEvidenceCount,
     },
   };
