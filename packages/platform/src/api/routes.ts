@@ -45,6 +45,7 @@ import {
   SourceCatalogSchema,
   CaseIdSchema,
   ProjectedGraphSchema,
+  RelationStatusSchema,
   BridgeCandidateSchema,
   TemporalBurstCandidateSchema,
   CommunityCandidateSchema,
@@ -548,12 +549,34 @@ apiRouter.get(
         });
       }
 
-      const relations = await relationHypothesisStore.listByCase(caseId, {
-        investigationId,
-      });
+      // PR-33: optional ?status=<RelationStatusSchema> filter narrows the read
+      // to a lifecycle grade (e.g. NEAR_MISS) — the durability seam that makes
+      // machine-derived near-miss records queryable by an operator/service.
+      const statusRaw = req.query.status;
+      let statusFilter: string | undefined;
+      if (statusRaw !== undefined) {
+        if (typeof statusRaw !== "string" || !RelationStatusSchema.safeParse(statusRaw).success) {
+          return res.status(400).json({
+            error: "Invalid relation status filter",
+            detail: "status must be one of PROPOSED, ACCEPTED, REJECTED, REVERSED, NEAR_MISS",
+          });
+        }
+        statusFilter = statusRaw;
+      }
+
+      const relations =
+        statusFilter !== undefined
+          ? await relationHypothesisStore.listByCaseAndStatus(caseId, {
+              investigationId,
+              status: statusFilter,
+            })
+          : await relationHypothesisStore.listByCase(caseId, {
+              investigationId,
+            });
       return res.status(200).json({
         investigationId,
         caseId,
+        ...(statusFilter !== undefined ? { status: statusFilter } : {}),
         count: relations.length,
         relations,
       });
