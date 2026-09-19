@@ -250,6 +250,92 @@ describe("makeProjectionInput (authoritative state → normalized input)", () =>
   });
 });
 
+// ============================================================================
+// PR-31 FIX 6 — the runtime graph (GraphRuntime / loadCaseProjection / toGraphEdge)
+// MUST carry the authoritative validityInterval as `temporalRange`, exactly like
+// the versioned projection. PR-30 verdict was "PARTIALLY": temporal ranges
+// reached the versioned projection but never the runtime analytics graph, so the
+// temporal-burst detector (which reads edge attrs.temporalRange.validFrom) could
+// never fire on the live graph. DB-free: injected stub stores only.
+// ============================================================================
+describe("PR-31 FIX 6 — runtime graph edges carry temporalRange", () => {
+  const E1 = "00000000-0000-4000-8000-000000000001";
+  const E2 = "00000000-0000-4000-8000-000000000002";
+  const R1 = "10100000-0000-4000-8000-000000000001";
+  const RANGE = { value: "2026-08-01T10:00:00.000Z", precision: "exact" as const };
+
+  interface StubStores {
+    entities?: unknown;
+    relations?: unknown;
+  }
+
+  function relationRow(validityInterval: unknown): Record<string, unknown> {
+    return {
+      id: R1,
+      caseId: "case-1",
+      investigationId: null,
+      relationType: "communication",
+      sourceEntityId: E1,
+      targetEntityId: E2,
+      directed: true,
+      support: 0.8,
+      evidenceBasis: [],
+      contradictions: [],
+      status: "ACTIVE",
+      scoreModelVersion: "v1",
+      evidenceCount: 1,
+      provenance: {},
+      hypothesisId: "hyp-1",
+      validityInterval,
+      temporalAssertions: [],
+      createdAt: new Date("2026-08-01T00:00:00.000Z"),
+      reversedAt: null,
+    };
+  }
+
+  function stores(validityInterval: unknown): StubStores {
+    const entities = [
+      { id: E1, entityType: "PERSON", canonicalName: "Alice" },
+      { id: E2, entityType: "PERSON", canonicalName: "Bob" },
+    ];
+    if (validityInterval === "__NONE__") {
+      return {
+        entities: { listByCase: async () => entities },
+        relations: { listActiveByCase: async () => [] },
+      };
+    }
+    return {
+      entities: { listByCase: async () => entities },
+      relations: { listActiveByCase: async () => [relationRow(validityInterval)] },
+    };
+  }
+
+  it("loadCaseProjection maps a persisted validityInterval to edge temporalRange", async () => {
+    const { loadCaseProjection } = await import("../src/relations/graph-runtime.js");
+    const projection = await loadCaseProjection(
+      { investigationId: "inv-1", caseId: "case-1" },
+      stores(RANGE) as never,
+    );
+    expect(projection.edges[0].temporalRange).toEqual(RANGE);
+  });
+
+  it("omits temporalRange when the authoritative relation has no validityInterval", async () => {
+    const { loadCaseProjection } = await import("../src/relations/graph-runtime.js");
+    const projection = await loadCaseProjection(
+      { investigationId: "inv-1", caseId: "case-1" },
+      stores(undefined) as never,
+    );
+    expect("temporalRange" in projection.edges[0]).toBe(false);
+  });
+
+  it("GraphRuntime.buildGraph edges carry temporalRange into the built graph attrs", async () => {
+    const { GraphRuntime } = await import("../src/relations/graph-runtime.js");
+    const runtime = new GraphRuntime(stores(RANGE) as never);
+    const view = await runtime.graph({ investigationId: "inv-1", caseId: "case-1" });
+    expect(view.edges[0].temporalRange).toEqual(RANGE);
+  });
+});
+
 describe("normalizeBuiltGraph (order-independent deterministic snapshot)", () => {
   const E1 = "00000000-0000-4000-8000-000000000001";
   const E2 = "00000000-0000-4000-8000-000000000002";
