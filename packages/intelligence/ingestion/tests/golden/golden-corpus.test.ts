@@ -16,6 +16,7 @@ import { DEFAULT_NORMALIZATION_CONFIG } from '@indago/contracts';
 import {
   GOLDEN_DOCUMENTS,
   GOLDEN_BANNER,
+  GOLDEN_IDENTITY_ROSTER,
   type GoldenDocument,
 } from '../fixtures/operation-financial-shadow.js';
 
@@ -85,12 +86,20 @@ async function runDocument(doc: GoldenDocument): Promise<RunResult> {
     sourceId: SOURCE_ID,
   });
 
+  // PR-31 (FIX 2): the case-scoped identity census is injected into M-A07 the
+  // same way the platform does from the payload identityRoster — as gazetteer
+  // entries. No roster is ever hardcoded into the engine.
+  const rosterEntries = GOLDEN_IDENTITY_ROSTER.map((entry) => ({
+    token: entry.text,
+    entityType: entry.entityType,
+  }));
+
   const finalized: Observation[] = [];
   const mentionTypes: { text: string; entityType?: string }[] = [];
   for (const draft of observations) {
     const obs = await finalizeObservation({ draft, nowIso: '2026-01-01T00:00:00.000Z' });
     finalized.push(obs);
-    const { drafts } = await extractEntityMentions(obs);
+    const { drafts } = await extractEntityMentions(obs, { gazetteerEntries: rosterEntries });
     for (const d of drafts) mentionTypes.push({ text: d.text, entityType: d.entityType });
   }
   return { observations: finalized, mentionTypes };

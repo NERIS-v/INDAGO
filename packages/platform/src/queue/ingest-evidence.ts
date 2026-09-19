@@ -67,6 +67,7 @@ import {
   NORMALIZER_ID,
   NORMALIZER_VERSION,
   parseStoredRawExtraction,
+  type GazetteerEntry,
   type RawExtraction,
 } from "@indago/ingestion";
 import {
@@ -962,16 +963,26 @@ async function completeMA07(params: {
     return;
   }
 
-  // 3. Pure, deterministic extraction (no clock, no I/O). No gazetteer data is
-  //    injected yet — M-A07 ships with the empty gazetteer (all mentions are
-  //    pattern/contextual/heuristic). ENTITY_MENTION_BOUNDS caps output.
+  // 3. Pure, deterministic extraction (no clock, no I/O). The optional
+  //    case-scoped identity roster (PR-31) is mapped 1:1 into gazetteer
+  //    entries — GAZETTEER_MATCH candidates only. No roster in the payload ⇒
+  //    empty gazetteer (pattern/contextual/heuristic only), exactly like the
+  //    pre-roster pipeline. ENTITY_MENTION_BOUNDS caps output.
+  const rosterEntries: GazetteerEntry[] = (payload.identityRoster ?? []).map(
+    (entry) => ({
+      token: entry.text,
+      entityType: entry.entityType,
+    }),
+  );
   const nowIso = new Date().toISOString();
   const candidateEntries: {
     identityKey: string;
     candidate: EntityMentionCandidate;
   }[] = [];
   for (const observation of observations) {
-    const { drafts } = await extractEntityMentions(observation);
+    const { drafts } = await extractEntityMentions(observation, {
+      gazetteerEntries: rosterEntries,
+    });
     for (const draft of drafts) {
       const candidate = await finalizeEntityMention({ draft, nowIso });
       candidateEntries.push({

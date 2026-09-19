@@ -122,6 +122,39 @@ describe('IngestionJobPayloadSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts a valid identityRoster (PR-31 case-scoped identity census)', () => {
+    const result = IngestionJobPayloadSchema.safeParse({
+      ...validPayload,
+      identityRoster: [
+        { text: 'Arjun Mehta', entityType: 'PERSON' },
+        { text: 'AX-4471', entityType: 'ACCOUNT' },
+        { text: 'Blue Dusk Logistics', entityType: 'ORGANIZATION' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects identityRoster with an invalid entityType', () => {
+    const result = IngestionJobPayloadSchema.safeParse({
+      ...validPayload,
+      identityRoster: [{ text: 'Arjun Mehta', entityType: 'NOT_A_TYPE' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects identityRoster with an empty roster text', () => {
+    const result = IngestionJobPayloadSchema.safeParse({
+      ...validPayload,
+      identityRoster: [{ text: '', entityType: 'PERSON' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('identityRoster is optional — a payload without it still validates', () => {
+    const result = IngestionJobPayloadSchema.safeParse(validPayload);
+    expect(result.success).toBe(true);
+  });
+
   it('rejects invalid sourceCatalog', () => {
     const result = IngestionJobPayloadSchema.safeParse({
       ...validPayload,
