@@ -1090,6 +1090,7 @@ model GraphHole {
   expectedInformationValue   Float
   significance               Float
   supersedesGraphHoleId      String? // lineage to the prior-version record of the same logical hole (plain column)
+  investigationGapId         String? // LINK TO INVESTIGATIVE GAP (Phase 5B)
   supersededAt               DateTime?
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
@@ -1101,6 +1102,7 @@ model GraphHole {
   @@index([caseId, status])
   @@index([graphVersionId])
   @@index([regionId])
+  @@index([investigationGapId])
 }
 
 // ============================================================================
@@ -1114,18 +1116,18 @@ model GraphHoleDetectorContribution {
   id                            String   @id @default(uuid())
   identityKey                   String   @unique // buildDetectorContributionIdentityKey — exact-dedup guard
   graphHoleId                   String
-  caseId                        String
+  caseId                      String
   candidateId                   String // parent candidateId (queryability, case-scoped audit)
   detectorType                  String // GraphHoleTypeSchema value
   detectionPolicyVersion        String // DETECTION_POLICY_VERSION consumed by THIS detector
   structuralBasis               String // StructuralBasisSchema value
   supportingHypothesisIds       Json // PR3 hypothesis ids (sorted unique)
   supportingObservationIds      Json // ObservationId[] (sorted unique)
-  contradictingObservationIds   Json // ObservationId[] (sorted unique)
-  observedEdgeIds               Json // GraphEdgeId[] (sorted unique)
-  detectorMetadata              Json // GraphHoleDetectorMetadataSchema
-  provenance                    Json // ProvenanceSchema — first-detector provenance preserved
-  createdAt                     DateTime @default(now())
+  contradictingObservationIds Json // ObservationId[] (sorted unique)
+  observedEdgeIds             Json // GraphEdgeId[] (sorted unique)
+  detectorMetadata            Json // GraphHoleDetectorMetadataSchema
+  provenance                  Json // ProvenanceSchema — first-detector provenance preserved
+  createdAt                   DateTime @default(now())
 
   graphHole GraphHole @relation(fields: [graphHoleId], references: [id], onDelete: Cascade)
 
@@ -1168,6 +1170,7 @@ model GraphHoleAssessment {
 }
 
 // ============================================================================
+// ============================================================================
 // Phase 5A-PR12 — Incremental Graph-Hole Reassessment (ordered change ledger)
 //
 // One durable row per authoritative change that may affect graph-hole
@@ -1188,20 +1191,21 @@ model GraphHoleAssessment {
 // No FK is declared (caseId / graphVersionId are plain indexed columns),
 // consistent with the rest of the schema's no-FK decoupling doctrine.
 // ============================================================================
+
 model CaseReassessmentChange {
   id                   String    @id @default(uuid())
   caseId               String
   graphVersionId       String? // the ACTIVE version the change was evaluated on
   sequence             Int // per-case monotonic (max+1, advisory-locked)
-  changeId             String    @unique // deterministic change identity — dedup guard
-  trigger              Json // ReassessmentTriggerSchema (zod-validated)
-  effectClass          String // EVIDENCE_AFFECTING | GRAPH_AFFECTING | MANUAL_REASSESSMENT
-  status               String    @default("PENDING") // PENDING | COMPLETED | PARTIAL | FAILED | SKIPPED
-  attemptCount         Int       @default(0)
-  failureReason        String?
-  processedAt          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  changeId              String    @unique // deterministic change identity — dedup guard
+  trigger               Json // ReassessmentTriggerSchema (zod-validated)
+  effectClass           String // EVIDENCE_AFFECTING | GRAPH_AFFECTING | MANUAL_REASSESSMENT
+  status                String    @default("PENDING") // PENDING | COMPLETED | PARTIAL | FAILED | SKIPPED
+  attemptCount          Int       @default(0)
+  failureReason         String?
+  processedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@unique([caseId, sequence])
   @@index([caseId, sequence])
@@ -1216,11 +1220,12 @@ model CaseReassessmentChange {
 // TemporalStateChange.sequence is per (caseId, entityType, entityId) and is NOT
 // an acceptable global cursor — this dedicated per-case cursor is authoritative.
 // ============================================================================
+
 model CaseReassessmentCursor {
-  caseId                  String   @id
-  lastProcessedSequence   Int      @default(0)
-  updatedAt               DateTime @updatedAt
-  policyVersion           String   @default("v1") // PR12_REASSESSMENT_POLICY_VERSION
+  caseId                String   @id
+  lastProcessedSequence Int      @default(0)
+  updatedAt              DateTime @updatedAt
+  policyVersion         String   @default("v1") // PR12_REASSESSMENT_POLICY_VERSION
 }
 
 // ============================================================================
@@ -1229,24 +1234,84 @@ model CaseReassessmentCursor {
 // One row per COMPLETED/PARTIAL run executing an incremental reassessment plan
 // for a change. runId is a deterministic UUID; the row records the frozen
 // IncrementalReassessmentRun envelope (affectedSet, plan, regionResults,
-// accounting, status) plus the per-case sequences it covered (cursorBefore/
-// cursorAfter) for exact auditability.
+// accounting, status) plus the per-case sequences it covered
+// (cursorBefore/cursorAfter) for exact auditability.
 // ============================================================================
+
 model ReassessmentRun {
-  id                 String   @id @default(uuid())
-  runId              String   @unique
-  caseId             String
-  investigationId    String?
-  changeId           String
-  sequence           Int // the change sequence this run accounts for
-  graphVersionId     String
-  policyVersion      String   @default("v1")
-  envelope           Json // IncrementalReassessmentRunSchema (zod-validated)
-  cursorBefore       Int
-  cursorAfter        Int
-  createdAt          DateTime @default(now())
+  id              String   @id @default(uuid())
+  runId           String   @unique
+  caseId          String
+  investigationId String?
+  changeId        String
+  sequence        Int // the change sequence this run accounts for
+  graphVersionId  String
+  policyVersion   String   @default("v1")
+  envelope        Json // IncrementalReassessmentRunSchema (zod-validated)
+  cursorBefore    Int
+  cursorAfter     Int
+  createdAt       DateTime @default(now())
 
   @@index([caseId, sequence])
   @@index([changeId])
   @@index([caseId])
+}
+
+// ============================================================================
+// Phase 5B: Investigative Gaps & Evidence Requests (Workflow State)
+// ============================================================================
+
+model InvestigativeGap {
+  id                      String   @id
+  identityKey             String   @unique
+
+  investigationId         String
+  caseId                  String
+
+  graphHoleCandidateId    String
+  graphHoleId             String?
+
+  type                    String
+  title                   String
+  description             String
+
+  status                  String   @default("IDENTIFIED")
+  priority                String
+
+  impact                  Float
+  expectedInformationValue Float?
+
+  relatedEntityIds        Json?
+  relatedHypothesisIds    Json?
+  evidenceRequestIds      Json?
+
+  resolution              String?
+  metadata                Json?
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  resolvedAt              DateTime?
+
+  @@index([caseId, status])
+  @@index([investigationId, status])
+  @@index([caseId, graphHoleCandidateId])
+  @@index([graphHoleId])
+}
+
+model EvidenceRequest {
+  id                       String   @id @default(uuid())
+  caseId                   String
+  gapId                    String
+  candidateSnapshot        Json
+  utilityScore             Float
+  status                   String   @default("DRAFT")
+  requestedBy              String?
+  approvedBy               String?
+  approvedAt               DateTime?
+  fulfillingObservationIds String[] @default([])
+
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([caseId, status])
 }

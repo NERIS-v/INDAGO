@@ -323,8 +323,8 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 5B. Gurashish — Investigation Workflow Around the Gap
 
-- 🟡 [ ] Add graph-hole event type `[Gurashish]` — typed `GRAPH_HOLE_DETECTED` event + payload already declared (`events/graph-events.ts:118`, `event-types.ts`); emission not yet wired to a detection runtime
-- 🟡 [ ] Add gap lifecycle state `[Gurashish]` — `GapStatusSchema` (IDENTIFIED…ADDRESSED/WONFIX) frozen (`domain/investigative-gap.ts`; ⚠️ `WONFIX` typo pending amendment); no Gap model/store/runtime yet
+- [x] Add graph-hole event type `[Gurashish]` — typed `GRAPH_HOLE_DETECTED` event + payload declared and emission wired through the 5B-PR1 GraphHole → InvestigativeGap runtime.
+- [x] Add gap lifecycle state `[Gurashish]` — `GapStatusSchema` (`IDENTIFIED`…`ADDRESSED`/`WONFIX`) frozen (`domain/investigative-gap.ts`; ⚠️ `WONFIX` typo pending amendment); `InvestigativeGap` model, store, deterministic GapType mapping, GraphHole linkage, and 5B-PR1 runtime materialization implemented.
 - [ ] Add evidence-request job `[Gurashish]`
 - [ ] Implement human approval for request `[Gurashish]`
 - 🟡 [ ] Implement WAITING_FOR_EVIDENCE state `[Gurashish]` — state + transitions frozen in the state-machine contract; runtime entry/exit + evidence-arrival wiring not implemented

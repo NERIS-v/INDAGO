@@ -24,7 +24,8 @@
     "@indago/contracts": "workspace:*",
     "@indago/gap-classification": "workspace:*",
     "@indago/graph-hole-region": "workspace:*",
-    "@indago/hypothesis-context": "workspace:*"
+    "@indago/hypothesis-context": "workspace:*",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
