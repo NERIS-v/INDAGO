@@ -95,6 +95,9 @@ importers:
       '@indago/gap-classification':
         specifier: workspace:*
         version: link:../gap-classification
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@indago/competing-explanations':
         specifier: workspace:*
