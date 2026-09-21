@@ -296,6 +296,7 @@ describe("PR-18 §12 focus ring is focus-only overlay; selection is body-persist
 
     dragOn(container, GN_VICTOR, { x: 400, y: 300 }, { x: 420, y: 310 });
     await whenMoving(container);
+    await whenFocusHidden(container);
     expect(ring.getAttribute("data-graph-aura")).toBe("hidden");
     expect(container.querySelector("[data-focus-aura='hidden']")).not.toBeNull();
 
