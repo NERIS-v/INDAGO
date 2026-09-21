@@ -14,7 +14,7 @@ export default function NotFound() {
           <h1 className="text-lg font-medium tracking-wide text-surface-700">404</h1>
           <p className="mt-2 text-xs text-surface-500">Page not found.</p>
         </div>
-        <Link href="/">
+        <Link href="/dashboard">
           <Button variant="secondary">Go to Dashboard</Button>
         </Link>
       </div>

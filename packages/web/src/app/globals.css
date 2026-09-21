@@ -12,6 +12,7 @@
     "Segoe UI", sans-serif;
   --font-mono: var(--font-jbmono), ui-monospace, "Cascadia Code", "SF Mono",
     monospace;
+  --font-cormorant: var(--font-cormorant), Georgia, "Times New Roman", serif;
 }
 
 @theme {
