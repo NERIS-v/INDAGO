@@ -291,9 +291,9 @@ export function EntityResolutionPanel({
                     </Button>
                   </div>
                   <p className="text-xs text-text-muted">
-                    Decisions are deliberate and recorded in an audit trail. In
-                    this demo, accepting a match records the decision only — it
-                    does not merge canonical entities or rewire the graph.
+                    Decisions are deliberate and recorded in an audit trail.
+                    Accepting a match records the decision only — it does not
+                    merge canonical entities or rewire the graph.
                   </p>
                 </div>
               </section>

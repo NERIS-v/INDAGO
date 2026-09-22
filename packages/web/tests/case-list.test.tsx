@@ -33,7 +33,7 @@ describe("CaseList", () => {
     const { cases } = mockProvider();
     render(<CaseList cases={cases} mode="demo" />);
     expect(await screen.findByText(/Operation Financial Shadow/)).toBeInTheDocument();
-    expect(screen.getByText("Demo")).toBeInTheDocument();
+    expect(screen.queryByText("Demo")).toBeNull();
   });
 
   it("renders an empty state when the provider returns no cases", async () => {
