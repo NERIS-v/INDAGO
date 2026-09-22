@@ -123,6 +123,28 @@ export const OPENING_GRAPH_SCALE = 1.3;
 export const OPENING_NODE_SCALE = 2.15;
 
 // ---------------------------------------------------------------------------
+// GRAPH GATHER — the persistent node discs slowly pull together pre-dive.
+//
+// In the tail of graphConnect, just before the camera dive opens, the bright
+// node discs (the persistent particles — the first nodes.length of the blur
+// field) gather toward the stage centre. The window reads 0.88 → 0.92 → 0.94
+// on the scrub: the smoothstep is twice as slow out of the gate and into the
+// settle, so it is a gentle "slowly come together", easing-midpoint exactly at
+// 0.92, fully gathered by 0.94 as the dive starts. The factor scales ONLY the
+// node SLOT mapping (worldX/worldY) — the glyph dust keeps its letter coords
+// and the early particle density is untouched. The DOM labels / icon circles
+// share the same factor (same worldX/worldY mapping) so they stay glued to the
+// discs, and the story anchors bake the FINAL factor (constant by the handoff)
+// so the spotlight aims exactly where the gathered nodes render.
+// ---------------------------------------------------------------------------
+
+/** Scroll window the gather occupies (shipped 0.88 → 0.94, midpoint 0.92). */
+export const OPENING_CONVERGE_WINDOW = { start: 0.88, end: 0.94 } as const;
+/** How close the discs come together: 0.12 = the final constellation is 88% of
+ *  its spread — modest, "a little less spread out". */
+export const OPENING_CONVERGE_AMOUNT = 0.12;
+
+// ---------------------------------------------------------------------------
 // GRAPH ZOOM / DEPTH — the final camera dive INTO the formed network.
 //
 // After the graph resolves (graphScale 1.3, nodeScale 2.15, camera 0.9) the
@@ -169,11 +191,10 @@ export const OPENING_GRAPH_ZOOM_LABEL_OPACITY = 0.85;
 //
 // In the tail of the graph-zoom dive the soft luminous discs crossfade into
 // crisp ringed-body icon nodes (the same entity icons + attention rings the
-// workspace graph canvas renders), the near edges read crisp and the far ones
-// recede, and a bounded set of entity names resolves alongside the icons. It
-// is intentionally SHARED vocabulary (icons via lib/graph/node-icon-path) and
-// still pure + deterministic: every persona, ring and depth gate is a function
-// of the node id, never of scroll state.
+// workspace graph canvas renders), and the near edges read crisp while the
+// far ones recede. It is intentionally SHARED vocabulary (icons via
+// lib/graph/node-icon-path) and still pure + deterministic: every persona,
+// ring and depth gate is a function of the node id, never of scroll state.
 // ---------------------------------------------------------------------------
 
 /** The resolve window lives INSIDE the dive (shipped 0.947 → 0.997), so the
@@ -181,12 +202,15 @@ export const OPENING_GRAPH_ZOOM_LABEL_OPACITY = 0.85;
 export const OPENING_GRAPH_RESOLVE_WINDOW = { start: 0.947, end: 0.997 } as const;
 /** Depth threshold reached at full resolve: nodes deeper than this STAY as
  *  glow dust (the far periphery recedes), every nearer node turns into an
- *  icon circle. */
-export const OPENING_NETWORK_DEPTH_CAP = 0.54;
+ *  icon circle. Shipped 0.34 resolves the near/front slab (94 icons on high vs
+ *  the old 149) — a sparser icon graph with more negative space, and lighter
+ *  per-frame resolve/DOM loops. The DUST layer is untouched: the node budgets
+ *  (156/124/90/62) keep the blur field's persistent discs fully dense. */
+export const OPENING_NETWORK_DEPTH_CAP = 0.34;
 /** Where the icon resolution begins (only the deepest foreground nodes). */
-export const OPENING_NETWORK_DEPTH_CAP_START = 0.3;
+export const OPENING_NETWORK_DEPTH_CAP_START = 0.22;
 /** Width of the soft depth gate around the cap (smoothstep ramp). */
-export const OPENING_NETWORK_DEPTH_FEATHER = 0.08;
+export const OPENING_NETWORK_DEPTH_FEATHER = 0.04;
 /** Disc crossfade: how far a resolved node's glow disc dims under the icon. */
 export const OPENING_NETWORK_DISC_FADE = 0.06;
 /** Icon body radius as a fraction of the particle disc radius. */
@@ -203,8 +227,8 @@ export const OPENING_NETWORK_MAX_LABELS = 12;
 /** Edge alpha restyle: how far the FAR edge midpoint dims at full resolve. */
 export const OPENING_NETWORK_EDGE_FAR_DIM = 0.75;
 /** Size multiplier for the resolved DOM icon circles (1 = the dived disc size;
- *  shipped 1.25 reads BIG clear nodes over the glow dust, tunable in the lab). */
-export const OPENING_NETWORK_NODE_SIZE = 1.25;
+ *  the smaller shipped value keeps the near icons from crowding each other). */
+export const OPENING_NETWORK_NODE_SIZE = 1;
 /** Exponent on the resolve-window smoothstep: >1 weights the morph toward the
  *  window's END (nodes stay blurred, then snap in hard); <1 starts earlier. */
 export const OPENING_NETWORK_RESOLVE_EASE = 1;
@@ -263,13 +287,17 @@ export const OPENING_NETWORK_LABEL_POOL: Readonly<Record<
 };
 
 // ---------------------------------------------------------------------------
-// Per-tier budgets. The final graph must be sparse and elegant: a modest ring
-// of meaningful relationships over ~100-ish nodes, with significant negative
-// space. The node budgets stay generous (the letters need density to remain
-// recognisable). Edge budgets match the CONNECTED-WEB design: mid sits at the
-// tier's surviving master-edge ceiling (spines + interleaved chords), so the
-// resolved icon graph is a woven triangle network (avg degree ~2.4) — never
-// the old disjoint-matching dust that read as floating pairs.
+// Per-tier budgets. The node budgets stay at the original generous levels —
+// the blur/dust DISC LAYER lives on these nodes (the first `nodes.length`
+// particles carry node identity), so cutting them would thin the full blur
+// field too. The FINAL icon graph's sparsity comes from the resolve depth cap
+// instead (OPENING_NETWORK_DEPTH_CAP): only the near/front slab turns into an
+// icon circle, the rest stays glow dust — fewer icons at the end with zero
+// touch to the early particle density. Edge budgets match the CONNECTED-WEB
+// design: mid sits at the tier's surviving master-edge ceiling (spines +
+// interleaved chords), so the resolved icon graph is a woven triangle network
+// (avg degree ~2.4) — never the old disjoint-matching dust that read as
+// floating pairs.
 // ---------------------------------------------------------------------------
 export interface OpeningTierBudget {
   readonly nodesMin: number;

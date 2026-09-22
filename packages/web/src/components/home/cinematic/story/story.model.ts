@@ -17,6 +17,7 @@
 
 import { CINEMATIC_REDUCED_ZOOM } from "../cinematic.constants";
 import {
+  OPENING_CONVERGE_AMOUNT,
   OPENING_FINAL_ZOOM,
   OPENING_GRAPH_SCALE,
   OPENING_GRAPH_VIEW_FRACTION,
@@ -184,9 +185,14 @@ export function storyNodeBaseFraction(
   const frame = openingGraphZoomFrame(1);
   const parallax = openingGraphZoomParallax(frame, depth);
   const scale = storyFractionScale();
+  // GRAPH GATHER: the story hands off AFTER the gather completes (the factor is
+  // constant 1 − AMOUNT by the handoff), and the DOM rows render through the
+  // same gathered mapping — so these anchors bake the final factor to stay
+  // EXACTLY where the gathered nodes render.
+  const gathered = 1 - OPENING_CONVERGE_AMOUNT;
   return {
-    fx: nx * scale * parallax * frame.plane,
-    fy: ny * scale * parallax * frame.plane,
+    fx: nx * scale * parallax * frame.plane * gathered,
+    fy: ny * scale * parallax * frame.plane * gathered,
   };
 }
 

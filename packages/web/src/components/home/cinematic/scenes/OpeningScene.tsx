@@ -56,6 +56,7 @@ import {
   OPENING_POINTS_VERTEX,
 } from "../opening/opening.points";
 import {
+  openingGraphConvergeAt,
   openingGraphResolveAt,
   openingGraphZoomFrame,
   openingGraphZoomParallax,
@@ -260,8 +261,14 @@ export function OpeningScene({
     // half-extent. Wide screens get a wide graph; portrait screens a tall one.
     // graphScale is art-directed (1.3 = the large final network) and remains
     // calibration-tunable in the dev lab.
-    const worldX = ((halfW * OPENING_GRAPH_VIEW_FRACTION) / OPENING_LAYOUT_EDGE) * graphScale;
-    const worldY = ((halfH * OPENING_GRAPH_VIEW_FRACTION) / OPENING_LAYOUT_EDGE) * graphScale;
+    let worldX = ((halfW * OPENING_GRAPH_VIEW_FRACTION) / OPENING_LAYOUT_EDGE) * graphScale;
+    let worldY = ((halfH * OPENING_GRAPH_VIEW_FRACTION) / OPENING_LAYOUT_EDGE) * graphScale;
+    // GRAPH GATHER: the persistent node discs slowly pull together (0.88 →
+    // 0.94) just before the dive. Scales ONLY the node SLOT mapping — glyph
+    // dust keeps letter coords, and reduced motion stays fully spread.
+    const converge = openingGraphConvergeAt(handle.progress, reduced);
+    worldX *= converge;
+    worldY *= converge;
     const clock = state.clock.elapsedTime;
     const group = groupRef.current;
     // The calibration `alignmentX/alignmentY` are OVERLAY-ONLY offsets: they
@@ -610,6 +617,12 @@ export function OpeningScene({
     const zoomFrame = openingGraphZoomFrame(reduced ? 0 : handle.progress, active);
     const fracX = (OPENING_GRAPH_VIEW_FRACTION / OPENING_LAYOUT_EDGE) * graphScale;
     const fracY = (OPENING_GRAPH_VIEW_FRACTION / OPENING_LAYOUT_EDGE) * graphScale;
+    // GRAPH GATHER: the SAME converge factor as the node compute, so the DOM
+    // labels + icon circles track the gathering discs exactly (glued through
+    // the motion). Reduced motion stays identity.
+    const converge = openingGraphConvergeAt(handle.progress, reduced);
+    const fracXG = fracX * converge;
+    const fracYG = fracY * converge;
     for (let k = 0; k < pose.rows.length; k += 1) {
       const row = pose.rows[k]!;
       const node = bundle.nodes[row.nodeIndex];
@@ -629,8 +642,8 @@ export function OpeningScene({
           ) *
           openingLabelAlpha(k, handle.progress, reduced, labelStart, labelOpacity) *
           labelOpacityBlend;
-      row.worldX = node.nx * fracX * (dive ? zPar * zoomFrame.plane : 1);
-      row.worldY = node.ny * fracY * (dive ? zPar * zoomFrame.plane : 1);
+      row.worldX = node.nx * fracXG * (dive ? zPar * zoomFrame.plane : 1);
+      row.worldY = node.ny * fracYG * (dive ? zPar * zoomFrame.plane : 1);
       // STORY ACT: labels are camera-anchored but stay UNDIMMED, so they ride
       // the spotlight centre without fading (they ARE the text the spotlight is
       // aimed at). Projection is the shared homothety about the act's camera.

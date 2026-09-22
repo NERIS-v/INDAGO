@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { CINEMATIC_CALIBRATION_DEFAULTS } from "@/components/home/cinematic/cinematic.calibration";
 import {
+  openingGraphConvergeAt,
   openingGraphZoomDistance,
   openingGraphZoomFrame,
   openingGraphZoomParallax,
@@ -17,7 +18,11 @@ import {
   openingGraphZoomZOffset,
   openingNodeDepth,
 } from "@/components/home/cinematic/opening/opening.zoom";
-import { OPENING_GRAPH_ZOOM_WINDOW } from "@/components/home/cinematic/opening/opening.constants";
+import {
+  OPENING_CONVERGE_AMOUNT,
+  OPENING_CONVERGE_WINDOW,
+  OPENING_GRAPH_ZOOM_WINDOW,
+} from "@/components/home/cinematic/opening/opening.constants";
 
 const CAL = CINEMATIC_CALIBRATION_DEFAULTS;
 const START = OPENING_GRAPH_ZOOM_WINDOW.start;
@@ -233,5 +238,48 @@ describe("graph zoom — reduced motion pins the identity frame", () => {
     expect(frame.labelBlend).toBe(1);
     expect(openingGraphZoomScale(frame, 0.4)).toBe(1);
     expect(openingGraphZoomParallax(frame, 0.9)).toBe(1);
+  });
+});
+
+describe("graph gather — the node discs slowly pull together pre-dive", () => {
+  const start = OPENING_CONVERGE_WINDOW.start;
+  const end = OPENING_CONVERGE_WINDOW.end;
+  const final = 1 - OPENING_CONVERGE_AMOUNT;
+
+  it("is identity before the window and fully gathered by/after the end", () => {
+    expect(openingGraphConvergeAt(start - 0.1, false)).toBe(1);
+    expect(openingGraphConvergeAt(start - 1e-9, false)).toBe(1);
+    expect(openingGraphConvergeAt(start, false)).toBe(1);
+    expect(openingGraphConvergeAt(end, false)).toBe(final);
+    expect(openingGraphConvergeAt(end + 0.5, false)).toBe(final);
+  });
+
+  it("eases through the 0.88 → 0.92 → 0.94 pacing (midpoint = half gathered)", () => {
+    // smoothstep is symmetric: at the exact midpoint of the window (0.91, the
+    // centre of the user's "0.88 → 0.92 → 0.94" pacing) the gather is exactly half.
+    const mid = (start + end) / 2;
+    expect(mid).toBeCloseTo(0.91, 10);
+    expect(openingGraphConvergeAt(mid, false)).toBeCloseTo((1 + final) / 2, 10);
+  });
+
+  it("is monotone (never reverses) and moves slowly out of the gate", () => {
+    let prev = 1;
+    for (let s = 0; s <= 1; s += 0.005) {
+      const p = start + (end - start) * s;
+      const v = openingGraphConvergeAt(p, false);
+      expect(v).toBeLessThanOrEqual(prev + 1e-9);
+      expect(v).toBeGreaterThanOrEqual(final - 1e-9);
+      prev = v;
+    }
+    // "slowly come together": the first quarter of the window moves less than a
+    // third of the final gather (smoothstep is flat at the start).
+    const quarter = openingGraphConvergeAt(start + (end - start) * 0.25, false);
+    expect(1 - quarter).toBeLessThan((1 - final) * 0.4);
+  });
+
+  it("reduced motion keeps the discs fully spread (identity)", () => {
+    for (const p of [0, (start + end) / 2, end, 1]) {
+      expect(openingGraphConvergeAt(p, true)).toBe(1);
+    }
   });
 });

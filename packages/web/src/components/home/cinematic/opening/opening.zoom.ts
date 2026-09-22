@@ -32,6 +32,8 @@
 import type { CinematicCalibration } from "../cinematic.calibration";
 import { clamp01, lerp, smoothstep } from "./opening.progress";
 import {
+  OPENING_CONVERGE_AMOUNT,
+  OPENING_CONVERGE_WINDOW,
   OPENING_GRAPH_BACKGROUND_SCALE,
   OPENING_GRAPH_CAMERA_END_Z,
   OPENING_GRAPH_CAMERA_START_Z,
@@ -183,6 +185,30 @@ export function openingGraphZoomFrame(
     labelBlend: lerp(1, z.labelOpacity, ease),
     resolve: openingGraphResolveAt(p, calibration),
   };
+}
+
+// ---------------------------------------------------------------------------
+// GRAPH GATHER: the persistent node discs slowly pull together BEFORE the dive
+// (0.88 → 0.94 on the scrub, easing midpoint at 0.92). A pure positional scale
+// about the stage centre: 1 before the window, falling to 1 − AMOUNT by 0.94.
+// The factor multiplies the node SLOT mapping only (worldX/worldY), so the
+// glyph dust and early particle density are untouched; reduced motion stays
+// fully spread (identity).
+// ---------------------------------------------------------------------------
+
+/** Positional gather factor for the node discs at scrub position `p`.
+ *  1 outside the window (fully spread), 1 − AMOUNT at/after the end (gathered).
+ *  `reduced` motion keeps the identity — the calm final frame is never pulled. */
+export function openingGraphConvergeAt(
+  p: number,
+  reduced: boolean,
+): number {
+  if (reduced) return 1;
+  return 1 - OPENING_CONVERGE_AMOUNT * smoothstep(
+    OPENING_CONVERGE_WINDOW.start,
+    OPENING_CONVERGE_WINDOW.end,
+    p,
+  );
 }
 
 // ---------------------------------------------------------------------------
