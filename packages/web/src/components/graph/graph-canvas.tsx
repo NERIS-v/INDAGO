@@ -8,6 +8,11 @@ import type { GraphNode, GraphEdge, GraphHole } from "@indago/contracts";
 import { GraphHoleBurstLayer } from "./graph-hole-burst-layer";
 import type { GraphVisualContext, GraphNodeVisualState, GraphEdgeVisualState, GraphAttentionRegion } from "@/lib/graph/graph-visual-state";
 import { DEFAULT_NODE_VISUAL_STATE, DEFAULT_EDGE_VISUAL_STATE } from "@/lib/graph/graph-visual-state";
+import { getNodeIconPath } from "@/lib/graph/node-icon-path";
+
+// The icon vocabulary is shared with the cinematic home opening — its
+// "network resolve" phase renders the SAME entity icons.
+export { getNodeIconPath } from "@/lib/graph/node-icon-path";
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
@@ -21,6 +26,13 @@ interface GraphCanvasProps {
   physicsEdges?: GraphEdge[];
   holes: GraphHole[];
   onNodeClick: (nodeId: string) => void;
+  /** Fired when the user clicks a RENDERED edge (relationship link). The edge
+   *  id is a graph edge id (not a relation id) — the panel maps it to the
+   *  provider-backed relation context. */
+  onEdgeClick?: (edgeId: string) => void;
+  /** Directly selected edge id (a picked relationship). Drives the selection
+   *  highlight on the edge itself; cleared when the panel selection moves. */
+  selectedEdgeId?: string | null;
   activeTimeRange: [number, number] | null;
   /** P4: per-node observation activity corridor (nodeId → [min,max] epoch or
    *  null when the node has no dated observations). When present it is the
@@ -41,7 +53,8 @@ interface GraphCanvasProps {
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
-const FIT_PADDING = 0.85;
+const FIT_PADDING = 0.95;
+const MAX_FIT_ZOOM = 1.15;
 const ENTER_MS = 700;
 const OFF_CANVAS_GAP = 60;
 // F-PR17: focus-aura lifecycle timing — fade out fast when the graph wakes,
@@ -56,38 +69,6 @@ const OUT_OF_RANGE_NODE_OPACITY = 0.22;
 const OUT_OF_RANGE_EDGE_OPACITY = 0.15;
 const OUT_OF_RANGE_LABEL_OPACITY = 0.35;
 
-const ICON_PATHS = {
-  PERSON: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
-  PHONE: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
-  LOCATION: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
-  ACCOUNT: "M3 21h18 M3 10h18 M5 6l7-3 7 3 M4 10v11 M20 10v11 M8 14v3 M12 14v3 M16 14v3",
-  COMPANY: "M3 21h18 M9 8h1 M9 12h1 M9 16h1 M14 8h1 M14 12h1 M14 16h1 M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16",
-  ORGANIZATION: "M18 10h-2m2-4h-2m4 8h-2m2-4h-6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z M8 6V4H3v16a2 2 0 0 0 2 2h4",
-  AGENCY: "M9 12l2 2 4-4 M7.5 2h9L19 5l-1 2.5-.5 9.5L17 19l-2 3H9l-2-3 .5-2-.5-9.5L6 5l1.5-3z",
-  DOCUMENT: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
-  DEFAULT: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z",
-};
-
-const PERSON_KEYWORDS = ["PERSON", "VICTOR", "WITNESS", "CASTELLAN", "ALDRIDGE", "RICO", "CALLAHAN", "MCGUIGAN", "HITMAN", "MARIA", "DOWD", "FORRESTER", "WHEELER"];
-const ACCOUNT_KEYWORDS = ["BANK", "ACCOUNT", "VAULT", "WALLET", "EXCHANGE", "MIXING", "OFFSHORE"];
-const AGENCY_KEYWORDS = ["FBI", "SOCTF", "TASK FORCE", "POLICE", "STATE", "AUTHORITY"];
-const COMPANY_KEYWORDS = ["COMPANY", "LTD", "TRANSIT", "HOLDINGS", "JAI ALAI", "CORP"];
-const ORG_KEYWORDS = ["GANG", "SYNDICATE", "RING", "ASSOCIATION", "CONSORTIUM"];
-
-export function getNodeIconPath(node: LayoutNode): string {
-  if (node.type !== "ENTITY") return ICON_PATHS.DOCUMENT;
-  const t = (node.label || "").toUpperCase();
-  if (PERSON_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.PERSON;
-  if (t.includes("PHONE") || t.includes("SIM") || t.includes("+91")) return ICON_PATHS.PHONE;
-  if (t.includes("LOCATION") || t.includes("ADDRESS") || t.includes("SOUTHERN HILLS") || t.includes("COUNTRY CLUB")) return ICON_PATHS.LOCATION;
-  if (ACCOUNT_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.ACCOUNT;
-  if (AGENCY_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.AGENCY;
-  if (COMPANY_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.COMPANY;
-  if (ORG_KEYWORDS.some((k) => t.includes(k))) return ICON_PATHS.ORGANIZATION;
-  if (["DOCUMENT", "FIR", "RECORD", "FILING"].some((k) => t.includes(k))) return ICON_PATHS.DOCUMENT;
-  return ICON_PATHS.DEFAULT;
-}
-
 function easeInOutCubic(t: number): number { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
 function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x: number; y: number } {
@@ -100,7 +81,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, onEdgeClick, activeTimeRange, controlsRef, selectedNodeId, selectedEdgeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
   // PR-10: the physics topology defaults to the rendered edges for standalone
   // callers and is the FULL merged topology when the panel supplies it — so
   // readability-filter interactions never restart the simulation.
@@ -113,6 +94,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [focusedNode, setFocusedNode] = useState<string | null>(null);
   const [internalSelectedNode, setInternalSelectedNode] = useState<string | null>(null);
+  const [internalSelectedEdge, setInternalSelectedEdge] = useState<string | null>(null);
   
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -142,6 +124,16 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
       setFocusedNode((prev) => (prev !== null && prev !== selectedNodeId ? null : prev));
     }
   }, [selectedNodeId]);
+
+  // A directly selected edge follows the panel selection (derived from the
+  // canonical context). A node selection deliberately clears the edge — a
+  // graph can highlight exactly one selection subject at a time.
+  useEffect(() => {
+    if (selectedEdgeId !== undefined) {
+      setInternalSelectedEdge(selectedEdgeId);
+      if (selectedEdgeId) setHoveredNode(null);
+    }
+  }, [selectedEdgeId]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -282,7 +274,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
     const minY = Math.min(...ys) - LABEL_PAD_Y; const maxY = Math.max(...ys) + LABEL_PAD_Y;
     const boxWidth = Math.max(maxX - minX, 1); const boxHeight = Math.max(maxY - minY, 1);
     const bboxCx = (minX + maxX) / 2; const bboxCy = (minY + maxY) / 2;
-    const scale = Math.min(1, MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING)));
+    const scale = Math.min(MAX_FIT_ZOOM, MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING)));
     return { zoom: scale, pan: { x: -(bboxCx - cx) * scale, y: -(bboxCy - cy) * scale } };
   }, [layoutRef, dimensions, cx, cy]);
 
@@ -492,12 +484,14 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   );
 
   const edgeStateFor = useCallback(
-    (edge: LayoutEdge, interaction: { selected: boolean; focused: boolean; hovered: boolean }): GraphEdgeVisualState => {
+    (edge: LayoutEdge, interaction: { selected: boolean; focused: boolean; hovered: boolean; selectedEdge: boolean }): GraphEdgeVisualState => {
       const raw = visualContext?.edges.get(edge.id) ?? DEFAULT_EDGE_VISUAL_STATE;
+      const selected = raw.selected || interaction.selectedEdge;
       return {
         ...raw,
-        incidentToSelection: raw.incidentToSelection || interaction.selected || interaction.focused || interaction.hovered,
-        attentionLevel: interaction.selected || interaction.focused ? 3 : raw.attentionLevel,
+        selected,
+        incidentToSelection: raw.incidentToSelection || interaction.selected || interaction.focused || interaction.hovered || selected,
+        attentionLevel: selected || interaction.selected || interaction.focused ? 3 : raw.attentionLevel,
       };
     },
     [visualContext],
@@ -651,7 +645,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                 const isForeignBridge = (edge as any).isForeignBridge;
                 const isForeignEdge = (edge as any).isForeignEdge;
                   
-                const isConnected = hoveredNode === source.id || hoveredNode === target.id || focusedNode === source.id || focusedNode === target.id || internalSelectedNode === source.id || internalSelectedNode === target.id || isDragged;
+                const isSelectedEdge = internalSelectedEdge === edge.id;
+                const isConnected = isSelectedEdge || hoveredNode === source.id || hoveredNode === target.id || focusedNode === source.id || focusedNode === target.id || internalSelectedNode === source.id || internalSelectedNode === target.id || isDragged;
                 const isOutOfBounds = !isNodeInTimeRange(source.id) || !isNodeInTimeRange(target.id);
                 const length = Math.max(1, edgeGeometry.get(edge.id) ?? 1);
 
@@ -676,6 +671,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   selected: internalSelectedNode === source.id || internalSelectedNode === target.id,
                   focused: focusedNode === source.id || focusedNode === target.id,
                   hovered: hoveredNode === source.id || hoveredNode === target.id,
+                  selectedEdge: isSelectedEdge,
                 };
                 const vs = edgeStateFor(edge, interaction);
                 const focusRecede =
@@ -729,7 +725,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                       hypRel: vs.hypothesisRelevance,
                       evidenceInScope: vs.evidenceInScope,
                       gapAffected: vs.gapAffected,
-                      selected: interaction.selected,
+                      selected: interaction.selected || interaction.selectedEdge,
                       attentionLevel: vs.attentionLevel,
                     })}
                     data-graph-case-scope={vs.caseScope}
@@ -755,6 +751,18 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                     >
                       {showTrace && <animate attributeName="stroke-dashoffset" from="20" to="0" dur={isForeignBridge ? "0.4s" : "0.6s"} repeatCount="indefinite" />}
                     </path>
+                    <path
+                      d={edgePath} fill="none" stroke="transparent" strokeOpacity={0}
+                      strokeLinecap="round" strokeWidth={14} style={{ pointerEvents: isOutOfBounds ? "none" : "stroke" }}
+                      aria-hidden="true"
+                      className="cursor-pointer"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInternalSelectedEdge(edge.id);
+                        onEdgeClick?.(edge.id);
+                      }}
+                    />
                   </g>
                 );
               })}
@@ -894,8 +902,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   className={`fill-transparent outline-none ${inTimeRange ? "cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-semantic-focus" : "pointer-events-none"}`}
                   onMouseEnter={() => setHoveredNode(node.id)} onMouseLeave={() => setHoveredNode(null)}
                   onFocus={() => applyFocus(node.id)} onBlur={() => applyFocus(null)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
-                  onClick={() => { setInternalSelectedNode(node.id); onNodeClick(node.id); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedEdge(null); setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
+                  onClick={() => { setInternalSelectedEdge(null); setInternalSelectedNode(node.id); onNodeClick(node.id); }}
                 />
               );
             })}

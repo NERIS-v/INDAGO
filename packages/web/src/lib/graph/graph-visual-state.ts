@@ -84,6 +84,7 @@ export interface GraphEdgeVisualState {
   readonly evidenceInScope: boolean;
   readonly gapAffected: boolean;
   readonly incidentToSelection: boolean;
+  readonly selected: boolean;
   readonly attentionLevel: AttentionLevel;
 }
 
@@ -239,6 +240,9 @@ export interface EdgeVisualStateInput {
   readonly sourceNode: GraphNode;
   readonly targetNode: GraphNode;
   readonly selectedNodeId: string | null;
+  /** Direct edge selection — a picked relationship highlights the edge itself,
+   *  independent of its incident nodes. */
+  readonly selectedEdgeId: string | null;
   readonly focusedNodeId: string | null;
   readonly hoveredNodeId: string | null;
   readonly activeTimeRange: [number, number] | null;
@@ -269,9 +273,11 @@ export function deriveEdgeVisualState(input: EdgeVisualStateInput): GraphEdgeVis
     input.focusedNodeId === input.edge.targetNodeId ||
     input.hoveredNodeId === input.edge.sourceNodeId ||
     input.hoveredNodeId === input.edge.targetNodeId;
+  const selected =
+    input.selectedEdgeId === input.edge.id;
 
   let attentionLevel: AttentionLevel = 0;
-  if (incidentToSelection) attentionLevel = 3;
+  if (selected || incidentToSelection) attentionLevel = 3;
   else if (input.inAttentionRegion) attentionLevel = 2;
   else if (input.edge.status === "CONTRADICTED" || deriveSupportBand(input.edge.support) === "weak")
     attentionLevel = 1;
@@ -286,6 +292,7 @@ export function deriveEdgeVisualState(input: EdgeVisualStateInput): GraphEdgeVis
     evidenceInScope: input.evidenceInScope,
     gapAffected: input.gapAffected,
     incidentToSelection,
+    selected,
     attentionLevel,
   };
 }
@@ -433,6 +440,9 @@ export interface GraphVisualContextInput {
   readonly activeTimeRange: [number, number] | null;
   readonly filter?: GraphFilterState | null;
   readonly selectedNodeId?: string | null;
+  /** Direct edge selection id (the picked relationship). Optional — absent
+   *  means no edge is directly selected. */
+  readonly selectedEdgeId?: string | null;
   readonly foreignNodeIds?: ReadonlySet<string>;
   readonly foreignEdgeIds?: ReadonlySet<string>;
   readonly focusSeed?: GraphFocusSeed | null;
@@ -602,6 +612,7 @@ export function deriveGraphVisualContext(
         sourceNode,
         targetNode,
         selectedNodeId: input.selectedNodeId ?? null,
+        selectedEdgeId: input.selectedEdgeId ?? null,
         focusedNodeId: null,
         hoveredNodeId: null,
         activeTimeRange: input.activeTimeRange,
@@ -670,5 +681,6 @@ export const DEFAULT_EDGE_VISUAL_STATE: GraphEdgeVisualState = {
   evidenceInScope: false,
   gapAffected: false,
   incidentToSelection: false,
+  selected: false,
   attentionLevel: 0,
 };

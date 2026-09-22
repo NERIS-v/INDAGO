@@ -238,9 +238,10 @@ describe("F-PR7 — cross-case comparison, boundary options and authorization ga
     expect(meta.hiddenCandidateCount).toBe(1);
     expect(meta.boundaryCaseId).toBe(CROSS_CASE_ID);
     expect(meta.boundaryLabel).toBe("Operation Cobalt");
-    expect(meta.columns).toHaveLength(4);
+    // Hero column (CROSS_ENTITY_ID) + the 7 Cobalt overlay nodes.
+    expect(meta.columns).toHaveLength(8);
     expect(meta.columns.map((c) => c.caseId)).toEqual(
-      Array(4).fill(CROSS_CASE_ID),
+      Array(8).fill(CROSS_CASE_ID),
     );
     for (const cell of meta.cells) {
       if (!cell.self) {
@@ -321,10 +322,15 @@ describe("F-PR7 — cross-case comparison, boundary options and authorization ga
     expect(meta.authorized).toBe(true);
     expect(meta.hiddenCandidateCount).toBe(0);
     expect(meta.boundaryLabel).toBe("Operation Crimson");
+    // Deterministic column order: overlay nodes by structuralImportance desc.
     expect(meta.columns.map((c) => c.entityId)).toEqual([
       "foreign-crimson-1",
+      "foreign-crimson-4",
       "foreign-crimson-2",
+      "foreign-crimson-5",
+      "foreign-crimson-6",
       "foreign-crimson-3",
+      "foreign-crimson-7",
     ]);
     for (const cell of meta.cells) {
       if (!cell.self) expect(cell.state).toBe("empty");

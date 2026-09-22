@@ -6,7 +6,9 @@
 // above the workspace: Brand, the full workspace destination set, a compact
 // investigation context block (title / status / graph version, resolved
 // through the provider seam — omitted silently when unavailable, e.g. live has
-// no graph version endpoint), and the data-mode indicator.
+// no graph version endpoint).
+//
+// Note: the data-mode indicator (Demo/Live) is intentionally withheld for now.
 //
 // Consumes only the WorkspaceProviders bundle via useWorkspace — never imports
 // Demo/Live and never branches on user-visible logic beyond active-route state.
@@ -57,9 +59,6 @@ export function WorkspaceNavDock() {
     };
   }, [workspace, investigationId]);
 
-  const modeLabel = workspace.mode === "demo" ? "Demo" : "Live";
-  const modeDot = workspace.mode === "demo" ? "bg-brand-500" : "bg-success";
-
   return (
     <div className="px-6 pt-4">
       <nav
@@ -69,7 +68,7 @@ export function WorkspaceNavDock() {
         <Link
           href="/"
           className="mr-2 flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
-          aria-label="INDAGO Dashboard"
+          aria-label="INDAGO Home"
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-md border border-brand-500/20 bg-brand-500/15">
             <svg className="h-3 w-3 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -97,10 +96,9 @@ export function WorkspaceNavDock() {
               {gi > 0 && <span className="h-5 w-px bg-semantic-border" aria-hidden />}
               <span className="sr-only">{g.label}</span>
               {g.entries.map((entry) => {
-                const href =
-                  entry.href === "/"
-                    ? "/"
-                    : investigationUrl(investigationId, workspace.caseId, entry.href || undefined);
+                const href = entry.href.startsWith("/")
+                  ? entry.href
+                  : investigationUrl(investigationId, workspace.caseId, entry.href || undefined);
                 const isActive = isNavEntryActive(entry, pathname);
                 return (
                   <Link
@@ -137,10 +135,6 @@ export function WorkspaceNavDock() {
               {graphVersion}
             </span>
           )}
-          <span className="status-tag">
-            <span className={`h-1.5 w-1.5 rounded-full ${modeDot}`} />
-            {modeLabel}
-          </span>
         </div>
       </nav>
     </div>

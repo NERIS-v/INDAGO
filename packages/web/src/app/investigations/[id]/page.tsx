@@ -27,7 +27,7 @@ export default async function InvestigationPage({
               Navigate from the dashboard with a case ID to view an investigation.
             </p>
           </div>
-          <a href="/">
+          <a href="/dashboard">
             <span className="inline-flex rounded-md border border-border-subtle bg-surface-50 px-3.5 py-2 text-sm font-medium text-surface-700 hover:bg-surface-100">
               Go to Dashboard
             </span>

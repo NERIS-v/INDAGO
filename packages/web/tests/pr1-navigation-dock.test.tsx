@@ -128,10 +128,10 @@ describe("PR-1 — WorkspaceNavDock", () => {
     expect(evidence.getAttribute("href")).toMatch(new RegExp(`\\?caseId=${CASE_ID}$`));
   });
 
-  it("keeps Dashboard reachable at the app landing route", () => {
+  it("keeps Dashboard reachable at its /dashboard route", () => {
     renderWorkspaceDock(graphPath());
     const dashboard = screen.getByRole("link", { name: "Dashboard" });
-    expect(dashboard).toHaveAttribute("href", "/");
+    expect(dashboard).toHaveAttribute("href", "/dashboard");
   });
 
   it("never surfaces New Investigation as a dock destination", () => {
@@ -140,22 +140,31 @@ describe("PR-1 — WorkspaceNavDock", () => {
     expect(screen.queryByText("/investigations/new")).not.toBeInTheDocument();
   });
 
-  it("renders the investigation context (title, status, graph version) and mode pill", async () => {
+  it("renders the investigation context (title, status, graph version) without the mode pill", async () => {
     renderWorkspaceDock(graphPath());
     expect(await screen.findByText("Financial Shadow — Shell Network")).toBeInTheDocument();
-    expect(screen.getByText("Demo")).toBeInTheDocument();
+    expect(screen.queryByText("Demo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
     expect(await screen.findByText("v3")).toBeInTheDocument();
   });
 });
 
 describe("PR-1 — AppNavDock", () => {
-  it("renders Brand + Dashboard on the landing route", () => {
+  it("renders nothing on the cinematic Home route (no chrome over the scene)", () => {
     pathnameMock.mockReturnValue("/");
     const { container } = render(<AppNavDock />);
-    expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/");
-    // The landing route never renders the workspace dock.
-    expect(container.querySelectorAll("a").length).toBe(2); // brand + dashboard
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+  });
+
+  it("marks Dashboard active only on /dashboard (never on Home)", () => {
+    pathnameMock.mockReturnValue("/dashboard");
+    render(<AppNavDock />);
+    const dashboard = screen.getByRole("link", { name: "Dashboard" });
+    expect(dashboard).toHaveAttribute("aria-current", "page");
+    expect(dashboard).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByRole("link", { name: "INDAGO Home" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "INDAGO Home" })).not.toHaveAttribute("aria-current");
   });
 
   it("hides itself on investigation workspace routes (workspace dock takes over)", () => {

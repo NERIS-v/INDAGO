@@ -474,6 +474,17 @@ export function GraphPanel({
     return finalNodes.find((n) => n.entityId === source)?.id ?? null;
   }, [selectedContext, selectedEntityId, finalNodes]);
 
+  // A relationship selection in the shell resolves to the DRAWN edge whose
+  // relationHypothesisId maps to the canonical relation context id (if it is
+  // still on screen). Graph edge ids (GE_*) are panel-internal — never leak.
+  const selectedGraphEdgeId = useMemo(() => {
+    if (selectedContext?.kind !== "relation") return null;
+    return (
+      finalEdges.find((e) => e.relationHypothesisId === selectedContext.id)?.id ??
+      null
+    );
+  }, [selectedContext, finalEdges]);
+
   // F-PR14: deterministic hidden-selection rule. The filter only ever removes
   // RENDERED edges (provider topology is untouched), so a selected node's
   // incident edges may be hidden even though the node stays. This derived
@@ -517,12 +528,13 @@ export function GraphPanel({
         activeTimeRange,
         filter,
         selectedNodeId: selectedGraphNodeId,
+        selectedEdgeId: selectedGraphEdgeId,
         foreignNodeIds,
         foreignEdgeIds,
         focusSeed,
         activityBounds: entityActivityBounds,
       }),
-    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, foreignNodeIds, foreignEdgeIds, focusSeed, entityActivityBounds],
+    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, selectedGraphEdgeId, foreignNodeIds, foreignEdgeIds, focusSeed, entityActivityBounds],
   );
 
   // PR-3: graph selection is an INTENT. The shell owns canonical selection
@@ -552,6 +564,21 @@ export function GraphPanel({
       }
     },
     [finalNodes, foreignOverlays, emitContext],
+  );
+
+  // PR-10: an edge click is a RELATION intent. Only provider-backed edges carry
+  // a relationHypothesisId; scaffold/demo links (e.g. authored islands, hole
+  // repairs) have neither a relation record nor an in-app drawer, so they stay
+  // unselectable. The panel trusts the provider id — never a graph id leak.
+  const handleEdgeSelect = useCallback(
+    (edgeId: string) => {
+      const edge = finalEdges.find((e) => e.id === edgeId);
+      if (!edge?.relationHypothesisId) return;
+      setSelectedEntityId(null);
+      setSelectedGapId(null);
+      emitContext({ kind: "relation", id: edge.relationHypothesisId, source: "graph" });
+    },
+    [finalEdges, emitContext],
   );
 
   const handleGapSelect = useCallback(
@@ -603,12 +630,23 @@ export function GraphPanel({
   const stagedRevealRef = useRef<{
     activeForeignCase: ForeignCaseOverlay | null;
     localBridgeAnchor: GraphNode | null;
-  }>({ activeForeignCase: null, localBridgeAnchor: null });
+    localRico: GraphNode | null;
+  }>({ activeForeignCase: null, localBridgeAnchor: null, localRico: null });
   stagedRevealRef.current = {
     activeForeignCase,
     localBridgeAnchor: activeForeignCase
       ? (finalNodes.find((n) =>
           (n.label ?? "").toUpperCase().includes(activeForeignCase.localTargetMatch),
+        ) ?? null)
+      : null,
+    // The reveal subject is the LOCAL H. Paul Rico node on the case's own graph
+    // (never the foreign island copy) — the original-graph subject that the
+    // cross-case island bridges onto.
+    localRico: activeForeignCase
+      ? (finalNodes.find(
+          (n) =>
+            !(n as { isForeign?: boolean }).isForeign &&
+            (n.label ?? "").toUpperCase().includes("RICO"),
         ) ?? null)
       : null,
   };
@@ -618,21 +656,26 @@ export function GraphPanel({
     let t2: ReturnType<typeof setTimeout>;
     let t3: ReturnType<typeof setTimeout>;
 
-    const { activeForeignCase: currentCase, localBridgeAnchor } = stagedRevealRef.current;
+    const { activeForeignCase: currentCase, localBridgeAnchor, localRico } = stagedRevealRef.current;
 
     if (currentCase && currentCase.nodes.length > 0) {
       // PR-3 UX: STAGED bridge reveal — the user wants to SEE both steps:
       // 1) the foreign nodes appear while the camera zooms OUT to frame the
       //    whole grown graph (fit),
       // 2) after the nodes settle and the full graph has a beat, a LONG slow
-      //    camera move frames the shared-infrastructure BRIDGE itself (local
-      //    target anchor + foreign island head) — never a sudden jump.
+      //    camera move frames the case's own H. Paul Rico node (the original-
+      //    graph subject the island bridges onto) — the 220px frame keeps the
+      //    local bridge anchor and the injected island head in view. Fall back
+      //    to the shared-infrastructure bridge pair when no local Rico node
+      //    exists (e.g. the scaffold demo islands).
       const foreignHead = currentCase.nodes[0]!;
       t1 = setTimeout(() => {
         controlsRef.current?.fit();
       }, 150);
       t2 = setTimeout(() => {
-        if (localBridgeAnchor) {
+        if (localRico) {
+          controlsRef.current?.focusPair(localRico.id, localRico.id, 1100);
+        } else if (localBridgeAnchor) {
           controlsRef.current?.focusPair(localBridgeAnchor.id, foreignHead.id, 1100);
         } else {
           controlsRef.current?.focusPair(foreignHead.id, foreignHead.id, 1100);
@@ -794,7 +837,9 @@ export function GraphPanel({
             physicsEdges={finalEdges as GraphEdge[]}
             holes={mergedHoles}
             selectedNodeId={selectedGraphNodeId}
+            selectedEdgeId={selectedGraphEdgeId}
             onNodeClick={handleNodeSelect}
+            onEdgeClick={handleEdgeSelect}
             onCanvasBackgroundPointerDown={handleBackgroundDeselect}
             activeTimeRange={activeTimeRange}
             controlsRef={controlsRef}

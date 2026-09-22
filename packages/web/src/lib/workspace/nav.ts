@@ -10,7 +10,7 @@
 // history): every investigation workspace sub-route is rendered under
 // /investigations/:id and keeps the case boundary via ?caseId=. The Overview
 // sub-route has an empty href (the :id index route). Dashboard is the app-level
-// landing route.
+// route; the root "/" is the cinematic Home surface.
 // ============================================================================
 
 export interface NavEntry {
@@ -24,7 +24,7 @@ export interface NavEntry {
 
 /** Investigation workspace destinations (real routes only — do not invent). */
 export const WORKSPACE_NAV: readonly NavEntry[] = [
-  { label: "Dashboard", href: "/", group: "Core" },
+  { label: "Dashboard", href: "/dashboard", group: "Core" },
   { label: "Overview", href: "", group: "Core" },
   // F-PR6: the parent network destination is labelled NETWORK; its five-zone
   // shell serves the selected representation (Graph / Pulse / Matrix / Flow).
@@ -64,17 +64,26 @@ export function isInvestigationWorkspacePathname(pathname: string): boolean {
   );
 }
 
-/** Dashboard (app landing) is active only on the root path. */
-export function isDashboardPathname(pathname: string): boolean {
+/** The cinematic Home owns the root path — no application chrome on "/". */
+export function isHomePathname(pathname: string): boolean {
   return pathname === "/";
 }
 
-/** Resolve active state for a dock entry on a given pathname. */
+/** Dashboard (app workspace) is active only on the /dashboard route. */
+export function isDashboardPathname(pathname: string): boolean {
+  return pathname === "/dashboard";
+}
+
+/**
+ * Resolve active state for a dock entry on a given pathname.
+ * Absolute hrefs (e.g. "/") are app-level routes matched exactly; workspace
+ * entries resolve against the workspace sub-route (Overview = empty href).
+ */
 export function isNavEntryActive(
   entry: NavEntry,
   pathname: string,
 ): boolean {
-  if (entry.href === "/") return isDashboardPathname(pathname);
+  if (entry.href.startsWith("/")) return pathname === entry.href;
   if (entry.href === "") return workspaceSubroute(pathname) === "";
   return workspaceSubroute(pathname) === entry.href;
 }

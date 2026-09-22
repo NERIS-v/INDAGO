@@ -398,6 +398,7 @@ describe("PR-6 §G edge derivations", () => {
       sourceNode: nodeById(GN_BANK as never),
       targetNode: nodeById(GN_VICTOR as never),
       selectedNodeId: GN_BANK,
+      selectedEdgeId: null,
       focusedNodeId: null,
       hoveredNodeId: null,
       activeTimeRange: null,
@@ -411,5 +412,30 @@ describe("PR-6 §G edge derivations", () => {
     expect(vs.attentionLevel).toBe(3);
     expect(vs.grounded).toBe(true);
     expect(vs.supportBand).toBe("strong");
+  });
+
+  it("direct edge selection marks the edge selected at attention 3 without its nodes selected", () => {
+    const vs = deriveEdgeVisualState({
+      edge: edgeById(GE_2 as never),
+      sourceNode: nodeById(GN_SHELL_ONE as never),
+      targetNode: nodeById(GN_BANK as never),
+      selectedNodeId: null,
+      selectedEdgeId: GE_2,
+      focusedNodeId: null,
+      hoveredNodeId: null,
+      activeTimeRange: null,
+      isForeign: false,
+      hypothesisRelevance: null,
+      evidenceInScope: false,
+      gapAffected: false,
+      inAttentionRegion: false,
+    });
+    expect(vs.selected).toBe(true);
+    expect(vs.attentionLevel).toBe(3);
+    expect(vs.incidentToSelection).toBe(false);
+  });
+
+  it("DEFAULT_EDGE_VISUAL_STATE stays unselected (interface back-compat)", () => {
+    expect(DEFAULT_EDGE_VISUAL_STATE.selected).toBe(false);
   });
 });

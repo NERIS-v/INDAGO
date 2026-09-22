@@ -217,13 +217,14 @@ describe("PR-1 — navigation module (shared WORKSPACE_NAV + route helpers)", ()
   it("isNavEntryActive marks Graph on the graph route and Hypothesis on the hypothesis route", () => {
     const graph = WORKSPACE_NAV.find((n) => n.href === "graph")!;
     const hypothesis = WORKSPACE_NAV.find((n) => n.href === "hypothesis")!;
-    const dashboard = WORKSPACE_NAV.find((n) => n.href === "/")!;
+    const dashboard = WORKSPACE_NAV.find((n) => n.href === "/dashboard")!;
 
     expect(isNavEntryActive(graph, `/investigations/${INVESTIGATION_ID}/graph`)).toBe(true);
     expect(isNavEntryActive(graph, `/investigations/${INVESTIGATION_ID}/hypothesis`)).toBe(false);
     expect(isNavEntryActive(hypothesis, `/investigations/${INVESTIGATION_ID}/hypothesis`)).toBe(true);
     expect(isNavEntryActive(hypothesis, `/investigations/${INVESTIGATION_ID}/graph`)).toBe(false);
-    expect(isNavEntryActive(dashboard, "/")).toBe(true);
+    expect(isNavEntryActive(dashboard, "/dashboard")).toBe(true);
+    expect(isNavEntryActive(dashboard, "/")).toBe(false);
     expect(isNavEntryActive(dashboard, `/investigations/${INVESTIGATION_ID}/graph`)).toBe(false);
   });
 
@@ -263,7 +264,10 @@ describe("PR-1 — source-level demo-coupling guards", () => {
   });
 
   it("New Investigation remains reachable through the Dashboard page", () => {
-    const dashboard = fs.readFileSync(path.resolve("src/app/page.tsx"), "utf-8");
+    const dashboard = fs.readFileSync(path.resolve("src/app/dashboard/page.tsx"), "utf-8");
     expect(dashboard).toMatch(/\/investigations\/new/);
+    // The cinematic Home route owns "/" and must not recreate the dashboard there.
+    const home = fs.readFileSync(path.resolve("src/app/page.tsx"), "utf-8");
+    expect(home).not.toMatch(/\/investigations\/new/);
   });
 });

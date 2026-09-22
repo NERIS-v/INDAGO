@@ -190,7 +190,7 @@ function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured, node
           {primaryInvestigation ? (
             <Link
               href={investigationUrl(primaryInvestigation, caseItem.id)}
-              className="group/link inline-flex items-center gap-2 text-xs font-medium text-accent-rose"
+              className="group/link inline-flex h-8 items-center gap-1.5 rounded-md bg-accent-rose px-3 text-xs font-medium text-background-base transition-colors duration-fast hover:bg-accent-rose/90 active:bg-accent-rose/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-rose"
             >
               Open investigation
               <span className="transition-transform duration-fast group-hover/link:translate-x-0.5">→</span>
@@ -268,7 +268,7 @@ function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured, node
         {primaryInvestigation ? (
           <Link
             href={investigationUrl(primaryInvestigation, caseItem.id)}
-            className="group/link inline-flex items-center gap-2 text-xs font-medium text-accent-rose"
+            className="group/link inline-flex h-8 items-center gap-1.5 rounded-md bg-accent-rose px-3 text-xs font-medium text-background-base transition-colors duration-fast hover:bg-accent-rose/90 active:bg-accent-rose/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-rose"
           >
             Open investigation
             <span className="transition-transform duration-fast group-hover/link:translate-x-0.5">→</span>
@@ -346,7 +346,7 @@ function NetworkMiniMap({
   return (
     <svg
       viewBox="0 0 340 384"
-      className="h-auto w-full select-none"
+      className="mx-auto block h-auto w-full max-w-64 select-none"
       role="img"
       aria-label="Preview of the active investigation topology"
     >
@@ -610,7 +610,7 @@ function FeaturedPanel({
             {primaryInvestigation ? (
               <Link
                 href={investigationUrl(primaryInvestigation, caseItem.id)}
-                className="group/link inline-flex items-center gap-2 text-xs font-medium text-accent-rose"
+                className="group/link inline-flex h-8 items-center gap-1.5 rounded-md bg-accent-rose px-3 text-xs font-medium text-background-base transition-colors duration-fast hover:bg-accent-rose/90 active:bg-accent-rose/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-rose"
               >
                 Open investigation
                 <span className="transition-transform duration-fast group-hover/link:translate-x-0.5">→</span>

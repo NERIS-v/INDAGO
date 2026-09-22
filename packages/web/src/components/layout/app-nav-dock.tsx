@@ -3,7 +3,8 @@
 //
 // Rendered at the application root (replaces the fixed left sidebar). Shows
 // Brand + the app-level landing destination (Dashboard) as a detached
-// horizontal dock. Hides itself inside investigation workspace routes, where
+// horizontal dock. Hides itself on the cinematic Home route (which owns the
+// root path with no chrome) and inside investigation workspace routes, where
 // the WorkspaceNavDock (rendered by the workspace shell) takes over.
 //
 // "New Investigation" is intentionally NOT a primary dock destination; it
@@ -14,14 +15,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isInvestigationWorkspacePathname } from "@/lib/workspace/nav";
+import {
+  isHomePathname,
+  isInvestigationWorkspacePathname,
+} from "@/lib/workspace/nav";
 
 export function AppNavDock() {
   const pathname = usePathname() ?? "/";
 
+  if (isHomePathname(pathname)) return null;
   if (isInvestigationWorkspacePathname(pathname)) return null;
 
-  const isDashboard = pathname === "/";
+  const isDashboard = pathname === "/dashboard";
 
   return (
     <div className="px-6 pt-4">
@@ -32,7 +37,7 @@ export function AppNavDock() {
         <Link
           href="/"
           className="mr-2 flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
-          aria-label="INDAGO Dashboard"
+          aria-label="INDAGO Home"
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-md border border-brand-500/20 bg-brand-500/15">
             <svg className="h-3 w-3 text-brand-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -45,7 +50,7 @@ export function AppNavDock() {
         <span className="h-5 w-px bg-semantic-border" aria-hidden />
 
         <Link
-          href="/"
+          href="/dashboard"
           aria-current={isDashboard ? "page" : undefined}
           className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
             isDashboard
