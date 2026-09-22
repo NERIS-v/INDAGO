@@ -30,7 +30,7 @@ describe("PASS 4 — Phase-2 motive panel UI", () => {
 
     expect(screen.getByTestId("phase2-motive-panel")).toBeInTheDocument();
     expect(screen.getByText(/Why was Roger Wheeler killed\?/)).toBeInTheDocument();
-    expect(screen.getByText(/DERIVED_BY_DEMO_LOGIC/)).toBeInTheDocument();
+    expect(screen.queryByText(/DERIVED_BY_DEMO_LOGIC/)).toBeNull();
     expect(screen.getByText(/None of them has won yet/)).toBeInTheDocument();
     expect(screen.getByText(/BLOCKED/)).toBeInTheDocument();
     expect(screen.getByText(/REPORT_TEXT_ACCOUNT/)).toBeInTheDocument();

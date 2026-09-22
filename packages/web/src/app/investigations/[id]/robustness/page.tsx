@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 const METRICS = [
   {
     label: "Missingness stability",
@@ -92,6 +94,15 @@ export default function RobustnessPage() {
             ))}
           </div>
         </section>
+
+        <div className="mt-10 border-t border-semantic-border-subtle pt-6">
+          <Link
+            href="/benchmarks"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint transition-colors duration-normal ease-restrained hover:text-semantic-foreground"
+          >
+            System benchmark · view controlled evaluation →
+          </Link>
+        </div>
       </div>
     </div>
   );

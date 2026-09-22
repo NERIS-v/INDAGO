@@ -192,9 +192,6 @@ export function Phase2MotivePanel() {
           Phase-2 · motive investigation
         </span>
         <span className="h-px flex-1 bg-semantic-border-subtle" aria-hidden="true" />
-        <Badge variant="accent" dot>
-          DERIVED_BY_DEMO_LOGIC
-        </Badge>
       </div>
 
       <h2

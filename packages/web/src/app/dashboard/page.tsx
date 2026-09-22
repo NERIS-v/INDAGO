@@ -27,15 +27,6 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-semantic-border-subtle bg-semantic-surface px-3 py-1 font-mono text-[9px] font-bold uppercase tracking-widest text-semantic-foreground-faint">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  providers.mode === "live" ? "bg-success" : "bg-accent-amber"
-                }`}
-                aria-hidden="true"
-              />
-              {providers.mode}
-            </span>
             <Link href="/investigations/new">
               <Button>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

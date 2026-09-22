@@ -105,7 +105,7 @@ interface CaseCardProps {
   readonly edges?: readonly GraphEdge[];
 }
 
-function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured, nodes, edges }: CaseCardProps) {
+function CaseCard({ caseItem, selected, disabled, onToggle, featured, nodes, edges }: CaseCardProps) {
   const badge = statusBadge(caseItem.status);
   const primaryInvestigation = caseItem.investigationIds[0];
 
@@ -121,7 +121,6 @@ function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured, node
               <Badge variant={badge.variant} dot dotPulse={badge.pulse}>
                 {caseItem.status}
               </Badge>
-              {mode === "demo" && <Badge variant="default">Demo</Badge>}
             </div>
             {caseItem.description && (
               <p className="text-sm text-semantic-foreground-muted leading-relaxed max-w-2xl">
@@ -214,7 +213,6 @@ function CaseCard({ caseItem, mode, selected, disabled, onToggle, featured, node
             <h3 className="text-sm font-medium text-semantic-foreground">
               {caseItem.title}
             </h3>
-            {mode === "demo" && <Badge variant="default">Demo</Badge>}
           </div>
           {caseItem.description && (
             <p className="mt-1 line-clamp-2 text-xs text-semantic-foreground-muted leading-relaxed">
@@ -504,7 +502,6 @@ function MetricBand({
 
 function FeaturedPanel({
   caseItem,
-  mode,
   enrichment,
 }: {
   readonly caseItem: Case;
@@ -536,7 +533,6 @@ function FeaturedPanel({
           <Badge variant={badge.variant} dot dotPulse={badge.pulse}>
             {caseItem.status}
           </Badge>
-          {mode === "demo" && <Badge variant="default">Demo</Badge>}
         </div>
         <span className="font-mono text-[10px] uppercase tracking-widest text-semantic-foreground-faint">
           {caseItem.id.slice(0, 8)}

@@ -54,7 +54,7 @@ function Phase1SignalBanner({ signal }: { signal?: Phase1Signal }) {
               Phase-1 Cross-Case Analysis
             </span>
             <span className="text-[9px] font-mono text-surface-700 uppercase tracking-widest">
-              DERIVED_BY_DEMO_LOGIC · deterministic structural comparison
+              deterministic structural comparison
             </span>
           </div>
           <Badge variant="info" className="bg-info/10 border-info/30 font-mono text-[9px] uppercase tracking-widest text-surface-900">

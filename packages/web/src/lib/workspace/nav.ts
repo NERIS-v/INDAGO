@@ -74,6 +74,11 @@ export function isDashboardPathname(pathname: string): boolean {
   return pathname === "/dashboard";
 }
 
+/** The system benchmark surface owns /benchmarks and every run sub-route. */
+export function isBenchmarkPathname(pathname: string): boolean {
+  return pathname === "/benchmarks" || pathname.startsWith("/benchmarks/");
+}
+
 /**
  * Resolve active state for a dock entry on a given pathname.
  * Absolute hrefs (e.g. "/") are app-level routes matched exactly; workspace
