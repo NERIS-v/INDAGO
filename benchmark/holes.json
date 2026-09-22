@@ -1,0 +1,798 @@
+{
+  "labels": {
+    "banner": "INTERNAL PILOT EVALUATION",
+    "corpus": "SYNTHETIC / DE-IDENTIFIED CORPUS",
+    "mode": "PROTOTYPE BENCHMARK",
+    "disclaimer": "Prototype dry-run over synthetic, de-identified benchmark data. The results below are internal prototype observations — not production results, not field results, and not independently validated results.",
+    "nonEndorsement": "This evaluation does not invoke, represent, or endorse any external institution, reviewer, publication, certification, or real-world validation."
+  },
+  "entries": [
+    {
+      "caseKey": "GAP-01",
+      "condition": "CLEAN",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.7445,
+          "significance": 0.7417,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "CLEAN",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 2,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "BROKEN_CHAIN",
+          "nodeIds": [
+            "4f12bf2e-0df0-454b-a15f-2a3b570d0a7c",
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "7efe6c94-ccdb-4094-80c9-07446927ef52",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5",
+            "ac28f8f4-ce0b-4c4e-bbc6-85512b37d5b1"
+          ],
+          "structuralScore": 0.7325,
+          "significance": 0.7345,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        },
+        {
+          "rank": 2,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
+          ],
+          "structuralScore": 0.7325,
+          "significance": 0.7345,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 3,
+      "qualifiedCount": 2,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "BROKEN_CHAIN",
+          "nodeIds": [
+            "4f12bf2e-0df0-454b-a15f-2a3b570d0a7c",
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "7efe6c94-ccdb-4094-80c9-07446927ef52",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5",
+            "bdcbcc17-855c-48a7-a327-978e6de0a602"
+          ],
+          "structuralScore": 0.7425,
+          "significance": 0.7405,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        },
+        {
+          "rank": 2,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
+          ],
+          "structuralScore": 0.7425,
+          "significance": 0.7405,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
+          ],
+          "structuralScore": 0.7675,
+          "significance": 0.7555,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "CLEAN",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "expectedType": null,
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "expectedType": null,
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 3,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "expectedType": null,
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 3,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "CLEAN",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "27d51443-431c-4e78-9478-4b884bae506c",
+            "f592adec-fd31-42b0-a59d-0de4520d3876"
+          ],
+          "structuralScore": 0.7175,
+          "significance": 0.7255,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "27d51443-431c-4e78-9478-4b884bae506c",
+            "f592adec-fd31-42b0-a59d-0de4520d3876"
+          ],
+          "structuralScore": 0.7175,
+          "significance": 0.7255,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 5,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "financial",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "financial",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "financial",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "CLEAN",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "CLEAN",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    }
+  ],
+  "verdicts": [
+    {
+      "caseKey": "GAP-01",
+      "condition": "CLEAN",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 19
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 15
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 15
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "CLEAN",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 2,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 19
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 2,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 16
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 19
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "CLEAN",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 4
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "CLEAN",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 17
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 17
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 13
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 1
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "CLEAN",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 4
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 4
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "CLEAN",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    }
+  ]
+}
