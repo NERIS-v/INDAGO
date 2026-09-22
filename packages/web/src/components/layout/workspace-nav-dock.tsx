@@ -6,7 +6,9 @@
 // above the workspace: Brand, the full workspace destination set, a compact
 // investigation context block (title / status / graph version, resolved
 // through the provider seam — omitted silently when unavailable, e.g. live has
-// no graph version endpoint), and the data-mode indicator.
+// no graph version endpoint).
+//
+// Note: the data-mode indicator (Demo/Live) is intentionally withheld for now.
 //
 // Consumes only the WorkspaceProviders bundle via useWorkspace — never imports
 // Demo/Live and never branches on user-visible logic beyond active-route state.
@@ -56,9 +58,6 @@ export function WorkspaceNavDock() {
       isMounted = false;
     };
   }, [workspace, investigationId]);
-
-  const modeLabel = workspace.mode === "demo" ? "Demo" : "Live";
-  const modeDot = workspace.mode === "demo" ? "bg-brand-500" : "bg-success";
 
   return (
     <div className="px-6 pt-4">
@@ -136,10 +135,6 @@ export function WorkspaceNavDock() {
               {graphVersion}
             </span>
           )}
-          <span className="status-tag">
-            <span className={`h-1.5 w-1.5 rounded-full ${modeDot}`} />
-            {modeLabel}
-          </span>
         </div>
       </nav>
     </div>

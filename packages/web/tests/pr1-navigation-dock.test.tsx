@@ -140,10 +140,11 @@ describe("PR-1 — WorkspaceNavDock", () => {
     expect(screen.queryByText("/investigations/new")).not.toBeInTheDocument();
   });
 
-  it("renders the investigation context (title, status, graph version) and mode pill", async () => {
+  it("renders the investigation context (title, status, graph version) without the mode pill", async () => {
     renderWorkspaceDock(graphPath());
     expect(await screen.findByText("Financial Shadow — Shell Network")).toBeInTheDocument();
-    expect(screen.getByText("Demo")).toBeInTheDocument();
+    expect(screen.queryByText("Demo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live")).not.toBeInTheDocument();
     expect(await screen.findByText("v3")).toBeInTheDocument();
   });
 });

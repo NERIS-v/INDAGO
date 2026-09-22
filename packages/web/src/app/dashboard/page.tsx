@@ -10,7 +10,7 @@ export default function DashboardPage() {
   const providers = useMemo(() => createCaseListProviders(), []);
 
   return (
-    <div className="min-h-screen bg-semantic-background animate-fade-in">
+    <div className="min-h-screen bg-semantic-surface animate-fade-in">
       <header className="border-b border-semantic-border px-10 py-8">
         <div className="mx-auto max-w-[1440px] flex items-end justify-between gap-6">
           <div className="space-y-1.5">
