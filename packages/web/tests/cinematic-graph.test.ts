@@ -298,7 +298,7 @@ describe("PR2 §F labels are sparse fiction anchors on the core knot", () => {
   it("stats start neutral and mirror the bundle", () => {
     const stats = openingGraphStats(bundleFor("high"));
     expect(stats.tier).toBe("high");
-    expect(stats.nodeCount).toBe(156);
+    expect(stats.nodeCount).toBe(OPENING_TIER_BUDGETS.high!.nodesMid);
     expect(stats.edgeCount).toBeGreaterThan(0);
     expect(stats.visibleNodeCount).toBe(0);
     expect(stats.sampleCount).toBe(0);

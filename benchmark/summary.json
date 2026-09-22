@@ -1,0 +1,5645 @@
+{
+  "nowIso": "2026-01-01T00:00:00.000Z",
+  "light": false,
+  "conditions": [
+    {
+      "condition": "CLEAN",
+      "cases": 15,
+      "totalHoles": 8,
+      "holesDetected": 3,
+      "holesDetectedStrict": 3,
+      "hookHitRate": 0.375,
+      "strictHitRate": 0.375,
+      "robustness": 1,
+      "errAtK": 0.16666666666666666,
+      "candidatePrecision": 0.2,
+      "fprProxy": 0.013758600000000001,
+      "surfaceRecallAt1": 0.8914814666666667,
+      "entityPrecision": 1,
+      "relationPrecision": 0.8666666666666667,
+      "relationRecall": 0.5659462666666666,
+      "observationCoverage": 1,
+      "classificationCoverage": 0.2,
+      "holesWithSignalAlignment": 2,
+      "hardFailures": 0,
+      "materializedEntities": 73,
+      "graphNodes": 73,
+      "graphEdges": 86
+    },
+    {
+      "condition": "NOISY_MISSING",
+      "cases": 15,
+      "totalHoles": 8,
+      "holesDetected": 2,
+      "holesDetectedStrict": 2,
+      "hookHitRate": 0.25,
+      "strictHitRate": 0.25,
+      "robustness": 1,
+      "errAtK": 0.1,
+      "candidatePrecision": 0.13333333333333333,
+      "fprProxy": 0.04012346666666667,
+      "surfaceRecallAt1": 0.8,
+      "entityPrecision": 1,
+      "relationPrecision": 0.8666666666666667,
+      "relationRecall": 0.5852332666666666,
+      "observationCoverage": 1,
+      "classificationCoverage": 0.13333333333333333,
+      "holesWithSignalAlignment": 1,
+      "hardFailures": 0,
+      "materializedEntities": 66,
+      "graphNodes": 66,
+      "graphEdges": 65
+    },
+    {
+      "condition": "ADVERSARIAL",
+      "cases": 15,
+      "totalHoles": 8,
+      "holesDetected": 1,
+      "holesDetectedStrict": 1,
+      "hookHitRate": 0.125,
+      "strictHitRate": 0.125,
+      "robustness": 1,
+      "errAtK": 0.06666666666666667,
+      "candidatePrecision": 0.06666666666666667,
+      "fprProxy": 0.04399933333333333,
+      "surfaceRecallAt1": 0.7394444666666666,
+      "entityPrecision": 1,
+      "relationPrecision": 0.8666666666666667,
+      "relationRecall": 0.5448773333333333,
+      "observationCoverage": 1,
+      "classificationCoverage": 0.06666666666666667,
+      "holesWithSignalAlignment": 0,
+      "hardFailures": 0,
+      "materializedEntities": 62,
+      "graphNodes": 62,
+      "graphEdges": 56
+    }
+  ],
+  "perCase": [
+    {
+      "caseKey": "ER-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000701",
+        "caseKey": "ER-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 8,
+          "recordsObserved": 8,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 8,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 0.8,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0.25,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000701",
+        "caseKey": "ER-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 4,
+          "recordsObserved": 4,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 4,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.6,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 2,
+          "expectedWithheldEdges": 2,
+          "resolutions": 2,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000701",
+        "caseKey": "ER-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 4,
+          "recordsObserved": 4,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 4,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.6,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 2,
+          "expectedWithheldEdges": 2,
+          "resolutions": 2,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-02",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000702",
+        "caseKey": "ER-02",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 0.5,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 3,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0,
+          "recallAtThreshold": 0,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-02",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000702",
+        "caseKey": "ER-02",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 4,
+          "recordsObserved": 4,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 4,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.375,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 2,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0,
+          "recallAtThreshold": 0,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-02",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000702",
+        "caseKey": "ER-02",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 7,
+          "recordsObserved": 7,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 7,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 0.5,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 2,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0,
+          "recallAtThreshold": 0,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-03",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000703",
+        "caseKey": "ER-03",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 3,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.666667,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-03",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000703",
+        "caseKey": "ER-03",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 4,
+          "recordsObserved": 4,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 4,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.75,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 2,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ER-03",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000703",
+        "caseKey": "ER-03",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 2,
+          "recordsObserved": 2,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 2,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 2,
+          "resolvedTruthKeys": 2,
+          "surfaceRecallAt1": 0.5,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 2,
+          "resolutions": 1,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 2,
+          "graphNodes": 2,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "REL-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000704",
+        "caseKey": "REL-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 10,
+          "recordsObserved": 10,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 10,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 5,
+          "resolvedTruthKeys": 5,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 3,
+          "matchedResolutions": 3,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.75,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 5,
+          "graphNodes": 5,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "REL-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000704",
+        "caseKey": "REL-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 11,
+          "recordsObserved": 11,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 11,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 0.8,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 3,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "REL-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000704",
+        "caseKey": "REL-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 8,
+          "recordsObserved": 8,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 8,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.6,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.333333,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "REL-02",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000705",
+        "caseKey": "REL-02",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.75,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 3,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.666667,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "REL-02",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000705",
+        "caseKey": "REL-02",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 3,
+          "recordsObserved": 3,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 3,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 2,
+          "resolvedTruthKeys": 2,
+          "surfaceRecallAt1": 0.5,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 2,
+          "resolutions": 1,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 1,
+          "contradictionObservationsMaterialized": 1,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 2,
+          "graphNodes": 2,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "REL-02",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000705",
+        "caseKey": "REL-02",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 3,
+          "recordsObserved": 3,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 3,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 2,
+          "resolvedTruthKeys": 2,
+          "surfaceRecallAt1": 0.5,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 2,
+          "resolutions": 1,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 1,
+          "contradictionObservationsMaterialized": 1,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 2,
+          "graphNodes": 2,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000706",
+        "caseKey": "GAP-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 48,
+          "recordsObserved": 48,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 48,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 14,
+          "expectedWithheldEdges": 0,
+          "resolutions": 15,
+          "resolvableResolutions": 7,
+          "matchedResolutions": 7,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 14,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1,
+          "strictHitRate": 1,
+          "robustness": 1,
+          "errAtK": 1,
+          "k": 3,
+          "qualifiedCandidates": 1,
+          "rawCandidates": 1,
+          "candidatesHittingAnyHole": 1,
+          "candidatePrecision": 1,
+          "totalPairEvaluations": 76,
+          "fprProxy": 0.013158,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 1,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 1
+            },
+            {
+              "type": "RECORD",
+              "count": 1
+            }
+          ],
+          "holesWithSignalAlignment": 1
+        },
+        "allTypeDistribution": [
+          {
+            "type": "MISSING_INVESTIGATION",
+            "count": 1
+          }
+        ],
+        "allStatusDistribution": [
+          {
+            "status": "CONFIDENT",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000706",
+        "caseKey": "GAP-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 44,
+          "recordsObserved": 44,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 11,
+          "observationsMaterialized": 44,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 11,
+          "expectedWithheldEdges": 3,
+          "resolutions": 12,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.363636,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 11,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 1,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 54,
+          "fprProxy": 0.018519,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000706",
+        "caseKey": "GAP-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 44,
+          "recordsObserved": 44,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 11,
+          "observationsMaterialized": 44,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 11,
+          "expectedWithheldEdges": 3,
+          "resolutions": 12,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.363636,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 11,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 1,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 54,
+          "fprProxy": 0.018519,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000707",
+        "caseKey": "GAP-02",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 48,
+          "recordsObserved": 48,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 48,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 14,
+          "expectedWithheldEdges": 0,
+          "resolutions": 15,
+          "resolvableResolutions": 6,
+          "matchedResolutions": 6,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.428571,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 14,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1,
+          "strictHitRate": 1,
+          "robustness": 1,
+          "errAtK": 0.5,
+          "k": 3,
+          "qualifiedCandidates": 2,
+          "rawCandidates": 2,
+          "candidatesHittingAnyHole": 2,
+          "candidatePrecision": 1,
+          "totalPairEvaluations": 77,
+          "fprProxy": 0.025974,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 2,
+          "classificationCoverage": 1,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 2
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 2
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 2,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 4,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 2
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 2
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 2,
+          "generatedCandidatesTotal": 8,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 8,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [
+          {
+            "type": "MISSING_INVESTIGATION",
+            "count": 2
+          }
+        ],
+        "allStatusDistribution": [
+          {
+            "status": "CONFIDENT",
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000707",
+        "caseKey": "GAP-02",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 43,
+          "recordsObserved": 43,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 11,
+          "observationsMaterialized": 43,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 11,
+          "expectedWithheldEdges": 3,
+          "resolutions": 12,
+          "resolvableResolutions": 5,
+          "matchedResolutions": 5,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.454545,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 11,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1,
+          "strictHitRate": 1,
+          "robustness": 1,
+          "errAtK": 0.5,
+          "k": 3,
+          "qualifiedCandidates": 2,
+          "rawCandidates": 3,
+          "candidatesHittingAnyHole": 2,
+          "candidatePrecision": 1,
+          "totalPairEvaluations": 63,
+          "fprProxy": 0.047619,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 2,
+          "classificationCoverage": 1,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 2
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 2
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 2,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 4,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 2
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 2
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 2,
+          "generatedCandidatesTotal": 8,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 8,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [
+          {
+            "type": "MISSING_INVESTIGATION",
+            "count": 2
+          }
+        ],
+        "allStatusDistribution": [
+          {
+            "status": "CONFIDENT",
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000707",
+        "caseKey": "GAP-02",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 46,
+          "recordsObserved": 46,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 14,
+          "observationsMaterialized": 46,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 10,
+          "expectedWithheldEdges": 4,
+          "resolutions": 11,
+          "resolvableResolutions": 5,
+          "matchedResolutions": 5,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 10,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1,
+          "strictHitRate": 1,
+          "robustness": 1,
+          "errAtK": 1,
+          "k": 3,
+          "qualifiedCandidates": 1,
+          "rawCandidates": 2,
+          "candidatesHittingAnyHole": 1,
+          "candidatePrecision": 1,
+          "totalPairEvaluations": 57,
+          "fprProxy": 0.035088,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 1,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 1
+            },
+            {
+              "type": "RECORD",
+              "count": 1
+            }
+          ],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [
+          {
+            "type": "MISSING_INVESTIGATION",
+            "count": 1
+          }
+        ],
+        "allStatusDistribution": [
+          {
+            "status": "CONFIDENT",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000708",
+        "caseKey": "GAP-03",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 8,
+          "recordsObserved": 8,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 8,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 3,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 2,
+          "expectedWithheldEdges": 0,
+          "resolutions": 3,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0,
+          "recallAtThreshold": 0,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 1,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 7,
+          "fprProxy": 0.142857,
+          "hardFailures": 0,
+          "byType": {
+            "TEMPORAL_GAP": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000708",
+        "caseKey": "GAP-03",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 3,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0,
+          "recallAtThreshold": 0,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 3,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 6,
+          "fprProxy": 0.5,
+          "hardFailures": 0,
+          "byType": {
+            "TEMPORAL_GAP": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000708",
+        "caseKey": "GAP-03",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 3,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0,
+          "recallAtThreshold": 0,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 3,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 6,
+          "fprProxy": 0.5,
+          "hardFailures": 0,
+          "byType": {
+            "TEMPORAL_GAP": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000709",
+        "caseKey": "GAP-04",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 45,
+          "recordsObserved": 45,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 45,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 8,
+          "resolvedTruthKeys": 8,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 13,
+          "expectedWithheldEdges": 0,
+          "resolutions": 14,
+          "resolvableResolutions": 8,
+          "matchedResolutions": 8,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.615385,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 8,
+          "graphNodes": 8,
+          "nodeMaterialization": 1,
+          "graphEdges": 13,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1,
+          "strictHitRate": 1,
+          "robustness": 1,
+          "errAtK": 1,
+          "k": 3,
+          "qualifiedCandidates": 1,
+          "rawCandidates": 2,
+          "candidatesHittingAnyHole": 1,
+          "candidatePrecision": 1,
+          "totalPairEvaluations": 82,
+          "fprProxy": 0.02439,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 1,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 1
+            },
+            {
+              "type": "RECORD",
+              "count": 1
+            }
+          ],
+          "holesWithSignalAlignment": 1
+        },
+        "allTypeDistribution": [
+          {
+            "type": "MISSING_INVESTIGATION",
+            "count": 1
+          }
+        ],
+        "allStatusDistribution": [
+          {
+            "status": "CONFIDENT",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000709",
+        "caseKey": "GAP-04",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 36,
+          "recordsObserved": 36,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 14,
+          "observationsMaterialized": 36,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 7,
+          "resolvedTruthKeys": 7,
+          "surfaceRecallAt1": 0.875,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 9,
+          "expectedWithheldEdges": 4,
+          "resolutions": 10,
+          "resolvableResolutions": 5,
+          "matchedResolutions": 5,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.555556,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 7,
+          "graphNodes": 7,
+          "nodeMaterialization": 1,
+          "graphEdges": 9,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1,
+          "strictHitRate": 1,
+          "robustness": 1,
+          "errAtK": 1,
+          "k": 3,
+          "qualifiedCandidates": 1,
+          "rawCandidates": 2,
+          "candidatesHittingAnyHole": 1,
+          "candidatePrecision": 1,
+          "totalPairEvaluations": 56,
+          "fprProxy": 0.035714,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 1,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 1
+            },
+            {
+              "type": "RECORD",
+              "count": 1
+            }
+          ],
+          "holesWithSignalAlignment": 1
+        },
+        "allTypeDistribution": [
+          {
+            "type": "MISSING_INVESTIGATION",
+            "count": 1
+          }
+        ],
+        "allStatusDistribution": [
+          {
+            "status": "CONFIDENT",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000709",
+        "caseKey": "GAP-04",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 32,
+          "recordsObserved": 32,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 20,
+          "observationsMaterialized": 32,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 7,
+          "resolvedTruthKeys": 7,
+          "surfaceRecallAt1": 0.875,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 7,
+          "expectedWithheldEdges": 6,
+          "resolutions": 8,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.571429,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 7,
+          "graphNodes": 7,
+          "nodeMaterialization": 1,
+          "graphEdges": 7,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 5,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 47,
+          "fprProxy": 0.106383,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000710",
+        "caseKey": "NBE-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 7,
+          "recordsObserved": 7,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 7,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 5,
+          "resolvedTruthKeys": 5,
+          "surfaceRecallAt1": 0.833333,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 5,
+          "graphNodes": 5,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 2,
+          "holesRegionBuilt": 2,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 38,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 2,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000710",
+        "caseKey": "NBE-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 7,
+          "recordsObserved": 7,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 7,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 5,
+          "resolvedTruthKeys": 5,
+          "surfaceRecallAt1": 0.833333,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 5,
+          "graphNodes": 5,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 2,
+          "holesRegionBuilt": 2,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 38,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 2,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000710",
+        "caseKey": "NBE-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 5,
+          "recordsObserved": 5,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 6,
+          "observationsMaterialized": 5,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.5,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.666667,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 2,
+          "holesRegionBuilt": 2,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 8,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 2,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000711",
+        "caseKey": "NBE-02",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 8,
+          "recordsObserved": 8,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 8,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 14,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000711",
+        "caseKey": "NBE-02",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 7,
+          "recordsObserved": 7,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 7,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 1,
+          "resolutions": 3,
+          "resolvableResolutions": 3,
+          "matchedResolutions": 3,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 12,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000711",
+        "caseKey": "NBE-02",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 5,
+          "recordsObserved": 5,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 6,
+          "observationsMaterialized": 5,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.75,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 2,
+          "expectedWithheldEdges": 2,
+          "resolutions": 2,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 1,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 4,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ROB-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000712",
+        "caseKey": "ROB-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 22,
+          "recordsObserved": 22,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 22,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 9,
+          "materializedEntities": 8,
+          "resolvedTruthKeys": 8,
+          "surfaceRecallAt1": 0.888889,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 7,
+          "expectedWithheldEdges": 0,
+          "resolutions": 10,
+          "resolvableResolutions": 3,
+          "matchedResolutions": 3,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.428571,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 8,
+          "graphNodes": 8,
+          "nodeMaterialization": 1,
+          "graphEdges": 7,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ROB-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000712",
+        "caseKey": "ROB-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 26,
+          "recordsObserved": 26,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 26,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 9,
+          "materializedEntities": 9,
+          "resolvedTruthKeys": 8,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 7,
+          "expectedWithheldEdges": 0,
+          "resolutions": 13,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.571429,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 9,
+          "graphNodes": 9,
+          "nodeMaterialization": 1,
+          "graphEdges": 7,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ROB-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000712",
+        "caseKey": "ROB-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 26,
+          "recordsObserved": 26,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 26,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 9,
+          "materializedEntities": 9,
+          "resolvedTruthKeys": 8,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 7,
+          "expectedWithheldEdges": 0,
+          "resolutions": 13,
+          "resolvableResolutions": 4,
+          "matchedResolutions": 4,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.571429,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 9,
+          "graphNodes": 9,
+          "nodeMaterialization": 1,
+          "graphEdges": 7,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ROB-02",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000713",
+        "caseKey": "ROB-02",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 5,
+          "recordsObserved": 5,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 5,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.6,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 2,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.333333,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ROB-02",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000713",
+        "caseKey": "ROB-02",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 5,
+          "recordsObserved": 5,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 5,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.6,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 2,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.333333,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "ROB-02",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000713",
+        "caseKey": "ROB-02",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 5,
+          "recordsObserved": 5,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 5,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 5,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.6,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 0,
+          "resolutions": 2,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.333333,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 2,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GRD-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000714",
+        "caseKey": "GRD-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 8,
+          "recordsObserved": 8,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 8,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GRD-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000714",
+        "caseKey": "GRD-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 11,
+          "recordsObserved": 11,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 0,
+          "observationsMaterialized": 11,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 0,
+          "resolutions": 4,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 1,
+          "contradictionObservationsMaterialized": 1,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 4,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GRD-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000714",
+        "caseKey": "GRD-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 8,
+          "recordsObserved": 8,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 8,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 4,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 3,
+          "expectedWithheldEdges": 1,
+          "resolutions": 3,
+          "resolvableResolutions": 1,
+          "matchedResolutions": 1,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.333333,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 1,
+          "contradictionObservationsMaterialized": 1,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 0,
+          "holesRegionBuilt": 0,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 0,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {}
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000715",
+        "caseKey": "SYS-01",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 10,
+          "recordsObserved": 10,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 10,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 6,
+          "resolvedTruthKeys": 6,
+          "surfaceRecallAt1": 1,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 5,
+          "expectedWithheldEdges": 0,
+          "resolutions": 5,
+          "resolvableResolutions": 3,
+          "matchedResolutions": 3,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.6,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 6,
+          "graphNodes": 6,
+          "nodeMaterialization": 1,
+          "graphEdges": 5,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 32,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000715",
+        "caseKey": "SYS-01",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 9,
+          "recordsObserved": 9,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 9,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 0.666667,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 1,
+          "resolutions": 3,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 12,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000715",
+        "caseKey": "SYS-01",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 9,
+          "recordsObserved": 9,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 9,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 6,
+          "materializedEntities": 4,
+          "resolvedTruthKeys": 4,
+          "surfaceRecallAt1": 0.666667,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 4,
+          "expectedWithheldEdges": 1,
+          "resolutions": 3,
+          "resolvableResolutions": 2,
+          "matchedResolutions": 2,
+          "precisionAtThreshold": 1,
+          "recallAtThreshold": 0.5,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 4,
+          "graphNodes": 4,
+          "nodeMaterialization": 1,
+          "graphEdges": 3,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 0,
+          "holesDetectedStrict": 0,
+          "lenientHitRate": 0,
+          "strictHitRate": 0,
+          "robustness": 0,
+          "errAtK": 0,
+          "k": 3,
+          "qualifiedCandidates": 0,
+          "rawCandidates": 0,
+          "candidatesHittingAnyHole": 0,
+          "candidatePrecision": 0,
+          "totalPairEvaluations": 12,
+          "fprProxy": 0,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 0
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 0,
+          "classificationCoverage": 0,
+          "typeDistribution": [],
+          "statusDistribution": [],
+          "holesWithClassifiedHit": 0
+        },
+        "explanation": {
+          "candidatesWithExplanation": 0,
+          "gapsWithExplanationShare": 0,
+          "explanationTotal": 0,
+          "explanationMeanPerGap": 0,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": []
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 0,
+          "generatedCandidatesTotal": 0,
+          "generatedMeanPerGap": 0,
+          "selectedTotal": 0,
+          "selectedMeanPerGap": 0,
+          "retentionRate": 0,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [],
+          "holesWithSignalAlignment": 0
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    }
+  ],
+  "allTypeDistribution": [
+    {
+      "type": "MISSING_INVESTIGATION",
+      "count": 8
+    }
+  ],
+  "allStatusDistribution": [
+    {
+      "status": "CONFIDENT",
+      "count": 8
+    }
+  ],
+  "allEvidenceTypes": [
+    {
+      "type": "DOCUMENT",
+      "count": 8
+    },
+    {
+      "type": "RECORD",
+      "count": 8
+    }
+  ],
+  "allExplanationTypes": [
+    {
+      "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+      "count": 8
+    },
+    {
+      "type": "MISSING_INVESTIGATION_EXPLANATION",
+      "count": 8
+    }
+  ],
+  "hardFailures": [],
+  "verdicts": [
+    {
+      "caseKey": "GAP-01",
+      "condition": "CLEAN",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 19
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 15
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 15
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "CLEAN",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 2,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 19
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 2,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 16
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 19
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "CLEAN",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 4
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "CLEAN",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 17
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 17
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 13
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 1
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "CLEAN",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 4
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 4
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "SATURATED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "CLEAN",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 3
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "lenientHit": false,
+      "strictHit": false,
+      "firstHitRank": null,
+      "regionStatus": "LIMITED",
+      "seedObservationCount": 2
+    }
+  ],
+  "chainHoles": [
+    {
+      "caseKey": "GAP-01",
+      "condition": "CLEAN",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.7445,
+          "significance": 0.7417,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-EDGE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "CLEAN",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 2,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "BROKEN_CHAIN",
+          "nodeIds": [
+            "4f12bf2e-0df0-454b-a15f-2a3b570d0a7c",
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "7efe6c94-ccdb-4094-80c9-07446927ef52",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5",
+            "ac28f8f4-ce0b-4c4e-bbc6-85512b37d5b1"
+          ],
+          "structuralScore": 0.7325,
+          "significance": 0.7345,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        },
+        {
+          "rank": 2,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
+          ],
+          "structuralScore": 0.7325,
+          "significance": 0.7345,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 3,
+      "qualifiedCount": 2,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "BROKEN_CHAIN",
+          "nodeIds": [
+            "4f12bf2e-0df0-454b-a15f-2a3b570d0a7c",
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "7efe6c94-ccdb-4094-80c9-07446927ef52",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5",
+            "bdcbcc17-855c-48a7-a327-978e6de0a602"
+          ],
+          "structuralScore": 0.7425,
+          "significance": 0.7405,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        },
+        {
+          "rank": 2,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
+          ],
+          "structuralScore": 0.7425,
+          "significance": 0.7405,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-PATH-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
+            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
+          ],
+          "structuralScore": 0.7675,
+          "significance": 0.7555,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "CLEAN",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "expectedType": null,
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "expectedType": null,
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 3,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-TEMP-1",
+      "holeType": "TEMPORAL_GAP",
+      "expectedType": null,
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 3,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "CLEAN",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "27d51443-431c-4e78-9478-4b884bae506c",
+            "f592adec-fd31-42b0-a59d-0de4520d3876"
+          ],
+          "structuralScore": 0.7175,
+          "significance": 0.7255,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 2,
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "27d51443-431c-4e78-9478-4b884bae506c",
+            "f592adec-fd31-42b0-a59d-0de4520d3876"
+          ],
+          "structuralScore": 0.7175,
+          "significance": 0.7255,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-COM-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "communication",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 5,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [
+        "LOW_STRUCTURAL_SCORE",
+        "LOW_SIGNIFICANCE"
+      ],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "CLEAN",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "financial",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "financial",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE-2",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "financial",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "CLEAN",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "NBE-02",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-NBE2-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "SATURATED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "CLEAN",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "NOISY_MISSING",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    },
+    {
+      "caseKey": "SYS-01",
+      "condition": "ADVERSARIAL",
+      "holeId": "H-SYS-1",
+      "holeType": "MISSING_EDGE",
+      "expectedType": "association",
+      "regionStatus": "LIMITED",
+      "regionError": null,
+      "detectionError": null,
+      "qualificationError": null,
+      "rawCandidateCount": 0,
+      "qualifiedCount": 0,
+      "qualificationFailureReasons": [],
+      "candidates": []
+    }
+  ]
+}

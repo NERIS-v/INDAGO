@@ -1,0 +1,94 @@
+{
+  "caseId": "00000000-0000-4000-8000-000000000703",
+  "caseKey": "ER-03",
+  "condition": "ADVERSARIAL",
+  "materialization": {
+    "recordsTotal": 2,
+    "recordsObserved": 2,
+    "recordsWithheld": 0,
+    "recordsHeldOut": 4,
+    "observationsMaterialized": 2,
+    "observationCoverage": 1,
+    "withheldRecordsStillMaterialized": 0
+  },
+  "entity": {
+    "truthSurfaces": 4,
+    "materializedEntities": 2,
+    "resolvedTruthKeys": 2,
+    "surfaceRecallAt1": 0.5,
+    "entityPrecision": 1,
+    "overCollapsedEntities": 0,
+    "mergedTruthPairs": 0
+  },
+  "relation": {
+    "expectedObservedEdges": 1,
+    "expectedWithheldEdges": 2,
+    "resolutions": 1,
+    "resolvableResolutions": 1,
+    "matchedResolutions": 1,
+    "precisionAtThreshold": 1,
+    "recallAtThreshold": 1,
+    "typeAccuracy": 0,
+    "supportThreshold": 0.25
+  },
+  "contradiction": {
+    "plantedContradictionClaims": 0,
+    "contradictionObservationsMaterialized": 0,
+    "contradictionsFlagged": 0,
+    "recall": 0
+  },
+  "graph": {
+    "entities": 2,
+    "graphNodes": 2,
+    "nodeMaterialization": 1,
+    "graphEdges": 1,
+    "truncated": false
+  },
+  "holes": {
+    "holesPlanted": 0,
+    "holesRegionBuilt": 0,
+    "holesDetected": 0,
+    "holesDetectedStrict": 0,
+    "lenientHitRate": 0,
+    "strictHitRate": 0,
+    "robustness": 0,
+    "errAtK": 0,
+    "k": 3,
+    "qualifiedCandidates": 0,
+    "rawCandidates": 0,
+    "candidatesHittingAnyHole": 0,
+    "candidatePrecision": 0,
+    "totalPairEvaluations": 0,
+    "fprProxy": 0,
+    "hardFailures": 0,
+    "byType": {}
+  },
+  "classification": {
+    "classifiedCandidates": 0,
+    "classificationCoverage": 0,
+    "typeDistribution": [],
+    "statusDistribution": [],
+    "holesWithClassifiedHit": 0
+  },
+  "explanation": {
+    "candidatesWithExplanation": 0,
+    "gapsWithExplanationShare": 0,
+    "explanationTotal": 0,
+    "explanationMeanPerGap": 0,
+    "truncatedExplanationSets": 0,
+    "typeCoverage": []
+  },
+  "evidence": {
+    "gapsWithEvidenceGeneration": 0,
+    "generatedCandidatesTotal": 0,
+    "generatedMeanPerGap": 0,
+    "selectedTotal": 0,
+    "selectedMeanPerGap": 0,
+    "retentionRate": 0,
+    "truncatedSelections": 0,
+    "evidenceTypeCoverage": [],
+    "holesWithSignalAlignment": 0
+  },
+  "allTypeDistribution": [],
+  "allStatusDistribution": []
+}

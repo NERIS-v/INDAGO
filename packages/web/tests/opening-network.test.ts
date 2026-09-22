@@ -305,8 +305,9 @@ describe("network resolve — reads as a connected WEB, not floating pairs", () 
           if (linkSet.has(na) && linkSet.has(nb)) triangleCount += 1;
         }
       }
-      // Shared neighbours on top of the spines → real cycles everywhere.
-      expect(triangleCount / 3).toBeGreaterThanOrEqual(8);
+      // Shared neighbours on top of the spines → real cycles in the sparse
+      // icon graph (fewer resolved nodes ⇒ fewer cliques; some is enough).
+      expect(triangleCount / 3).toBeGreaterThanOrEqual(3);
     }
   });
 });
