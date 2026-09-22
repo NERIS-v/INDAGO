@@ -83,29 +83,6 @@ export const OPENING_RELEASE_WINDOW = { start: 0.63, end: 0.84 } as const;
 export const OPENING_EDGE_WINDOW = { start: 0.76, end: 0.94 } as const;
 
 // ---------------------------------------------------------------------------
-// FRAGMENTED DATA narrative layer — the single restrained statement for the
-// moment right after INDAGO disintegrates. Fades in over the disintegration →
-// node-release transition and is already leaving as the network takes over
-// (the controller derives the fade-out from the in-windows below). Text sits
-// in negative space, never over the node field: one tiny label + ONE statement.
-// ---------------------------------------------------------------------------
-/** The small "FRAGMENTED EVIDENCE" label fades in 0.50 → 0.60. */
-export const FRAG_LABEL_START = 0.5;
-export const FRAG_LABEL_END = 0.6;
-/** The primary statement fades in 0.56 → 0.68 (after the physical break). */
-export const FRAG_TEXT_START = 0.56;
-export const FRAG_TEXT_END = 0.68;
-/** Multiplier on the whole layer's opacity (1 = shipped). */
-export const FRAG_TEXT_OPACITY = 1;
-/** Multiplier on the layer scale (1 = shipped). */
-export const FRAG_TEXT_SCALE = 1;
-/** CSS px offset for the layer (calibration drift only, 0 = shipped). */
-export const FRAG_TEXT_X = 0;
-export const FRAG_TEXT_Y = 0;
-/** Max-width of the statement in rem (responsiveness ceiling). */
-export const FRAG_TEXT_MAX_WIDTH = 30;
-
-// ---------------------------------------------------------------------------
 // Camera. The perceived relationship is ONE continuous dolly: the viewer
 // starts close on the wordmark (hero 1.0), pulls away as it loses focus
 // (wide 0.62), holds the wide emptiness through the disintegration and the

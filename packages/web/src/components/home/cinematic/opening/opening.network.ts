@@ -85,7 +85,7 @@ export function openingNetworkRing(node: OpeningNodeDefinition): OpeningNetworkR
 /** Candidate rows: every node that can resolve at full strength (its depth sits
  *  inside the cap + feather), sorted FRONT-FIRST so the morph resolves near
  *  nodes before the periphery. `showLabel` marks a bounded, readable subset
- *  (never peripheral, never the pool labels EvidenceLabels already owns). */
+ *  (never peripheral, never the pool's own labels). */
 export function createOpeningNetworkView(
   bundle: OpeningGraphBundle,
 ): OpeningNetworkView {

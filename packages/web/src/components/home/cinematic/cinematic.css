@@ -118,204 +118,6 @@
   flex-basis: 0;
 }
 
-/* ----------------------------------------------------------------------------
-   Story act · beat copy (inside the pinned stage)
-   Each beat fades purely from the track's --story-t: opacity =
-   fadeIn(t) · (1 − fadeOut(t)), both clamped 0..1. Values are (point, slope)
-   pairs so the calc is only multiplies. While t = −1 (the intro owns the
-   stage) every window is negative → opacity 0.
-   The intro carries its OWN restrained narrative layer (see
-   .cinematic-scene__fragment below), so the beats never bleed into the field.
-   Sits above the network layer.
-   ---------------------------------------------------------------------------- */
-.cinematic-scene__story-copy {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.cinematic-scene__story-beat {
-  position: absolute;
-  bottom: clamp(4.5rem, 13svh, 8.5rem);
-  max-width: min(34rem, 84vw);
-  color: var(--color-semantic-foreground);
-  opacity: clamp(0, (var(--story-t, -1) - var(--in-a)) * var(--in-s), 1) *
-    (1 - clamp(0, (var(--story-t, -1) - var(--out-a)) * var(--out-s), 1));
-  text-shadow: 0 1px 3px rgba(6, 5, 4, 0.85);
-  will-change: opacity;
-}
-
-.cinematic-scene__story-beat.is-center {
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-}
-
-.cinematic-scene__story-beat.is-left {
-  left: clamp(1.5rem, 7vw, 7rem);
-  text-align: left;
-}
-
-.cinematic-scene__story-beat.is-right {
-  right: clamp(1.5rem, 7vw, 7rem);
-  text-align: left;
-}
-
-.cinematic-scene__story-kicker {
-  margin: 0 0 0.7rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.6rem;
-  font-weight: 600;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: var(--color-accent-amber);
-}
-
-.cinematic-scene__story-headline {
-  margin: 0;
-  color: var(--color-semantic-foreground);
-  font-family: var(--font-cormorant), Georgia, serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: clamp(2rem, 4.6svh, 3.25rem);
-  line-height: 1.06;
-  letter-spacing: 0.01em;
-}
-
-.cinematic-scene__story-sub {
-  margin: 0.8rem 0 0;
-  color: var(--color-semantic-foreground-muted);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-size: clamp(0.95rem, 1.8svh, 1.15rem);
-  line-height: 1.5;
-}
-
-.cinematic-scene__story-meta {
-  margin-top: 1.05rem;
-}
-
-.cinematic-scene__story-mono {
-  color: var(--color-accent-amber);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: clamp(1.5rem, 3svh, 2.1rem);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.cinematic-scene__story-meta-months {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.cinematic-scene__story-meta-months .cinematic-scene__story-mono {
-  padding: 0.45rem 0.75rem;
-  border: 1px solid var(--color-semantic-border-subtle);
-  border-radius: 4px;
-  color: var(--color-semantic-foreground-muted);
-  font-size: 0.85rem;
-  letter-spacing: 0.18em;
-}
-
-.cinematic-scene__story-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1.2rem;
-  justify-content: center;
-}
-
-.cinematic-scene__story-beat:not(.is-center)
-  .cinematic-scene__story-tags {
-  justify-content: flex-start;
-}
-
-.cinematic-scene__story-tag {
-  padding: 0.5rem 0.85rem;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  opacity: 0.9;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-}
-
-.cinematic-scene__story-cta {
-  display: inline-block;
-  margin-top: 1.7rem;
-  color: var(--color-semantic-foreground);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.9rem;
-  letter-spacing: 0.06em;
-  text-decoration: none;
-  pointer-events: auto;
-  border-bottom: 1px solid var(--color-accent-amber);
-}
-
-.cinematic-scene__story-cta:hover {
-  color: var(--color-accent-amber);
-}
-
-/* ----------------------------------------------------------------------------
-   Intro · FRAGMENTED DATA narrative layer
-   The single restrained statement for the moment right after INDAGO
-   disintegrates: one tiny amber label + ONE editorial sentence, sitting in the
-   bottom-left negative space of the pinned stage. NO card, no panel, no
-   border, no backdrop — just type over the fragmented field. Its CSS variables
-   come from the controller (--frag-*): the label/statement opacities are pure
-   window smoothsteps on intro progress (0.50–0.60 label, 0.56–0.68 statement,
-   both already leaving as the network takes over), the rest are calibration
-   drift (scale, x/y, max-width). defaults here are the shipped values.
-   Renders above the network layer (z-index 4) but the StoryCopy (z-index 5)
-   never overlaps it in time: by the time t >= 0 these windows are long over.
-   Reduced motion publishes zeros, and the defaults below are also 0, so the
-   layer is invisible there by construction.
-   ---------------------------------------------------------------------------- */
-.cinematic-scene__fragment {
-  position: absolute;
-  left: clamp(1.5rem, 7vw, 7rem);
-  bottom: clamp(4.5rem, 13svh, 8.5rem);
-  z-index: 4;
-  max-width: min(var(--frag-max-width, 30rem), 84vw);
-  pointer-events: none;
-  transform: translate(
-      var(--frag-x, 0px),
-      var(--frag-y, 0px)
-    )
-    scale(var(--frag-scale, 1));
-  transform-origin: left bottom;
-  will-change: opacity, transform;
-}
-
-.cinematic-scene__fragment-label {
-  margin: 0 0 0.7rem;
-  opacity: var(--frag-label, 0);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.6rem;
-  font-weight: 600;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: var(--color-accent-amber);
-}
-
-.cinematic-scene__fragment-statement {
-  margin: 0;
-  opacity: var(--frag-text, 0);
-  color: var(--color-semantic-foreground);
-  font-family: var(--font-cormorant), Georgia, serif;
-  font-style: italic;
-  font-weight: 500;
-  font-size: clamp(1.75rem, 5svh, 3.25rem);
-  line-height: 1.1;
-  letter-spacing: 0.01em;
-  text-wrap: balance;
-  text-shadow: 0 1px 3px rgba(6, 5, 4, 0.85);
-}
-
 /* Once the act engages (the controller marks the stage), the "Scroll" cue is
    done — it belongs to the intro. The breathe keyframe is stopped too, since
    an animation overrides the opacity property. */
@@ -512,30 +314,6 @@
   background: var(--color-semantic-foreground);
 }
 
-/* Sparse fiction labels on top of the graph canvas. Kept tiny, muted and few;
-   positioned in percent units from the scene's normalized anchors so they
-   never need per-frame DOM measurement. Below the CSS vignette. */
-.cinematic-scene__labels {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.cinematic-scene__label {
-  position: absolute;
-  transform: translate(-50%, -130%);
-  white-space: nowrap;
-  color: var(--color-semantic-foreground-muted);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 3px rgba(6, 5, 4, 0.9);
-  transition: opacity 300ms linear;
-  will-change: left, top, opacity;
-}
-
 /* ============================================================================
    Network resolution — the icon-node design layer (constellation → graph).
    Rendered as absolutely-positioned <div> anchors (percent units from the
@@ -596,13 +374,6 @@
   fill: var(--color-semantic-background);
   stroke: var(--color-warning);
   stroke-width: 1.25;
-}
-
-.cinematic-scene__net-hole-text {
-  fill: var(--color-warning);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 700;
 }
 
 /* The demo marches its hole dashes and breathes the badge; keep opacity
@@ -678,16 +449,6 @@
 
 .cinematic-scene__net-node[data-resolve-ring="bridge"] .cinematic-scene__net-ring {
   stroke: var(--cinematic-net-bridge);
-}
-
-.cinematic-scene__net-label {
-  fill: var(--color-semantic-foreground-muted);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.03em;
-  text-anchor: middle;
-  filter: drop-shadow(0 1px 2px rgba(6, 5, 4, 0.9));
-  opacity: 0.9;
 }
 
 /* ==========================================================================

@@ -4,10 +4,10 @@
 // At the very end of the dive the soft glow discs cede the stage to the DEMO
 // network's node design: circular ringed bodies with entity icons, dashed
 // attention rings (contradicted → red, gap → amber, bridge/accent → rose),
-// ICON-TO-ICON LINK EDGES that reach the moving circles, deterministic amber
-// GRAPH HOLES over unlinked pairs, and a bounded set of entity names.
+// ICON-TO-ICON LINK EDGES that reach the moving circles, and deterministic
+// amber GRAPH HOLES over unlinked pairs.
 //
-// Like EvidenceLabels, this layer is a pure DOM surface — the R3F pose writer
+// This layer is a pure DOM surface — the R3F pose writer
 // fills the shared OpeningNetworkView every frame (normalized ±1 anchors + px
 // radii) and a rAF loop here writes to ONE absolutely-positioned <div> per
 // node and ONE inset-0 <svg> for all links+holes. The <svg> has NO viewBox,
@@ -37,13 +37,11 @@ interface ResolvedNode {
   body: SVGCircleElement;
   ring: SVGCircleElement | null;
   icon: SVGSVGElement | null;
-  label: SVGTextElement | null;
 }
 
 interface ResolvedHole {
   line: SVGLineElement;
   dot: SVGCircleElement;
-  text: SVGTextElement;
 }
 
 const RING_OFFSETS = {
@@ -149,9 +147,6 @@ export function NetworkResolution({
             icon: el.querySelector<SVGSVGElement>(
               ".cinematic-scene__net-icon",
             ),
-            label: el.querySelector<SVGTextElement>(
-              ".cinematic-scene__net-label",
-            ),
           };
           resolvedRef.current[k] = node;
         }
@@ -185,9 +180,6 @@ export function NetworkResolution({
           node.icon.setAttribute("width", String(2 * iconBox));
           node.icon.setAttribute("height", String(2 * iconBox));
         }
-        if (node.label) {
-          node.label.setAttribute("y", String(-bodyR - 10));
-        }
       }
 
       // Icon-to-icon LINKS: endpoints are the node rows' CURRENT dived
@@ -213,7 +205,7 @@ export function NetworkResolution({
         link.dirty = false;
       }
 
-      // GRAPH HOLES: dashed amber gap + "?" badge at the pair midpoint.
+      // GRAPH HOLES: dashed amber gap marker at the pair midpoint.
       for (let k = 0; k < view.holes.length; k += 1) {
         const hole = view.holes[k]!;
         const group = holeGroupsRefRef.current[k];
@@ -226,17 +218,13 @@ export function NetworkResolution({
           const dot = group.querySelector<SVGCircleElement>(
             ".cinematic-scene__net-hole-dot",
           );
-          const text = group.querySelector<SVGTextElement>(
-            ".cinematic-scene__net-hole-text",
-          );
-          if (!line || !dot || !text) continue;
-          g = { line, dot, text };
+          if (!line || !dot) continue;
+          g = { line, dot };
           resolvedHolesRef.current[k] = g;
         }
         if (hole.alpha <= 0.005) {
           g.line.setAttribute("opacity", "0");
           g.dot.setAttribute("opacity", "0");
-          g.text.setAttribute("opacity", "0");
           hole.dirty = false;
           continue;
         }
@@ -257,9 +245,6 @@ export function NetworkResolution({
         g.dot.setAttribute("cx", mx.toFixed(2));
         g.dot.setAttribute("cy", my.toFixed(2));
         g.dot.setAttribute("opacity", opacity);
-        g.text.setAttribute("x", mx.toFixed(2));
-        g.text.setAttribute("y", my.toFixed(2));
-        g.text.setAttribute("opacity", opacity);
         hole.dirty = false;
       }
     };
@@ -301,14 +286,6 @@ export function NetworkResolution({
           >
             <line className="cinematic-scene__net-hole" opacity={0} />
             <circle className="cinematic-scene__net-hole-dot" r={13} opacity={0} />
-            <text
-              className="cinematic-scene__net-hole-text"
-              textAnchor="middle"
-              dominantBaseline="central"
-              opacity={0}
-            >
-              ?
-            </text>
           </g>
         ))}
       </svg>
@@ -347,18 +324,13 @@ export function NetworkResolution({
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path
+<path
                 d={getNodeIconPath({
                   type: "ENTITY",
                   label: row.label,
                 })}
               />
             </svg>
-            {row.showLabel ? (
-              <text className="cinematic-scene__net-label" textAnchor="middle">
-                {row.label}
-              </text>
-            ) : null}
           </svg>
         </div>
       ))}

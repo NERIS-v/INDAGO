@@ -18,11 +18,8 @@
 
 import { Canvas } from "@react-three/fiber";
 import type { RefObject } from "react";
-import { EvidenceLabels } from "./EvidenceLabels";
-import { FragmentedEvidence } from "./FragmentedEvidence";
 import { NetworkResolution } from "./NetworkResolution";
 import { FoundationScene } from "./scenes/FoundationScene";
-import { StoryCopy } from "./story/StoryCopy";
 import { OPENING_LETTERS, OPENING_WORDMARK_TEXT } from "./opening/opening.constants";
 import type { CinematicQuality, CinematicSceneHandle } from "./cinematic.types";
 import type { OpeningEffects } from "./opening/opening.types";
@@ -96,23 +93,12 @@ export function CinematicStage({
           />
         </Canvas>
       </div>
-      {/* Sparse DOM evidence labels: read the scene's shared pose buffer on a
-          slow cadence and appear only at the very end of the journey. */}
-      <EvidenceLabels effects={effects} />
       {/* NETWORK RESOLUTION: the icon-node design layer, also read from the
           scene's shared buffer — appears as the dive resolves. */}
       <NetworkResolution
         effects={effects}
         animate={quality.motion !== "reduced"}
       />
-      {/* FRAGMENTED DATA: the single restrained statement over the scattered
-          discs after INDAGO disintegrates — scrubbed by --frag-* (set on the
-          track by the controller); invisible by default and in reduced motion. */}
-      <FragmentedEvidence />
-      {/* STORY COPY: the twelve post-intro beats, scrubbed by --story-t (set on
-          the track by the controller). Opacity windows live on each beat; the
-          beats are invisible while the intro owns the stage (t = −1). */}
-      <StoryCopy />
     </section>
   );
 }

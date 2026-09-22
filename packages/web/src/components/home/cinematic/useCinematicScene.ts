@@ -32,18 +32,7 @@ import {
   clamp01,
   isCinematicDiagnosticsRequested,
 } from "./cinematic.constants";
-import { openingSnapshotAt, smoothstep } from "./opening/opening.progress";
-import {
-  FRAG_LABEL_END,
-  FRAG_LABEL_START,
-  FRAG_TEXT_END,
-  FRAG_TEXT_MAX_WIDTH,
-  FRAG_TEXT_OPACITY,
-  FRAG_TEXT_SCALE,
-  FRAG_TEXT_START,
-  FRAG_TEXT_X,
-  FRAG_TEXT_Y,
-} from "./opening/opening.constants";
+import { openingSnapshotAt } from "./opening/opening.progress";
 import { createStoryBase, storyStateAt } from "./story/story.model";
 import {
   STORY_SCROLL_CSS_DEFAULT,
@@ -68,79 +57,6 @@ import type { StoryFocus } from "./story/story.types";
 const STORY_T_CSS_VAR = "--story-t";
 const STORY_WRAPPER_SELECTOR = "[data-cinematic-story-wrapper]";
 const STORY_STAGE_ATTR = "data-cinematic-story";
-
-// --frag-*: the intro's FRAGMENTED DATA layer — the single restrained statement
-// ("FRAGMENTED EVIDENCE" + one line) that fades in over the disintegration →
-// node-release transition and leaves before the graph resolves. The controller
-// publishes window smoothsteps (label/text presence) plus the calibration drift
-// (scale / x / y / max-width) so the layer is fully scrubbed by intro progress.
-// Reduced motion publishes zeros and the CSS defaults are also 0, so the layer
-// is invisible there by construction. It never overlaps the act: by the time
-// the story handoff (t >= 0) happens these windows are long over.
-const FRAG_LABEL_CSS_VAR = "--frag-label";
-const FRAG_TEXT_CSS_VAR = "--frag-text";
-const FRAG_SCALE_CSS_VAR = "--frag-scale";
-const FRAG_X_CSS_VAR = "--frag-x";
-const FRAG_Y_CSS_VAR = "--frag-y";
-const FRAG_MAX_WIDTH_CSS_VAR = "--frag-max-width";
-
-/**
- * Publish the FRAGMENTED DATA layer onto the track. label/text are window
- * smoothsteps on intro progress (see the FRAG_LABEL / FRAG_TEXT shippings),
- * each carrying a derived fade-OUT just past its window so the words are gone
- * as the network takes over — the layer can never overlap the act's beats. The
- * transform / max-width fields are passed through 1:1 from calibration (shipped
- * values are the CSS defaults). Reduced motion publishes zeros; the CSS default
- * is also 0.
- */
-function publishFragmentedEvidence(
-  track: HTMLElement | null,
-  progress: number,
-  reduced: boolean,
-  calibration: CinematicCalibration | null,
-): void {
-  if (!track) return;
-  track.style.setProperty(
-    FRAG_SCALE_CSS_VAR,
-    String(calibration?.fragTextScale ?? FRAG_TEXT_SCALE),
-  );
-  track.style.setProperty(
-    FRAG_X_CSS_VAR,
-    `${calibration?.fragTextX ?? FRAG_TEXT_X}px`,
-  );
-  track.style.setProperty(
-    FRAG_Y_CSS_VAR,
-    `${calibration?.fragTextY ?? FRAG_TEXT_Y}px`,
-  );
-  track.style.setProperty(
-    FRAG_MAX_WIDTH_CSS_VAR,
-    `${calibration?.fragTextMaxWidth ?? FRAG_TEXT_MAX_WIDTH}rem`,
-  );
-  if (reduced) {
-    track.style.setProperty(FRAG_LABEL_CSS_VAR, "0");
-    track.style.setProperty(FRAG_TEXT_CSS_VAR, "0");
-    return;
-  }
-  const labelEnd = calibration?.fragLabelEnd ?? FRAG_LABEL_END;
-  const textEnd = calibration?.fragTextEnd ?? FRAG_TEXT_END;
-  const opacity = calibration?.fragTextOpacity ?? FRAG_TEXT_OPACITY;
-  const labelIn = smoothstep(
-    calibration?.fragLabelStart ?? FRAG_LABEL_START,
-    labelEnd,
-    progress,
-  );
-  const textIn = smoothstep(
-    calibration?.fragTextStart ?? FRAG_TEXT_START,
-    textEnd,
-    progress,
-  );
-  const labelOut = smoothstep(labelEnd + 0.14, labelEnd + 0.22, progress);
-  const textOut = smoothstep(textEnd + 0.1, textEnd + 0.18, progress);
-  const label = Math.max(0, labelIn * (1 - labelOut)) * opacity;
-  const text = Math.max(0, textIn * (1 - textOut)) * opacity;
-  track.style.setProperty(FRAG_LABEL_CSS_VAR, label.toFixed(6));
-  track.style.setProperty(FRAG_TEXT_CSS_VAR, text.toFixed(6));
-}
 
 // gsap.registerPlugin is idempotent, so this may safely run on every mount;
 // keeping it call-site-local avoids module-level mutable state and stale flags
@@ -318,7 +234,6 @@ export function useCinematicScene(
       handle.camera = { centerX: 0, centerY: 0, zoom: CINEMATIC_REDUCED_ZOOM };
     }
     writeWordmarkCues(wordmarkRef.current, handle.wordmark);
-    publishFragmentedEvidence(track, 0, reduced, calibrationRef.current);
     handle.pointer = { x: 0, y: 0, normalizedX: 0, normalizedY: 0, isInside: false };
     setQuality(nextQuality);
 
@@ -371,16 +286,7 @@ export function useCinematicScene(
       // intro owns everything and the copy is parked invisible at t = −1.
       if (scrollY > introTopPx.current + 1) {
         // A locked calibration owns progress; the act must not move the scene.
-        if (calibrationRef.current?.progressLocked) {
-          // The slider owns the frame — keep the fragmented layer scrubbed.
-          publishFragmentedEvidence(
-            track,
-            calibrationRef.current.progress,
-            reduced,
-            calibrationRef.current,
-          );
-          return;
-        }
+        if (calibrationRef.current?.progressLocked) return;
         const s = clamp01(
           (scrollY - introTopPx.current) / Math.max(storyHeightPx.current, 1),
         );
@@ -391,22 +297,9 @@ export function useCinematicScene(
         handle.camera = state.camera;
         if (!reduced) handle.progress = 1;
         track.style.setProperty(STORY_T_CSS_VAR, s.toFixed(6));
-        // The intro sits at p = 1 behind the act — the fragmented layer is
-        // long gone by then, so nothing can overlap the act's beats.
-        publishFragmentedEvidence(track, 1, reduced, calibrationRef.current);
         stage.setAttribute(STORY_STAGE_ATTR, "true");
       } else {
         handle.story = createStoryBase(reduced);
-        // The fragmented layer fades in over the disintegration → node-release
-        // transition; the intro progress is the raw scroll over the wrapper top.
-        publishFragmentedEvidence(
-          track,
-          calibrationRef.current?.progressLocked
-            ? calibrationRef.current.progress
-            : clamp01(scrollY / Math.max(introTopPx.current, 1)),
-          reduced,
-          calibrationRef.current,
-        );
         track.style.setProperty(STORY_T_CSS_VAR, "-1");
         stage.removeAttribute(STORY_STAGE_ATTR);
       }
@@ -463,12 +356,6 @@ export function useCinematicScene(
           false,
           lastPhase,
           onPhaseChangeRef.current,
-          calibrationRef.current,
-        );
-        publishFragmentedEvidence(
-          track,
-          progress,
-          false,
           calibrationRef.current,
         );
         writeWordmarkCues(wordmarkRef.current, handle.wordmark);
@@ -586,7 +473,6 @@ export function useCinematicScene(
           onPhaseChangeRef.current,
           calibration,
         );
-        publishFragmentedEvidence(trackRef.current, progress, reduced, calibration);
         writeWordmarkCues(wordmarkRef.current, handle.wordmark);
         return;
       }
@@ -612,17 +498,6 @@ export function useCinematicScene(
       handle.state = progress >= 1 ? "complete" : "active";
       handle.completion = completionAt(progress);
       writeWordmarkCues(wordmarkRef.current, handle.wordmark);
-      // Keep the fragmented layer scrubbed whichever path owns progress: the
-      // slider when locked, otherwise the real scroll (the same mapping
-      // applyScroll uses).
-      publishFragmentedEvidence(
-        trackRef.current,
-        locked
-          ? calibration!.progress
-          : clamp01(window.scrollY / Math.max(introTopPx.current, 1)),
-        false,
-        calibration,
-      );
     },
     [handle],
   );

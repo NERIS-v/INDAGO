@@ -7,8 +7,7 @@
 //               └─ <FoundationScene>  WebGL backdrop + haze + camera
 //                    ├─ <OpeningScene>        whole journey: wordmark particles
 //                    │                        crack apart → travel → graph
-//                    ├─ <OpeningInteraction>  pointer emphasis (full motion)
-//                    └─ <EvidenceLabels>      sparse end-state labels
+//                    └─ <OpeningInteraction>  pointer emphasis (full motion)
 //
 // The stage runs the FULL opening journey from one effects object: the H1
 // wordmark is sampled into a whole-word particle field, the letters dissolve

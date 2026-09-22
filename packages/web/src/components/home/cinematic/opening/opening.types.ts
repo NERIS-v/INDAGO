@@ -170,7 +170,7 @@ export interface OpeningPoseRow {
   dirty: boolean;
 }
 
-/** Shared pose buffer: the R3F compute writes it, EvidenceLabels reads it. */
+/** Shared pose buffer: the R3F compute writes it, the point field reads it. */
 export interface OpeningPoseView {
   readonly rows: readonly OpeningPoseRow[];
   readonly labelCapacity: number;
