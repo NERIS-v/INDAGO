@@ -458,7 +458,11 @@ function MetricBand({
     (l) => l.status === "ACTIVE" || l.status === "NEW",
   ).length;
   const openGaps = enrichment.gaps.filter(
-    (g) => g.status === "WORKING" || g.status === "ACKNOWLEDGED" || g.status === "IDENTIFIED",
+    (g) =>
+      g.status === "UNDER_REVIEW" ||
+      g.status === "IDENTIFIED" ||
+      g.status === "EVIDENCE_REQUESTED" ||
+      g.status === "WAITING_FOR_EVIDENCE",
   ).length;
 
   const cells: MetricCell[] = [

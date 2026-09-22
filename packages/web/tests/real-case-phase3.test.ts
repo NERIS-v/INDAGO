@@ -14,7 +14,7 @@
 //   3. DETERMINISTIC       — identical runs, identical records, stable freezes.
 //   4. IDEMPOTENT          — re-submitting never duplicates records.
 //   5. HONEST              — provenance is mandatory everywhere, gap is
-//                            PARTIALLY_ADDRESSED (not resolved), the refinement
+//                            WAITING_FOR_EVIDENCE (not resolved), the refinement
 //                            reuses the parent chain, and no guilt/conspiracy or
 //                            later-validation hearsay ever enters derived JSON.
 // ============================================================================
@@ -282,11 +282,11 @@ describe("PASS 3 — package supply chain (DERIVED, honest, deterministic)", () 
     }
   });
 
-  it("reassesses the gap to PARTIALLY_ADDRESSED and completes EREQ_B4", () => {
+  it("reassesses the gap to WAITING_FOR_EVIDENCE and completes EREQ_B4", () => {
     const pkg = buildBreakthroughPackage();
     const gap = pkg.gapReassessment;
     expect(gap.id).toBe(GAP_B4);
-    expect(gap.status).toBe("PARTIALLY_ADDRESSED");
+    expect(gap.status).toBe("WAITING_FOR_EVIDENCE");
     expect(gap.resolution).toContain("NOT resolved");
     expect(gap.resolution).toContain("financial edge");
     expect(gap.resolvedAt).toBeUndefined();
@@ -390,7 +390,7 @@ describe("PASS 3 — live ingestion through DemoEvidenceProvider", () => {
     expect(state.graphEdgeById.has(GE_B_HITMAN_WINTER_HILL)).toBe(true);
     expect(state.graphEdgeById.size).toBe(9);
     expect(state.hypothesisById.has(HYP_B3)).toBe(true);
-    expect(state.gapById.get(GAP_B4)?.status).toBe("PARTIALLY_ADDRESSED");
+    expect(state.gapById.get(GAP_B4)?.status).toBe("WAITING_FOR_EVIDENCE");
     expect(state.evidenceRequestById.get(EREQ_B4)?.status).toBe("COMPLETED");
     expect(listDemoSessionBreakthrough(INVESTIGATION_B_ID)).toHaveLength(1);
   });
@@ -413,7 +413,7 @@ describe("PASS 3 — live ingestion through DemoEvidenceProvider", () => {
     hydrateDemoSessionBreakthroughs(fresh.state);
     expect(fresh.state.evidenceById.has(EVID_EXHIBIT_719)).toBe(true);
     expect(fresh.state.hypothesisById.has(HYP_B3)).toBe(true);
-    expect(fresh.state.gapById.get(GAP_B4)?.status).toBe("PARTIALLY_ADDRESSED");
+    expect(fresh.state.gapById.get(GAP_B4)?.status).toBe("WAITING_FOR_EVIDENCE");
     const page = await fresh.evidence.listByInvestigation(INVESTIGATION_B_ID, { pageSize: 100 });
     expect(page.items.filter((e: Evidence) => e.id === EVID_EXHIBIT_719)).toHaveLength(1);
   });
@@ -445,7 +445,7 @@ describe("PASS 3 — live ingestion through DemoEvidenceProvider", () => {
     expect(state.graphEdgeById.has(GE_B_WJA_FBI)).toBe(true);
     expect(state.graphEdgeById.has(GE_B_RICO_HITMAN)).toBe(true);
     expect(state.graphEdgeById.has(GE_B_HITMAN_WINTER_HILL)).toBe(true);
-    expect(state.gapById.get(GAP_B4)?.status).toBe("PARTIALLY_ADDRESSED");
+    expect(state.gapById.get(GAP_B4)?.status).toBe("WAITING_FOR_EVIDENCE");
     expect(listDemoSessionBreakthrough(INVESTIGATION_B_ID)).toHaveLength(1);
   });
 
@@ -475,7 +475,7 @@ describe("PASS 3 — live ingestion through DemoEvidenceProvider", () => {
     expect(state.evidenceById.get(EVID_EXHIBIT_719)).toBeTruthy();
     expect(state.evidenceById.size).toBe(caseBEnriched.evidence.length + 1);
     expect(state.graphEdgeById.size).toBe(9);
-    expect(state.gapById.get(GAP_B4)?.status).toBe("PARTIALLY_ADDRESSED");
+    expect(state.gapById.get(GAP_B4)?.status).toBe("WAITING_FOR_EVIDENCE");
   });
 });
 

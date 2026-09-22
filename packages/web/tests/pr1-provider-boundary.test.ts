@@ -107,7 +107,7 @@ describe("PR-1 T3 — investigative gaps flow through the provider + adapter", (
       type: "UNRESOLVED_IDENTITY",
       title: "Principal behind signing authority",
       description: "Whether Maria exercises signing authority independently or under Victor's direction is unresolved.",
-      status: "ACKNOWLEDGED",
+      status: "EVIDENCE_REQUESTED",
       priority: "MEDIUM",
       impact: 0.58,
       expectedInformationValue: 0.5,

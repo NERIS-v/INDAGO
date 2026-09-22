@@ -53,13 +53,14 @@ export const GapPrioritySchema = z.enum([
 ]);
 export type GapPriority = z.infer<typeof GapPrioritySchema>;
 
+
 export const GapStatusSchema = z.enum([
   'IDENTIFIED',
-  'ACKNOWLEDGED',
-  'WORKING',
-  'PARTIALLY_ADDRESSED',
+  'UNDER_REVIEW',
+  'EVIDENCE_REQUESTED',
+  'WAITING_FOR_EVIDENCE',
   'ADDRESSED',
-  'WONFIX',
+  'WONT_FIX',
 ]);
 export type GapStatus = z.infer<typeof GapStatusSchema>;
 

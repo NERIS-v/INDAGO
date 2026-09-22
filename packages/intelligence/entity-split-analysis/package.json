@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@indago/contracts": "workspace:*",
-    "@indago/gap-classification": "workspace:*"
+    "@indago/gap-classification": "workspace:*",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@indago/competing-explanations": "workspace:*",
