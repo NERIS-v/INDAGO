@@ -80,6 +80,8 @@ import {
   OBS_B12,
   ENT_WHEELER,
   ENT_SOUTHERN_HILLS,
+  ENT_A_MCGUIGAN,
+  ENT_A_SOCTF,
   ENT_CALLAHAN,
   ENT_RICO,
   ENT_WJA,
@@ -834,14 +836,60 @@ const foreignOverlaysB: Record<string, { id: string; title: string; summary: str
       { id: ENT_CALLAHAN, type: "ENTITY", label: "John \"Jack\" Callahan", isForeign: true, structuralImportance: 0.5 },
       { id: ENT_RICO, type: "ENTITY", label: "H. Paul Rico", isForeign: true, structuralImportance: 0.45 },
       { id: ENT_WJA, type: "ENTITY", label: "World Jai Alai", isForeign: true, structuralImportance: 0.9 },
+      { id: ENT_A_SOCTF, type: "ENTITY", label: "CT SOCTF", isForeign: true, structuralImportance: 0.8 },
+      { id: ENT_A_MCGUIGAN, type: "ENTITY", label: "Austin McGuigan", isForeign: true, structuralImportance: 0.55 },
     ],
-    edges: [],
+    edges: [
+      { id: "ct-e1", sourceNodeId: ENT_WJA, targetNodeId: ENT_CALLAHAN, support: 0.7, isForeignEdge: true },
+      { id: "ct-e2", sourceNodeId: ENT_WJA, targetNodeId: ENT_RICO, support: 0.65, isForeignEdge: true },
+      { id: "ct-e3", sourceNodeId: ENT_CALLAHAN, targetNodeId: ENT_RICO, support: 0.6, isForeignEdge: true },
+      { id: "ct-e4", sourceNodeId: ENT_WJA, targetNodeId: ENT_A_SOCTF, support: 0.75, isForeignEdge: true },
+      { id: "ct-e5", sourceNodeId: ENT_A_SOCTF, targetNodeId: ENT_A_MCGUIGAN, support: 0.7, isForeignEdge: true },
+      { id: "ct-e6", sourceNodeId: ENT_WJA, targetNodeId: ENT_A_MCGUIGAN, support: 0.55, isForeignEdge: true },
+      { id: "ct-e7", sourceNodeId: ENT_RICO, targetNodeId: ENT_A_SOCTF, support: 0.5, isForeignEdge: true },
+      { id: "ct-e8", sourceNodeId: ENT_CALLAHAN, targetNodeId: ENT_A_MCGUIGAN, support: 0.45, isForeignEdge: true },
+      { id: "ct-b1", sourceNodeId: GN_B_WJA, targetNodeId: ENT_A_SOCTF, support: 0.68, isForeignEdge: true },
+      { id: "ct-b2", sourceNodeId: GN_B_RICO, targetNodeId: ENT_A_MCGUIGAN, support: 0.6, isForeignEdge: true },
+    ],
   },
 };
 
 // ── Foreign Entity DB ───────────────────────────────────────────────────────
 
-const foreignEntityDbB: Record<string, any> = {};
+const foreignEntityDbB: Record<string, any> = {
+  [ENT_A_SOCTF]: {
+    id: ENT_A_SOCTF,
+    caseId: CASE_A_ID,
+    investigationId: INVESTIGATION_A_ID,
+    canonicalName: "Connecticut Statewide Organized Crime Task Force",
+    status: "ACTIVE",
+    observationIds: [],
+    evidenceIds: [],
+    hypothesisIds: [],
+    roleHypothesisIds: [],
+    entityType: "ORGANIZATION",
+    aliases: ["CT SOCTF"],
+    summary: "The Connecticut prosecutor-driven task force reviewing organized-crime influence over jai-alai licensing. Its review of the World Jai Alai ownership chain overlaps the Tulsa homicide probe on the shared WJA bridge.",
+    createdAt: obs("2024-07-01"),
+    updatedAt: obs("2024-07-01"),
+  },
+  [ENT_A_MCGUIGAN]: {
+    id: ENT_A_MCGUIGAN,
+    caseId: CASE_A_ID,
+    investigationId: INVESTIGATION_A_ID,
+    canonicalName: "Austin McGuigan",
+    status: "ACTIVE",
+    observationIds: [],
+    evidenceIds: [],
+    hypothesisIds: [],
+    roleHypothesisIds: [],
+    entityType: "PERSON",
+    aliases: ["McGuigan"],
+    summary: "Connecticut Statewide Organized Crime Task Force attorney who led the licensing review. His file attests the WJA employment of the security figures named in the cross-case bridge.",
+    createdAt: obs("2024-07-01"),
+    updatedAt: obs("2024-07-01"),
+  },
+};
 
 // ── Assembled Fixture Set ───────────────────────────────────────────────────
 
