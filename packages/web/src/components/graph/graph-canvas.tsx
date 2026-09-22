@@ -26,6 +26,13 @@ interface GraphCanvasProps {
   physicsEdges?: GraphEdge[];
   holes: GraphHole[];
   onNodeClick: (nodeId: string) => void;
+  /** Fired when the user clicks a RENDERED edge (relationship link). The edge
+   *  id is a graph edge id (not a relation id) — the panel maps it to the
+   *  provider-backed relation context. */
+  onEdgeClick?: (edgeId: string) => void;
+  /** Directly selected edge id (a picked relationship). Drives the selection
+   *  highlight on the edge itself; cleared when the panel selection moves. */
+  selectedEdgeId?: string | null;
   activeTimeRange: [number, number] | null;
   /** P4: per-node observation activity corridor (nodeId → [min,max] epoch or
    *  null when the node has no dated observations). When present it is the
@@ -74,7 +81,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, activeTimeRange, controlsRef, selectedNodeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, onEdgeClick, activeTimeRange, controlsRef, selectedNodeId, selectedEdgeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
   // PR-10: the physics topology defaults to the rendered edges for standalone
   // callers and is the FULL merged topology when the panel supplies it — so
   // readability-filter interactions never restart the simulation.
@@ -87,6 +94,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [focusedNode, setFocusedNode] = useState<string | null>(null);
   const [internalSelectedNode, setInternalSelectedNode] = useState<string | null>(null);
+  const [internalSelectedEdge, setInternalSelectedEdge] = useState<string | null>(null);
   
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -116,6 +124,16 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
       setFocusedNode((prev) => (prev !== null && prev !== selectedNodeId ? null : prev));
     }
   }, [selectedNodeId]);
+
+  // A directly selected edge follows the panel selection (derived from the
+  // canonical context). A node selection deliberately clears the edge — a
+  // graph can highlight exactly one selection subject at a time.
+  useEffect(() => {
+    if (selectedEdgeId !== undefined) {
+      setInternalSelectedEdge(selectedEdgeId);
+      if (selectedEdgeId) setHoveredNode(null);
+    }
+  }, [selectedEdgeId]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -466,12 +484,14 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   );
 
   const edgeStateFor = useCallback(
-    (edge: LayoutEdge, interaction: { selected: boolean; focused: boolean; hovered: boolean }): GraphEdgeVisualState => {
+    (edge: LayoutEdge, interaction: { selected: boolean; focused: boolean; hovered: boolean; selectedEdge: boolean }): GraphEdgeVisualState => {
       const raw = visualContext?.edges.get(edge.id) ?? DEFAULT_EDGE_VISUAL_STATE;
+      const selected = raw.selected || interaction.selectedEdge;
       return {
         ...raw,
-        incidentToSelection: raw.incidentToSelection || interaction.selected || interaction.focused || interaction.hovered,
-        attentionLevel: interaction.selected || interaction.focused ? 3 : raw.attentionLevel,
+        selected,
+        incidentToSelection: raw.incidentToSelection || interaction.selected || interaction.focused || interaction.hovered || selected,
+        attentionLevel: selected || interaction.selected || interaction.focused ? 3 : raw.attentionLevel,
       };
     },
     [visualContext],
@@ -625,7 +645,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                 const isForeignBridge = (edge as any).isForeignBridge;
                 const isForeignEdge = (edge as any).isForeignEdge;
                   
-                const isConnected = hoveredNode === source.id || hoveredNode === target.id || focusedNode === source.id || focusedNode === target.id || internalSelectedNode === source.id || internalSelectedNode === target.id || isDragged;
+                const isSelectedEdge = internalSelectedEdge === edge.id;
+                const isConnected = isSelectedEdge || hoveredNode === source.id || hoveredNode === target.id || focusedNode === source.id || focusedNode === target.id || internalSelectedNode === source.id || internalSelectedNode === target.id || isDragged;
                 const isOutOfBounds = !isNodeInTimeRange(source.id) || !isNodeInTimeRange(target.id);
                 const length = Math.max(1, edgeGeometry.get(edge.id) ?? 1);
 
@@ -650,6 +671,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   selected: internalSelectedNode === source.id || internalSelectedNode === target.id,
                   focused: focusedNode === source.id || focusedNode === target.id,
                   hovered: hoveredNode === source.id || hoveredNode === target.id,
+                  selectedEdge: isSelectedEdge,
                 };
                 const vs = edgeStateFor(edge, interaction);
                 const focusRecede =
@@ -703,7 +725,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                       hypRel: vs.hypothesisRelevance,
                       evidenceInScope: vs.evidenceInScope,
                       gapAffected: vs.gapAffected,
-                      selected: interaction.selected,
+                      selected: interaction.selected || interaction.selectedEdge,
                       attentionLevel: vs.attentionLevel,
                     })}
                     data-graph-case-scope={vs.caseScope}
@@ -729,6 +751,18 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                     >
                       {showTrace && <animate attributeName="stroke-dashoffset" from="20" to="0" dur={isForeignBridge ? "0.4s" : "0.6s"} repeatCount="indefinite" />}
                     </path>
+                    <path
+                      d={edgePath} fill="none" stroke="transparent" strokeOpacity={0}
+                      strokeLinecap="round" strokeWidth={14} style={{ pointerEvents: isOutOfBounds ? "none" : "stroke" }}
+                      aria-hidden="true"
+                      className="cursor-pointer"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInternalSelectedEdge(edge.id);
+                        onEdgeClick?.(edge.id);
+                      }}
+                    />
                   </g>
                 );
               })}
@@ -868,8 +902,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                   className={`fill-transparent outline-none ${inTimeRange ? "cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-semantic-focus" : "pointer-events-none"}`}
                   onMouseEnter={() => setHoveredNode(node.id)} onMouseLeave={() => setHoveredNode(null)}
                   onFocus={() => applyFocus(node.id)} onBlur={() => applyFocus(null)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
-                  onClick={() => { setInternalSelectedNode(node.id); onNodeClick(node.id); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setInternalSelectedEdge(null); setInternalSelectedNode(node.id); onNodeClick(node.id); } }}
+                  onClick={() => { setInternalSelectedEdge(null); setInternalSelectedNode(node.id); onNodeClick(node.id); }}
                 />
               );
             })}

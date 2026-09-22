@@ -474,6 +474,17 @@ export function GraphPanel({
     return finalNodes.find((n) => n.entityId === source)?.id ?? null;
   }, [selectedContext, selectedEntityId, finalNodes]);
 
+  // A relationship selection in the shell resolves to the DRAWN edge whose
+  // relationHypothesisId maps to the canonical relation context id (if it is
+  // still on screen). Graph edge ids (GE_*) are panel-internal — never leak.
+  const selectedGraphEdgeId = useMemo(() => {
+    if (selectedContext?.kind !== "relation") return null;
+    return (
+      finalEdges.find((e) => e.relationHypothesisId === selectedContext.id)?.id ??
+      null
+    );
+  }, [selectedContext, finalEdges]);
+
   // F-PR14: deterministic hidden-selection rule. The filter only ever removes
   // RENDERED edges (provider topology is untouched), so a selected node's
   // incident edges may be hidden even though the node stays. This derived
@@ -517,12 +528,13 @@ export function GraphPanel({
         activeTimeRange,
         filter,
         selectedNodeId: selectedGraphNodeId,
+        selectedEdgeId: selectedGraphEdgeId,
         foreignNodeIds,
         foreignEdgeIds,
         focusSeed,
         activityBounds: entityActivityBounds,
       }),
-    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, foreignNodeIds, foreignEdgeIds, focusSeed, entityActivityBounds],
+    [finalNodes, canvasEdges, mergedHoles, activeTimeRange, filter, selectedGraphNodeId, selectedGraphEdgeId, foreignNodeIds, foreignEdgeIds, focusSeed, entityActivityBounds],
   );
 
   // PR-3: graph selection is an INTENT. The shell owns canonical selection
@@ -552,6 +564,21 @@ export function GraphPanel({
       }
     },
     [finalNodes, foreignOverlays, emitContext],
+  );
+
+  // PR-10: an edge click is a RELATION intent. Only provider-backed edges carry
+  // a relationHypothesisId; scaffold/demo links (e.g. authored islands, hole
+  // repairs) have neither a relation record nor an in-app drawer, so they stay
+  // unselectable. The panel trusts the provider id — never a graph id leak.
+  const handleEdgeSelect = useCallback(
+    (edgeId: string) => {
+      const edge = finalEdges.find((e) => e.id === edgeId);
+      if (!edge?.relationHypothesisId) return;
+      setSelectedEntityId(null);
+      setSelectedGapId(null);
+      emitContext({ kind: "relation", id: edge.relationHypothesisId, source: "graph" });
+    },
+    [finalEdges, emitContext],
   );
 
   const handleGapSelect = useCallback(
@@ -810,7 +837,9 @@ export function GraphPanel({
             physicsEdges={finalEdges as GraphEdge[]}
             holes={mergedHoles}
             selectedNodeId={selectedGraphNodeId}
+            selectedEdgeId={selectedGraphEdgeId}
             onNodeClick={handleNodeSelect}
+            onEdgeClick={handleEdgeSelect}
             onCanvasBackgroundPointerDown={handleBackgroundDeselect}
             activeTimeRange={activeTimeRange}
             controlsRef={controlsRef}

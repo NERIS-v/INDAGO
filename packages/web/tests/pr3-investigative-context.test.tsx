@@ -31,6 +31,7 @@ import {
   LEAD_1,
   REL_1,
   HYP_1,
+  GE_1,
 } from "@/lib/providers/demo/demo-fixtures/lookup";
 import {
   contextKey,
@@ -99,6 +100,16 @@ vi.mock("@/components/graph/graph-canvas", () => ({
           >
             {n.label ?? n.entityId ?? n.id}
           </button>
+        ))}
+        {(props.edges ?? []).map((e: any) => (
+          <button
+            key={e.id}
+            type="button"
+            data-edge-id={e.id}
+            data-selected-edge={props.selectedEdgeId === e.id ? "true" : "false"}
+            aria-label={`${e.relationType ?? "Relationship"} relationship ${e.id}`}
+            onClick={() => props.onEdgeClick?.(e.id)}
+          />
         ))}
       </div>
     );
@@ -639,6 +650,32 @@ describe("PR-3 — graph → context bridge (end-to-end)", () => {
     fireEvent.click(screen.getByTestId("canvas-background"));
     await waitFor(() => expect(regionState()).toBe("empty"));
     expect(screen.getByRole("button", { name: "Victor Aldridge" }).getAttribute("data-selected")).toBe("false");
+  });
+
+  it("clicking a relationship edge selects the relation and resolves the right panel", async () => {
+    renderControlCenter();
+    await screen.findByTestId("graph-canvas");
+
+    // GE_1 is provider-backed (relationHypothesisId REL_1, ownership).
+    const edgeButton = document.querySelector<HTMLButtonElement>(`[data-edge-id="${GE_1}"]`);
+    expect(edgeButton).not.toBeNull();
+    fireEvent.click(edgeButton as HTMLButtonElement);
+    await waitResolved("OWNERSHIP", "relation");
+
+    expect(document.querySelector("[data-context-panel-kind]")?.textContent).toBe("Relation");
+    // The drawn edge carries the selection highlight while its relation is selected.
+    expect(
+      document.querySelector<HTMLElement>(`[data-edge-id="${GE_1}"]`)?.getAttribute("data-selected-edge"),
+    ).toBe("true");
+    // No node was selected by the edge click.
+    expect(screen.getByRole("button", { name: "Victor Aldridge" }).getAttribute("data-selected")).toBe("false");
+
+    // Background click clears the relation selection too.
+    fireEvent.click(screen.getByTestId("canvas-background"));
+    await waitFor(() => expect(regionState()).toBe("empty"));
+    expect(
+      document.querySelector<HTMLElement>(`[data-edge-id="${GE_1}"]`)?.getAttribute("data-selected-edge"),
+    ).toBe("false");
   });
 
   it("deselecting does NOT zoom the camera back out (only the rail focus zooms)", async () => {
