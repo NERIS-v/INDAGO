@@ -28,10 +28,27 @@ import {
 import {
   IS_DEV,
   CINEMATIC_PIN_END,
+  CINEMATIC_REDUCED_ZOOM,
   clamp01,
   isCinematicDiagnosticsRequested,
 } from "./cinematic.constants";
-import { openingSnapshotAt } from "./opening/opening.progress";
+import { openingSnapshotAt, smoothstep } from "./opening/opening.progress";
+import {
+  FRAG_LABEL_END,
+  FRAG_LABEL_START,
+  FRAG_TEXT_END,
+  FRAG_TEXT_MAX_WIDTH,
+  FRAG_TEXT_OPACITY,
+  FRAG_TEXT_SCALE,
+  FRAG_TEXT_START,
+  FRAG_TEXT_X,
+  FRAG_TEXT_Y,
+} from "./opening/opening.constants";
+import { createStoryBase, storyStateAt } from "./story/story.model";
+import {
+  STORY_SCROLL_CSS_DEFAULT,
+  STORY_SCROLL_CSS_VAR,
+} from "./story/story.constants";
 import type { CinematicCalibration } from "./cinematic.calibration";
 import type {
   CinematicCompletionState,
@@ -40,6 +57,90 @@ import type {
   OpeningPhaseName,
 } from "./cinematic.types";
 import type { OpeningWordmarkCues } from "./cinematic.types";
+import type { StoryFocus } from "./story/story.types";
+
+// The story act is scrubbed by a PASSIVE window scroll listener (the track's
+// post-intro extent), not by GSAP. Every frame of the act is a pure function
+// of the story fraction (storyStateAt) written straight onto the handle, and
+// the wrapper's progress is published to the CSS layer via these two handles —
+// STORY_T_CSS_VAR (the scrubbed 0..1 fraction every beat's fade window reads)
+// and the STAGE's attribute (which hides the "Scroll" cue once the act begins).
+const STORY_T_CSS_VAR = "--story-t";
+const STORY_WRAPPER_SELECTOR = "[data-cinematic-story-wrapper]";
+const STORY_STAGE_ATTR = "data-cinematic-story";
+
+// --frag-*: the intro's FRAGMENTED DATA layer — the single restrained statement
+// ("FRAGMENTED EVIDENCE" + one line) that fades in over the disintegration →
+// node-release transition and leaves before the graph resolves. The controller
+// publishes window smoothsteps (label/text presence) plus the calibration drift
+// (scale / x / y / max-width) so the layer is fully scrubbed by intro progress.
+// Reduced motion publishes zeros and the CSS defaults are also 0, so the layer
+// is invisible there by construction. It never overlaps the act: by the time
+// the story handoff (t >= 0) happens these windows are long over.
+const FRAG_LABEL_CSS_VAR = "--frag-label";
+const FRAG_TEXT_CSS_VAR = "--frag-text";
+const FRAG_SCALE_CSS_VAR = "--frag-scale";
+const FRAG_X_CSS_VAR = "--frag-x";
+const FRAG_Y_CSS_VAR = "--frag-y";
+const FRAG_MAX_WIDTH_CSS_VAR = "--frag-max-width";
+
+/**
+ * Publish the FRAGMENTED DATA layer onto the track. label/text are window
+ * smoothsteps on intro progress (see the FRAG_LABEL / FRAG_TEXT shippings),
+ * each carrying a derived fade-OUT just past its window so the words are gone
+ * as the network takes over — the layer can never overlap the act's beats. The
+ * transform / max-width fields are passed through 1:1 from calibration (shipped
+ * values are the CSS defaults). Reduced motion publishes zeros; the CSS default
+ * is also 0.
+ */
+function publishFragmentedEvidence(
+  track: HTMLElement | null,
+  progress: number,
+  reduced: boolean,
+  calibration: CinematicCalibration | null,
+): void {
+  if (!track) return;
+  track.style.setProperty(
+    FRAG_SCALE_CSS_VAR,
+    String(calibration?.fragTextScale ?? FRAG_TEXT_SCALE),
+  );
+  track.style.setProperty(
+    FRAG_X_CSS_VAR,
+    `${calibration?.fragTextX ?? FRAG_TEXT_X}px`,
+  );
+  track.style.setProperty(
+    FRAG_Y_CSS_VAR,
+    `${calibration?.fragTextY ?? FRAG_TEXT_Y}px`,
+  );
+  track.style.setProperty(
+    FRAG_MAX_WIDTH_CSS_VAR,
+    `${calibration?.fragTextMaxWidth ?? FRAG_TEXT_MAX_WIDTH}rem`,
+  );
+  if (reduced) {
+    track.style.setProperty(FRAG_LABEL_CSS_VAR, "0");
+    track.style.setProperty(FRAG_TEXT_CSS_VAR, "0");
+    return;
+  }
+  const labelEnd = calibration?.fragLabelEnd ?? FRAG_LABEL_END;
+  const textEnd = calibration?.fragTextEnd ?? FRAG_TEXT_END;
+  const opacity = calibration?.fragTextOpacity ?? FRAG_TEXT_OPACITY;
+  const labelIn = smoothstep(
+    calibration?.fragLabelStart ?? FRAG_LABEL_START,
+    labelEnd,
+    progress,
+  );
+  const textIn = smoothstep(
+    calibration?.fragTextStart ?? FRAG_TEXT_START,
+    textEnd,
+    progress,
+  );
+  const labelOut = smoothstep(labelEnd + 0.14, labelEnd + 0.22, progress);
+  const textOut = smoothstep(textEnd + 0.1, textEnd + 0.18, progress);
+  const label = Math.max(0, labelIn * (1 - labelOut)) * opacity;
+  const text = Math.max(0, textIn * (1 - textOut)) * opacity;
+  track.style.setProperty(FRAG_LABEL_CSS_VAR, label.toFixed(6));
+  track.style.setProperty(FRAG_TEXT_CSS_VAR, text.toFixed(6));
+}
 
 // gsap.registerPlugin is idempotent, so this may safely run on every mount;
 // keeping it call-site-local avoids module-level mutable state and stale flags
@@ -115,6 +216,7 @@ export function createCinematicSceneHandle(
     interactionEnvelope: snapshot.interactionEnvelope,
     wordmark: snapshot.wordmark,
     camera: snapshot.camera,
+    story: createStoryBase(false),
     pointer: { x: 0, y: 0, normalizedX: 0, normalizedY: 0, isInside: false },
   };
 }
@@ -126,6 +228,9 @@ export interface CinematicSceneController {
   wordmarkRef: React.RefObject<HTMLHeadingElement | null>;
   handle: CinematicSceneHandle;
   quality: CinematicQuality;
+  /** The story focus set — assign from the cinematic root each render so the
+   *  act's camera/dim/pair/edge drivers stay locked to the live bundle. */
+  focusRef: React.MutableRefObject<StoryFocus | null>;
   /**
    * Development-only calibration hook. Feed it the calibration record (or null
    * to restore production). It NEVER creates a second ScrollTrigger: it merely
@@ -146,6 +251,7 @@ export type CinematicPhaseListener = (phase: OpeningPhaseName) => void;
 export function useCinematicScene(
   onCompletion?: CinematicCompletionListener,
   onPhaseChange?: CinematicPhaseListener,
+  focus?: StoryFocus | null,
 ): CinematicSceneController {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -154,8 +260,14 @@ export function useCinematicScene(
   onCompletionRef.current = onCompletion;
   const onPhaseChangeRef = useRef(onPhaseChange);
   onPhaseChangeRef.current = onPhaseChange;
+  const focusRef = useRef<StoryFocus | null>(null);
+  focusRef.current = focus ?? null;
   const lastCompletion = useRef<CinematicCompletionState>("active");
   const lastPhase = useRef<OpeningPhaseName>("hero");
+  // Story geometry, cached after measure (svh resolves against the live
+  // viewport; measured on mount + resize — never per frame).
+  const introTopPx = useRef(0);
+  const storyHeightPx = useRef(0);
   const [quality, setQuality] = useState<CinematicQuality>(BASE_CINEMATIC_QUALITY);
   const handleRef = useRef<CinematicSceneHandle | null>(null);
   if (handleRef.current === null) {
@@ -188,6 +300,7 @@ export function useCinematicScene(
     handle.progress = 0;
     handle.state = "idle";
     handle.completion = "active";
+    handle.story = createStoryBase(reduced);
     lastCompletion.current = "active";
     lastPhase.current = openingSnapshotAt(0, reduced).phase;
     applySnapshot(
@@ -198,21 +311,124 @@ export function useCinematicScene(
       onPhaseChangeRef.current,
       calibrationRef.current,
     );
+    // Reduced motion: the whole page — intro AND story act — is one calm wide
+    // camera held static. The story's own static frame mirrors it, so there is
+    // no 1.0 → 0.575 jump the moment the act scrolls in.
+    if (reduced) {
+      handle.camera = { centerX: 0, centerY: 0, zoom: CINEMATIC_REDUCED_ZOOM };
+    }
     writeWordmarkCues(wordmarkRef.current, handle.wordmark);
+    publishFragmentedEvidence(track, 0, reduced, calibrationRef.current);
     handle.pointer = { x: 0, y: 0, normalizedX: 0, normalizedY: 0, isInside: false };
     setQuality(nextQuality);
 
+    // Deferred scroll length: applied post-hydration so the server and first
+    // client paint stay identical (no SSR mismatch), and applied for EVERY tier
+    // (reduced collapses it to 0 → the story wrapper starts at page top). The
+    // track wraps the 100svh stage and stands it + intro distance + story
+    // distance tall.
+    track.style.setProperty(
+      "--cinematic-scroll-length",
+      `${nextQuality.scrollLength}svh`,
+    );
+    // The story distance is identical across tiers (the wrapper's height + the
+    // twelve propeller-length spacers) — written from the single source
+    // constant so the DOM and the model can never disagree.
+    track.style.setProperty(STORY_SCROLL_CSS_VAR, STORY_SCROLL_CSS_DEFAULT);
+    // Park every beat invisible until the intro hands the stage over: t = −1
+    // makes every fade-in window negative (opacity 0). The scroll listener
+    // writes the real 0..1 fraction once engaged.
+    track.style.setProperty(STORY_T_CSS_VAR, "-1");
+
     const disposers: Array<() => void> = [];
 
-    const context = gsap.context(() => {
-      // Deferred scroll length: applied post-hydration so the server and first
-      // client paint stay identical (no SSR mismatch). The track wraps the
-      // 100svh stage and stands viewport + distance tall.
-      track.style.setProperty("--cinematic-scroll-length", `${nextQuality.scrollLength}svh`);
+    // --- Story act scroll driver (full AND reduced motion) ---------------
+    // The story wrapper (inside the track, below the pinned stage) owns the
+    // post-intro scroll extent. Its document top is where the intro ENDS on the
+    // scroll axis — so:
+    //   intro progress p   = scroll / wrapperTop
+    //   story fraction  s  = (scroll − wrapperTop) / wrapperHeight
+    // Both measured once + on resize and cached (svh resolves against the live
+    // viewport); the scroll listener only writes, never measures.
+    const measureStory = (): boolean => {
+      const wrapper = track.querySelector<HTMLElement>(STORY_WRAPPER_SELECTOR);
+      if (!wrapper) return false;
+      const rect = wrapper.getBoundingClientRect();
+      if (rect.height <= 0) return false;
+      introTopPx.current = rect.top + window.scrollY;
+      storyHeightPx.current = rect.height;
+      return true;
+    };
 
-      // Reduced motion: calm single-viewport presentation — no pin, no scrub,
-      // no long choreography to trap a keyboard user in. The static snapshot
-      // laid down above keeps the graph present and the wordmark legible.
+    const applyStory = (): void => {
+      const focus = focusRef.current;
+      if (!focus || storyHeightPx.current <= 0) {
+        handle.story = createStoryBase(reduced);
+        return;
+      }
+      const scrollY = window.scrollY;
+      // Past the handoff → the act owns the stage. Inside it (or before), the
+      // intro owns everything and the copy is parked invisible at t = −1.
+      if (scrollY > introTopPx.current + 1) {
+        // A locked calibration owns progress; the act must not move the scene.
+        if (calibrationRef.current?.progressLocked) {
+          // The slider owns the frame — keep the fragmented layer scrubbed.
+          publishFragmentedEvidence(
+            track,
+            calibrationRef.current.progress,
+            reduced,
+            calibrationRef.current,
+          );
+          return;
+        }
+        const s = clamp01(
+          (scrollY - introTopPx.current) / Math.max(storyHeightPx.current, 1),
+        );
+        const state = storyStateAt(s, focus, reduced);
+        handle.story = state;
+        // Mirror the act's camera onto the shared handle so the canvas zoom,
+        // point size and DOM radii all follow the spotlight automatically.
+        handle.camera = state.camera;
+        if (!reduced) handle.progress = 1;
+        track.style.setProperty(STORY_T_CSS_VAR, s.toFixed(6));
+        // The intro sits at p = 1 behind the act — the fragmented layer is
+        // long gone by then, so nothing can overlap the act's beats.
+        publishFragmentedEvidence(track, 1, reduced, calibrationRef.current);
+        stage.setAttribute(STORY_STAGE_ATTR, "true");
+      } else {
+        handle.story = createStoryBase(reduced);
+        // The fragmented layer fades in over the disintegration → node-release
+        // transition; the intro progress is the raw scroll over the wrapper top.
+        publishFragmentedEvidence(
+          track,
+          calibrationRef.current?.progressLocked
+            ? calibrationRef.current.progress
+            : clamp01(scrollY / Math.max(introTopPx.current, 1)),
+          reduced,
+          calibrationRef.current,
+        );
+        track.style.setProperty(STORY_T_CSS_VAR, "-1");
+        stage.removeAttribute(STORY_STAGE_ATTR);
+      }
+    };
+
+    measureStory();
+    const onScroll = (): void => applyStory();
+    const onResize = (): void => {
+      measureStory();
+      applyStory();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    disposers.push(() => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    });
+
+    const context = gsap.context(() => {
+      // Reduced motion: calm presentation — the CSS sticky stage holds the
+      // frame while the passive story listener above scrubs the copy. No pin,
+      // no scrub, no long choreography to trap a keyboard user in.
       if (reduced) {
         handle.state = "active";
         writeWordmarkCues(wordmarkRef.current, handle.wordmark);
@@ -224,15 +440,35 @@ export function useCinematicScene(
       const enableDiagnostics =
         IS_DEV && isCinematicDiagnosticsRequested();
 
-      const updateFromProgress = (progress: number): void => {
+      /**
+       * Map a REAL scroll position onto the intro scrub. The pin runs "max"
+       * because the stage must stay pinned through the story's scroll extent
+       * too — so self.progress would stretch the intro across the whole page.
+       * Instead the intro's progress is <scroll / story-wrapper top>, which
+       * fixes the scrub to the intro's own reserved distance, and once scroll
+       * passes the wrapper top the intro freezes at p = 1 and the story act
+       * owns the frame (applyScroll stops writing the intro then).
+       */
+      const applyScroll = (scrollPosition: number): void => {
         // A locked calibration owns progress; scroll must not move the scene.
         if (calibrationRef.current?.progressLocked) return;
+        // Story owns the stage from the handoff on — never overwrite it.
+        if (scrollPosition > introTopPx.current + 1) return;
+        const progress = clamp01(
+          scrollPosition / Math.max(introTopPx.current, 1),
+        );
         applySnapshot(
           handle,
           progress,
           false,
           lastPhase,
           onPhaseChangeRef.current,
+          calibrationRef.current,
+        );
+        publishFragmentedEvidence(
+          track,
+          progress,
+          false,
           calibrationRef.current,
         );
         writeWordmarkCues(wordmarkRef.current, handle.wordmark);
@@ -249,14 +485,17 @@ export function useCinematicScene(
 
       const trigger = ScrollTrigger.create({
         // The track is the scroll container: its top is at document top, so
-        // the pin engages at scroll 0. The scroll DURATION is the track's own
-        // height (viewport + CINEMATIC_SCROLL_DISTANCE_SVH svh, written via
-        // --cinematic-scroll-length) — that tracked extent is the ONLY flow
-        // on the home route, so pinning "max" makes the release position R
-        // exactly coincide with the document's real max scroll. GSAP then
-        // holds the pinned stage at that boundary (its "isAtMax" guard) and a
-        // reverse scroll re-enters the active pin continuously: no unpin
-        // snap-back, no dark-track reveal, no progress/reset mismatch.
+        // the pin engages at scroll 0. The pin runs to "max" (the document's
+        // real max scroll) so the stage stays pinned through BOTH the intro
+        // distance and the story act's extent; scroll DURATION stays owned by
+        // the track height (viewport + intro + story, written via the two
+        // --cinematic-* length vars) — that tracked extent is the only flow on
+        // the home route, so the release position coincides with the document's
+        // real max scroll. GSAP then holds the pinned stage at that boundary
+        // (its "isAtMax" guard) and a reverse scroll re-enters the active pin
+        // continuously: no unpin snap-back, no dark-track reveal, no
+        // progress/reset mismatch. Intro progress is mapped from raw scroll in
+        // applyScroll (see above) so the act's extent never stretches it.
         trigger: track,
         start: "top top",
         end: CINEMATIC_PIN_END,
@@ -264,8 +503,8 @@ export function useCinematicScene(
         pinSpacing: false,
         anticipatePin: 1,
         markers: enableDiagnostics,
-        onUpdate: (self) => updateFromProgress(self.progress),
-        onRefresh: (self) => updateFromProgress(self.progress),
+        onUpdate: (self) => applyScroll(self.scroll()),
+        onRefresh: (self) => applyScroll(self.scroll()),
       });
 
       triggerRef.current = trigger;
@@ -347,6 +586,7 @@ export function useCinematicScene(
           onPhaseChangeRef.current,
           calibration,
         );
+        publishFragmentedEvidence(trackRef.current, progress, reduced, calibration);
         writeWordmarkCues(wordmarkRef.current, handle.wordmark);
         return;
       }
@@ -358,7 +598,9 @@ export function useCinematicScene(
         lockedRef.current = locked;
       }
 
-      const progress = locked ? calibration!.progress : clamp01(trigger.progress);
+      const progress = locked
+        ? calibration!.progress
+        : clamp01(trigger.progress);
       applySnapshot(
         handle,
         progress,
@@ -370,9 +612,28 @@ export function useCinematicScene(
       handle.state = progress >= 1 ? "complete" : "active";
       handle.completion = completionAt(progress);
       writeWordmarkCues(wordmarkRef.current, handle.wordmark);
+      // Keep the fragmented layer scrubbed whichever path owns progress: the
+      // slider when locked, otherwise the real scroll (the same mapping
+      // applyScroll uses).
+      publishFragmentedEvidence(
+        trackRef.current,
+        locked
+          ? calibration!.progress
+          : clamp01(window.scrollY / Math.max(introTopPx.current, 1)),
+        false,
+        calibration,
+      );
     },
     [handle],
   );
 
-  return { stageRef, trackRef, wordmarkRef, handle, quality, applyCalibration };
+  return {
+    stageRef,
+    trackRef,
+    wordmarkRef,
+    handle,
+    quality,
+    focusRef,
+    applyCalibration,
+  };
 }

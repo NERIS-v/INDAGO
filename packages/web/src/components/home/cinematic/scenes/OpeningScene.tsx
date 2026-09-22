@@ -42,7 +42,8 @@ import {
   OPENING_CLASS_SIZE,
   OPENING_CORE_TINT,
   OPENING_EDGE_TINT,
-  OPENING_LAYOUT_FIT_MARGIN,
+  OPENING_GRAPH_VIEW_FRACTION,
+  OPENING_LAYOUT_EDGE,
   OPENING_NETWORK_DISC_FADE,
   OPENING_NETWORK_HOLE_OPACITY,
   OPENING_NETWORK_NODE_SIZE,
@@ -68,18 +69,21 @@ import {
 import type { CinematicSceneHandle } from "../cinematic.types";
 import type { CinematicCalibration } from "../cinematic.calibration";
 import { shippingCalibrationAt } from "../cinematic.calibration";
+import {
+  computeStoryFocus,
+  storyDimAt,
+  storyEdgeEmphasis,
+  storyEmphasizedSlot,
+  storyNodeBaseFraction,
+  storyPairOffset,
+  storyProject,
+} from "../story/story.model";
 
-/**
- * Target world footprint of the final graph, as a fraction of each VIEWPORT
- * half-extent. The graph is meant to read as a large sparse network (~50vw
- * wide, ~50vh tall) with substantial negative space — never a small central
- * dot. Because the layout is normalised to ±(1 − fitMargin) on BOTH axes, a
- * node at layout edge (±1) maps to FRACTION × half-extent here.
- */
-const GRAPH_X_FRACTION = 0.5;
-const GRAPH_Y_FRACTION = 0.5;
-/** The ±1 layout box is really ±(1 − fitMargin); invert it for the mapping. */
-const LAYOUT_EDGE = 1 - OPENING_LAYOUT_FIT_MARGIN;
+// The blurred vertex-line buffer is REMOVED from the choreography: the intro
+// leaves the field FRAGMENTED — no edges join the slow discs (the "Form first."
+// beat carries that moment at the intro's tail), so the only edges the user
+// ever sees are the crisp DOM links the network resolve brings in later.
+const INTRO_EDGE_VISIBLE = false;
 
 export function OpeningScene({
   handle,
@@ -141,6 +145,27 @@ export function OpeningScene({
     }
     return arr;
   }, [bundle, count, nodeCount]);
+  // Deterministic story focus set + base-fraction anchors (both derived purely
+  // from the bundle at the handoff dive frame p = 1). The focus anchors the
+  // spotlight camera keys AND the pair-merge midpoint; the base fractions feed
+  // the dim falloff for every node (same fraction space the DOM rows use).
+  const focus = useMemo(() => computeStoryFocus(bundle), [bundle]);
+  const storyBase = useMemo(() => {
+    const baseFx = new Float32Array(count);
+    const baseFy = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) {
+      const node = i < nodeCount ? bundle.nodes[i] : null;
+      if (!node) continue;
+      const base = storyNodeBaseFraction(
+        node.nx,
+        node.ny,
+        depthByIndex[i] ?? 1,
+      );
+      baseFx[i] = base.fx;
+      baseFy[i] = base.fy;
+    }
+    return { fx: baseFx, fy: baseFy };
+  }, [bundle, count, nodeCount, depthByIndex]);
   const depthsUploaded = useRef(false);
 
   const edgeGeometry = useMemo(() => {
@@ -235,8 +260,8 @@ export function OpeningScene({
     // half-extent. Wide screens get a wide graph; portrait screens a tall one.
     // graphScale is art-directed (1.3 = the large final network) and remains
     // calibration-tunable in the dev lab.
-    const worldX = ((halfW * GRAPH_X_FRACTION) / LAYOUT_EDGE) * graphScale;
-    const worldY = ((halfH * GRAPH_Y_FRACTION) / LAYOUT_EDGE) * graphScale;
+    const worldX = ((halfW * OPENING_GRAPH_VIEW_FRACTION) / OPENING_LAYOUT_EDGE) * graphScale;
+    const worldY = ((halfH * OPENING_GRAPH_VIEW_FRACTION) / OPENING_LAYOUT_EDGE) * graphScale;
     const clock = state.clock.elapsedTime;
     const group = groupRef.current;
     // The calibration `alignmentX/alignmentY` are OVERLAY-ONLY offsets: they
@@ -373,6 +398,29 @@ export function OpeningScene({
         ? openingNetworkResolvedDepth(depth, resolveCap)
         : 0;
       alpha *= 1 - resolve * resolvedGate * (1 - OPENING_NETWORK_DISC_FADE);
+      // STORY ACT: the spotlight dim + the pair-merge sidelining. The dim
+      // softens every node by its distance from the camera's lit centre (the
+      // same base-fraction space the DOM rows use); outside the act it is the
+      // identity. The pair beat slides the two candidate nodes toward their
+      // shared midpoint (65% of the way, held once merged).
+      if (handle.story.active) {
+        alpha *= storyDimAt(
+          handle.story,
+          storyBase.fx[i] ?? 0,
+          storyBase.fy[i] ?? 0,
+        );
+        const mergeOffset = storyPairOffset(handle.story.mergeT, reduced);
+        if (
+          mergeOffset > 0 &&
+          (i === handle.story.pairA || i === handle.story.pairB)
+        ) {
+          const px0 = positions[i * 3] ?? 0;
+          const py0 = positions[i * 3 + 1] ?? 0;
+          positions[i * 3] = px0 + (focus.pairFx * worldX - px0) * mergeOffset;
+          positions[i * 3 + 1] =
+            py0 + (focus.pairFy * worldY - py0) * mergeOffset;
+        }
+      }
       alphas[i] = alpha;
       if (alpha > 0.01) visibleCount += 1;
 
@@ -438,22 +486,45 @@ export function OpeningScene({
       // `edgeMaterial.visible` switch at the end of this block. No dim-through:
       // the blink would pass through BLACK (vertex-colour lines have no
       // per-line alpha), so instead the crisp DOM edges simply take over.
+      //
+      // The blurred edge buffer is ALSO switched off for the whole intro: the
+      // field stays FRAGMENTED — no edges join the slow discs (the "Form
+      // first." beat carries that moment at the intro's tail). The only edges
+      // the user ever sees are the crisp DOM links the network resolve brings
+      // in near the handoff.
       const alpha = hideGraph
         ? 0
-        : Math.min(
-            1,
-            openingEdgeAlpha(
-              edge.formationStart,
-              handle.progress,
-              reduced,
-              edgeWindow,
-              edgeOpacity,
-            ) *
-              settleGate *
-              mul *
-              zoomFrame.edgeBlend,
-          );
+        : INTRO_EDGE_VISIBLE
+          ? Math.min(
+              1,
+              openingEdgeAlpha(
+                edge.formationStart,
+                handle.progress,
+                reduced,
+                edgeWindow,
+                edgeOpacity,
+              ) *
+                settleGate *
+                mul *
+                zoomFrame.edgeBlend,
+            )
+          : 0;
       const order = edge.slot;
+      // STORY ACT: the SINGLE emphasized slot's edge brightens by the beat's
+      // emphasis amplitude and shifts to the rose tint (used by beats 2/4/5/10
+      // to spotlight which graph link the copy is talking about). Outside the
+      // act — or if this edge isn't that slot — the boost is the identity.
+      let emphasized = false;
+      let emphasisBoost = 1;
+      const storyState = handle.story;
+      if (
+        storyState.active &&
+        storyState.edgeEmphasis > 0 &&
+        storyEmphasizedSlot(storyState) === edge.slot
+      ) {
+        emphasized = true;
+        emphasisBoost = storyEdgeEmphasis(storyState.edgeEmphasis);
+      }
       if (alpha <= 0.001) {
         lineColors[order * 6] = 0;
         lineColors[order * 6 + 1] = 0;
@@ -485,9 +556,9 @@ export function OpeningScene({
       linePositions[order * 6 + 3] = xt;
       linePositions[order * 6 + 4] = yt;
       linePositions[order * 6 + 5] = zt;
-      const rx = tints.edge.r * alpha;
-      const ry = tints.edge.g * alpha;
-      const rz = tints.edge.b * alpha;
+      const rx = (emphasized ? tints.rose.r : tints.edge.r) * alpha * emphasisBoost;
+      const ry = (emphasized ? tints.rose.g : tints.edge.g) * alpha * emphasisBoost;
+      const rz = (emphasized ? tints.rose.b : tints.edge.b) * alpha * emphasisBoost;
       lineColors[order * 6] = rx;
       lineColors[order * 6 + 1] = ry;
       lineColors[order * 6 + 2] = rz;
@@ -511,7 +582,7 @@ export function OpeningScene({
     const pixelRatio = gl.getPixelRatio();
     nodeMaterial.uniforms.uWorldToPx!.value = size.height / (2 * halfH);
     nodeMaterial.uniforms.uPixelRatio!.value = pixelRatio;
-    nodeMaterial.uniforms.uZoom!.value = reduced ? 1 : handle.camera.zoom;
+    nodeMaterial.uniforms.uZoom!.value = handle.camera.zoom;
     nodeMaterial.uniforms.uDive!.value = zoomFrame.ease;
     nodeMaterial.uniforms.uResolve!.value = resolve;
     radiiRef.current = radii;
@@ -537,8 +608,8 @@ export function OpeningScene({
     // this node (parallax × plane about the centre) so DOM labels track the
     // dived nodes exactly.
     const zoomFrame = openingGraphZoomFrame(reduced ? 0 : handle.progress, active);
-    const fracX = (GRAPH_X_FRACTION / LAYOUT_EDGE) * graphScale;
-    const fracY = (GRAPH_Y_FRACTION / LAYOUT_EDGE) * graphScale;
+    const fracX = (OPENING_GRAPH_VIEW_FRACTION / OPENING_LAYOUT_EDGE) * graphScale;
+    const fracY = (OPENING_GRAPH_VIEW_FRACTION / OPENING_LAYOUT_EDGE) * graphScale;
     for (let k = 0; k < pose.rows.length; k += 1) {
       const row = pose.rows[k]!;
       const node = bundle.nodes[row.nodeIndex];
@@ -560,6 +631,14 @@ export function OpeningScene({
           labelOpacityBlend;
       row.worldX = node.nx * fracX * (dive ? zPar * zoomFrame.plane : 1);
       row.worldY = node.ny * fracY * (dive ? zPar * zoomFrame.plane : 1);
+      // STORY ACT: labels are camera-anchored but stay UNDIMMED, so they ride
+      // the spotlight centre without fading (they ARE the text the spotlight is
+      // aimed at). Projection is the shared homothety about the act's camera.
+      if (handle.story.active) {
+        const story = handle.story;
+        row.worldX = storyProject(row.worldX, story.camera.centerX, story.camera.zoom, true);
+        row.worldY = storyProject(row.worldY, story.camera.centerY, story.camera.zoom, true);
+      }
       row.dirty = true;
     }
 
@@ -573,7 +652,7 @@ export function OpeningScene({
       const resolve = openingGraphResolveAt(reduced ? 1 : handle.progress, active);
       const cap = openingNetworkDepthCapAt(resolve, active);
       const pw = size.height / (2 * CINEMATIC_CAMERA_HALF_EXTENT);
-      const uZoom = reduced ? 1 : handle.camera.zoom;
+      const uZoom = handle.camera.zoom;
       const nodeSize =
         active.networkNodeSize ?? OPENING_NETWORK_NODE_SIZE;
       const radii = radiiRef.current;
@@ -592,6 +671,39 @@ export function OpeningScene({
         row.alpha = gate * resolve;
         row.worldX = node.nx * fracX * (dive ? zPar * zoomFrame.plane : 1);
         row.worldY = node.ny * fracY * (dive ? zPar * zoomFrame.plane : 1);
+        // STORY ACT: same drivers as the WebGL discs — spotlight dim, pair
+        // sidelining toward the shared midpoint, then the shared homothety —
+        // so the crisp icons, the blur discs and the labels STAY on one another
+        // through the whole act (the merge moves BOTH in the same fraction
+        // space; projection is applied after the merge).
+        if (handle.story.active) {
+          const story = handle.story;
+          const mergeOffset = storyPairOffset(story.mergeT, reduced);
+          if (
+            mergeOffset > 0 &&
+            (node.index === story.pairA || node.index === story.pairB)
+          ) {
+            row.worldX += (focus.pairFx - row.worldX) * mergeOffset;
+            row.worldY += (focus.pairFy - row.worldY) * mergeOffset;
+          }
+          row.worldX = storyProject(
+            row.worldX,
+            story.camera.centerX,
+            story.camera.zoom,
+            true,
+          );
+          row.worldY = storyProject(
+            row.worldY,
+            story.camera.centerY,
+            story.camera.zoom,
+            true,
+          );
+          row.alpha *= storyDimAt(
+            story,
+            storyBase.fx[node.index] ?? 0,
+            storyBase.fy[node.index] ?? 0,
+          );
+        }
         row.radiusPx = (radii[node.index] ?? 0) * pw * uZoom * nodeSize;
         row.dirty = true;
       }
@@ -631,7 +743,10 @@ export function OpeningScene({
         const g = Math.min(a.alpha, b.alpha);
         hole.midWorldX = (a.worldX + b.worldX) / 2;
         hole.midWorldY = (a.worldY + b.worldY) / 2;
-        hole.alpha = g * OPENING_NETWORK_HOLE_OPACITY;
+        hole.alpha =
+        (handle.story.active ? handle.story.holeOpen : 1) *
+        g *
+        OPENING_NETWORK_HOLE_OPACITY;
         hole.dirty = true;
       }
     }

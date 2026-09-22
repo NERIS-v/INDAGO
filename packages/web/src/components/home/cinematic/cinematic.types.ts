@@ -8,6 +8,11 @@
 // identifiers the whole timeline reads.
 // ============================================================================
 
+import type {
+  CinematicStoryBase,
+  CinematicStoryState,
+} from "./story/story.types";
+
 /** Lifecycle state of the pinned scene (distinct from the active phase). */
 export type CinematicLifecycleState = "idle" | "active" | "complete";
 
@@ -128,6 +133,11 @@ export interface CinematicSceneHandle {
   wordmark: OpeningWordmarkCues;
   /** The scroll-scrubbed orthographic camera (zoom multiplies everything). */
   camera: OpeningCameraState;
+  /** The post-intro story act. The neutral inactive base while the intro owns
+   *  the stage; the story scroll listener writes the full state past the
+   *  handoff (and mirrors its camera here so every existing handle.camera
+   *  consumer — canvas zoom, point size, DOM radii — follows the act). */
+  story: CinematicStoryState | CinematicStoryBase;
   /** Latest pointer sample. No-ops on touch devices. */
   pointer: PointerState;
 }

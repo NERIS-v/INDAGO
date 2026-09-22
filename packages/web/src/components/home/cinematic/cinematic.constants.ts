@@ -125,6 +125,14 @@ export function isCinematicCalibrationRequested(): boolean {
  */
 export const CINEMATIC_CAMERA_HALF_EXTENT = 3;
 
+/**
+ * Reduced-motion story camera: one calm, wide final frame held across the whole
+ * story act (no spotlight moves, no morph — the beat copy is the narrative).
+ * Deliberately a little wider than the intro's final 0.9 so the static graph
+ * reads with the same generous negative space the reduced intro settles on.
+ */
+export const CINEMATIC_REDUCED_ZOOM = 0.575;
+
 export function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }

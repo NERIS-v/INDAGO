@@ -140,6 +140,20 @@ function CinematicCamera({ handle }: { handle: CinematicSceneHandle }) {
       camera.zoom = zoom;
       camera.updateProjectionMatrix();
     }
+    // The story act centres its spotlight on an anchor (pair / edge / hole /
+    // lead) expressed as fractions of the half-extents. Pan the orthographic
+    // centre to match — the DOM rows carry the SAME (base − center) displacement
+    // through storyProject, so the blur discs and the crisp icons slide together.
+    // Center stays 0 through the whole intro, so the camera never moves there.
+    const bounds = cinematicCameraBounds(size.width / Math.max(size.height, 1));
+    const cx = handle.camera.centerX * bounds.right;
+    const cy = handle.camera.centerY * bounds.top;
+    if (
+      Math.abs(camera.position.x - cx) > 1e-6 ||
+      Math.abs(camera.position.y - cy) > 1e-6
+    ) {
+      camera.position.set(cx, cy, 10);
+    }
   });
 
   return null;

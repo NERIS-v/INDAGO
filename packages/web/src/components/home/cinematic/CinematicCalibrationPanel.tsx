@@ -500,6 +500,27 @@ export function CinematicCalibrationPanel({
           </details>
 
           <details>
+            <summary>FRAGMENTED DATA</summary>
+            <Slider label="label start" field="fragLabelStart" calibration={calibration} onChange={onChange} />
+            <Slider label="label end" field="fragLabelEnd" calibration={calibration} onChange={onChange} />
+            <Slider label="text start" field="fragTextStart" calibration={calibration} onChange={onChange} />
+            <Slider label="text end" field="fragTextEnd" calibration={calibration} onChange={onChange} />
+            <Slider label="text opacity ×" field="fragTextOpacity" calibration={calibration} onChange={onChange} />
+            <Slider label="text scale ×" field="fragTextScale" calibration={calibration} onChange={onChange} />
+            <Slider label="text x (px)" field="fragTextX" calibration={calibration} onChange={onChange} />
+            <Slider label="text y (px)" field="fragTextY" calibration={calibration} onChange={onChange} />
+            <Slider label="text max width (rem)" field="fragTextMaxWidth" calibration={calibration} onChange={onChange} />
+            <p className="cinematic-cal__note">
+              The single restrained statement after INDAGO disintegrates. The
+              label/text windows are intro progress: both fade in over the
+              disintegration → node-release transition and leave before the
+              graph resolves. Graph dimming and fragment spread are NOT
+              exposed — the scattered field keeps its shipped deterministic
+              layout.
+            </p>
+          </details>
+
+          <details>
             <summary>CAMERA</summary>
             <Slider label="hero zoom" field="heroZoom" calibration={calibration} onChange={onChange} />
             <Slider label="pullback zoom" field="pullbackZoom" calibration={calibration} onChange={onChange} />

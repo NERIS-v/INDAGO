@@ -34,6 +34,20 @@ export const OPENING_LAYOUT_TICKS = 260;
  *  letters, not a small central dot. */
 export const OPENING_LAYOUT_FIT_MARGIN = 0.42;
 
+/** The ±1 layout box is really ±(1 − fitMargin); invert it for the mapping. */
+export const OPENING_LAYOUT_EDGE = 1 - OPENING_LAYOUT_FIT_MARGIN;
+
+/**
+ * Target world footprint of the final graph, as a fraction of each VIEWPORT
+ * half-extent, shared by the scene's per-axis mapping and the story focus math
+ * (the camera keys centre on nodes placed with the SAME fraction). The graph is
+ * meant to read as a large sparse network (~50vw wide, ~50vh tall) with
+ * substantial negative space — never a small central dot. Because the layout is
+ * normalised to ±(1 − fitMargin) on BOTH axes, a node at layout edge (±1) maps
+ * to FRACTION × half-extent here.
+ */
+export const OPENING_GRAPH_VIEW_FRACTION = 0.5;
+
 /** The wordmark text and its reading-order letters. */
 export const OPENING_WORDMARK_TEXT = "INDAGO" as const;
 export const OPENING_LETTERS: readonly string[] = [
@@ -67,6 +81,29 @@ export const OPENING_DECOMPOSE_WINDOW = { start: 0.4, end: 0.68 } as const;
 export const OPENING_RELEASE_WINDOW = { start: 0.63, end: 0.84 } as const;
 /** The graph connection window (edges weave in), in progress space. */
 export const OPENING_EDGE_WINDOW = { start: 0.76, end: 0.94 } as const;
+
+// ---------------------------------------------------------------------------
+// FRAGMENTED DATA narrative layer — the single restrained statement for the
+// moment right after INDAGO disintegrates. Fades in over the disintegration →
+// node-release transition and is already leaving as the network takes over
+// (the controller derives the fade-out from the in-windows below). Text sits
+// in negative space, never over the node field: one tiny label + ONE statement.
+// ---------------------------------------------------------------------------
+/** The small "FRAGMENTED EVIDENCE" label fades in 0.50 → 0.60. */
+export const FRAG_LABEL_START = 0.5;
+export const FRAG_LABEL_END = 0.6;
+/** The primary statement fades in 0.56 → 0.68 (after the physical break). */
+export const FRAG_TEXT_START = 0.56;
+export const FRAG_TEXT_END = 0.68;
+/** Multiplier on the whole layer's opacity (1 = shipped). */
+export const FRAG_TEXT_OPACITY = 1;
+/** Multiplier on the layer scale (1 = shipped). */
+export const FRAG_TEXT_SCALE = 1;
+/** CSS px offset for the layer (calibration drift only, 0 = shipped). */
+export const FRAG_TEXT_X = 0;
+export const FRAG_TEXT_Y = 0;
+/** Max-width of the statement in rem (responsiveness ceiling). */
+export const FRAG_TEXT_MAX_WIDTH = 30;
 
 // ---------------------------------------------------------------------------
 // Camera. The perceived relationship is ONE continuous dolly: the viewer

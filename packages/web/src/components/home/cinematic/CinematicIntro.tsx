@@ -30,6 +30,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { CinematicScrollTrack } from "./CinematicScrollTrack";
 import { CinematicStage } from "./CinematicStage";
+import { CinematicStory } from "./CinematicStory";
 import { CinematicDebugOverlay } from "./CinematicDebugOverlay";
 import { IS_DEV } from "./cinematic.constants";
 import { CINEMATIC_CAMERA_HALF_EXTENT } from "./cinematic.constants";
@@ -68,6 +69,7 @@ const CinematicCalibrationOverlay = dynamic(
 );
 import { generateOpeningGraph, openingGraphStats } from "./opening/opening.graph";
 import { createOpeningPoseView } from "./opening/opening.graph";
+import { computeStoryFocus } from "./story/story.model";
 import {
   createOpeningNetworkHoles,
   createOpeningNetworkView,
@@ -133,6 +135,7 @@ export function CinematicIntro({ onCompletion }: CinematicIntroProps = {}) {
     wordmarkRef,
     handle,
     quality,
+    focusRef,
     applyCalibration,
   } = useCinematicScene(onCompletion);
 
@@ -140,6 +143,16 @@ export function CinematicIntro({ onCompletion }: CinematicIntroProps = {}) {
     () => openingEffectsFor(quality.tier),
     [quality.tier],
   );
+
+  // The story act's deterministic focus set, derived from the SAME bundle the
+  // scene renders — locked into the controller's focusRef every render so the
+  // act's camera keys / pair sideline / edge emphasis / hole all track the live
+  // graph (render-phase ref write; the type-only "forget nothing" guarantee).
+  const focus = useMemo(
+    () => computeStoryFocus(baseEffects.bundle),
+    [baseEffects],
+  );
+  focusRef.current = focus;
 
   const [wordmark, setWordmark] = useState<OpeningWordmarkLayout | null>(null);
 
@@ -468,6 +481,11 @@ export function CinematicIntro({ onCompletion }: CinematicIntroProps = {}) {
           effects={effects}
           calibration={effective}
         />
+        {/* The act's scroll surface: starts where the intro's reserved distance
+            ends and stretches to the document's max scroll. It sits AFTER the
+            pinned stage in flow, so the stage keeps its viewport while this
+            extents the track. */}
+        <CinematicStory />
       </CinematicScrollTrack>
       {session && effective ? (
         <CinematicCalibrationOverlay

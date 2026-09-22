@@ -21,6 +21,15 @@ import {
   OPENING_EDGE_OPACITY,
   OPENING_EDGE_WINDOW,
   OPENING_FINAL_ZOOM,
+  FRAG_LABEL_END,
+  FRAG_LABEL_START,
+  FRAG_TEXT_END,
+  FRAG_TEXT_MAX_WIDTH,
+  FRAG_TEXT_OPACITY,
+  FRAG_TEXT_SCALE,
+  FRAG_TEXT_START,
+  FRAG_TEXT_X,
+  FRAG_TEXT_Y,
   OPENING_GRAPH_BACKGROUND_SCALE,
   OPENING_GRAPH_CAMERA_END_Z,
   OPENING_GRAPH_CAMERA_START_Z,
@@ -128,6 +137,26 @@ export interface CinematicCalibration {
   cameraPullbackStart: number;
   /** Where the push-in begins on the scrub (shipped 0.66). */
   cameraPushInStart: number;
+
+  // --- FRAGMENTED DATA (the single restrained statement after disintegration) --
+  /** Label fade-in window on the scrub: start (shipped 0.50). */
+  fragLabelStart: number;
+  /** Label fade-in window on the scrub: end (shipped 0.60). */
+  fragLabelEnd: number;
+  /** Statement fade-in window on the scrub: start (shipped 0.56). */
+  fragTextStart: number;
+  /** Statement fade-in window on the scrub: end (shipped 0.68). */
+  fragTextEnd: number;
+  /** Multiplier on the layer opacity (1 = shipped). */
+  fragTextOpacity: number;
+  /** Multiplier on the layer scale (1 = shipped). */
+  fragTextScale: number;
+  /** Layer CSS px offset X (0 = shipped). */
+  fragTextX: number;
+  /** Layer CSS px offset Y (0 = shipped). */
+  fragTextY: number;
+  /** Statement max-width in rem (responsiveness ceiling). */
+  fragTextMaxWidth: number;
 
   // --- GRAPH ----------------------------------------------------------------
   /** Edge weave window start (shipped 0.76). */
@@ -256,6 +285,16 @@ export const CINEMATIC_CALIBRATION_DEFAULTS: CinematicCalibration = {
   cameraPullbackStart: OPENING_CAMERA_PULLBACK_START,
   cameraPushInStart: OPENING_CAMERA_PUSHIN_START,
 
+  fragLabelStart: FRAG_LABEL_START,
+  fragLabelEnd: FRAG_LABEL_END,
+  fragTextStart: FRAG_TEXT_START,
+  fragTextEnd: FRAG_TEXT_END,
+  fragTextOpacity: FRAG_TEXT_OPACITY,
+  fragTextScale: FRAG_TEXT_SCALE,
+  fragTextX: FRAG_TEXT_X,
+  fragTextY: FRAG_TEXT_Y,
+  fragTextMaxWidth: FRAG_TEXT_MAX_WIDTH,
+
   edgeStart: OPENING_EDGE_WINDOW.start,
   edgeEnd: OPENING_EDGE_WINDOW.end,
   edgeOpacity: OPENING_EDGE_OPACITY,
@@ -334,6 +373,15 @@ export type CinematicCalibrationNumericKey =
   | "graphZoom"
   | "cameraPullbackStart"
   | "cameraPushInStart"
+  | "fragLabelStart"
+  | "fragLabelEnd"
+  | "fragTextStart"
+  | "fragTextEnd"
+  | "fragTextOpacity"
+  | "fragTextScale"
+  | "fragTextX"
+  | "fragTextY"
+  | "fragTextMaxWidth"
   | "edgeStart"
   | "edgeEnd"
   | "edgeOpacity"
@@ -390,6 +438,15 @@ export const CINEMATIC_CALIBRATION_BOUNDS: Readonly<
   graphZoom: { min: 0.1, max: 4, step: 0.01 },
   cameraPullbackStart: { min: 0, max: 1, step: 0.001 },
   cameraPushInStart: { min: 0, max: 1, step: 0.001 },
+  fragLabelStart: { min: 0, max: 1, step: 0.001 },
+  fragLabelEnd: { min: 0, max: 1, step: 0.001 },
+  fragTextStart: { min: 0, max: 1, step: 0.001 },
+  fragTextEnd: { min: 0, max: 1, step: 0.001 },
+  fragTextOpacity: { min: 0, max: 1, step: 0.01 },
+  fragTextScale: { min: 0.1, max: 3, step: 0.01 },
+  fragTextX: { min: -600, max: 600, step: 1 },
+  fragTextY: { min: -600, max: 600, step: 1 },
+  fragTextMaxWidth: { min: 12, max: 72, step: 1 },
   edgeStart: { min: 0, max: 1, step: 0.001 },
   edgeEnd: { min: 0, max: 1, step: 0.001 },
   edgeOpacity: { min: 0, max: 1, step: 0.01 },
@@ -527,6 +584,24 @@ export function sanitizeCalibration(
   next.edgeEnd = ee;
 
   next.labelStart = clampCalibrationValue("labelStart", next.labelStart);
+
+  const [fl0, fl1] = normalizeWindow(
+    next.fragLabelStart,
+    next.fragLabelEnd,
+    "fragLabelStart",
+    "fragLabelEnd",
+  );
+  next.fragLabelStart = fl0;
+  next.fragLabelEnd = fl1;
+
+  const [ft0, ft1] = normalizeWindow(
+    next.fragTextStart,
+    next.fragTextEnd,
+    "fragTextStart",
+    "fragTextEnd",
+  );
+  next.fragTextStart = ft0;
+  next.fragTextEnd = ft1;
 
   const [gz0, gz1] = normalizeWindow(
     next.graphZoomStart,
@@ -683,6 +758,15 @@ const EXPORT_KEY_ORDER: readonly (keyof CinematicCalibration)[] = [
   "graphZoom",
   "cameraPullbackStart",
   "cameraPushInStart",
+  "fragLabelStart",
+  "fragLabelEnd",
+  "fragTextStart",
+  "fragTextEnd",
+  "fragTextOpacity",
+  "fragTextScale",
+  "fragTextX",
+  "fragTextY",
+  "fragTextMaxWidth",
   "edgeStart",
   "edgeEnd",
   "edgeOpacity",
@@ -1164,6 +1248,15 @@ const OPENING_SHIPPING_STATIC: CinematicCalibration = {
   graphZoom: 0.9,
   cameraPullbackStart: 0.14,
   cameraPushInStart: OPENING_CAMERA_PUSHIN_START,
+  fragLabelStart: FRAG_LABEL_START,
+  fragLabelEnd: FRAG_LABEL_END,
+  fragTextStart: FRAG_TEXT_START,
+  fragTextEnd: FRAG_TEXT_END,
+  fragTextOpacity: FRAG_TEXT_OPACITY,
+  fragTextScale: FRAG_TEXT_SCALE,
+  fragTextX: FRAG_TEXT_X,
+  fragTextY: FRAG_TEXT_Y,
+  fragTextMaxWidth: FRAG_TEXT_MAX_WIDTH,
   edgeStart: OPENING_EDGE_WINDOW.start,
   edgeEnd: OPENING_EDGE_WINDOW.end,
   edgeOpacity: OPENING_EDGE_OPACITY,

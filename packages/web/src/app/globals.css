@@ -27,7 +27,11 @@
   --color-brand-800: #ead6b4;
   --color-brand-900: #f5e8d0;
 
-  --color-surface-0: #0c0a08;
+  /* Two-blacks invariant: the page base and the semantic background MUST be
+     the same black. Previously surface-0 was a hair lighter (#0c0a08) than
+     semantic-background (#0a0908), so the cinematic track/stage (semantic) and
+     the document body (surface-0) showed a seam where they met during pinning. */
+  --color-surface-0: #0a0908;
   --color-surface-50: #11100d;
   --color-surface-100: #161411;
   --color-surface-200: #1e1b17;
