@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  isBenchmarkPathname,
   isHomePathname,
   isInvestigationWorkspacePathname,
 } from "@/lib/workspace/nav";
@@ -27,6 +28,7 @@ export function AppNavDock() {
   if (isInvestigationWorkspacePathname(pathname)) return null;
 
   const isDashboard = pathname === "/dashboard";
+  const isBenchmark = isBenchmarkPathname(pathname);
 
   return (
     <div className="px-6 pt-4">
@@ -59,6 +61,18 @@ export function AppNavDock() {
           }`}
         >
           Dashboard
+        </Link>
+
+        <Link
+          href="/benchmarks"
+          aria-current={isBenchmark ? "page" : undefined}
+          className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
+            isBenchmark
+              ? "bg-semantic-surface-soft text-semantic-selection"
+              : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
+          }`}
+        >
+          System benchmark
         </Link>
       </nav>
     </div>
