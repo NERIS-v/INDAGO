@@ -603,12 +603,23 @@ export function GraphPanel({
   const stagedRevealRef = useRef<{
     activeForeignCase: ForeignCaseOverlay | null;
     localBridgeAnchor: GraphNode | null;
-  }>({ activeForeignCase: null, localBridgeAnchor: null });
+    localRico: GraphNode | null;
+  }>({ activeForeignCase: null, localBridgeAnchor: null, localRico: null });
   stagedRevealRef.current = {
     activeForeignCase,
     localBridgeAnchor: activeForeignCase
       ? (finalNodes.find((n) =>
           (n.label ?? "").toUpperCase().includes(activeForeignCase.localTargetMatch),
+        ) ?? null)
+      : null,
+    // The reveal subject is the LOCAL H. Paul Rico node on the case's own graph
+    // (never the foreign island copy) — the original-graph subject that the
+    // cross-case island bridges onto.
+    localRico: activeForeignCase
+      ? (finalNodes.find(
+          (n) =>
+            !(n as { isForeign?: boolean }).isForeign &&
+            (n.label ?? "").toUpperCase().includes("RICO"),
         ) ?? null)
       : null,
   };
@@ -618,21 +629,26 @@ export function GraphPanel({
     let t2: ReturnType<typeof setTimeout>;
     let t3: ReturnType<typeof setTimeout>;
 
-    const { activeForeignCase: currentCase, localBridgeAnchor } = stagedRevealRef.current;
+    const { activeForeignCase: currentCase, localBridgeAnchor, localRico } = stagedRevealRef.current;
 
     if (currentCase && currentCase.nodes.length > 0) {
       // PR-3 UX: STAGED bridge reveal — the user wants to SEE both steps:
       // 1) the foreign nodes appear while the camera zooms OUT to frame the
       //    whole grown graph (fit),
       // 2) after the nodes settle and the full graph has a beat, a LONG slow
-      //    camera move frames the shared-infrastructure BRIDGE itself (local
-      //    target anchor + foreign island head) — never a sudden jump.
+      //    camera move frames the case's own H. Paul Rico node (the original-
+      //    graph subject the island bridges onto) — the 220px frame keeps the
+      //    local bridge anchor and the injected island head in view. Fall back
+      //    to the shared-infrastructure bridge pair when no local Rico node
+      //    exists (e.g. the scaffold demo islands).
       const foreignHead = currentCase.nodes[0]!;
       t1 = setTimeout(() => {
         controlsRef.current?.fit();
       }, 150);
       t2 = setTimeout(() => {
-        if (localBridgeAnchor) {
+        if (localRico) {
+          controlsRef.current?.focusPair(localRico.id, localRico.id, 1100);
+        } else if (localBridgeAnchor) {
           controlsRef.current?.focusPair(localBridgeAnchor.id, foreignHead.id, 1100);
         } else {
           controlsRef.current?.focusPair(foreignHead.id, foreignHead.id, 1100);

@@ -563,13 +563,13 @@ export function useGraphLayout(
         forceLink<SimNode, SimLink>(links)
           .id((d) => d.id)
           // Bounded preferred distance gives each relationship physical room to
-          // stretch. High-importance structures rest tighter (~88px); normal and
-          // low-importance relationships rest looser (up to ~190px). This is
+          // stretch. High-importance structures rest tighter (~96px); normal and
+          // low-importance relationships rest looser (up to ~204px). This is
           // presentation geometry only — importance is never a "truth" force.
-          //   high imp: ~88px   normal (~0.5): ~139px   low: ~190px
+          //   high imp: ~96px   normal (~0.5): ~150px   low: ~204px
           .distance((d) => {
             const importance = Math.min(1, (d.source.structuralImportance + d.target.structuralImportance) / 2);
-            return 88 + (1 - importance) * 102;
+            return 96 + (1 - importance) * 108;
           })
           // Stronger elastic link response (spring pull-back toward equilibrium).
           .strength(0.5)
