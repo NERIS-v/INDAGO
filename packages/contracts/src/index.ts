@@ -109,6 +109,9 @@ export * from './events/analysis-events.js';
 export * from './events/observation-events.js';
 export * from './events/execution-events.js';
 
+// Benchmark contracts
+export * from './benchmark/index.js';
+
 // Security contracts
 export * from './security/authorization.js';
 export * from './security/access-context.js';
