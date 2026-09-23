@@ -13,6 +13,10 @@ interface GraphHoleBurstLayerProps {
   /** Hole ids belonging to the currently selected gap — rendered with the
    *  selection highlight (line, "?", and dashed endpoint rings). */
   readonly selectedHoleIds?: ReadonlySet<string> | null;
+  /** Mirrors the edge-layer's out-of-range gate: a hole whose anchor nodes are
+   *  outside the active time range is hidden so the "?" marker does not linger
+   *  on nodes that no longer exist in the window. When absent, always visible. */
+  readonly isNodeInTimeRange?: (nodeId: string) => boolean;
 }
 
 export function GraphHoleBurstLayer({
@@ -22,6 +26,7 @@ export function GraphHoleBurstLayer({
   zoom,
   bloom,
   selectedHoleIds,
+  isNodeInTimeRange,
 }: GraphHoleBurstLayerProps) {
   const [burstBuffer, setBurstBuffer] = useState<LayoutNode[]>([]);
   
@@ -88,6 +93,9 @@ export function GraphHoleBurstLayer({
     <>
       <g id="hole-layer">
         {holes.map((hole) => {
+          if (isNodeInTimeRange && hole.nodeIds.some((id) => !isNodeInTimeRange(id))) {
+            return null;
+          }
           const nodes = hole.nodeIds
             .map((id) => nodeById.get(id))
             .filter((n): n is LayoutNode => Boolean(n));

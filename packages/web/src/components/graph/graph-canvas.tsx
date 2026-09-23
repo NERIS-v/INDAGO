@@ -778,7 +778,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
               })}
           </g>
 
-          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} selectedHoleIds={selectedHoleIds} /></g>
+          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} selectedHoleIds={selectedHoleIds} isNodeInTimeRange={isNodeInTimeRange} /></g>
 
           <g id="node-layer">
             {layoutNodes.map((node) => {
