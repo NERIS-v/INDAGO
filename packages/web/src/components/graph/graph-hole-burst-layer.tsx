@@ -10,6 +10,9 @@ interface GraphHoleBurstLayerProps {
   readonly reducedMotion: boolean;
   readonly zoom: number;
   readonly bloom: boolean;
+  /** Hole ids belonging to the currently selected gap — rendered with the
+   *  selection highlight (line, "?", and dashed endpoint rings). */
+  readonly selectedHoleIds?: ReadonlySet<string> | null;
 }
 
 export function GraphHoleBurstLayer({
@@ -18,6 +21,7 @@ export function GraphHoleBurstLayer({
   reducedMotion,
   zoom,
   bloom,
+  selectedHoleIds,
 }: GraphHoleBurstLayerProps) {
   const [burstBuffer, setBurstBuffer] = useState<LayoutNode[]>([]);
   
@@ -95,6 +99,7 @@ export function GraphHoleBurstLayer({
 
             const mx = (a.x + b.x) / 2;
             const my = (a.y + b.y) / 2;
+            const isSelected = selectedHoleIds?.has(hole.id) ?? false;
             return (
               <g key={`hole-${hole.investigationGapId ?? `${a.id}-${b.id}`}`}>
                 <line
@@ -102,27 +107,31 @@ export function GraphHoleBurstLayer({
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  className="stroke-accent-amber"
-                  strokeWidth={1.75}
+                  className={isSelected ? "stroke-semantic-selection" : "stroke-accent-amber"}
+                  strokeWidth={isSelected ? 2.75 : 1.75}
                   strokeDasharray="5 5"
-                  strokeOpacity={0.7}
+                  strokeOpacity={isSelected ? 0.95 : 0.7}
                   strokeLinecap="round"
                   style={{
                     animation: reducedMotion
                       ? undefined
-                      : "hole-pulse 2.6s ease-in-out infinite",
+                      : isSelected
+                        ? "hole-pulse 1.1s ease-in-out infinite"
+                        : "hole-pulse 2.6s ease-in-out infinite",
                   }}
                 />
                 <circle
                   cx={mx}
                   cy={my}
-                  r={13}
-                  className="fill-surface-0 stroke-accent-amber"
-                  strokeWidth={1.25}
+                  r={isSelected ? 16 : 13}
+                  className={isSelected ? "fill-semantic-selection/15 stroke-semantic-selection" : "fill-surface-0 stroke-accent-amber"}
+                  strokeWidth={isSelected ? 1.75 : 1.25}
                   style={{
                     animation: reducedMotion
                       ? undefined
-                      : "hole-pulse 2.6s ease-in-out infinite",
+                      : isSelected
+                        ? "hole-pulse 1.1s ease-in-out infinite"
+                        : "hole-pulse 2.6s ease-in-out infinite",
                   }}
                 />
                 <text
@@ -130,11 +139,40 @@ export function GraphHoleBurstLayer({
                   y={my}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  className="fill-accent-amber font-mono text-[11px] font-bold pointer-events-none"
+                  className={isSelected ? "fill-semantic-selection font-mono text-[13px] font-bold pointer-events-none" : "fill-accent-amber font-mono text-[11px] font-bold pointer-events-none"}
                   transform={`translate(${mx}, ${my}) scale(${1 / zoom}) translate(${-mx}, ${-my})`}
+                  style={isSelected ? { textShadow: "0 0 8px var(--color-semantic-selection)" } : undefined}
                 >
                   ?
                 </text>
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={a.x}
+                      cy={a.y}
+                      r={nodeVisualRadius(a.structuralImportance) + 10}
+                      fill="none"
+                      className="stroke-semantic-selection"
+                      strokeWidth={1.5}
+                      strokeDasharray="1.5 4"
+                      strokeLinecap="round"
+                      strokeOpacity={0.9}
+                      style={{ animation: reducedMotion ? undefined : "hole-pulse 1.1s ease-in-out infinite" }}
+                    />
+                    <circle
+                      cx={b.x}
+                      cy={b.y}
+                      r={nodeVisualRadius(b.structuralImportance) + 10}
+                      fill="none"
+                      className="stroke-semantic-selection"
+                      strokeWidth={1.5}
+                      strokeDasharray="1.5 4"
+                      strokeLinecap="round"
+                      strokeOpacity={0.9}
+                      style={{ animation: reducedMotion ? undefined : "hole-pulse 1.1s ease-in-out infinite" }}
+                    />
+                  </>
+                )}
                 <title>{hole.description}</title>
               </g>
             );
@@ -145,21 +183,24 @@ export function GraphHoleBurstLayer({
             if (!n) return null;
 
             const r = nodeVisualRadius(n.structuralImportance) + 10;
+            const isSelected = selectedHoleIds?.has(hole.id) ?? false;
             return (
               <circle
                 key={`hole-${hole.investigationGapId ?? n.id}`}
                 cx={n.x}
                 cy={n.y}
-                r={r}
+                r={isSelected ? r + 3 : r}
                 fill="none"
-                className="stroke-accent-amber"
-                strokeWidth={1.5}
+                className={isSelected ? "stroke-semantic-selection" : "stroke-accent-amber"}
+                strokeWidth={isSelected ? 2 : 1.5}
                 strokeDasharray="3 4"
-                strokeOpacity={0.75}
+                strokeOpacity={isSelected ? 0.95 : 0.75}
                 style={{
                   animation: reducedMotion
                     ? undefined
-                    : "hole-pulse 2.6s ease-in-out infinite",
+                    : isSelected
+                      ? "hole-pulse 1.1s ease-in-out infinite"
+                      : "hole-pulse 2.6s ease-in-out infinite",
                 }}
               >
                 <title>{hole.description}</title>

@@ -373,6 +373,20 @@ export function GraphPanel({
     });
   }, [data, overlayHoles, finalEdges]);
 
+  // PR-3 UX: a selected gap highlights its own "?" hole(s) in the burst layer.
+  // The active gap id is the shell-owned context when present (shell mode) and
+  // the local standalone selection otherwise. Resolved to hole ids via the
+  // mergedHole join so the highlight always matches what the gaps panel lists.
+  const activeGapId = selectedContext?.kind === "gap" ? selectedContext.id : selectedGapId;
+
+  const selectedHoleIds = useMemo(() => {
+    if (!activeGapId) return null;
+    const ids = mergedHoles
+      .filter((h) => h.investigationGapId === activeGapId)
+      .map((h) => h.id);
+    return ids.length > 0 ? new Set(ids) : null;
+  }, [activeGapId, mergedHoles]);
+
   // PR-4: readability filter changes ONLY the rendered edges — the force
   // simulation still runs on the FULL topology (no physics restart on filter
   // interaction) and the entity drawer still sees every relation.
@@ -674,13 +688,13 @@ export function GraphPanel({
       }, 150);
       t2 = setTimeout(() => {
         if (localRico) {
-          controlsRef.current?.focusPair(localRico.id, localRico.id, 1100);
+          controlsRef.current?.focusPair(localRico.id, localRico.id, 1600);
         } else if (localBridgeAnchor) {
-          controlsRef.current?.focusPair(localBridgeAnchor.id, foreignHead.id, 1100);
+          controlsRef.current?.focusPair(localBridgeAnchor.id, foreignHead.id, 1600);
         } else {
-          controlsRef.current?.focusPair(foreignHead.id, foreignHead.id, 1100);
+          controlsRef.current?.focusPair(foreignHead.id, foreignHead.id, 1600);
         }
-      }, 1700);
+      }, 2400);
     } else if (mounted && activeForeignCaseId === null && mergedCases.length === 0) {
       t3 = setTimeout(() => {
         controlsRef.current?.fit();
@@ -836,6 +850,7 @@ export function GraphPanel({
             edges={canvasEdges as GraphEdge[]}
             physicsEdges={finalEdges as GraphEdge[]}
             holes={mergedHoles}
+            selectedHoleIds={selectedHoleIds}
             selectedNodeId={selectedGraphNodeId}
             selectedEdgeId={selectedGraphEdgeId}
             onNodeClick={handleNodeSelect}

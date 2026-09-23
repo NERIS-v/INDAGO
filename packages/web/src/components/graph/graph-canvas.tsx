@@ -25,6 +25,9 @@ interface GraphCanvasProps {
    *  Absent → defaults to `edges` (standalone/back-compat callers). */
   physicsEdges?: GraphEdge[];
   holes: GraphHole[];
+  /** Hole ids belonging to the currently selected gap — highlighted in the
+   *  "?" layer (selection color + dashed rings on the hole's endpoint nodes). */
+  selectedHoleIds?: ReadonlySet<string> | null;
   onNodeClick: (nodeId: string) => void;
   /** Fired when the user clicks a RENDERED edge (relationship link). The edge
    *  id is a graph edge id (not a relation id) — the panel maps it to the
@@ -81,7 +84,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, onEdgeClick, activeTimeRange, controlsRef, selectedNodeId, selectedEdgeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, selectedHoleIds, onNodeClick, onEdgeClick, activeTimeRange, controlsRef, selectedNodeId, selectedEdgeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
   // PR-10: the physics topology defaults to the rendered edges for standalone
   // callers and is the FULL merged topology when the panel supplies it — so
   // readability-filter interactions never restart the simulation.
@@ -346,9 +349,13 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
 
   useEffect(() => {
     if (cameraEase === "400ms cubic-bezier(0.22, 1, 0.36, 1)") return;
+    // Reset the programmatic ease AFTER the requested camera move completes,
+    // with a small buffer so the next user interaction is snappy again.
+    const durationMatch = /\b(\d+)ms\b/.exec(cameraEase);
+    const moveMs = durationMatch ? Number(durationMatch[1]) : 1600;
     const t = setTimeout(
       () => setCameraEase("400ms cubic-bezier(0.22, 1, 0.36, 1)"),
-      1600,
+      Math.max(moveMs + 400, 1600),
     );
     return () => clearTimeout(t);
   }, [cameraEase]);
@@ -583,7 +590,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
           <circle cx="0" cy="0" r="16" fill="none" stroke="var(--color-surface-600)" strokeWidth="1" />
         </g>
 
-        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${cameraEase}` }}>
+        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${cameraEase}`, willChange: "transform" }}>
           
           <g id="community-layer">
             {communities.map((c) => {
@@ -768,7 +775,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
               })}
           </g>
 
-          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} /></g>
+          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} selectedHoleIds={selectedHoleIds} /></g>
 
           <g id="node-layer">
             {layoutNodes.map((node) => {

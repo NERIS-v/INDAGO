@@ -523,13 +523,13 @@ export function useGraphLayout(
           const exitX = Math.abs(dirX) > 1e-6 ? width / 2 / Math.abs(dirX) : Infinity;
           const exitY = Math.abs(dirY) > 1e-6 ? height / 2 / Math.abs(dirY) : Infinity;
           const exitDist = Math.min(exitX, exitY);
-          x = width / 2 + dirX * (exitDist + 70);
-          y = height / 2 + dirY * (exitDist + 70);
+          x = width / 2 + dirX * (exitDist + 44);
+          y = height / 2 + dirY * (exitDist + 44);
           const ax = anchorX - x;
           const ay = anchorY - y;
           const al = Math.hypot(ax, ay) || 1;
-          spawnVx = (ax / al) * 16;
-          spawnVy = (ay / al) * 16;
+          spawnVx = (ax / al) * 9;
+          spawnVy = (ay / al) * 9;
         }
       }
 
