@@ -45,7 +45,7 @@ function ToggleRow({
         aria-hidden="true"
         className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors duration-fast ${
           checked
-            ? "border-semantic-selection bg-semantic-selection"
+            ? "border-accent-rose bg-accent-rose"
             : "border-semantic-border bg-semantic-background"
         }`}
       >
