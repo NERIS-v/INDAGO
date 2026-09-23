@@ -59,14 +59,14 @@ function SliceCard({
     <section
       data-context-slice
       data-context-slice-available={available ? "true" : "false"}
-      className="flex flex-col gap-1 overflow-hidden rounded-lg border border-surface-200/70 bg-white/60"
+      className="flex flex-col gap-1 overflow-hidden rounded-lg border border-semantic-border-subtle bg-semantic-surface-elevated"
     >
       <header className="flex items-center justify-between px-2.5 py-1.5">
-        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-surface-500">
+        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-semantic-foreground-muted">
           {label}
         </h4>
         {count !== undefined && (
-          <span className="text-[9px] font-mono text-surface-400" data-context-slice-count>
+          <span className="text-[9px] font-mono text-semantic-foreground-faint" data-context-slice-count>
             {count}
           </span>
         )}
@@ -137,7 +137,7 @@ function renderList<T>(
         <div key={keyOf(t)}>{row(t)}</div>
       ))}
       {hidden > 0 && (
-        <p className="px-2.5 py-1 text-[10px] font-mono text-surface-400">
+        <p className="px-2.5 py-1 text-[10px] font-mono text-semantic-foreground-faint">
           +{hidden} more
         </p>
       )}
@@ -316,14 +316,14 @@ function RelationSlices({
   onSelect: (ctx: InvestigativeContext) => void;
 }) {
   const axis = (
-    <div className="flex items-center justify-between rounded-lg border border-surface-200/70 bg-white/60 px-2.5 py-2">
-      <div className="text-[12px] font-medium text-surface-800">
+    <div className="flex items-center justify-between rounded-lg border border-semantic-border-subtle bg-semantic-surface-elevated px-2.5 py-2">
+      <div className="text-[12px] font-medium text-semantic-foreground">
         {details.sourceName ?? "—"}
       </div>
       <span className="text-[10px] font-mono uppercase tracking-widest text-brand-600">
         {details.relation.relationType}
       </span>
-      <div className="text-[12px] font-medium text-surface-800">
+      <div className="text-[12px] font-medium text-semantic-foreground">
         {details.targetName ?? "—"}
       </div>
     </div>
@@ -397,7 +397,7 @@ function EvidenceSlices({
       >
         {details.item.sourceRef ? (
           <>
-            <p className="px-2.5 py-1.5 text-[11px] font-mono text-surface-500">
+            <p className="px-2.5 py-1.5 text-[11px] font-mono text-semantic-foreground-muted">
               {details.item.sourceRef}
             </p>
             {renderList(
@@ -569,7 +569,7 @@ function HypothesisSlices({
     <div className="flex flex-col gap-2">
       {robustness && (
         <SliceCard label="Engine robustness" count={robustness.robustnessScore}>
-          <p className="px-2.5 py-1.5 text-[11px] text-surface-500" data-hypothesis-robustness>
+          <p className="px-2.5 py-1.5 text-[11px] text-semantic-foreground-muted" data-hypothesis-robustness>
             {robustness.robustnessScore}/100 · perturbation stability, not truth probability
           </p>
         </SliceCard>
@@ -656,7 +656,7 @@ function GapSlices({
           details.evidenceRequests,
           (r) => r.id,
           (r) => (
-            <p className="px-2.5 py-1.5 text-[12px] font-medium text-surface-800" data-context-slice-object>
+            <p className="px-2.5 py-1.5 text-[12px] font-medium text-semantic-foreground" data-context-slice-object>
               {r.description ?? r.id}
             </p>
           ),
