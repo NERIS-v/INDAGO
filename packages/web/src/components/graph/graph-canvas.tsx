@@ -57,7 +57,13 @@ interface GraphCanvasProps {
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
 const FIT_PADDING = 0.95;
-const MAX_FIT_ZOOM = 1.15;
+const MAX_FIT_ZOOM = 1.45;
+// One notch of the canvas zoom controls (buttons + wheel). The default camera
+// opens a plain bbox fit pushed IN by two of these steps, so the network lands
+// closer than an exact frame. MAX_FIT_ZOOM is lifted by the same two steps so
+// that default/fit never clamps the increment away.
+const FIT_ZOOM_STEP = 0.15;
+const DEFAULT_FIT_ZOOM_STEPS = 2;
 const ENTER_MS = 700;
 const OFF_CANVAS_GAP = 60;
 // F-PR17: focus-aura lifecycle timing — fade out fast when the graph wakes,
@@ -280,7 +286,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
     const minY = Math.min(...ys) - LABEL_PAD_Y; const maxY = Math.max(...ys) + LABEL_PAD_Y;
     const boxWidth = Math.max(maxX - minX, 1); const boxHeight = Math.max(maxY - minY, 1);
     const bboxCx = (minX + maxX) / 2; const bboxCy = (minY + maxY) / 2;
-    const scale = Math.min(MAX_FIT_ZOOM, MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING)));
+    const fitScale = Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING);
+    const scale = Math.min(MAX_FIT_ZOOM, MAX_ZOOM, Math.max(MIN_ZOOM, fitScale + FIT_ZOOM_STEP * DEFAULT_FIT_ZOOM_STEPS));
     return { zoom: scale, pan: { x: -(bboxCx - cx) * scale, y: -(bboxCy - cy) * scale } };
   }, [layoutRef, dimensions, cx, cy]);
 
