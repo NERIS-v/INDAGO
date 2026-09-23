@@ -89,11 +89,10 @@ export function WorkspaceNavDock() {
   }, [workspace, investigationId]);
 
   return (
-    <div className={`px-6 pt-4 ${exiting ? "relative z-[95]" : ""}`}>
+    <div className="px-6 pt-4">
       <nav
         aria-label="Investigation workspace"
-        className={`cc-panel-floating relative mx-auto flex max-w-fit flex-wrap items-center gap-1 px-3 py-2 ${exiting ? "animate-dock-panel-out" : ""}`}
-        style={exiting ? { animationDelay: `${EXIT_BASE_MS + Math.max(0, totalTabs - 1) * EXIT_STAGGER_MS + EXIT_TAB_ANIM_MS}ms` } : undefined}
+        className="cc-panel-floating relative mx-auto flex max-w-fit flex-wrap items-center gap-1 px-3 py-2"
       >
         <Link
           href="/"
@@ -190,14 +189,6 @@ export function WorkspaceNavDock() {
           )}
         </div>
       </nav>
-      {exiting && (
-        <div
-          aria-hidden
-          className="animate-page-dim-out pointer-events-none fixed inset-0 z-[90] bg-surface-0"
-          style={{ animationDuration: exitDelayMs > 0 ? `${exitDelayMs}ms` : undefined }}
-          data-workspace-exit-veil
-        />
-      )}
     </div>
   );
 }
