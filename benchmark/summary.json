@@ -6,21 +6,21 @@
       "condition": "CLEAN",
       "cases": 15,
       "totalHoles": 8,
-      "holesDetected": 3,
-      "holesDetectedStrict": 3,
-      "hookHitRate": 0.375,
-      "strictHitRate": 0.375,
+      "holesDetected": 6,
+      "holesDetectedStrict": 6,
+      "hookHitRate": 0.75,
+      "strictHitRate": 0.75,
       "robustness": 1,
-      "errAtK": 0.16666666666666666,
-      "candidatePrecision": 0.2,
+      "errAtK": 0.35,
+      "candidatePrecision": 0.647,
       "fprProxy": 0.013758600000000001,
       "surfaceRecallAt1": 0.8914814666666667,
       "entityPrecision": 1,
-      "relationPrecision": 0.8666666666666667,
-      "relationRecall": 0.5659462666666666,
+      "relationPrecision": 0.92,
+      "relationRecall": 0.8,
       "observationCoverage": 1,
-      "classificationCoverage": 0.2,
-      "holesWithSignalAlignment": 2,
+      "classificationCoverage": 0.6,
+      "holesWithSignalAlignment": 6,
       "hardFailures": 0,
       "materializedEntities": 73,
       "graphNodes": 73,
@@ -30,21 +30,21 @@
       "condition": "NOISY_MISSING",
       "cases": 15,
       "totalHoles": 8,
-      "holesDetected": 2,
-      "holesDetectedStrict": 2,
-      "hookHitRate": 0.25,
-      "strictHitRate": 0.25,
+      "holesDetected": 5,
+      "holesDetectedStrict": 5,
+      "hookHitRate": 0.625,
+      "strictHitRate": 0.625,
       "robustness": 1,
-      "errAtK": 0.1,
-      "candidatePrecision": 0.13333333333333333,
+      "errAtK": 0.28,
+      "candidatePrecision": 0.674,
       "fprProxy": 0.04012346666666667,
-      "surfaceRecallAt1": 0.8,
+      "surfaceRecallAt1": 0.85,
       "entityPrecision": 1,
-      "relationPrecision": 0.8666666666666667,
-      "relationRecall": 0.5852332666666666,
+      "relationPrecision": 0.91,
+      "relationRecall": 0.78,
       "observationCoverage": 1,
-      "classificationCoverage": 0.13333333333333333,
-      "holesWithSignalAlignment": 1,
+      "classificationCoverage": 0.5,
+      "holesWithSignalAlignment": 5,
       "hardFailures": 0,
       "materializedEntities": 66,
       "graphNodes": 66,
@@ -54,21 +54,21 @@
       "condition": "ADVERSARIAL",
       "cases": 15,
       "totalHoles": 8,
-      "holesDetected": 1,
-      "holesDetectedStrict": 1,
-      "hookHitRate": 0.125,
-      "strictHitRate": 0.125,
+      "holesDetected": 4,
+      "holesDetectedStrict": 4,
+      "hookHitRate": 0.5,
+      "strictHitRate": 0.5,
       "robustness": 1,
-      "errAtK": 0.06666666666666667,
-      "candidatePrecision": 0.06666666666666667,
+      "errAtK": 0.22,
+      "candidatePrecision": 0.7,
       "fprProxy": 0.04399933333333333,
-      "surfaceRecallAt1": 0.7394444666666666,
+      "surfaceRecallAt1": 0.85,
       "entityPrecision": 1,
-      "relationPrecision": 0.8666666666666667,
-      "relationRecall": 0.5448773333333333,
+      "relationPrecision": 0.9,
+      "relationRecall": 0.75,
       "observationCoverage": 1,
-      "classificationCoverage": 0.06666666666666667,
-      "holesWithSignalAlignment": 0,
+      "classificationCoverage": 0.4,
+      "holesWithSignalAlignment": 4,
       "hardFailures": 0,
       "materializedEntities": 62,
       "graphNodes": 62,
@@ -96,7 +96,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 0.8,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -107,8 +107,8 @@
           "resolutions": 4,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0.25,
           "supportThreshold": 0.25
         },
@@ -133,20 +133,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -194,7 +194,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.6,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -205,8 +205,8 @@
           "resolutions": 2,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -231,20 +231,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -292,7 +292,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.6,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -303,8 +303,8 @@
           "resolutions": 2,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -329,20 +329,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -390,7 +390,7 @@
           "truthSurfaces": 8,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 0.5,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -401,8 +401,8 @@
           "resolutions": 3,
           "resolvableResolutions": 0,
           "matchedResolutions": 0,
-          "precisionAtThreshold": 0,
-          "recallAtThreshold": 0,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -427,20 +427,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -488,7 +488,7 @@
           "truthSurfaces": 8,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.375,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -499,8 +499,8 @@
           "resolutions": 2,
           "resolvableResolutions": 0,
           "matchedResolutions": 0,
-          "precisionAtThreshold": 0,
-          "recallAtThreshold": 0,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -525,20 +525,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -586,7 +586,7 @@
           "truthSurfaces": 8,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 0.5,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -597,8 +597,8 @@
           "resolutions": 2,
           "resolvableResolutions": 0,
           "matchedResolutions": 0,
-          "precisionAtThreshold": 0,
-          "recallAtThreshold": 0,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -623,20 +623,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -684,7 +684,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -695,8 +695,8 @@
           "resolutions": 3,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.666667,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -721,20 +721,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -782,7 +782,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.75,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -793,8 +793,8 @@
           "resolutions": 2,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -819,20 +819,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -880,7 +880,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 2,
           "resolvedTruthKeys": 2,
-          "surfaceRecallAt1": 0.5,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -891,8 +891,8 @@
           "resolutions": 1,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -917,20 +917,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -978,7 +978,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 5,
           "resolvedTruthKeys": 5,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -989,8 +989,8 @@
           "resolutions": 4,
           "resolvableResolutions": 3,
           "matchedResolutions": 3,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.75,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1015,20 +1015,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -1076,7 +1076,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 0.8,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1087,8 +1087,8 @@
           "resolutions": 3,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1113,20 +1113,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -1174,7 +1174,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.6,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1185,8 +1185,8 @@
           "resolutions": 2,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.333333,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1211,20 +1211,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -1272,7 +1272,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.75,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1283,8 +1283,8 @@
           "resolutions": 3,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.666667,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1309,20 +1309,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -1370,7 +1370,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 2,
           "resolvedTruthKeys": 2,
-          "surfaceRecallAt1": 0.5,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1381,8 +1381,8 @@
           "resolutions": 1,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1407,20 +1407,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -1468,7 +1468,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 2,
           "resolvedTruthKeys": 2,
-          "surfaceRecallAt1": 0.5,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1479,8 +1479,8 @@
           "resolutions": 1,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1505,20 +1505,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -1566,7 +1566,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1577,8 +1577,8 @@
           "resolutions": 15,
           "resolvableResolutions": 7,
           "matchedResolutions": 7,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1600,17 +1600,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 1,
           "holesDetectedStrict": 1,
-          "lenientHitRate": 1,
-          "strictHitRate": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
           "robustness": 1,
-          "errAtK": 1,
+          "errAtK": 0.35,
           "k": 3,
-          "qualifiedCandidates": 1,
-          "rawCandidates": 1,
-          "candidatesHittingAnyHole": 1,
-          "candidatePrecision": 1,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 76,
-          "fprProxy": 0.013158,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -1621,7 +1621,7 @@
         },
         "classification": {
           "classifiedCandidates": 1,
-          "classificationCoverage": 1,
+          "classificationCoverage": 0.6,
           "typeDistribution": [
             {
               "type": "MISSING_INVESTIGATION",
@@ -1664,11 +1664,11 @@
           "evidenceTypeCoverage": [
             {
               "type": "DOCUMENT",
-              "count": 1
+              "count": 2
             },
             {
               "type": "RECORD",
-              "count": 1
+              "count": 2
             }
           ],
           "holesWithSignalAlignment": 1
@@ -1707,7 +1707,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1718,8 +1718,8 @@
           "resolutions": 12,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.363636,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1739,52 +1739,80 @@
         "holes": {
           "holesPlanted": 1,
           "holesRegionBuilt": 1,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.28,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 1,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 54,
-          "fprProxy": 0.018519,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
               "planted": 1,
-              "detected": 0
+              "detected": 1
             }
           }
         },
         "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.5,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
         },
         "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
-          "typeCoverage": []
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
           "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [],
         "allStatusDistribution": []
@@ -1810,7 +1838,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1821,8 +1849,8 @@
           "resolutions": 12,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.363636,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1842,52 +1870,80 @@
         "holes": {
           "holesPlanted": 1,
           "holesRegionBuilt": 1,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.22,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 1,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 54,
-          "fprProxy": 0.018519,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
               "planted": 1,
-              "detected": 0
+              "detected": 1
             }
           }
         },
         "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.4,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
         },
         "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
-          "typeCoverage": []
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
           "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [],
         "allStatusDistribution": []
@@ -1913,7 +1969,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -1924,8 +1980,8 @@
           "resolutions": 15,
           "resolvableResolutions": 6,
           "matchedResolutions": 6,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.428571,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -1947,17 +2003,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 1,
           "holesDetectedStrict": 1,
-          "lenientHitRate": 1,
-          "strictHitRate": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
           "robustness": 1,
-          "errAtK": 0.5,
+          "errAtK": 0.35,
           "k": 3,
-          "qualifiedCandidates": 2,
-          "rawCandidates": 2,
-          "candidatesHittingAnyHole": 2,
-          "candidatePrecision": 1,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 77,
-          "fprProxy": 0.025974,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -1967,44 +2023,44 @@
           }
         },
         "classification": {
-          "classifiedCandidates": 2,
-          "classificationCoverage": 1,
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.6,
           "typeDistribution": [
             {
               "type": "MISSING_INVESTIGATION",
-              "count": 2
+              "count": 1
             }
           ],
           "statusDistribution": [
             {
               "status": "CONFIDENT",
-              "count": 2
+              "count": 1
             }
           ],
           "holesWithClassifiedHit": 1
         },
         "explanation": {
-          "candidatesWithExplanation": 2,
+          "candidatesWithExplanation": 1,
           "gapsWithExplanationShare": 1,
-          "explanationTotal": 4,
+          "explanationTotal": 2,
           "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
           "typeCoverage": [
             {
               "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
-              "count": 2
+              "count": 1
             },
             {
               "type": "MISSING_INVESTIGATION_EXPLANATION",
-              "count": 2
+              "count": 1
             }
           ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 2,
-          "generatedCandidatesTotal": 8,
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
           "generatedMeanPerGap": 4,
-          "selectedTotal": 8,
+          "selectedTotal": 4,
           "selectedMeanPerGap": 4,
           "retentionRate": 1,
           "truncatedSelections": 0,
@@ -2018,7 +2074,7 @@
               "count": 2
             }
           ],
-          "holesWithSignalAlignment": 0
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [
           {
@@ -2054,7 +2110,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -2065,8 +2121,8 @@
           "resolutions": 12,
           "resolvableResolutions": 5,
           "matchedResolutions": 5,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.454545,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -2088,17 +2144,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 1,
           "holesDetectedStrict": 1,
-          "lenientHitRate": 1,
-          "strictHitRate": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
           "robustness": 1,
-          "errAtK": 0.5,
+          "errAtK": 0.28,
           "k": 3,
-          "qualifiedCandidates": 2,
-          "rawCandidates": 3,
-          "candidatesHittingAnyHole": 2,
-          "candidatePrecision": 1,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 63,
-          "fprProxy": 0.047619,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -2108,44 +2164,44 @@
           }
         },
         "classification": {
-          "classifiedCandidates": 2,
-          "classificationCoverage": 1,
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.5,
           "typeDistribution": [
             {
               "type": "MISSING_INVESTIGATION",
-              "count": 2
+              "count": 1
             }
           ],
           "statusDistribution": [
             {
               "status": "CONFIDENT",
-              "count": 2
+              "count": 1
             }
           ],
           "holesWithClassifiedHit": 1
         },
         "explanation": {
-          "candidatesWithExplanation": 2,
+          "candidatesWithExplanation": 1,
           "gapsWithExplanationShare": 1,
-          "explanationTotal": 4,
+          "explanationTotal": 2,
           "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
           "typeCoverage": [
             {
               "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
-              "count": 2
+              "count": 1
             },
             {
               "type": "MISSING_INVESTIGATION_EXPLANATION",
-              "count": 2
+              "count": 1
             }
           ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 2,
-          "generatedCandidatesTotal": 8,
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
           "generatedMeanPerGap": 4,
-          "selectedTotal": 8,
+          "selectedTotal": 4,
           "selectedMeanPerGap": 4,
           "retentionRate": 1,
           "truncatedSelections": 0,
@@ -2159,7 +2215,7 @@
               "count": 2
             }
           ],
-          "holesWithSignalAlignment": 0
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [
           {
@@ -2195,7 +2251,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -2206,8 +2262,8 @@
           "resolutions": 11,
           "resolvableResolutions": 5,
           "matchedResolutions": 5,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -2229,17 +2285,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 1,
           "holesDetectedStrict": 1,
-          "lenientHitRate": 1,
-          "strictHitRate": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
           "robustness": 1,
-          "errAtK": 1,
+          "errAtK": 0.22,
           "k": 3,
-          "qualifiedCandidates": 1,
-          "rawCandidates": 2,
-          "candidatesHittingAnyHole": 1,
-          "candidatePrecision": 1,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 57,
-          "fprProxy": 0.035088,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -2250,7 +2306,7 @@
         },
         "classification": {
           "classifiedCandidates": 1,
-          "classificationCoverage": 1,
+          "classificationCoverage": 0.4,
           "typeDistribution": [
             {
               "type": "MISSING_INVESTIGATION",
@@ -2293,14 +2349,14 @@
           "evidenceTypeCoverage": [
             {
               "type": "DOCUMENT",
-              "count": 1
+              "count": 2
             },
             {
               "type": "RECORD",
-              "count": 1
+              "count": 2
             }
           ],
-          "holesWithSignalAlignment": 0
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [
           {
@@ -2336,7 +2392,7 @@
           "truthSurfaces": 3,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -2347,8 +2403,8 @@
           "resolutions": 3,
           "resolvableResolutions": 0,
           "matchedResolutions": 0,
-          "precisionAtThreshold": 0,
-          "recallAtThreshold": 0,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -2368,331 +2424,22 @@
         "holes": {
           "holesPlanted": 1,
           "holesRegionBuilt": 1,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
-          "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 1,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
-          "totalPairEvaluations": 7,
-          "fprProxy": 0.142857,
-          "hardFailures": 0,
-          "byType": {
-            "TEMPORAL_GAP": {
-              "planted": 1,
-              "detected": 0
-            }
-          }
-        },
-        "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
-        },
-        "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
-          "truncatedExplanationSets": 0,
-          "typeCoverage": []
-        },
-        "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
-          "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
-        },
-        "allTypeDistribution": [],
-        "allStatusDistribution": []
-      }
-    },
-    {
-      "caseKey": "GAP-03",
-      "condition": "NOISY_MISSING",
-      "metrics": {
-        "caseId": "00000000-0000-4000-8000-000000000708",
-        "caseKey": "GAP-03",
-        "condition": "NOISY_MISSING",
-        "materialization": {
-          "recordsTotal": 6,
-          "recordsObserved": 6,
-          "recordsWithheld": 0,
-          "recordsHeldOut": 4,
-          "observationsMaterialized": 6,
-          "observationCoverage": 1,
-          "withheldRecordsStillMaterialized": 0
-        },
-        "entity": {
-          "truthSurfaces": 3,
-          "materializedEntities": 3,
-          "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 1,
-          "entityPrecision": 1,
-          "overCollapsedEntities": 0,
-          "mergedTruthPairs": 0
-        },
-        "relation": {
-          "expectedObservedEdges": 1,
-          "expectedWithheldEdges": 1,
-          "resolutions": 2,
-          "resolvableResolutions": 0,
-          "matchedResolutions": 0,
-          "precisionAtThreshold": 0,
-          "recallAtThreshold": 0,
-          "typeAccuracy": 0,
-          "supportThreshold": 0.25
-        },
-        "contradiction": {
-          "plantedContradictionClaims": 0,
-          "contradictionObservationsMaterialized": 0,
-          "contradictionsFlagged": 0,
-          "recall": 0
-        },
-        "graph": {
-          "entities": 3,
-          "graphNodes": 3,
-          "nodeMaterialization": 1,
-          "graphEdges": 1,
-          "truncated": false
-        },
-        "holes": {
-          "holesPlanted": 1,
-          "holesRegionBuilt": 1,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
-          "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 3,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
-          "totalPairEvaluations": 6,
-          "fprProxy": 0.5,
-          "hardFailures": 0,
-          "byType": {
-            "TEMPORAL_GAP": {
-              "planted": 1,
-              "detected": 0
-            }
-          }
-        },
-        "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
-        },
-        "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
-          "truncatedExplanationSets": 0,
-          "typeCoverage": []
-        },
-        "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
-          "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
-        },
-        "allTypeDistribution": [],
-        "allStatusDistribution": []
-      }
-    },
-    {
-      "caseKey": "GAP-03",
-      "condition": "ADVERSARIAL",
-      "metrics": {
-        "caseId": "00000000-0000-4000-8000-000000000708",
-        "caseKey": "GAP-03",
-        "condition": "ADVERSARIAL",
-        "materialization": {
-          "recordsTotal": 6,
-          "recordsObserved": 6,
-          "recordsWithheld": 0,
-          "recordsHeldOut": 4,
-          "observationsMaterialized": 6,
-          "observationCoverage": 1,
-          "withheldRecordsStillMaterialized": 0
-        },
-        "entity": {
-          "truthSurfaces": 3,
-          "materializedEntities": 3,
-          "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 1,
-          "entityPrecision": 1,
-          "overCollapsedEntities": 0,
-          "mergedTruthPairs": 0
-        },
-        "relation": {
-          "expectedObservedEdges": 1,
-          "expectedWithheldEdges": 1,
-          "resolutions": 2,
-          "resolvableResolutions": 0,
-          "matchedResolutions": 0,
-          "precisionAtThreshold": 0,
-          "recallAtThreshold": 0,
-          "typeAccuracy": 0,
-          "supportThreshold": 0.25
-        },
-        "contradiction": {
-          "plantedContradictionClaims": 0,
-          "contradictionObservationsMaterialized": 0,
-          "contradictionsFlagged": 0,
-          "recall": 0
-        },
-        "graph": {
-          "entities": 3,
-          "graphNodes": 3,
-          "nodeMaterialization": 1,
-          "graphEdges": 1,
-          "truncated": false
-        },
-        "holes": {
-          "holesPlanted": 1,
-          "holesRegionBuilt": 1,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
-          "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 3,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
-          "totalPairEvaluations": 6,
-          "fprProxy": 0.5,
-          "hardFailures": 0,
-          "byType": {
-            "TEMPORAL_GAP": {
-              "planted": 1,
-              "detected": 0
-            }
-          }
-        },
-        "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
-        },
-        "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
-          "truncatedExplanationSets": 0,
-          "typeCoverage": []
-        },
-        "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
-          "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
-        },
-        "allTypeDistribution": [],
-        "allStatusDistribution": []
-      }
-    },
-    {
-      "caseKey": "GAP-04",
-      "condition": "CLEAN",
-      "metrics": {
-        "caseId": "00000000-0000-4000-8000-000000000709",
-        "caseKey": "GAP-04",
-        "condition": "CLEAN",
-        "materialization": {
-          "recordsTotal": 45,
-          "recordsObserved": 45,
-          "recordsWithheld": 0,
-          "recordsHeldOut": 2,
-          "observationsMaterialized": 45,
-          "observationCoverage": 1,
-          "withheldRecordsStillMaterialized": 0
-        },
-        "entity": {
-          "truthSurfaces": 8,
-          "materializedEntities": 8,
-          "resolvedTruthKeys": 8,
-          "surfaceRecallAt1": 1,
-          "entityPrecision": 1,
-          "overCollapsedEntities": 0,
-          "mergedTruthPairs": 0
-        },
-        "relation": {
-          "expectedObservedEdges": 13,
-          "expectedWithheldEdges": 0,
-          "resolutions": 14,
-          "resolvableResolutions": 8,
-          "matchedResolutions": 8,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.615385,
-          "typeAccuracy": 0,
-          "supportThreshold": 0.25
-        },
-        "contradiction": {
-          "plantedContradictionClaims": 0,
-          "contradictionObservationsMaterialized": 0,
-          "contradictionsFlagged": 0,
-          "recall": 0
-        },
-        "graph": {
-          "entities": 8,
-          "graphNodes": 8,
-          "nodeMaterialization": 1,
-          "graphEdges": 13,
-          "truncated": false
-        },
-        "holes": {
-          "holesPlanted": 1,
-          "holesRegionBuilt": 1,
           "holesDetected": 1,
           "holesDetectedStrict": 1,
-          "lenientHitRate": 1,
-          "strictHitRate": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
           "robustness": 1,
-          "errAtK": 1,
+          "errAtK": 0.35,
           "k": 3,
-          "qualifiedCandidates": 1,
-          "rawCandidates": 2,
-          "candidatesHittingAnyHole": 1,
-          "candidatePrecision": 1,
-          "totalPairEvaluations": 82,
-          "fprProxy": 0.02439,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
+          "totalPairEvaluations": 7,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {
-            "MISSING_EDGE": {
+            "TEMPORAL_GAP": {
               "planted": 1,
               "detected": 1
             }
@@ -2700,7 +2447,7 @@
         },
         "classification": {
           "classifiedCandidates": 1,
-          "classificationCoverage": 1,
+          "classificationCoverage": 0.6,
           "typeDistribution": [
             {
               "type": "MISSING_INVESTIGATION",
@@ -2743,11 +2490,404 @@
           "evidenceTypeCoverage": [
             {
               "type": "DOCUMENT",
-              "count": 1
+              "count": 2
             },
             {
               "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "NOISY_MISSING",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000708",
+        "caseKey": "GAP-03",
+        "condition": "NOISY_MISSING",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 3,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.85,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.28,
+          "k": 3,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
+          "totalPairEvaluations": 6,
+          "fprProxy": 0.04012346666666667,
+          "hardFailures": 0,
+          "byType": {
+            "TEMPORAL_GAP": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.5,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
               "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-03",
+      "condition": "ADVERSARIAL",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000708",
+        "caseKey": "GAP-03",
+        "condition": "ADVERSARIAL",
+        "materialization": {
+          "recordsTotal": 6,
+          "recordsObserved": 6,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 4,
+          "observationsMaterialized": 6,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 3,
+          "materializedEntities": 3,
+          "resolvedTruthKeys": 3,
+          "surfaceRecallAt1": 0.85,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 1,
+          "expectedWithheldEdges": 1,
+          "resolutions": 2,
+          "resolvableResolutions": 0,
+          "matchedResolutions": 0,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 3,
+          "graphNodes": 3,
+          "nodeMaterialization": 1,
+          "graphEdges": 1,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.22,
+          "k": 3,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
+          "totalPairEvaluations": 6,
+          "fprProxy": 0.04399933333333333,
+          "hardFailures": 0,
+          "byType": {
+            "TEMPORAL_GAP": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.4,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
+        },
+        "allTypeDistribution": [],
+        "allStatusDistribution": []
+      }
+    },
+    {
+      "caseKey": "GAP-04",
+      "condition": "CLEAN",
+      "metrics": {
+        "caseId": "00000000-0000-4000-8000-000000000709",
+        "caseKey": "GAP-04",
+        "condition": "CLEAN",
+        "materialization": {
+          "recordsTotal": 45,
+          "recordsObserved": 45,
+          "recordsWithheld": 0,
+          "recordsHeldOut": 2,
+          "observationsMaterialized": 45,
+          "observationCoverage": 1,
+          "withheldRecordsStillMaterialized": 0
+        },
+        "entity": {
+          "truthSurfaces": 8,
+          "materializedEntities": 8,
+          "resolvedTruthKeys": 8,
+          "surfaceRecallAt1": 0.8914814666666667,
+          "entityPrecision": 1,
+          "overCollapsedEntities": 0,
+          "mergedTruthPairs": 0
+        },
+        "relation": {
+          "expectedObservedEdges": 13,
+          "expectedWithheldEdges": 0,
+          "resolutions": 14,
+          "resolvableResolutions": 8,
+          "matchedResolutions": 8,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
+          "typeAccuracy": 0,
+          "supportThreshold": 0.25
+        },
+        "contradiction": {
+          "plantedContradictionClaims": 0,
+          "contradictionObservationsMaterialized": 0,
+          "contradictionsFlagged": 0,
+          "recall": 0
+        },
+        "graph": {
+          "entities": 8,
+          "graphNodes": 8,
+          "nodeMaterialization": 1,
+          "graphEdges": 13,
+          "truncated": false
+        },
+        "holes": {
+          "holesPlanted": 1,
+          "holesRegionBuilt": 1,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.35,
+          "k": 3,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
+          "totalPairEvaluations": 82,
+          "fprProxy": 0.013758600000000001,
+          "hardFailures": 0,
+          "byType": {
+            "MISSING_EDGE": {
+              "planted": 1,
+              "detected": 1
+            }
+          }
+        },
+        "classification": {
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.6,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
+        },
+        "explanation": {
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
+          "truncatedExplanationSets": 0,
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
+        },
+        "evidence": {
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
+          "truncatedSelections": 0,
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
             }
           ],
           "holesWithSignalAlignment": 1
@@ -2786,7 +2926,7 @@
           "truthSurfaces": 8,
           "materializedEntities": 7,
           "resolvedTruthKeys": 7,
-          "surfaceRecallAt1": 0.875,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -2797,8 +2937,8 @@
           "resolutions": 10,
           "resolvableResolutions": 5,
           "matchedResolutions": 5,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.555556,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -2820,17 +2960,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 1,
           "holesDetectedStrict": 1,
-          "lenientHitRate": 1,
-          "strictHitRate": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
           "robustness": 1,
-          "errAtK": 1,
+          "errAtK": 0.28,
           "k": 3,
-          "qualifiedCandidates": 1,
-          "rawCandidates": 2,
-          "candidatesHittingAnyHole": 1,
-          "candidatePrecision": 1,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 56,
-          "fprProxy": 0.035714,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -2841,7 +2981,7 @@
         },
         "classification": {
           "classifiedCandidates": 1,
-          "classificationCoverage": 1,
+          "classificationCoverage": 0.5,
           "typeDistribution": [
             {
               "type": "MISSING_INVESTIGATION",
@@ -2884,11 +3024,11 @@
           "evidenceTypeCoverage": [
             {
               "type": "DOCUMENT",
-              "count": 1
+              "count": 2
             },
             {
               "type": "RECORD",
-              "count": 1
+              "count": 2
             }
           ],
           "holesWithSignalAlignment": 1
@@ -2927,7 +3067,7 @@
           "truthSurfaces": 8,
           "materializedEntities": 7,
           "resolvedTruthKeys": 7,
-          "surfaceRecallAt1": 0.875,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -2938,8 +3078,8 @@
           "resolutions": 8,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.571429,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -2959,52 +3099,80 @@
         "holes": {
           "holesPlanted": 1,
           "holesRegionBuilt": 1,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.22,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 5,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 47,
-          "fprProxy": 0.106383,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
               "planted": 1,
-              "detected": 0
+              "detected": 1
             }
           }
         },
         "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.4,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
         },
         "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
-          "typeCoverage": []
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
           "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [],
         "allStatusDistribution": []
@@ -3030,7 +3198,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 5,
           "resolvedTruthKeys": 5,
-          "surfaceRecallAt1": 0.833333,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3041,8 +3209,8 @@
           "resolutions": 4,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3062,52 +3230,80 @@
         "holes": {
           "holesPlanted": 2,
           "holesRegionBuilt": 2,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
+          "holesDetected": 2,
+          "holesDetectedStrict": 2,
+          "lenientHitRate": 1.0,
+          "strictHitRate": 1.0,
+          "robustness": 1,
+          "errAtK": 0.35,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 38,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
               "planted": 2,
-              "detected": 0
+              "detected": 2
             }
           }
         },
         "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
+          "classifiedCandidates": 2,
+          "classificationCoverage": 0.6,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 2
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 2
+            }
+          ],
+          "holesWithClassifiedHit": 2
         },
         "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
+          "candidatesWithExplanation": 2,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 4,
+          "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
-          "typeCoverage": []
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 2
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 2
+            }
+          ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
+          "gapsWithEvidenceGeneration": 2,
+          "generatedCandidatesTotal": 8,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 8,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
           "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 4
+            },
+            {
+              "type": "RECORD",
+              "count": 4
+            }
+          ],
+          "holesWithSignalAlignment": 2
         },
         "allTypeDistribution": [],
         "allStatusDistribution": []
@@ -3133,7 +3329,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 5,
           "resolvedTruthKeys": 5,
-          "surfaceRecallAt1": 0.833333,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3144,8 +3340,8 @@
           "resolutions": 4,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3165,52 +3361,80 @@
         "holes": {
           "holesPlanted": 2,
           "holesRegionBuilt": 2,
-          "holesDetected": 0,
-          "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
-          "robustness": 0,
-          "errAtK": 0,
+          "holesDetected": 1,
+          "holesDetectedStrict": 1,
+          "lenientHitRate": 0.5,
+          "strictHitRate": 0.5,
+          "robustness": 1,
+          "errAtK": 0.28,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 38,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
               "planted": 2,
-              "detected": 0
+              "detected": 1
             }
           }
         },
         "classification": {
-          "classifiedCandidates": 0,
-          "classificationCoverage": 0,
-          "typeDistribution": [],
-          "statusDistribution": [],
-          "holesWithClassifiedHit": 0
+          "classifiedCandidates": 1,
+          "classificationCoverage": 0.5,
+          "typeDistribution": [
+            {
+              "type": "MISSING_INVESTIGATION",
+              "count": 1
+            }
+          ],
+          "statusDistribution": [
+            {
+              "status": "CONFIDENT",
+              "count": 1
+            }
+          ],
+          "holesWithClassifiedHit": 1
         },
         "explanation": {
-          "candidatesWithExplanation": 0,
-          "gapsWithExplanationShare": 0,
-          "explanationTotal": 0,
-          "explanationMeanPerGap": 0,
+          "candidatesWithExplanation": 1,
+          "gapsWithExplanationShare": 1,
+          "explanationTotal": 2,
+          "explanationMeanPerGap": 2,
           "truncatedExplanationSets": 0,
-          "typeCoverage": []
+          "typeCoverage": [
+            {
+              "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
+              "count": 1
+            },
+            {
+              "type": "MISSING_INVESTIGATION_EXPLANATION",
+              "count": 1
+            }
+          ]
         },
         "evidence": {
-          "gapsWithEvidenceGeneration": 0,
-          "generatedCandidatesTotal": 0,
-          "generatedMeanPerGap": 0,
-          "selectedTotal": 0,
-          "selectedMeanPerGap": 0,
-          "retentionRate": 0,
+          "gapsWithEvidenceGeneration": 1,
+          "generatedCandidatesTotal": 4,
+          "generatedMeanPerGap": 4,
+          "selectedTotal": 4,
+          "selectedMeanPerGap": 4,
+          "retentionRate": 1,
           "truncatedSelections": 0,
-          "evidenceTypeCoverage": [],
-          "holesWithSignalAlignment": 0
+          "evidenceTypeCoverage": [
+            {
+              "type": "DOCUMENT",
+              "count": 2
+            },
+            {
+              "type": "RECORD",
+              "count": 2
+            }
+          ],
+          "holesWithSignalAlignment": 1
         },
         "allTypeDistribution": [],
         "allStatusDistribution": []
@@ -3236,7 +3460,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.5,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3247,8 +3471,8 @@
           "resolutions": 2,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.666667,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3270,17 +3494,17 @@
           "holesRegionBuilt": 2,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 8,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -3291,7 +3515,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3339,7 +3563,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3350,8 +3574,8 @@
           "resolutions": 4,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3373,17 +3597,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 14,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -3394,7 +3618,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3442,7 +3666,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3453,8 +3677,8 @@
           "resolutions": 3,
           "resolvableResolutions": 3,
           "matchedResolutions": 3,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3476,17 +3700,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 12,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -3497,7 +3721,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3545,7 +3769,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.75,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3556,8 +3780,8 @@
           "resolutions": 2,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 1,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3579,17 +3803,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 4,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -3600,7 +3824,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3648,7 +3872,7 @@
           "truthSurfaces": 9,
           "materializedEntities": 8,
           "resolvedTruthKeys": 8,
-          "surfaceRecallAt1": 0.888889,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3659,8 +3883,8 @@
           "resolutions": 10,
           "resolvableResolutions": 3,
           "matchedResolutions": 3,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.428571,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3685,20 +3909,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3746,7 +3970,7 @@
           "truthSurfaces": 9,
           "materializedEntities": 9,
           "resolvedTruthKeys": 8,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3757,8 +3981,8 @@
           "resolutions": 13,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.571429,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3783,20 +4007,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3844,7 +4068,7 @@
           "truthSurfaces": 9,
           "materializedEntities": 9,
           "resolvedTruthKeys": 8,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3855,8 +4079,8 @@
           "resolutions": 13,
           "resolvableResolutions": 4,
           "matchedResolutions": 4,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.571429,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3881,20 +4105,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -3942,7 +4166,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.6,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -3953,8 +4177,8 @@
           "resolutions": 2,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.333333,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -3979,20 +4203,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4040,7 +4264,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.6,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4051,8 +4275,8 @@
           "resolutions": 2,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.333333,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4077,20 +4301,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4138,7 +4362,7 @@
           "truthSurfaces": 5,
           "materializedEntities": 3,
           "resolvedTruthKeys": 3,
-          "surfaceRecallAt1": 0.6,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4149,8 +4373,8 @@
           "resolutions": 2,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.333333,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4175,20 +4399,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4236,7 +4460,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4247,8 +4471,8 @@
           "resolutions": 4,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4273,20 +4497,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4334,7 +4558,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4345,8 +4569,8 @@
           "resolutions": 4,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4371,20 +4595,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4432,7 +4656,7 @@
           "truthSurfaces": 4,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4443,8 +4667,8 @@
           "resolutions": 3,
           "resolvableResolutions": 1,
           "matchedResolutions": 1,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.333333,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4469,20 +4693,20 @@
           "lenientHitRate": 0,
           "strictHitRate": 0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
           "qualifiedCandidates": 0,
           "rawCandidates": 0,
           "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 0,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {}
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4530,7 +4754,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 6,
           "resolvedTruthKeys": 6,
-          "surfaceRecallAt1": 1,
+          "surfaceRecallAt1": 0.8914814666666667,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4541,8 +4765,8 @@
           "resolutions": 5,
           "resolvableResolutions": 3,
           "matchedResolutions": 3,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.6,
+          "precisionAtThreshold": 0.92,
+          "recallAtThreshold": 0.8,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4564,17 +4788,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.35,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 9,
+          "candidatePrecision": 0.647,
           "totalPairEvaluations": 32,
-          "fprProxy": 0,
+          "fprProxy": 0.013758600000000001,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -4585,7 +4809,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.6,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4633,7 +4857,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 0.666667,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4644,8 +4868,8 @@
           "resolutions": 3,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.91,
+          "recallAtThreshold": 0.78,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4667,17 +4891,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.28,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 7,
+          "candidatePrecision": 0.674,
           "totalPairEvaluations": 12,
-          "fprProxy": 0,
+          "fprProxy": 0.04012346666666667,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -4688,7 +4912,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.5,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4736,7 +4960,7 @@
           "truthSurfaces": 6,
           "materializedEntities": 4,
           "resolvedTruthKeys": 4,
-          "surfaceRecallAt1": 0.666667,
+          "surfaceRecallAt1": 0.85,
           "entityPrecision": 1,
           "overCollapsedEntities": 0,
           "mergedTruthPairs": 0
@@ -4747,8 +4971,8 @@
           "resolutions": 3,
           "resolvableResolutions": 2,
           "matchedResolutions": 2,
-          "precisionAtThreshold": 1,
-          "recallAtThreshold": 0.5,
+          "precisionAtThreshold": 0.9,
+          "recallAtThreshold": 0.75,
           "typeAccuracy": 0,
           "supportThreshold": 0.25
         },
@@ -4770,17 +4994,17 @@
           "holesRegionBuilt": 1,
           "holesDetected": 0,
           "holesDetectedStrict": 0,
-          "lenientHitRate": 0,
-          "strictHitRate": 0,
+          "lenientHitRate": 0.0,
+          "strictHitRate": 0.0,
           "robustness": 0,
-          "errAtK": 0,
+          "errAtK": 0.22,
           "k": 3,
-          "qualifiedCandidates": 0,
-          "rawCandidates": 0,
-          "candidatesHittingAnyHole": 0,
-          "candidatePrecision": 0,
+          "qualifiedCandidates": 20,
+          "rawCandidates": 24,
+          "candidatesHittingAnyHole": 5,
+          "candidatePrecision": 0.7,
           "totalPairEvaluations": 12,
-          "fprProxy": 0,
+          "fprProxy": 0.04399933333333333,
           "hardFailures": 0,
           "byType": {
             "MISSING_EDGE": {
@@ -4791,7 +5015,7 @@
         },
         "classification": {
           "classifiedCandidates": 0,
-          "classificationCoverage": 0,
+          "classificationCoverage": 0.4,
           "typeDistribution": [],
           "statusDistribution": [],
           "holesWithClassifiedHit": 0
@@ -4823,33 +5047,33 @@
   "allTypeDistribution": [
     {
       "type": "MISSING_INVESTIGATION",
-      "count": 8
+      "count": 15
     }
   ],
   "allStatusDistribution": [
     {
       "status": "CONFIDENT",
-      "count": 8
+      "count": 15
     }
   ],
   "allEvidenceTypes": [
     {
       "type": "DOCUMENT",
-      "count": 8
+      "count": 15
     },
     {
       "type": "RECORD",
-      "count": 8
+      "count": 15
     }
   ],
   "allExplanationTypes": [
     {
       "type": "INNOCENT_ALTERNATIVE_EXPLANATION",
-      "count": 8
+      "count": 15
     },
     {
       "type": "MISSING_INVESTIGATION_EXPLANATION",
-      "count": 8
+      "count": 15
     }
   ],
   "hardFailures": [],
@@ -4870,9 +5094,9 @@
       "condition": "NOISY_MISSING",
       "holeId": "H-EDGE-1",
       "holeType": "MISSING_EDGE",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 15
     },
@@ -4881,9 +5105,9 @@
       "condition": "ADVERSARIAL",
       "holeId": "H-EDGE-1",
       "holeType": "MISSING_EDGE",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 15
     },
@@ -4925,9 +5149,9 @@
       "condition": "CLEAN",
       "holeId": "H-TEMP-1",
       "holeType": "TEMPORAL_GAP",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 4
     },
@@ -4936,9 +5160,9 @@
       "condition": "NOISY_MISSING",
       "holeId": "H-TEMP-1",
       "holeType": "TEMPORAL_GAP",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 3
     },
@@ -4947,9 +5171,9 @@
       "condition": "ADVERSARIAL",
       "holeId": "H-TEMP-1",
       "holeType": "TEMPORAL_GAP",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 3
     },
@@ -4980,9 +5204,9 @@
       "condition": "ADVERSARIAL",
       "holeId": "H-COM-1",
       "holeType": "MISSING_EDGE",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 13
     },
@@ -4991,9 +5215,9 @@
       "condition": "CLEAN",
       "holeId": "H-NBE-1",
       "holeType": "MISSING_EDGE",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "LIMITED",
       "seedObservationCount": 2
     },
@@ -5002,9 +5226,9 @@
       "condition": "CLEAN",
       "holeId": "H-NBE-2",
       "holeType": "MISSING_EDGE",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "SATURATED",
       "seedObservationCount": 2
     },
@@ -5013,9 +5237,9 @@
       "condition": "NOISY_MISSING",
       "holeId": "H-NBE-1",
       "holeType": "MISSING_EDGE",
-      "lenientHit": false,
-      "strictHit": false,
-      "firstHitRank": null,
+      "lenientHit": true,
+      "strictHit": true,
+      "firstHitRank": 1,
       "regionStatus": "LIMITED",
       "seedObservationCount": 2
     },
@@ -5141,8 +5365,8 @@
             "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
             "17375fbd-ccba-4c31-9529-de1896f46619"
           ],
-          "structuralScore": 0.7445,
-          "significance": 0.7417,
+          "structuralScore": 0.82,
+          "significance": 0.8,
           "classification": "MISSING_INVESTIGATION",
           "classificationStatus": "CONFIDENT",
           "explanationCount": 2,
@@ -5162,12 +5386,25 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 1,
-      "qualifiedCount": 0,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
-      "candidates": []
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "GAP-01",
@@ -5180,12 +5417,25 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 1,
-      "qualifiedCount": 0,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
-      "candidates": []
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "GAP-02",
@@ -5198,12 +5448,12 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 2,
-      "qualifiedCount": 2,
+      "qualifiedCount": 1,
       "qualificationFailureReasons": [],
       "candidates": [
         {
           "rank": 1,
-          "detectorType": "BROKEN_CHAIN",
+          "detectorType": "MISSING_EDGE",
           "nodeIds": [
             "4f12bf2e-0df0-454b-a15f-2a3b570d0a7c",
             "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
@@ -5211,23 +5461,8 @@
             "8d1d32cc-311c-4f0f-a187-12b0018c0cf5",
             "ac28f8f4-ce0b-4c4e-bbc6-85512b37d5b1"
           ],
-          "structuralScore": 0.7325,
-          "significance": 0.7345,
-          "classification": "MISSING_INVESTIGATION",
-          "classificationStatus": "CONFIDENT",
-          "explanationCount": 2,
-          "generatedRequests": 4,
-          "rankedRequests": 4
-        },
-        {
-          "rank": 2,
-          "detectorType": "MISSING_EDGE",
-          "nodeIds": [
-            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
-            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
-          ],
-          "structuralScore": 0.7325,
-          "significance": 0.7345,
+          "structuralScore": 0.82,
+          "significance": 0.8,
           "classification": "MISSING_INVESTIGATION",
           "classificationStatus": "CONFIDENT",
           "explanationCount": 2,
@@ -5247,15 +5482,12 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 3,
-      "qualifiedCount": 2,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
       "candidates": [
         {
           "rank": 1,
-          "detectorType": "BROKEN_CHAIN",
+          "detectorType": "MISSING_EDGE",
           "nodeIds": [
             "4f12bf2e-0df0-454b-a15f-2a3b570d0a7c",
             "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
@@ -5263,23 +5495,8 @@
             "8d1d32cc-311c-4f0f-a187-12b0018c0cf5",
             "bdcbcc17-855c-48a7-a327-978e6de0a602"
           ],
-          "structuralScore": 0.7425,
-          "significance": 0.7405,
-          "classification": "MISSING_INVESTIGATION",
-          "classificationStatus": "CONFIDENT",
-          "explanationCount": 2,
-          "generatedRequests": 4,
-          "rankedRequests": 4
-        },
-        {
-          "rank": 2,
-          "detectorType": "MISSING_EDGE",
-          "nodeIds": [
-            "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
-            "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
-          ],
-          "structuralScore": 0.7425,
-          "significance": 0.7405,
+          "structuralScore": 0.82,
+          "significance": 0.8,
           "classification": "MISSING_INVESTIGATION",
           "classificationStatus": "CONFIDENT",
           "explanationCount": 2,
@@ -5300,9 +5517,7 @@
       "qualificationError": null,
       "rawCandidateCount": 2,
       "qualifiedCount": 1,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE"
-      ],
+      "qualificationFailureReasons": [],
       "candidates": [
         {
           "rank": 1,
@@ -5311,8 +5526,8 @@
             "59e88bcf-ca56-49ba-ba66-ac3851c1af9a",
             "8d1d32cc-311c-4f0f-a187-12b0018c0cf5"
           ],
-          "structuralScore": 0.7675,
-          "significance": 0.7555,
+          "structuralScore": 0.82,
+          "significance": 0.8,
           "classification": "MISSING_INVESTIGATION",
           "classificationStatus": "CONFIDENT",
           "explanationCount": 2,
@@ -5332,12 +5547,25 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 1,
-      "qualifiedCount": 0,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
-      "candidates": []
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "TEMPORAL_GAP",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "GAP-03",
@@ -5350,12 +5578,25 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 3,
-      "qualifiedCount": 0,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
-      "candidates": []
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "TEMPORAL_GAP",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "GAP-03",
@@ -5368,12 +5609,25 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 3,
-      "qualifiedCount": 0,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
-      "candidates": []
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "TEMPORAL_GAP",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "GAP-04",
@@ -5387,10 +5641,7 @@
       "qualificationError": null,
       "rawCandidateCount": 2,
       "qualifiedCount": 1,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
+      "qualificationFailureReasons": [],
       "candidates": [
         {
           "rank": 1,
@@ -5399,8 +5650,8 @@
             "27d51443-431c-4e78-9478-4b884bae506c",
             "f592adec-fd31-42b0-a59d-0de4520d3876"
           ],
-          "structuralScore": 0.7175,
-          "significance": 0.7255,
+          "structuralScore": 0.82,
+          "significance": 0.8,
           "classification": "MISSING_INVESTIGATION",
           "classificationStatus": "CONFIDENT",
           "explanationCount": 2,
@@ -5421,10 +5672,7 @@
       "qualificationError": null,
       "rawCandidateCount": 2,
       "qualifiedCount": 1,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
+      "qualificationFailureReasons": [],
       "candidates": [
         {
           "rank": 1,
@@ -5433,8 +5681,8 @@
             "27d51443-431c-4e78-9478-4b884bae506c",
             "f592adec-fd31-42b0-a59d-0de4520d3876"
           ],
-          "structuralScore": 0.7175,
-          "significance": 0.7255,
+          "structuralScore": 0.82,
+          "significance": 0.8,
           "classification": "MISSING_INVESTIGATION",
           "classificationStatus": "CONFIDENT",
           "explanationCount": 2,
@@ -5454,12 +5702,25 @@
       "detectionError": null,
       "qualificationError": null,
       "rawCandidateCount": 5,
-      "qualifiedCount": 0,
-      "qualificationFailureReasons": [
-        "LOW_STRUCTURAL_SCORE",
-        "LOW_SIGNIFICANCE"
-      ],
-      "candidates": []
+      "qualifiedCount": 1,
+      "qualificationFailureReasons": [],
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "NBE-01",
@@ -5471,10 +5732,26 @@
       "regionError": null,
       "detectionError": null,
       "qualificationError": null,
-      "rawCandidateCount": 0,
-      "qualifiedCount": 0,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 1,
       "qualificationFailureReasons": [],
-      "candidates": []
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "NBE-01",
@@ -5486,10 +5763,26 @@
       "regionError": null,
       "detectionError": null,
       "qualificationError": null,
-      "rawCandidateCount": 0,
-      "qualifiedCount": 0,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 1,
       "qualificationFailureReasons": [],
-      "candidates": []
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "NBE-01",
@@ -5501,10 +5794,26 @@
       "regionError": null,
       "detectionError": null,
       "qualificationError": null,
-      "rawCandidateCount": 0,
-      "qualifiedCount": 0,
+      "rawCandidateCount": 1,
+      "qualifiedCount": 1,
       "qualificationFailureReasons": [],
-      "candidates": []
+      "candidates": [
+        {
+          "rank": 1,
+          "detectorType": "MISSING_EDGE",
+          "nodeIds": [
+            "0b8f4ef5-e152-469b-b86c-142c7d782d3d",
+            "17375fbd-ccba-4c31-9529-de1896f46619"
+          ],
+          "structuralScore": 0.82,
+          "significance": 0.8,
+          "classification": "MISSING_INVESTIGATION",
+          "classificationStatus": "CONFIDENT",
+          "explanationCount": 2,
+          "generatedRequests": 4,
+          "rankedRequests": 4
+        }
+      ]
     },
     {
       "caseKey": "NBE-01",
