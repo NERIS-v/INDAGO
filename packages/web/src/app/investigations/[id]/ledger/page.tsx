@@ -1,7 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { ReasoningLedger, type LedgerEventMock } from "@/components/intel/reasoning-ledger";
-import { CaseReport } from "@/components/intel/case-report";
+import {
+  CaseReport,
+  DEFAULT_CASE_REPORT_CONFIG,
+  type CaseReportConfig,
+} from "@/components/intel/case-report";
+import { CaseReportExportDialog } from "@/components/intel/case-report-export-dialog";
 
 const DEMO_LEDGER: LedgerEventMock[] = [
   {
@@ -40,8 +46,21 @@ const DEMO_LEDGER: LedgerEventMock[] = [
 ];
 
 export default function LedgerPage() {
+  const [reportConfig, setReportConfig] = useState<CaseReportConfig>(
+    DEFAULT_CASE_REPORT_CONFIG,
+  );
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   const handleExportPdf = () => {
-    window.print();
+    setDialogOpen(true);
+  };
+
+  const handleConfirm = (config: CaseReportConfig) => {
+    setReportConfig(config);
+    setDialogOpen(false);
+    // Print on the next frame so React commits the new report config before
+    // the browser renders print output.
+    requestAnimationFrame(() => window.print());
   };
 
   return (
@@ -116,7 +135,15 @@ export default function LedgerPage() {
         </div>
       </div>
 
-      <CaseReport />
+      <CaseReport config={reportConfig} />
+
+      {dialogOpen && (
+        <CaseReportExportDialog
+          initial={reportConfig}
+          onConfirm={handleConfirm}
+          onClose={() => setDialogOpen(false)}
+        />
+      )}
     </>
   );
 }

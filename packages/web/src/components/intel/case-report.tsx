@@ -12,6 +12,48 @@ import type {
 } from "@indago/contracts";
 import type { EvidenceListItem } from "@/lib/api/types";
 
+// ============================================================================
+// Case Report Configuration
+//
+// The export dialog produces a CaseReportConfig that decides both the layout
+// (full detail tables vs condensed summary) and which information is printed.
+// CaseReport renders itself from this config; the dialog never touches print.
+// ============================================================================
+
+export type ReportLayout = "full" | "condensed";
+
+export interface CaseReportConfig {
+  readonly layout: ReportLayout;
+  /** Maximum rows rendered per section (slice cap). */
+  readonly rowCap: number;
+  /** Sections / information to print. */
+  readonly includeIdentity: boolean;
+  readonly includeCurrentPicture: boolean;
+  readonly includeState: boolean;
+  readonly includeEntities: boolean;
+  readonly includeEvidence: boolean;
+  readonly includeLeads: boolean;
+  readonly includeGaps: boolean;
+  readonly includeHypotheses: boolean;
+}
+
+export const DEFAULT_CASE_REPORT_CONFIG: CaseReportConfig = {
+  layout: "full",
+  rowCap: 120,
+  includeIdentity: true,
+  includeCurrentPicture: true,
+  includeState: true,
+  includeEntities: true,
+  includeEvidence: true,
+  includeLeads: true,
+  includeGaps: true,
+  includeHypotheses: true,
+};
+
+interface CaseReportProps {
+  readonly config?: CaseReportConfig;
+}
+
 interface CaseReportData {
   readonly investigation: Investigation;
   /** null = backend endpoint unavailable (distinct from empty). */
@@ -59,7 +101,9 @@ const TH =
   "text-left font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-[#45403a]";
 const TD = "align-top py-2 pr-4 text-[10.5px] leading-relaxed text-[#1a1815]";
 
-export function CaseReport() {
+export function CaseReport({
+  config = DEFAULT_CASE_REPORT_CONFIG,
+}: CaseReportProps) {
   const workspace = useWorkspace();
   const [data, setData] = useState<CaseReportData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -115,15 +159,18 @@ export function CaseReport() {
       : String(value).padStart(2, "0");
 
   const sections: Array<{
-    key: string;
+    key: keyof CaseReportConfig;
     title: string;
   }> = [
-    { key: "entities", title: "Entity register" },
-    { key: "evidence", title: "Evidence" },
-    { key: "leads", title: "Leads" },
-    { key: "gaps", title: "Investigative gaps" },
-    { key: "hypotheses", title: "Working hypotheses" },
+    { key: "includeEntities", title: "Entity register" },
+    { key: "includeEvidence", title: "Evidence" },
+    { key: "includeLeads", title: "Leads" },
+    { key: "includeGaps", title: "Investigative gaps" },
+    { key: "includeHypotheses", title: "Working hypotheses" },
   ];
+
+  const enabledSection = (key: keyof CaseReportConfig): boolean =>
+    config[key] === true;
 
   const investigation = data?.investigation;
 
@@ -142,7 +189,8 @@ export function CaseReport() {
               </h1>
               <p className="mt-2 font-mono text-[10px] uppercase tracking-widest text-[#45403a]">
                 {data.caseDoc?.title ?? "Case"} · Generated{" "}
-                {formatDate(new Date().toISOString())}
+                {formatDate(new Date().toISOString())} · Layout{" "}
+                {config.layout === "full" ? "full detail" : "condensed"}
               </p>
             </>
           ) : (
@@ -163,33 +211,35 @@ export function CaseReport() {
         {investigation && (
           <>
             {/* ── Identity grid ────────────────────────────────────── */}
-            <section className="mt-8 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
-              {[
-                ["Case", data.caseDoc?.title ?? workspace.caseId],
-                ["Investigation", investigation.id],
-                [
-                  "Status",
-                  `${investigation.status}${data.caseDoc?.status ? ` / ${data.caseDoc.status} case` : ""}`,
-                ],
-                ["Priority", investigation.priority],
-                ["Owner", investigation.owner],
-                ["Mode", workspace.mode],
-                ["Created", formatDate(investigation.createdAt.value)],
-                ["Updated", formatDate(investigation.updatedAt.value)],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <div className="font-mono text-[8px] font-bold uppercase tracking-[0.25em] text-[#67615a]">
-                    {label}
+            {config.includeIdentity && (
+              <section className="mt-8 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+                {[
+                  ["Case", data.caseDoc?.title ?? workspace.caseId],
+                  ["Investigation", investigation.id],
+                  [
+                    "Status",
+                    `${investigation.status}${data.caseDoc?.status ? ` / ${data.caseDoc.status} case` : ""}`,
+                  ],
+                  ["Priority", investigation.priority],
+                  ["Owner", investigation.owner],
+                  ["Mode", workspace.mode],
+                  ["Created", formatDate(investigation.createdAt.value)],
+                  ["Updated", formatDate(investigation.updatedAt.value)],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <div className="font-mono text-[8px] font-bold uppercase tracking-[0.25em] text-[#67615a]">
+                      {label}
+                    </div>
+                    <div className="mt-1 font-mono text-[10px] text-[#1a1815]">
+                      {String(value ?? "—")}
+                    </div>
                   </div>
-                  <div className="mt-1 font-mono text-[10px] text-[#1a1815]">
-                    {String(value ?? "—")}
-                  </div>
-                </div>
-              ))}
-            </section>
+                ))}
+              </section>
+            )}
 
             {/* ── Current picture ──────────────────────────────────── */}
-            {investigation.description && (
+            {config.includeCurrentPicture && (
               <section className="mt-8">
                 <div className="flex items-baseline gap-3">
                   <span className="font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[#1a1815]">
@@ -197,9 +247,15 @@ export function CaseReport() {
                   </span>
                   <span className="flex-1 border-t border-[#c9c2b7]" aria-hidden="true" />
                 </div>
-                <p className="mt-3 max-w-[70ch] text-[13px] leading-relaxed text-[#32302c]">
-                  {investigation.description}
-                </p>
+                {investigation.description ? (
+                  <p className="mt-3 max-w-[70ch] text-[13px] leading-relaxed text-[#32302c]">
+                    {investigation.description}
+                  </p>
+                ) : (
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-[#67615a]">
+                    No case description has been recorded for this investigation.
+                  </p>
+                )}
                 {data.caseDoc?.description && (
                   <p className="mt-2 max-w-[70ch] text-[13px] leading-relaxed text-[#32302c]">
                     {data.caseDoc.description}
@@ -209,211 +265,76 @@ export function CaseReport() {
             )}
 
             {/* ── Investigative state ──────────────────────────────── */}
-            <section className="mt-8">
-              <div className="flex items-baseline gap-3">
-                <span className="font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[#1a1815]">
-                  Investigative state
-                </span>
-                <span className="flex-1 border-t border-[#c9c2b7]" aria-hidden="true" />
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden border border-[#c9c2b7] bg-[#c9c2b7] sm:grid-cols-5">
-                {[
-                  ["Evidence", stat(data.evidence?.length)],
-                  ["Entities", stat(data.entities?.length)],
-                  ["Leads", stat(data.leads?.length)],
-                  ["Gaps", stat(data.gaps?.length)],
-                  ["Hypotheses", stat(data.hypotheses?.length)],
-                ].map(([label, value]) => (
-                  <div key={label} className="bg-[#ffffff] px-4 py-3">
-                    <div className="font-mono text-[8px] font-bold uppercase tracking-[0.25em] text-[#67615a]">
-                      {label}
+            {config.includeState && (
+              <section className="mt-8">
+                <div className="flex items-baseline gap-3">
+                  <span className="font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[#1a1815]">
+                    Investigative state
+                  </span>
+                  <span className="flex-1 border-t border-[#c9c2b7]" aria-hidden="true" />
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden border border-[#c9c2b7] bg-[#c9c2b7] sm:grid-cols-5">
+                  {[
+                    [
+                      "Evidence",
+                      stat(config.includeEvidence ? data.evidence?.length : null),
+                    ],
+                    [
+                      "Entities",
+                      stat(config.includeEntities ? data.entities?.length : null),
+                    ],
+                    [
+                      "Leads",
+                      stat(config.includeLeads ? data.leads?.length : null),
+                    ],
+                    [
+                      "Gaps",
+                      stat(config.includeGaps ? data.gaps?.length : null),
+                    ],
+                    [
+                      "Hypotheses",
+                      stat(config.includeHypotheses ? data.hypotheses?.length : null),
+                    ],
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-[#ffffff] px-4 py-3">
+                      <div className="font-mono text-[8px] font-bold uppercase tracking-[0.25em] text-[#67615a]">
+                        {label}
+                      </div>
+                      <div className="mt-1 font-mono text-xl font-extralight tracking-wide text-[#1a1815]">
+                        {value}
+                      </div>
                     </div>
-                    <div className="mt-1 font-mono text-xl font-extralight tracking-wide text-[#1a1815]">
-                      {value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* ── Detail tables ────────────────────────────────────── */}
-            {data.entities && data.entities.length > 0 && (
-              <section className="mt-9">
-                <SectionHeading title="Entity register" />
-                <table className="mt-3 w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#c9c2b7]">
-                      <th className={TH}>Name</th>
-                      <th className={TH}>Status</th>
-                      <th className={TH}>Source identifiers</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.entities.slice(0, 120).map((entity) => (
-                      <tr key={entity.id} className="border-b border-[#e3ded4]">
-                        <td className={TD}>{entity.canonicalName}</td>
-                        <td className={TD}>{entity.status}</td>
-                        <td className={TD}>
-                          {listCell(entity.sourceIdentifiers?.length)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {data.evidence && data.evidence.length > 0 && (
-              <section className="mt-9">
-                <SectionHeading
-                  title="Evidence"
-                  counts={{
-                    total: data.evidence.length,
-                    cap: 120,
-                  }}
-                />
-                <table className="mt-3 w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#c9c2b7]">
-                      <th className={TH}>Title</th>
-                      <th className={TH}>Type</th>
-                      <th className={TH}>Status</th>
-                      <th className={TH}>Source ref</th>
-                      <th className={TH}>Observed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.evidence.slice(0, 120).map((item) => (
-                      <tr key={item.id} className="border-b border-[#e3ded4]">
-                        <td className={TD}>{item.title}</td>
-                        <td className={TD}>{item.type}</td>
-                        <td className={TD}>{item.status}</td>
-                        <td className={TD}>{listCell(item.sourceRef)}</td>
-                        <td className={TD}>{formatObservedAt(item.observedAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {data.leads && data.leads.length > 0 && (
-              <section className="mt-9">
-                <SectionHeading
-                  title="Leads"
-                  counts={{
-                    total: data.leads.length,
-                    cap: 120,
-                  }}
-                />
-                <table className="mt-3 w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#c9c2b7]">
-                      <th className={TH}>Title</th>
-                      <th className={TH}>Status</th>
-                      <th className={TH}>Priority</th>
-                      <th className={TH}>Confidence</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.leads.slice(0, 120).map((lead) => (
-                      <tr key={lead.id} className="border-b border-[#e3ded4]">
-                        <td className={TD}>{lead.title}</td>
-                        <td className={TD}>{lead.status}</td>
-                        <td className={TD}>{lead.priority}</td>
-                        <td className={TD}>{lead.confidence?.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {data.gaps && data.gaps.length > 0 && (
-              <section className="mt-9">
-                <SectionHeading
-                  title="Investigative gaps"
-                  counts={{
-                    total: data.gaps.length,
-                    cap: 120,
-                  }}
-                />
-                <table className="mt-3 w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#c9c2b7]">
-                      <th className={TH}>Title</th>
-                      <th className={TH}>Type</th>
-                      <th className={TH}>Status</th>
-                      <th className={TH}>Priority</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.gaps.slice(0, 120).map((gap) => (
-                      <tr key={gap.id} className="border-b border-[#e3ded4]">
-                        <td className={TD}>{gap.title}</td>
-                        <td className={TD}>{gap.type}</td>
-                        <td className={TD}>{gap.status}</td>
-                        <td className={TD}>{gap.priority}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            {data.hypotheses && data.hypotheses.length > 0 && (
-              <section className="mt-9">
-                <SectionHeading
-                  title="Working hypotheses"
-                  counts={{
-                    total: data.hypotheses.length,
-                    cap: 120,
-                  }}
-                />
-                <table className="mt-3 w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#c9c2b7]">
-                      <th className={TH}>Hypothesis</th>
-                      <th className={TH}>Status</th>
-                      <th className={TH}>Confidence</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.hypotheses.slice(0, 120).map((hypothesis) => (
-                      <tr key={hypothesis.id} className="border-b border-[#e3ded4]">
-                        <td className={`${TD} max-w-[46ch]`}>
-                          <div className="font-semibold text-[#1a1815]">
-                            {hypothesis.title}
-                          </div>
-                          <div className="mt-0.5 text-[#45403a]">
-                            {hypothesis.statement}
-                          </div>
-                        </td>
-                        <td className={TD}>{hypothesis.status}</td>
-                        <td className={TD}>{hypothesis.confidence?.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
+            {config.layout === "full" ? (
+              <FullLayout data={data} config={config} />
+            ) : (
+              <CondensedLayout
+                data={data}
+                config={config}
+                enabledSection={enabledSection}
+              />
             )}
 
             {/* ── Empty/unavailable notes ──────────────────────────── */}
             {sections.map((section) => {
+              if (!enabledSection(section.key)) return null;
               const value =
-                section.key === "entities"
+                section.key === "includeEntities"
                   ? data.entities
-                  : section.key === "evidence"
+                  : section.key === "includeEvidence"
                     ? data.evidence
-                    : section.key === "leads"
+                    : section.key === "includeLeads"
                       ? data.leads
-                      : section.key === "gaps"
+                      : section.key === "includeGaps"
                         ? data.gaps
                         : data.hypotheses;
-              const visible = value === null || value?.length === 0;
-              if (section.key === "entities" && data.entities && data.entities.length > 0)
-                return null;
-              if (!visible) return null;
+              const isEmpty = value === null || value?.length === 0;
+              if (!isEmpty) return null;
               return (
                 <section key={section.key} className="mt-8">
                   <SectionHeading title={section.title} />
@@ -439,6 +360,292 @@ export function CaseReport() {
         )}
       </div>
     </div>
+  );
+}
+
+function FullLayout({
+  data,
+  config,
+}: {
+  readonly data: CaseReportData;
+  readonly config: CaseReportConfig;
+}) {
+  const cap = config.rowCap;
+
+  return (
+    <>
+      {config.includeEntities && data.entities && data.entities.length > 0 && (
+        <section className="mt-9">
+          <SectionHeading
+            title="Entity register"
+            counts={{ total: data.entities.length, cap }}
+          />
+          <table className="mt-3 w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[#c9c2b7]">
+                <th className={TH}>Name</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Source identifiers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.entities.slice(0, cap).map((entity) => (
+                <tr key={entity.id} className="border-b border-[#e3ded4]">
+                  <td className={TD}>{entity.canonicalName}</td>
+                  <td className={TD}>{entity.status}</td>
+                  <td className={TD}>
+                    {listCell(entity.sourceIdentifiers?.length)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {config.includeEvidence && data.evidence && data.evidence.length > 0 && (
+        <section className="mt-9">
+          <SectionHeading
+            title="Evidence"
+            counts={{ total: data.evidence.length, cap }}
+          />
+          <table className="mt-3 w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[#c9c2b7]">
+                <th className={TH}>Title</th>
+                <th className={TH}>Type</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Source ref</th>
+                <th className={TH}>Observed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.evidence.slice(0, cap).map((item) => (
+                <tr key={item.id} className="border-b border-[#e3ded4]">
+                  <td className={TD}>{item.title}</td>
+                  <td className={TD}>{item.type}</td>
+                  <td className={TD}>{item.status}</td>
+                  <td className={TD}>{listCell(item.sourceRef)}</td>
+                  <td className={TD}>{formatObservedAt(item.observedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {config.includeLeads && data.leads && data.leads.length > 0 && (
+        <section className="mt-9">
+          <SectionHeading
+            title="Leads"
+            counts={{ total: data.leads.length, cap }}
+          />
+          <table className="mt-3 w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[#c9c2b7]">
+                <th className={TH}>Title</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Priority</th>
+                <th className={TH}>Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.leads.slice(0, cap).map((lead) => (
+                <tr key={lead.id} className="border-b border-[#e3ded4]">
+                  <td className={TD}>{lead.title}</td>
+                  <td className={TD}>{lead.status}</td>
+                  <td className={TD}>{lead.priority}</td>
+                  <td className={TD}>{lead.confidence?.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {config.includeGaps && data.gaps && data.gaps.length > 0 && (
+        <section className="mt-9">
+          <SectionHeading
+            title="Investigative gaps"
+            counts={{ total: data.gaps.length, cap }}
+          />
+          <table className="mt-3 w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[#c9c2b7]">
+                <th className={TH}>Title</th>
+                <th className={TH}>Type</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Priority</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.gaps.slice(0, cap).map((gap) => (
+                <tr key={gap.id} className="border-b border-[#e3ded4]">
+                  <td className={TD}>{gap.title}</td>
+                  <td className={TD}>{gap.type}</td>
+                  <td className={TD}>{gap.status}</td>
+                  <td className={TD}>{gap.priority}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {config.includeHypotheses && data.hypotheses && data.hypotheses.length > 0 && (
+        <section className="mt-9">
+          <SectionHeading
+            title="Working hypotheses"
+            counts={{ total: data.hypotheses.length, cap }}
+          />
+          <table className="mt-3 w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[#c9c2b7]">
+                <th className={TH}>Hypothesis</th>
+                <th className={TH}>Status</th>
+                <th className={TH}>Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.hypotheses.slice(0, cap).map((hypothesis) => (
+                <tr key={hypothesis.id} className="border-b border-[#e3ded4]">
+                  <td className={`${TD} max-w-[46ch]`}>
+                    <div className="font-semibold text-[#1a1815]">
+                      {hypothesis.title}
+                    </div>
+                    <div className="mt-0.5 text-[#45403a]">
+                      {hypothesis.statement}
+                    </div>
+                  </td>
+                  <td className={TD}>{hypothesis.status}</td>
+                  <td className={TD}>{hypothesis.confidence?.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+    </>
+  );
+}
+
+function CondensedLayout({
+  data,
+  config,
+  enabledSection,
+}: {
+  readonly data: CaseReportData;
+  readonly config: CaseReportConfig;
+  readonly enabledSection: (key: keyof CaseReportConfig) => boolean;
+}) {
+  const cap = config.rowCap;
+
+  const entityRows: Array<{ title: string; meta: string }> = (data.entities ?? [])
+    .slice(0, cap)
+    .map((entity) => ({
+      title: entity.canonicalName,
+      meta: [entity.status, entity.sourceIdentifiers?.length
+        ? `${entity.sourceIdentifiers.length} ids`
+        : undefined]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+
+  const evidenceRows: Array<{ title: string; meta: string }> = (data.evidence ?? [])
+    .slice(0, cap)
+    .map((item) => ({
+      title: item.title,
+      meta: [item.type, item.status, listCell(item.sourceRef, undefined)].filter(Boolean).join(" · "),
+    }));
+
+  const leadRows: Array<{ title: string; meta: string }> = (data.leads ?? [])
+    .slice(0, cap)
+    .map((lead) => ({
+      title: lead.title,
+      meta: [lead.status, lead.priority, lead.confidence !== undefined ? `${lead.confidence.toFixed(2)} conf` : undefined]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+
+  const gapRows: Array<{ title: string; meta: string }> = (data.gaps ?? [])
+    .slice(0, cap)
+    .map((gap) => ({
+      title: gap.title,
+      meta: [gap.type, gap.status, gap.priority].filter(Boolean).join(" · "),
+    }));
+
+  const hypothesisRows: Array<{ title: string; meta: string }> = (data.hypotheses ?? [])
+    .slice(0, cap)
+    .map((hypothesis) => ({
+      title: hypothesis.title,
+      meta: [hypothesis.status, hypothesis.confidence !== undefined ? `${hypothesis.confidence.toFixed(2)} conf` : undefined]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+
+  const groups: Array<{
+    key: keyof CaseReportConfig;
+    title: string;
+    rows: Array<{ title: string; meta: string }>;
+    total: number;
+  }> = [
+    {
+      key: "includeEntities",
+      title: "Entity register",
+      rows: entityRows,
+      total: (data.entities ?? []).length,
+    },
+    {
+      key: "includeEvidence",
+      title: "Evidence",
+      rows: evidenceRows,
+      total: (data.evidence ?? []).length,
+    },
+    {
+      key: "includeLeads",
+      title: "Leads",
+      rows: leadRows,
+      total: (data.leads ?? []).length,
+    },
+    {
+      key: "includeGaps",
+      title: "Investigative gaps",
+      rows: gapRows,
+      total: (data.gaps ?? []).length,
+    },
+    {
+      key: "includeHypotheses",
+      title: "Working hypotheses",
+      rows: hypothesisRows,
+      total: (data.hypotheses ?? []).length,
+    },
+  ];
+
+  return (
+    <>
+      {groups.map((group) => {
+        if (!enabledSection(group.key)) return null;
+        if (group.rows.length === 0) return null;
+        return (
+          <section key={group.key} className="mt-9">
+            <SectionHeading title={group.title} counts={{ total: group.total, cap }} />
+            <ul className="mt-3 divide-y divide-[#e3ded4]">
+              {group.rows.map((row) => (
+                <li
+                  key={row.title}
+                  className="flex items-baseline justify-between gap-6 py-2"
+                >
+                  <span className={TD}>{row.title}</span>
+                  <span className="shrink-0 text-right font-mono text-[8px] uppercase tracking-widest text-[#67615a]">
+                    {row.meta}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </>
   );
 }
 
