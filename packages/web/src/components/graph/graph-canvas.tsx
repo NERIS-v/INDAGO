@@ -237,7 +237,6 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   const enterRef = useRef<Map<string, { t0: number; fromX: number; fromY: number }>>(new Map());
   const enterAnimRef = useRef<number | null>(null);
   const prevInRangeRef = useRef<Set<string> | null>(null);
-  const enteredOnceRef = useRef<Set<string>>(new Set());
 
   const stepEntrances = useCallback(() => {
     const now = performance.now(); let done = true;
@@ -256,11 +255,14 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
     layoutRef.current.layoutNodes.forEach((n) => {
       if (isNodeInTimeRange(n.id)) {
         inSet.add(n.id);
-        if (prev && !prev.has(n.id) && !enteredOnceRef.current.has(n.id)) {
+        // P4: re-ease on EVERY playhead passage — a node leaving the range and
+        // returning (later play, rewind-then-forward, replay) gets the same
+        // off-canvas entrance as its very first appearance. Without this the
+        // ease-in only fires once and later passes just pop the node in flat.
+        if (prev && !prev.has(n.id)) {
           const spawn = offCanvasSpawn(n.x, n.y, dimensions.width, dimensions.height);
           enterRef.current.set(n.id, { t0: performance.now(), fromX: spawn.x, fromY: spawn.y });
         }
-        enteredOnceRef.current.add(n.id);
       }
     });
     if (enterRef.current.size > 0 && enterAnimRef.current === null) enterAnimRef.current = requestAnimationFrame(stepEntrances);
