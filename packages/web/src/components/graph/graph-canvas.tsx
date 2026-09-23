@@ -25,6 +25,9 @@ interface GraphCanvasProps {
    *  Absent → defaults to `edges` (standalone/back-compat callers). */
   physicsEdges?: GraphEdge[];
   holes: GraphHole[];
+  /** Hole ids belonging to the currently selected gap — highlighted in the
+   *  "?" layer (selection color + dashed rings on the hole's endpoint nodes). */
+  selectedHoleIds?: ReadonlySet<string> | null;
   onNodeClick: (nodeId: string) => void;
   /** Fired when the user clicks a RENDERED edge (relationship link). The edge
    *  id is a graph edge id (not a relation id) — the panel maps it to the
@@ -54,7 +57,13 @@ interface GraphCanvasProps {
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
 const FIT_PADDING = 0.95;
-const MAX_FIT_ZOOM = 1.15;
+const MAX_FIT_ZOOM = 1.45;
+// One notch of the canvas zoom controls (buttons + wheel). The default camera
+// opens a plain bbox fit pushed IN by two of these steps, so the network lands
+// closer than an exact frame. MAX_FIT_ZOOM is lifted by the same two steps so
+// that default/fit never clamps the increment away.
+const FIT_ZOOM_STEP = 0.15;
+const DEFAULT_FIT_ZOOM_STEPS = 2;
 const ENTER_MS = 700;
 const OFF_CANVAS_GAP = 60;
 // F-PR17: focus-aura lifecycle timing — fade out fast when the graph wakes,
@@ -63,11 +72,12 @@ const AURA_FADE_OUT_MS = 150;
 const AURA_FADE_IN_MS = 250;
 const AURA_SETTLE_DELAY_MS = 160;
 
-// P4: out-of-window objects are DIMMED, never hidden — the analyst must be able
-// to see where the timeline's activity sits relative to the rest of the graph.
-const OUT_OF_RANGE_NODE_OPACITY = 0.22;
-const OUT_OF_RANGE_EDGE_OPACITY = 0.15;
-const OUT_OF_RANGE_LABEL_OPACITY = 0.35;
+// P4: out-of-window objects are HIDDEN, never dimmed — a node before or after
+// the timeline window stays invisible and eases in (via the entrance animation /
+// CSS opacity transition) exactly when the playhead actually reaches it.
+const OUT_OF_RANGE_NODE_OPACITY = 0;
+const OUT_OF_RANGE_EDGE_OPACITY = 0;
+const OUT_OF_RANGE_LABEL_OPACITY = 0;
 
 function easeInOutCubic(t: number): number { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
@@ -81,7 +91,7 @@ function offCanvasSpawn(nodeX: number, nodeY: number, w: number, h: number): { x
   return { x: w / 2 + dirX * (exitDist + OFF_CANVAS_GAP), y: h / 2 + dirY * (exitDist + OFF_CANVAS_GAP) };
 }
 
-export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, onNodeClick, onEdgeClick, activeTimeRange, controlsRef, selectedNodeId, selectedEdgeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, holes, selectedHoleIds, onNodeClick, onEdgeClick, activeTimeRange, controlsRef, selectedNodeId, selectedEdgeId, onCanvasBackgroundPointerDown, visualContext, nodeTemporalBounds }: GraphCanvasProps) {
   // PR-10: the physics topology defaults to the rendered edges for standalone
   // callers and is the FULL merged topology when the panel supplies it — so
   // readability-filter interactions never restart the simulation.
@@ -152,7 +162,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
           setDimensions({ width, height });
-        }, 400);
+        }, 50);
       }
     });
     observer.observe(containerRef.current);
@@ -233,7 +243,6 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
   const enterRef = useRef<Map<string, { t0: number; fromX: number; fromY: number }>>(new Map());
   const enterAnimRef = useRef<number | null>(null);
   const prevInRangeRef = useRef<Set<string> | null>(null);
-  const enteredOnceRef = useRef<Set<string>>(new Set());
 
   const stepEntrances = useCallback(() => {
     const now = performance.now(); let done = true;
@@ -252,11 +261,14 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
     layoutRef.current.layoutNodes.forEach((n) => {
       if (isNodeInTimeRange(n.id)) {
         inSet.add(n.id);
-        if (prev && !prev.has(n.id) && !enteredOnceRef.current.has(n.id)) {
+        // P4: re-ease on EVERY playhead passage — a node leaving the range and
+        // returning (later play, rewind-then-forward, replay) gets the same
+        // off-canvas entrance as its very first appearance. Without this the
+        // ease-in only fires once and later passes just pop the node in flat.
+        if (prev && !prev.has(n.id)) {
           const spawn = offCanvasSpawn(n.x, n.y, dimensions.width, dimensions.height);
           enterRef.current.set(n.id, { t0: performance.now(), fromX: spawn.x, fromY: spawn.y });
         }
-        enteredOnceRef.current.add(n.id);
       }
     });
     if (enterRef.current.size > 0 && enterAnimRef.current === null) enterAnimRef.current = requestAnimationFrame(stepEntrances);
@@ -274,7 +286,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
     const minY = Math.min(...ys) - LABEL_PAD_Y; const maxY = Math.max(...ys) + LABEL_PAD_Y;
     const boxWidth = Math.max(maxX - minX, 1); const boxHeight = Math.max(maxY - minY, 1);
     const bboxCx = (minX + maxX) / 2; const bboxCy = (minY + maxY) / 2;
-    const scale = Math.min(MAX_FIT_ZOOM, MAX_ZOOM, Math.max(MIN_ZOOM, Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING)));
+    const fitScale = Math.min((dimensions.width / boxWidth) * FIT_PADDING, (dimensions.height / boxHeight) * FIT_PADDING);
+    const scale = Math.min(MAX_FIT_ZOOM, MAX_ZOOM, Math.max(MIN_ZOOM, fitScale + FIT_ZOOM_STEP * DEFAULT_FIT_ZOOM_STEPS));
     return { zoom: scale, pan: { x: -(bboxCx - cx) * scale, y: -(bboxCy - cy) * scale } };
   }, [layoutRef, dimensions, cx, cy]);
 
@@ -346,9 +359,13 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
 
   useEffect(() => {
     if (cameraEase === "400ms cubic-bezier(0.22, 1, 0.36, 1)") return;
+    // Reset the programmatic ease AFTER the requested camera move completes,
+    // with a small buffer so the next user interaction is snappy again.
+    const durationMatch = /\b(\d+)ms\b/.exec(cameraEase);
+    const moveMs = durationMatch ? Number(durationMatch[1]) : 1600;
     const t = setTimeout(
       () => setCameraEase("400ms cubic-bezier(0.22, 1, 0.36, 1)"),
-      1600,
+      Math.max(moveMs + 400, 1600),
     );
     return () => clearTimeout(t);
   }, [cameraEase]);
@@ -583,7 +600,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
           <circle cx="0" cy="0" r="16" fill="none" stroke="var(--color-surface-600)" strokeWidth="1" />
         </g>
 
-        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${cameraEase}` }}>
+        <g transform={`translate(${pan.x}, ${pan.y}) translate(${cx}, ${cy}) scale(${zoom}) translate(${-cx}, ${-cy})`} style={{ transition: isPanning ? "none" : `transform ${cameraEase}`, willChange: "transform" }}>
           
           <g id="community-layer">
             {communities.map((c) => {
@@ -768,7 +785,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
               })}
           </g>
 
-          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} /></g>
+          <g className="focus-target"><GraphHoleBurstLayer layoutNodes={layoutNodes} holes={holes} reducedMotion={reducedMotion} zoom={zoom} bloom={bloom} selectedHoleIds={selectedHoleIds} isNodeInTimeRange={isNodeInTimeRange} /></g>
 
           <g id="node-layer">
             {layoutNodes.map((node) => {

@@ -78,6 +78,8 @@ import {
   OBS_B6,
   OBS_B11,
   OBS_B12,
+  OBS_B13,
+  OBS_B14,
   ENT_WHEELER,
   ENT_SOUTHERN_HILLS,
   ENT_A_MCGUIGAN,
@@ -296,7 +298,7 @@ const evidenceB = [
   }),
 ];
 
-// ── Observations (8) ────────────────────────────────────────────────────────
+// ── Observations (10) ───────────────────────────────────────────────────────
 
 const observationsB = [
   ObservationSchema.parse({
@@ -385,6 +387,28 @@ const observationsB = [
     strength: 0.6,
     provenance: { sourceId: SRC_HR_WJA_B, extractor: "govinfo.extractor.v1" },
     observedAt: evt("1983-01-01", "day"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
+  ObservationSchema.parse({
+    id: OBS_B13, evidenceId: EVID_HR_WJA, sourceId: SRC_HR_WJA_B,
+    type: "FINANCIAL",
+    content: "The congressional review documents WJA retaining H. Paul Rico in June 1979 as a consultant under a consulting retainer recorded in the ownership chain.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.6,
+    provenance: { sourceId: SRC_HR_WJA_B, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1979-06-01", "approximate"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
+  ObservationSchema.parse({
+    id: OBS_B14, evidenceId: EVID_HR_WJA, sourceId: SRC_HR_WJA_B,
+    type: "COMMUNICATION",
+    content: "Records from July 1981 log H. Paul Rico as a listed contact for investigators assigned to the Tulsa ownership question.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.55,
+    provenance: { sourceId: SRC_HR_WJA_B, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1981-07-01", "approximate"),
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
 ];
@@ -491,7 +515,7 @@ const graphVersionB = GraphVersionSchema.parse({
 // direct structural link to the Tulsa graph beyond the reference.
 const graphNodesB = [
   GraphNodeSchema.parse({ id: GN_B_CALLAHAN, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_CALLAHAN, label: "John \"Jack\" Callahan", structuralImportance: 0.7, observationCount: 2, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
-  GraphNodeSchema.parse({ id: GN_B_RICO, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.65, observationCount: 3, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
+  GraphNodeSchema.parse({ id: GN_B_RICO, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.65, observationCount: 5, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_WJA, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_WJA, label: "World Jai Alai", structuralImportance: 0.9, observationCount: 3, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_FBI, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_FBIBOSTON, label: "FBI Boston Field Office", structuralImportance: 0.5, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_WHEELER, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_WHEELER, label: "Roger Wheeler, Sr.", structuralImportance: 0.85, observationCount: 4, sourceCount: 3, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
@@ -799,9 +823,11 @@ const timelineB: InvestigationTimeline = {
     { id: BAND_MILE, label: "Milestones", kind: "milestone" },
   ],
   items: [
+    bandItem(BAND_OBS, "tl-ob-b13", "1979-06-01T12:00:00.000Z", "HR: WJA retains Rico as consultant", { observationId: OBS_B13, entityIds: [ENT_RICO] }),
     bandItem(BAND_OBS, "tl-ob-b1", "1981-05-27T12:00:00.000Z", "Wheeler murdered at Southern Hills CC, Tulsa", { observationId: OBS_B1, entityIds: [ENT_WHEELER, ENT_SOUTHERN_HILLS] }),
     bandItem(BAND_OBS, "tl-ob-b2", "1981-05-28T12:00:00.000Z", "Tulsa news: Wheeler shot in head after golf", { observationId: OBS_B2, entityIds: [ENT_WHEELER, ENT_SOUTHERN_HILLS] }),
     bandItem(BAND_OBS, "tl-ob-b6", "1981-07-01T12:00:00.000Z", "Tip to Tulsa/CT: Winter Hill / WJA matter", { observationId: OBS_B6, entityIds: [ENT_WJA, ENT_FBIBOSTON] }),
+    bandItem(BAND_OBS, "tl-ob-b14", "1981-07-01T12:00:00.000Z", "Records log Rico as listed contact for Tulsa investigators", { observationId: OBS_B14, entityIds: [ENT_RICO] }),
     bandItem(BAND_OBS, "tl-ob-b3", "1983-01-01T12:00:00.000Z", "HR documents Wheeler as WJA owner / Telex chairman", { observationId: OBS_B3, entityIds: [ENT_WHEELER, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-b4", "1983-01-01T12:00:00.000Z", "HR: Wheeler suspected skimming, fired president, began audit", { observationId: OBS_B4, entityIds: [ENT_WHEELER, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-b5", "1983-01-01T12:00:00.000Z", "HR: Callahan = WJA security director, Rico = consultant", { observationId: OBS_B5, entityIds: [ENT_WJA, ENT_CALLAHAN, ENT_RICO] }),
@@ -833,11 +859,12 @@ const foreignOverlaysB: Record<string, { id: string; title: string; summary: str
     localTargetMatch: "WJA",
     bridgeSupport: 0.9,
     nodes: [
-      { id: ENT_CALLAHAN, type: "ENTITY", label: "John \"Jack\" Callahan", isForeign: true, structuralImportance: 0.5 },
-      { id: ENT_RICO, type: "ENTITY", label: "H. Paul Rico", isForeign: true, structuralImportance: 0.45 },
-      { id: ENT_WJA, type: "ENTITY", label: "World Jai Alai", isForeign: true, structuralImportance: 0.9 },
+      { id: ENT_CALLAHAN, type: "ENTITY", label: "John \"Jack\" Callahan (CT)", isForeign: true, structuralImportance: 0.5 },
+      { id: ENT_RICO, type: "ENTITY", label: "H. Paul Rico (CT)", isForeign: true, structuralImportance: 0.45 },
+      { id: ENT_WJA, type: "ENTITY", label: "World Jai Alai (CT)", isForeign: true, structuralImportance: 0.9 },
       { id: ENT_A_SOCTF, type: "ENTITY", label: "CT SOCTF", isForeign: true, structuralImportance: 0.8 },
       { id: ENT_A_MCGUIGAN, type: "ENTITY", label: "Austin McGuigan", isForeign: true, structuralImportance: 0.55 },
+      { id: ENT_FBIBOSTON, type: "ENTITY", label: "FBI Boston Field Office (CT)", isForeign: true, structuralImportance: 0.6 },
     ],
     edges: [
       { id: "ct-e1", sourceNodeId: ENT_WJA, targetNodeId: ENT_CALLAHAN, support: 0.7, isForeignEdge: true },
@@ -848,6 +875,9 @@ const foreignOverlaysB: Record<string, { id: string; title: string; summary: str
       { id: "ct-e6", sourceNodeId: ENT_WJA, targetNodeId: ENT_A_MCGUIGAN, support: 0.55, isForeignEdge: true },
       { id: "ct-e7", sourceNodeId: ENT_RICO, targetNodeId: ENT_A_SOCTF, support: 0.5, isForeignEdge: true },
       { id: "ct-e8", sourceNodeId: ENT_CALLAHAN, targetNodeId: ENT_A_MCGUIGAN, support: 0.45, isForeignEdge: true },
+      { id: "ct-e9", sourceNodeId: ENT_A_SOCTF, targetNodeId: ENT_FBIBOSTON, support: 0.7, isForeignEdge: true },
+      { id: "ct-e10", sourceNodeId: ENT_FBIBOSTON, targetNodeId: ENT_RICO, support: 0.6, isForeignEdge: true },
+      { id: "ct-e11", sourceNodeId: ENT_CALLAHAN, targetNodeId: ENT_FBIBOSTON, support: 0.5, isForeignEdge: true },
       { id: "ct-b1", sourceNodeId: GN_B_WJA, targetNodeId: ENT_A_SOCTF, support: 0.68, isForeignEdge: true },
       { id: "ct-b2", sourceNodeId: GN_B_RICO, targetNodeId: ENT_A_MCGUIGAN, support: 0.6, isForeignEdge: true },
     ],

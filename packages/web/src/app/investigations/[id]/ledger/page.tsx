@@ -1,6 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { ReasoningLedger, type LedgerEventMock } from "@/components/intel/reasoning-ledger";
+import {
+  CaseReport,
+  DEFAULT_CASE_REPORT_CONFIG,
+  type CaseReportConfig,
+} from "@/components/intel/case-report";
+import { CaseReportExportDialog } from "@/components/intel/case-report-export-dialog";
 
 const DEMO_LEDGER: LedgerEventMock[] = [
   {
@@ -39,28 +46,104 @@ const DEMO_LEDGER: LedgerEventMock[] = [
 ];
 
 export default function LedgerPage() {
-  return (
-    <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background">
-      <div className="mx-auto max-w-[1080px]">
-        <header className="border-b border-semantic-border-subtle pb-8">
-          <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
-            <span>Traceability</span>
-            <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
-            <span>Chain of custody</span>
-          </div>
-          <h1 className="mt-4 font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
-            Reasoning ledger
-          </h1>
-          <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
-            Immutable audit record of autonomous inference, anomaly resolution, and
-            investigator intervention across the lifetime of this case.
-          </p>
-        </header>
+  const [reportConfig, setReportConfig] = useState<CaseReportConfig>(
+    DEFAULT_CASE_REPORT_CONFIG,
+  );
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-        <div className="flex w-full flex-col pt-6">
-          <ReasoningLedger events={DEMO_LEDGER} />
+  const handleExportPdf = () => {
+    setDialogOpen(true);
+  };
+
+  const handleConfirm = (config: CaseReportConfig) => {
+    setReportConfig(config);
+    setDialogOpen(false);
+    // Print on the next frame so React commits the new report config before
+    // the browser renders print output.
+    requestAnimationFrame(() => window.print());
+  };
+
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .case-report-print-root { display: none; }
+
+        @media print {
+          body * { visibility: hidden !important; }
+          .case-report-print-root, .case-report-print-root * { visibility: visible !important; }
+
+          html, body, main, #__next, .layout-wrapper {
+            display: block !important;
+            position: static !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+          }
+
+          .case-report-print-root {
+            display: block !important;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: #ffffff !important;
+            color: #1a1815 !important;
+          }
+
+          .ledger-print-hide, .ledger-print-hide * { display: none !important; visibility: hidden !important; }
+        }
+      ` }} />
+
+      <div className="relative min-h-full px-10 py-10 animate-fade-in bg-semantic-background ledger-print-hide">
+        <div className="mx-auto max-w-[1080px]">
+          <header className="border-b border-semantic-border-subtle pb-8">
+            <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-semantic-foreground-faint">
+              <span>Traceability</span>
+              <span className="h-px w-12 bg-semantic-border-subtle" aria-hidden="true" />
+              <span>Chain of custody</span>
+            </div>
+            <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h1 className="font-display text-[2rem] font-light leading-tight tracking-[-0.015em] text-semantic-foreground">
+                  Reasoning ledger
+                </h1>
+                <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-semantic-foreground-muted">
+                  Immutable audit record of autonomous inference, anomaly resolution, and
+                  investigator intervention across the lifetime of this case.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                className="flex items-center gap-2 rounded-lg border border-semantic-border-subtle bg-semantic-surface-elevated px-3.5 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-semantic-foreground transition-colors hover:bg-semantic-surface-soft hover:text-semantic-selection focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659" />
+                </svg>
+                <span>Export PDF</span>
+              </button>
+            </div>
+          </header>
+
+          <div className="flex w-full flex-col pt-6">
+            <ReasoningLedger events={DEMO_LEDGER} />
+          </div>
         </div>
       </div>
-    </div>
+
+      <CaseReport config={reportConfig} />
+
+      {dialogOpen && (
+        <CaseReportExportDialog
+          initial={reportConfig}
+          onConfirm={handleConfirm}
+          onClose={() => setDialogOpen(false)}
+        />
+      )}
+    </>
   );
 }

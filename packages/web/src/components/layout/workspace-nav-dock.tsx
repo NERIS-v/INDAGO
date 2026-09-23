@@ -17,7 +17,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useWorkspace } from "@/lib/providers/workspace/context";
 import { investigationUrl } from "@/lib/workspace/url";
@@ -27,6 +27,14 @@ import {
 } from "@/lib/workspace/nav";
 import type { Investigation } from "@indago/contracts";
 
+// Exit choreography (returning to /dashboard): the dock tabs contract in the
+// exact reverse stagger of their pop-in, then the panel fades and the whole
+// page dims before navigation commits.
+const EXIT_STAGGER_MS = 50;
+const EXIT_BASE_MS = 80;
+const EXIT_TAB_ANIM_MS = 500;
+const EXIT_PANEL_MS = 300;
+
 export function WorkspaceNavDock() {
   const pathname = usePathname();
   const workspace = useWorkspace();
@@ -35,6 +43,27 @@ export function WorkspaceNavDock() {
 
   const [investigation, setInvestigation] = useState<Investigation | null>(null);
   const [graphVersion, setGraphVersion] = useState<string | null>(null);
+  const [exiting, setExiting] = useState(false);
+  const exitRef = useRef(false);
+
+  const totalTabs = WORKSPACE_NAV.length;
+  const exitDelayMs =
+    EXIT_BASE_MS + Math.max(0, totalTabs - 1) * EXIT_STAGGER_MS + EXIT_TAB_ANIM_MS + EXIT_PANEL_MS;
+
+  const startExit = (e: { preventDefault(): void }, href: string) => {
+    if (href !== "/dashboard") return;
+    e.preventDefault();
+    if (exitRef.current) return;
+    exitRef.current = true;
+    setExiting(true);
+    const reduced =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.setTimeout(() => {
+      window.location.assign(href);
+    }, reduced ? 0 : exitDelayMs);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -60,13 +89,17 @@ export function WorkspaceNavDock() {
   }, [workspace, investigationId]);
 
   return (
-    <div className="px-6 pt-4">
+    <div className={`px-6 pt-4 ${exiting ? "relative z-[95]" : ""}`}>
       <nav
         aria-label="Investigation workspace"
-        className="cc-panel-floating relative mx-auto flex max-w-fit flex-wrap items-center gap-1 px-3 py-2"
+        className={`cc-panel-floating relative mx-auto flex max-w-fit flex-wrap items-center gap-1 px-3 py-2 ${exiting ? "animate-dock-panel-out" : ""}`}
+        style={exiting ? { animationDelay: `${EXIT_BASE_MS + Math.max(0, totalTabs - 1) * EXIT_STAGGER_MS + EXIT_TAB_ANIM_MS}ms` } : undefined}
       >
         <Link
           href="/"
+          onClick={(e) => {
+            if (exiting) e.preventDefault();
+          }}
           className="mr-2 flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus"
           aria-label="INDAGO Home"
         >
@@ -91,25 +124,45 @@ export function WorkspaceNavDock() {
               last.entries.push(entry);
             }
           }
+          let tabIndex = 0;
           return groups.map((g, gi) => (
             <span key={g.label} className="flex items-center gap-0.5">
-              {gi > 0 && <span className="h-5 w-px bg-semantic-border" aria-hidden />}
+              {gi > 0 && (
+                <span
+                  className={`h-5 w-px bg-semantic-border ${exiting ? "animate-dock-tab-out" : "animate-dock-tab-in"}`}
+                  aria-hidden
+                  style={{ animationDelay: exiting ? `${EXIT_BASE_MS + (totalTabs - 1 - tabIndex) * EXIT_STAGGER_MS}ms` : `${80 + tabIndex * 50}ms` }}
+                />
+              )}
               <span className="sr-only">{g.label}</span>
               {g.entries.map((entry) => {
                 const href = entry.href.startsWith("/")
                   ? entry.href
                   : investigationUrl(investigationId, workspace.caseId, entry.href || undefined);
                 const isActive = isNavEntryActive(entry, pathname);
+                const i = tabIndex;
+                const delay = exiting
+                  ? `${EXIT_BASE_MS + (totalTabs - 1 - i) * EXIT_STAGGER_MS}ms`
+                  : `${80 + i * 50}ms`;
+                tabIndex += 1;
                 return (
                   <Link
                     key={entry.label}
                     href={href}
+                    onClick={(e) => {
+                      if (exiting) {
+                        e.preventDefault();
+                        return;
+                      }
+                      startExit(e, href);
+                    }}
                     aria-current={isActive ? "page" : undefined}
-                    className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
+                    className={`${exiting ? "animate-dock-tab-out" : "animate-dock-tab-in"} rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
                       isActive
                         ? "bg-semantic-surface-soft text-semantic-selection"
                         : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
                     }`}
+                    style={{ animationDelay: delay }}
                   >
                     {entry.label}
                   </Link>
@@ -137,6 +190,14 @@ export function WorkspaceNavDock() {
           )}
         </div>
       </nav>
+      {exiting && (
+        <div
+          aria-hidden
+          className="animate-page-dim-out pointer-events-none fixed inset-0 z-[90] bg-surface-0"
+          style={{ animationDuration: exitDelayMs > 0 ? `${exitDelayMs}ms` : undefined }}
+          data-workspace-exit-veil
+        />
+      )}
     </div>
   );
 }

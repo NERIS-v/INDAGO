@@ -31,7 +31,7 @@ export function AppNavDock() {
   const isBenchmark = isBenchmarkPathname(pathname);
 
   return (
-    <div className="px-6 pt-4">
+    <div className={`px-6 pt-4 ${isDashboard ? "bg-semantic-surface" : ""}`}>
       <nav
         aria-label="Primary"
         className="cc-panel-floating relative mx-auto flex max-w-fit items-center gap-1 px-3 py-2"
