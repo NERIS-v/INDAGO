@@ -57,13 +57,13 @@ interface GraphCanvasProps {
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
 const FIT_PADDING = 0.95;
-const MAX_FIT_ZOOM = 1.45;
+const MAX_FIT_ZOOM = 1.75;
 // One notch of the canvas zoom controls (buttons + wheel). The default camera
-// opens a plain bbox fit pushed IN by two of these steps, so the network lands
-// closer than an exact frame. MAX_FIT_ZOOM is lifted by the same two steps so
+// opens a plain bbox fit pushed IN by four of these steps, so the network lands
+// closer than an exact frame. MAX_FIT_ZOOM is lifted by the same four steps so
 // that default/fit never clamps the increment away.
 const FIT_ZOOM_STEP = 0.15;
-const DEFAULT_FIT_ZOOM_STEPS = 2;
+const DEFAULT_FIT_ZOOM_STEPS = 4;
 const ENTER_MS = 700;
 const OFF_CANVAS_GAP = 60;
 // F-PR17: focus-aura lifecycle timing — fade out fast when the graph wakes,
@@ -525,9 +525,10 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
       const centerX = members.reduce((s, m) => s + m.x, 0) / members.length;
       const centerY = members.reduce((s, m) => s + m.y, 0) / members.length;
       const radius = Math.max(56, Math.max(0, ...members.map((m) => Math.hypot(m.x - centerX, m.y - centerY))) + 30);
-      return { id: region.id, signals: region.signalTypes, cx: centerX, cy: centerY, radius };
-    }).filter((r): r is { id: string; signals: GraphAttentionRegion["signalTypes"]; cx: number; cy: number; radius: number } => Boolean(r));
-  }, [visualContext, layoutNodesById, cx, cy]);
+      const inRange = region.memberNodeIds.some((id) => isNodeInTimeRange(id));
+      return { id: region.id, signals: region.signalTypes, cx: centerX, cy: centerY, radius, inRange };
+    }).filter((r): r is { id: string; signals: GraphAttentionRegion["signalTypes"]; cx: number; cy: number; radius: number; inRange: boolean } => Boolean(r));
+  }, [visualContext, layoutNodesById, cx, cy, isNodeInTimeRange]);
 
   if (!dimensions.width) return <div ref={containerRef} className="w-full h-full" />;
 
@@ -623,8 +624,8 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
                 data-graph-attention-signals={region.signals.join(",")}
                 data-graph-attention-members={region.id}
               >
-                <circle cx={region.cx} cy={region.cy} r={region.radius} fill="url(#attention-gradient)" style={{ opacity: bloom ? 1 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 500ms` }} />
-                <circle cx={region.cx} cy={region.cy} r={region.radius + 6} fill="none" stroke="var(--color-semantic-attention)" strokeWidth={1.5} strokeDasharray="3 6" style={{ opacity: bloom ? 0.65 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 800ms` }} />
+                <circle cx={region.cx} cy={region.cy} r={region.radius} fill="url(#attention-gradient)" style={{ opacity: bloom && region.inRange ? 1 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 500ms` }} />
+                <circle cx={region.cx} cy={region.cy} r={region.radius + 6} fill="none" stroke="var(--color-semantic-attention)" strokeWidth={1.5} strokeDasharray="3 6" style={{ opacity: bloom && region.inRange ? 0.65 : 0, transition: reducedMotion ? "none" : `opacity ${EASE_SLOW} 800ms` }} />
               </g>
             ))}
           </g>
