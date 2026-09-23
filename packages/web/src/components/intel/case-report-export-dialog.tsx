@@ -46,7 +46,7 @@ function ToggleRow({
         className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors duration-fast ${
           checked
             ? "border-semantic-selection bg-semantic-selection"
-            : "border-semantic-border bg-semantic-surface-soft"
+            : "border-semantic-border bg-semantic-background"
         }`}
       >
         <span
