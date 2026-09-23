@@ -588,12 +588,18 @@ describe('PR-25 golden corpus — MA10 relation resolution', () => {
         namedPair(byName.get(r.sourceEntityId)!, byName.get(r.targetEntityId)!),
       )
       .sort();
+    // The four non-proposals are ALL source-grounded below-threshold pairs.
+    // arjun mehta|meridian trading llp DOES NOT belong here — it graduated to
+    // PROPOSED (support 0.55, 3 evidence) under the current scoring, and FIX 5
+    // surfaced northstar warehousing|rohan singh as the grounded pair that took
+    // its place. The derivedPairs assertion below keeps this pinned so a silent
+    // drop (the FIX-5 antipattern) can never regress unnoticed.
     expect(derivedPairs).toEqual(
       [
-        'arjun mehta|meridian trading llp',
         'ax-4471|mt-883',
         'blue dusk logistics|northstar warehousing',
         'mt-883|nw-009',
+        'northstar warehousing|rohan singh',
       ].sort(),
     );
   }, 60000);

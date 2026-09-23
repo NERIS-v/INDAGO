@@ -51,8 +51,19 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
   let queue: import("bullmq").Queue;
   let worker: import("bullmq").Worker;
 
+  // Fixed, explicitly-granted case ids. verifyCaseAccess (auth.ts) is fail-closed
+  // in EVERY environment: the demo principal may reach a case ONLY when it is in
+  // DEMO_ALLOWED_CASES or an explicit INDAGO_DEV_ALLOWED_CASES grant. Random ids
+  // would (and did) 403 every /start. These are granted in beforeAll below and
+  // revoked in afterAll, mirroring the other API e2e suites.
+  const SUITE_CASE_ID = "550e8400-e29b-41d4-a716-446655440101";
+  const PDF_CASE_ID = "550e8400-e29b-41d4-a716-446655440102";
+  const DEDUP_CASE_ID = "550e8400-e29b-41d4-a716-446655440103";
+  const RETRY_CASE_ID = "550e8400-e29b-41d4-a716-446655440104";
+  const SECURITY_CASE_ID = "550e8400-e29b-41d4-a716-446655440105";
+
   const investigationId = randomUUID();
-  const caseId = randomUUID();
+  const caseId = SUITE_CASE_ID;
   const fixtureBytes = Buffer.from(
     "REPORT: balance 42000.00; status: under-review\n",
     "utf8",
@@ -178,6 +189,13 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
     // Env MUST be set before the worker/queue modules are imported.
     process.env.DATABASE_URL = TEST_DATABASE_URL;
     process.env.REDIS_URL = REDIS_URL;
+    process.env.INDAGO_DEV_ALLOWED_CASES = [
+      SUITE_CASE_ID,
+      PDF_CASE_ID,
+      DEDUP_CASE_ID,
+      RETRY_CASE_ID,
+      SECURITY_CASE_ID,
+    ].join(",");
     artifactsDir = await mkdtemp(join(tmpdir(), "indago-realstack-"));
     process.env.ARTIFACT_STORAGE_DIR = artifactsDir;
     // TEST-ONLY fetcher escape hatches: this suite serves fixtures from
@@ -242,6 +260,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
   afterAll(async () => {
     if (!TEST_DATABASE_URL || !REDIS_URL) return;
+    delete process.env.INDAGO_DEV_ALLOWED_CASES;
     try {
       await queue.obliterate({ force: true });
     } finally {
@@ -366,7 +385,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
   it("M-A06 Option A live: a PDF with a layout-split 'Address:' line is re-ingested as ONE merged SPATIAL observation", async () => {
     const invPdf = randomUUID();
-    const cid = randomUUID();
+    const cid = PDF_CASE_ID;
     const start = await fetch(`${baseUrl}/api/v1/investigations/start`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth },
@@ -450,7 +469,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
   it("BullMQ producer dedup: same idempotencyKey POST twice → job processed once", async () => {
     const inv2 = randomUUID();
-    const cid = randomUUID();
+    const cid = DEDUP_CASE_ID;
     const start = await fetch(`${baseUrl}/api/v1/investigations/start`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth },
@@ -492,7 +511,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
   it("REAL retry + permanent failure: 503 fixture → retried by BullMQ → run FAILED, audited once", async () => {
     const inv3 = randomUUID();
-    const cid = randomUUID();
+    const cid = RETRY_CASE_ID;
     const start = await fetch(`${baseUrl}/api/v1/investigations/start`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth },
@@ -544,7 +563,7 @@ describeOrSkip("REAL-STACK E2E: HTTP → BullMQ → worker → Postgres → SSE"
 
   it("security: 401 / 403 / 400 on the real API", async () => {
     const inv4 = randomUUID();
-    const cid = randomUUID();
+    const cid = SECURITY_CASE_ID;
     const body = evidenceBody(inv4, "x.txt", "x.txt", `${baseUrl}/fixture.txt`);
 
     const noAuth = await fetch(`${baseUrl}/api/v1/investigations/${inv4}/evidence`, {

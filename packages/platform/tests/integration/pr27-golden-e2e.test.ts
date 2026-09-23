@@ -182,9 +182,16 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
     // Managed Neon drops pooled connections under the sustained deterministic
     // load. A single reused connection with explicit timeouts is the stable
     // configuration; this changes NO pipeline logic.
+    //
+    // Append with the ACTUAL URL-query separator: a clean datasource URL
+    // carries no "?" yet, so joining with "&" would make Prisma parse the whole
+    // appended string as part of the DATABASE NAME and fail with "database
+    // indago_test&connection_limit=... does not exist" (the exact symptom this
+    // suite hit in CI). Only once a "?" is present do parameters use "&".
+    const urlSeparator = TEST_DATABASE_URL.includes("?") ? "&" : "?";
     process.env.DATABASE_URL = TEST_DATABASE_URL.includes("connection_limit=")
       ? TEST_DATABASE_URL
-      : `${TEST_DATABASE_URL}&connection_limit=1&pool_timeout=30&connect_timeout=30`;
+      : `${TEST_DATABASE_URL}${urlSeparator}connection_limit=1&pool_timeout=30&connect_timeout=30`;
     process.env.REDIS_URL = REDIS_URL;
     artifactsDir = await mkdtemp(join(tmpdir(), "indago-pr27-"));
     process.env.ARTIFACT_STORAGE_DIR = artifactsDir;
