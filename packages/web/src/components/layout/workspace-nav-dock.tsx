@@ -91,25 +91,29 @@ export function WorkspaceNavDock() {
               last.entries.push(entry);
             }
           }
+          let tabIndex = 0;
           return groups.map((g, gi) => (
             <span key={g.label} className="flex items-center gap-0.5">
-              {gi > 0 && <span className="h-5 w-px bg-semantic-border" aria-hidden />}
+              {gi > 0 && <span className="h-5 w-px animate-dock-tab-in bg-semantic-border" aria-hidden style={{ animationDelay: `${80 + tabIndex * 50}ms` }} />}
               <span className="sr-only">{g.label}</span>
               {g.entries.map((entry) => {
                 const href = entry.href.startsWith("/")
                   ? entry.href
                   : investigationUrl(investigationId, workspace.caseId, entry.href || undefined);
                 const isActive = isNavEntryActive(entry, pathname);
+                const delay = `${80 + tabIndex * 50}ms`;
+                tabIndex += 1;
                 return (
                   <Link
                     key={entry.label}
                     href={href}
                     aria-current={isActive ? "page" : undefined}
-                    className={`rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
+                    className={`animate-dock-tab-in rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-normal ease-restrained focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-semantic-focus ${
                       isActive
                         ? "bg-semantic-surface-soft text-semantic-selection"
                         : "text-semantic-foreground-muted hover:bg-semantic-surface-elevated hover:text-semantic-foreground"
                     }`}
+                    style={{ animationDelay: delay }}
                   >
                     {entry.label}
                   </Link>
