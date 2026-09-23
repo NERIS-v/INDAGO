@@ -61,6 +61,8 @@ import {
   OBS_A6,
   OBS_A8,
   OBS_A9,
+  OBS_A10,
+  OBS_A11,
   ENT_A_SOCTF,
   ENT_A_MCGUIGAN,
   ENT_CALLAHAN,
@@ -351,7 +353,7 @@ const evidenceA = [
   }),
 ];
 
-// ── Observations (8) ────────────────────────────────────────────────────────
+// ── Observations (10) ───────────────────────────────────────────────────────
 
 const observationsA = [
   ObservationSchema.parse({
@@ -440,6 +442,28 @@ const observationsA = [
     strength: 0.75,
     provenance: { sourceId: SRC_JAN76_A, extractor: "registry.extractor.v1" },
     observedAt: evt("1976-01-15", "approximate"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
+  ObservationSchema.parse({
+    id: OBS_A10, evidenceId: EVID_HR_CT, sourceId: SRC_HR_VOL1_A,
+    type: "FINANCIAL",
+    content: "Mid-1977 accounting records show H. Paul Rico drawing a consulting retainer paid through the Hartford fronton office.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.55,
+    provenance: { sourceId: SRC_HR_VOL1_A, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1977-06-01", "approximate"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
+  ObservationSchema.parse({
+    id: OBS_A11, evidenceId: EVID_HR_CT, sourceId: SRC_HR_VOL1_A,
+    type: "SPATIAL",
+    content: "Appointment registers from November 1979 place H. Paul Rico at the Hartford fronton on a sequence of weekday visits.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.5,
+    provenance: { sourceId: SRC_HR_VOL1_A, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1979-11-01", "approximate"),
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
 ];
@@ -534,7 +558,7 @@ const graphVersionA = GraphVersionSchema.parse({
 
 const graphNodesA = [
   GraphNodeSchema.parse({ id: GN_A_CALLAHAN, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_CALLAHAN, label: "John \"Jack\" Callahan", structuralImportance: 0.9, observationCount: 5, sourceCount: 4, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
-  GraphNodeSchema.parse({ id: GN_A_RICO, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.72, observationCount: 3, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
+  GraphNodeSchema.parse({ id: GN_A_RICO, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.72, observationCount: 5, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_A_WJA, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_WJA, label: "World Jai Alai", structuralImportance: 0.95, observationCount: 4, sourceCount: 4, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_A_FBI, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_FBIBOSTON, label: "FBI Boston Field Office", structuralImportance: 0.75, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_A_SOCTF, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_A_SOCTF, label: "CT SOCTF", structuralImportance: 0.7, observationCount: 2, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
@@ -828,6 +852,8 @@ const timelineA: InvestigationTimeline = {
     bandItem(BAND_OBS, "tl-ob-a2", "1976-02-01T12:00:00.000Z", "Surveillance: Callahan drives to Boston area", { observationId: OBS_A2, entityIds: [ENT_CALLAHAN] }),
     bandItem(BAND_OBS, "tl-ob-a6", "1976-03-01T12:00:00.000Z", "Rico entertains FBI SAs in Bahamas", { observationId: OBS_A6, entityIds: [ENT_RICO, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-a3", "1976-05-03T12:00:00.000Z", "Callahan's WJA employment ends before hearing", { observationId: OBS_A3, entityIds: [ENT_CALLAHAN, ENT_WJA] }),
+    bandItem(BAND_OBS, "tl-ob-a10", "1977-06-01T12:00:00.000Z", "Accounting records: consulting retainer for Rico", { observationId: OBS_A10, entityIds: [ENT_RICO] }),
+    bandItem(BAND_OBS, "tl-ob-a11", "1979-11-01T12:00:00.000Z", "Appointment records: Rico at Hartford fronton", { observationId: OBS_A11, entityIds: [ENT_RICO] }),
     bandItem(BAND_OBS, "tl-ob-a4", "1983-01-01T12:00:00.000Z", "HR108-414 documents WJA employment of Callahan and Rico", { observationId: OBS_A4, entityIds: [ENT_CALLAHAN, ENT_RICO, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-a5", "1983-01-01T12:00:00.000Z", "Loan-shark allegations shared with Rico", { observationId: OBS_A5, entityIds: [ENT_CALLAHAN, ENT_RICO, ENT_FBIBOSTON] }),
     bandItem(BAND_EVID, "tl-ev-a1", "1983-01-01T12:00:00.000Z", "HR108-414 Vol 1 extract", { evidenceId: EVID_HR_CT }),

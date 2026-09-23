@@ -19,11 +19,15 @@ import {
   OBS_A4,
   OBS_A5,
   OBS_A6,
+  OBS_A10,
+  OBS_A11,
   OBS_B3,
   OBS_B4,
   OBS_B5,
   OBS_B11,
   OBS_B12,
+  OBS_B13,
+  OBS_B14,
   EVID_HR_CT,
   EVID_JAN76,
   EVID_SURV,
@@ -66,16 +70,16 @@ export const SHARED_CALLAHAN: Entity = {
 // E2 — H. Paul Rico
 // ============================================================================
 // Former FBI agent; WJA security consultant; entertained FBI SAs in Bahamas.
-// Case A observations: OBS_A4, OBS_A5, OBS_A6
-// Case B observations: OBS_B5 (employment facts), OBS_B11 (coordination), OBS_B12 (retainer)
-// Union = [OBS_A4, OBS_A5, OBS_A6, OBS_B5, OBS_B11, OBS_B12]
+// Case A observations: OBS_A4, OBS_A5, OBS_A6, OBS_A10 (retainer), OBS_A11 (visits)
+// Case B observations: OBS_B5 (employment facts), OBS_B11 (coordination), OBS_B12 (retainer), OBS_B13 (retained 1979), OBS_B14 (listed contact 1981)
+// Union = [OBS_A4, OBS_A5, OBS_A6, OBS_A10, OBS_A11, OBS_B5, OBS_B11, OBS_B12, OBS_B13, OBS_B14]
 export const SHARED_RICO: Entity = {
   id: ENT_RICO,
   caseId: CASE_A_ID,
   investigationId: INVESTIGATION_A_ID,
   canonicalName: "H. Paul Rico",
   status: "ACTIVE",
-  observationIds: [OBS_A4, OBS_A5, OBS_A6, OBS_B5, OBS_B11, OBS_B12],
+  observationIds: [OBS_A4, OBS_A5, OBS_A6, OBS_A10, OBS_A11, OBS_B5, OBS_B11, OBS_B12, OBS_B13, OBS_B14],
   evidenceIds: [EVID_HR_CT, EVID_BAHAMAS],
   hypothesisIds: [],
   roleHypothesisIds: [],
