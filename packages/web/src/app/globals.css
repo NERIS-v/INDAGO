@@ -381,8 +381,57 @@ body {
   animation: dock-tab-in 0.5s var(--ease-spring) backwards;
 }
 
+/* The exact reverse of dock-tab-in: the dock "contracts" out of the route.
+   `forwards` holds the collapsed end-state so the panel can fade and the
+   outgoing page can dim underneath before navigation commits. */
+@keyframes dock-tab-out {
+  0% {
+    max-width: 18rem;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    overflow: visible;
+  }
+  100% {
+    max-width: 0;
+    opacity: 0;
+    transform: translateY(6px) scale(0.85);
+    overflow: hidden;
+  }
+}
+
+.animate-dock-tab-out {
+  display: inline-flex;
+  min-width: 0;
+  white-space: nowrap;
+  will-change: max-width, transform, opacity;
+  animation: dock-tab-out 0.5s var(--ease-spring) forwards;
+}
+
+@keyframes dock-panel-out {
+  from { opacity: 1; }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+
+.animate-dock-panel-out {
+  animation: dock-panel-out 0.3s var(--ease-restrained) forwards;
+}
+
+/* Exit veil: dims the whole workspace page underneath the contracting dock,
+   so returning to /dashboard is an owned fade instead of an abrupt swap. */
+@keyframes page-dim-out {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-page-dim-out {
+  animation: page-dim-out var(--transition-duration-normal) var(--ease-restrained) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-dock-tab-in {
+  .animate-dock-tab-in,
+  .animate-dock-tab-out,
+  .animate-dock-panel-out,
+  .animate-page-dim-out {
     animation: none;
   }
 }
