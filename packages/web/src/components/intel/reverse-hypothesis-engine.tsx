@@ -257,7 +257,7 @@ export function ReverseHypothesisEngine() {
   }
 
   return (
-    <section data-testid="reverse-hypothesis-engine" className="flex w-full flex-col gap-5">
+    <section data-testid="reverse-hypothesis-engine" className="mx-auto flex w-full max-w-[1080px] flex-col gap-5 px-10 py-8 pb-16">
       <div className="flex flex-col gap-1">
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-surface-600">
           Reverse hypothesis

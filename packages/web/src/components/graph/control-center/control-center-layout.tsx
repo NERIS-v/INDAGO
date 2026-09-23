@@ -77,7 +77,7 @@ export function ControlCenterLayout({
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden">
       <div
-        className="grid min-h-0 flex-1 gap-2 transition-[grid-template-columns] duration-300 ease-out motion-reduce:transition-none"
+        className="grid min-h-0 flex-1 gap-2"
         style={{ gridTemplateColumns: controlCenterColumns({ leftRailOpen, rightPanelOpen }) }}
         data-control-center-main
         data-cols={columnsKey(leftRailOpen, rightPanelOpen)}

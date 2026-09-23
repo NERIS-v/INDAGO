@@ -66,11 +66,12 @@ const AURA_FADE_OUT_MS = 150;
 const AURA_FADE_IN_MS = 250;
 const AURA_SETTLE_DELAY_MS = 160;
 
-// P4: out-of-window objects are DIMMED, never hidden — the analyst must be able
-// to see where the timeline's activity sits relative to the rest of the graph.
-const OUT_OF_RANGE_NODE_OPACITY = 0.22;
-const OUT_OF_RANGE_EDGE_OPACITY = 0.15;
-const OUT_OF_RANGE_LABEL_OPACITY = 0.35;
+// P4: out-of-window objects are HIDDEN, never dimmed — a node before or after
+// the timeline window stays invisible and eases in (via the entrance animation /
+// CSS opacity transition) exactly when the playhead actually reaches it.
+const OUT_OF_RANGE_NODE_OPACITY = 0;
+const OUT_OF_RANGE_EDGE_OPACITY = 0;
+const OUT_OF_RANGE_LABEL_OPACITY = 0;
 
 function easeInOutCubic(t: number): number { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
 
@@ -155,7 +156,7 @@ export function GraphCanvas({ nodes, edges, physicsEdges: physicsEdgesProp, hole
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(() => {
           setDimensions({ width, height });
-        }, 400);
+        }, 50);
       }
     });
     observer.observe(containerRef.current);
