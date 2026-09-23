@@ -358,9 +358,11 @@ export function TimelinePanel({ onTimeRangeChange, onEventActivate, restoredTime
 
       {/* TRACK + AXIS BLOCK — fills the panel (min-h-0 flex-1), never scrolls */}
       <div className="relative flex min-h-0 flex-1 flex-col bg-surface-50" data-timeline-block>
-        {/* Analytical window overlay — plain % bounds over the WHOLE tracks */}
+        {/* Analytical window overlay — plain % bounds over the WHOLE tracks.
+            NO transition: it must track the drag handles on the same frame as
+            the pointer, otherwise the window visibly lags the hand. */}
         <div
-          className="pointer-events-none absolute inset-y-0 z-10 flex transition-all duration-75"
+          className="pointer-events-none absolute inset-y-0 z-10 flex"
           style={{ left: `${rangePct[0]}%`, right: `${100 - rangePct[1]}%` }}
           data-timeline-window
         >
