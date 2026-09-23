@@ -84,6 +84,7 @@ export const OBS_A8 = id(NS_CASE_A, "observation:task-force-jai-alai");
 export const OBS_A9 = id(NS_CASE_A, "observation:mcguigan-request-actor");
 export const OBS_A10 = id(NS_CASE_A, "observation:rico-retainer-1977");
 export const OBS_A11 = id(NS_CASE_A, "observation:rico-fronton-visits-1979");
+export const OBS_A12 = id(NS_CASE_A, "observation:rico-fronton-forwarding-1981");
 
 // -- Entities (case-A-specific) ----------------------------------------------
 export const ENT_A_SOCTF = id(NS_CASE_A, "entity:ct-soctf");
@@ -335,6 +336,7 @@ export const OBS_B11 = id(NS_CASE_B, "observation:rico-coordination-callahan");
 export const OBS_B12 = id(NS_CASE_B, "observation:rico-consulting-stipend");
 export const OBS_B13 = id(NS_CASE_B, "observation:rico-retained-1979");
 export const OBS_B14 = id(NS_CASE_B, "observation:rico-listed-contact-1981");
+export const OBS_B15 = id(NS_CASE_B, "observation:rico-miami-forwarding-1979");
 
 // -- Relation / graph edge derived at ingest -----------------------------------
 export const REL_B_WJA_FBI = id(NS_CASE_B, "relation:wja-fbi-boston");

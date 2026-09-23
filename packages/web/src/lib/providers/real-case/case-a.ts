@@ -63,6 +63,7 @@ import {
   OBS_A9,
   OBS_A10,
   OBS_A11,
+  OBS_A12,
   ENT_A_SOCTF,
   ENT_A_MCGUIGAN,
   ENT_CALLAHAN,
@@ -353,7 +354,7 @@ const evidenceA = [
   }),
 ];
 
-// ── Observations (10) ───────────────────────────────────────────────────────
+// ── Observations (11) ───────────────────────────────────────────────────────
 
 const observationsA = [
   ObservationSchema.parse({
@@ -466,6 +467,17 @@ const observationsA = [
     observedAt: evt("1979-11-01", "approximate"),
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
+  ObservationSchema.parse({
+    id: OBS_A12, evidenceId: EVID_HR_CT, sourceId: SRC_HR_VOL1_A,
+    type: "COMMUNICATION",
+    content: "Telephone toll records from spring 1981 show the Hartford fronton extension held in H. Paul Rico's name forwarding to a Miami number across a three-month stretch.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.5,
+    provenance: { sourceId: SRC_HR_VOL1_A, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1981-05-01", "approximate"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
 ];
 
 // ── Case-specific entities (2) ──────────────────────────────────────────────
@@ -558,7 +570,7 @@ const graphVersionA = GraphVersionSchema.parse({
 
 const graphNodesA = [
   GraphNodeSchema.parse({ id: GN_A_CALLAHAN, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_CALLAHAN, label: "John \"Jack\" Callahan", structuralImportance: 0.9, observationCount: 5, sourceCount: 4, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
-  GraphNodeSchema.parse({ id: GN_A_RICO, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.72, observationCount: 5, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
+  GraphNodeSchema.parse({ id: GN_A_RICO, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.72, observationCount: 6, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_A_WJA, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_WJA, label: "World Jai Alai", structuralImportance: 0.95, observationCount: 4, sourceCount: 4, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_A_FBI, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_FBIBOSTON, label: "FBI Boston Field Office", structuralImportance: 0.75, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_A_SOCTF, investigationId: INVESTIGATION_A_ID, versionId: GRAPH_VERSION_A, type: "ENTITY", entityId: ENT_A_SOCTF, label: "CT SOCTF", structuralImportance: 0.7, observationCount: 2, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
@@ -854,6 +866,7 @@ const timelineA: InvestigationTimeline = {
     bandItem(BAND_OBS, "tl-ob-a3", "1976-05-03T12:00:00.000Z", "Callahan's WJA employment ends before hearing", { observationId: OBS_A3, entityIds: [ENT_CALLAHAN, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-a10", "1977-06-01T12:00:00.000Z", "Accounting records: consulting retainer for Rico", { observationId: OBS_A10, entityIds: [ENT_RICO] }),
     bandItem(BAND_OBS, "tl-ob-a11", "1979-11-01T12:00:00.000Z", "Appointment records: Rico at Hartford fronton", { observationId: OBS_A11, entityIds: [ENT_RICO] }),
+    bandItem(BAND_OBS, "tl-ob-a12", "1981-05-01T12:00:00.000Z", "Toll records: fronton line forwarding to Miami", { observationId: OBS_A12, entityIds: [ENT_RICO] }),
     bandItem(BAND_OBS, "tl-ob-a4", "1983-01-01T12:00:00.000Z", "HR108-414 documents WJA employment of Callahan and Rico", { observationId: OBS_A4, entityIds: [ENT_CALLAHAN, ENT_RICO, ENT_WJA] }),
     bandItem(BAND_OBS, "tl-ob-a5", "1983-01-01T12:00:00.000Z", "Loan-shark allegations shared with Rico", { observationId: OBS_A5, entityIds: [ENT_CALLAHAN, ENT_RICO, ENT_FBIBOSTON] }),
     bandItem(BAND_EVID, "tl-ev-a1", "1983-01-01T12:00:00.000Z", "HR108-414 Vol 1 extract", { evidenceId: EVID_HR_CT }),

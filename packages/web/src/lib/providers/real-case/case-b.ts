@@ -80,6 +80,7 @@ import {
   OBS_B12,
   OBS_B13,
   OBS_B14,
+  OBS_B15,
   ENT_WHEELER,
   ENT_SOUTHERN_HILLS,
   ENT_A_MCGUIGAN,
@@ -298,7 +299,7 @@ const evidenceB = [
   }),
 ];
 
-// ── Observations (10) ───────────────────────────────────────────────────────
+// ── Observations (11) ───────────────────────────────────────────────────────
 
 const observationsB = [
   ObservationSchema.parse({
@@ -411,6 +412,17 @@ const observationsB = [
     observedAt: evt("1981-07-01", "approximate"),
     createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
   }),
+  ObservationSchema.parse({
+    id: OBS_B15, evidenceId: EVID_HR_WJA, sourceId: SRC_HR_WJA_B,
+    type: "SPATIAL",
+    content: "A Miami forwarding address appears in late-1979 correspondence tied to H. Paul Rico, months before the Tulsa question entered the record.",
+    entityIds: [ENT_RICO],
+    candidateMentions: [],
+    strength: 0.5,
+    provenance: { sourceId: SRC_HR_WJA_B, extractor: "govinfo.extractor.v1" },
+    observedAt: evt("1979-11-15", "approximate"),
+    createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01"),
+  }),
 ];
 
 // ── Case-specific entities (6) ──────────────────────────────────────────────
@@ -515,7 +527,7 @@ const graphVersionB = GraphVersionSchema.parse({
 // direct structural link to the Tulsa graph beyond the reference.
 const graphNodesB = [
   GraphNodeSchema.parse({ id: GN_B_CALLAHAN, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_CALLAHAN, label: "John \"Jack\" Callahan", structuralImportance: 0.7, observationCount: 2, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
-  GraphNodeSchema.parse({ id: GN_B_RICO, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.65, observationCount: 5, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
+  GraphNodeSchema.parse({ id: GN_B_RICO, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_RICO, label: "H. Paul Rico", structuralImportance: 0.65, observationCount: 6, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_WJA, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_WJA, label: "World Jai Alai", structuralImportance: 0.9, observationCount: 3, sourceCount: 2, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_FBI, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_FBIBOSTON, label: "FBI Boston Field Office", structuralImportance: 0.5, observationCount: 1, sourceCount: 1, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
   GraphNodeSchema.parse({ id: GN_B_WHEELER, investigationId: INVESTIGATION_B_ID, versionId: GRAPH_VERSION_B, type: "ENTITY", entityId: ENT_WHEELER, label: "Roger Wheeler, Sr.", structuralImportance: 0.85, observationCount: 4, sourceCount: 3, createdAt: obs("2024-07-01"), updatedAt: obs("2024-07-01") }),
@@ -824,6 +836,7 @@ const timelineB: InvestigationTimeline = {
   ],
   items: [
     bandItem(BAND_OBS, "tl-ob-b13", "1979-06-01T12:00:00.000Z", "HR: WJA retains Rico as consultant", { observationId: OBS_B13, entityIds: [ENT_RICO] }),
+    bandItem(BAND_OBS, "tl-ob-b15", "1979-11-15T12:00:00.000Z", "Correspondence: Miami forwarding address for Rico", { observationId: OBS_B15, entityIds: [ENT_RICO] }),
     bandItem(BAND_OBS, "tl-ob-b1", "1981-05-27T12:00:00.000Z", "Wheeler murdered at Southern Hills CC, Tulsa", { observationId: OBS_B1, entityIds: [ENT_WHEELER, ENT_SOUTHERN_HILLS] }),
     bandItem(BAND_OBS, "tl-ob-b2", "1981-05-28T12:00:00.000Z", "Tulsa news: Wheeler shot in head after golf", { observationId: OBS_B2, entityIds: [ENT_WHEELER, ENT_SOUTHERN_HILLS] }),
     bandItem(BAND_OBS, "tl-ob-b6", "1981-07-01T12:00:00.000Z", "Tip to Tulsa/CT: Winter Hill / WJA matter", { observationId: OBS_B6, entityIds: [ENT_WJA, ENT_FBIBOSTON] }),
