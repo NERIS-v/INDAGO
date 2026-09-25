@@ -136,6 +136,17 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 - **Case report export** landed: reasoning-ledger and case-report print stylesheets plus an export configuration dialog, deterministic output.
 - **Row changes in this entry:** 7A "Investigation workspace shell" 🟡 → 🟡 [x]; "Graph visualization" 🟡 → ✅; "Lead card" 🟡 → ✅ (the route is no longer hardcoded `DEMO_LEADS` — list + drawer run off the live-capable `leads` provider with the persisted provenance chain and alternative explanations); "Evidence FOR / AGAINST panels" 🟡 → ✅; "Premium loading/empty/error states" 🟡 → ✅ (the kit is used across ~36 surfaces, including panel error boundaries). Unchanged: timeline, gap/graph-hole, next-best-evidence, reasoning ledger (still a demo `DEMO_LEDGER` beside the real case report), review/approval and realtime/recovery — all remain `🟡 [ ]` because their capabilities are still demo-only or the surface is still hardcoded.
 
+## Tracker Update — Robustness & Epistemic Verification Pass (25 Sep 2026)
+
+**The Phase 6 robustness engine is still not built, and this entry does not pretend otherwise.** What the last stretch *did* produce is real evidence against four rows, and a sharper statement of what is still missing. One Phase 6A row and three Phase 9B rows move to `🟡 [x]` on the strength of an enforcing artifact, not on the strength of intent.
+
+- **Phase 6A "Add incremental recomputation where possible" 🟡 → 🟡 [x].** PR-12 is exactly this for the graph-hole chain: an authorized change ledger with a per-case cursor watermark, an affected-set/plan resolver, ≤25 changes per run, group+coalesce by effect class and graph version, a `contextSha256` AI-skip gate, and `SKIPPED_CONTEXT_UNCHANGED` / `SKIPPED_NO_CHANGE` / `RECOMPUTED` / `FAILED` outcomes — a bounded per-case pull, never a whole-case fallback (real-Postgres integration 6/6).
+- **Still open in 6A, named precisely:** staged robustness, the graph-version + perturbation policy cache key, adaptive stopping, ER pair-completeness / false-split / false-merge **evaluation**, and the five named missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification). The pilot's `NOISY_MISSING` / `ADVERSARIAL` conditions are a **benchmark regime, not the five missingness regimes**, and are not counted here. Region-scoped computation exists (PR-1 region layer, PR-11 region-membership selector) but there is no robustness-stage candidate-region restriction yet.
+- **Phase 9B "Review all intelligence wording for epistemic overclaim" 🟡 → 🟡 [x].** The intelligence layer's wording is codified and machine-checked rather than eyeballed: the PR-8 validator enforces negation-guarded pattern rules, closed rating/warning-code enums, bounded uncertainty ranges and completeness-overclaim checks (11 finding codes, 15 checked categories, 112 tests); PR-30 audited the golden run's output against the V7 rules and produced 7 verdicts; PR-31 remediated all of them and pinned them. Scope note: this covers the deterministic intelligence surface and its emitted labels/explanations, not a line-by-line review of hand-written UI copy.
+- **Phase 9B "Verify absence != concealment" 🟡 → 🟡 [x].** The distinction is enforced in policy and tested, not merely documented: `INSUFFICIENT_CONTEXT` is never forced to `MISSING_DATA`; contradictions force `AMBIGUOUS` + `CONTRADICTION_PRESERVED`; the concealment status ceiling is `SUPPORTED` and the wording is pattern-compatible only; and PR-15 §16 forbids emitting `CONCEALMENT_CONSISTENT` or `MISSING_DATA` when contradictions exist. Absence is reported as absence.
+- **Phase 9B "Verify blocked pair != different entity" 🟡 → 🟡 [x].** M-A12-G2/G3 verified exactly this and the record is in `docs/reports/m-a12-entry-gate-audit.md`: distinct id namespaces (a `candidateId` never becomes an `EntityId`), canonical ids minted only under explicit M-A09.5 accept authority, bounded deterministic UNION blocking (`maxBlockSize` 50, `maxPassesPerPair` 100), and a `CandidatePair` that carries no entity id and no score. A blocked pair is an unexamined pair, not a verdict of difference.
+- **Still open in 9B, named precisely:** "role != culpability", "structural signal != criminal relevance" and "confidence != legal admissibility" have structural safeguards in the contracts (no culpability concept exists in the role model; the frozen score surface keeps structural / evidence / significance separate; the classification labels describe the *gap*, never a person) but **no dedicated verification record yet** — the statements are currently architectural intent plus contract shape.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
@@ -402,12 +413,12 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 - [ ] Implement staged robustness `[Mayur]`
 - [ ] Add graph version + perturbation policy cache key `[Mayur]`
-- [ ] Add candidate-region restriction `[Mayur]`
-- [ ] Add incremental recomputation where possible `[Mayur]`
+- [ ] Add candidate-region restriction `[Mayur]` — region-scoped computation exists (PR-1 region layer, PR-11 region-membership selector) but there is **no robustness-stage region restriction**; partial evidence, milestone not met
+- 🟡 [x] Add incremental recomputation where possible `[Mayur]` — PR-12 is exactly this for the graph-hole chain: authorized change ledger + per-case cursor watermark, affected-set/plan resolution, ≤25 changes/run, group+coalesce by effect class and graph version, `contextSha256` AI-skip gate, `SKIPPED_*`/`RECOMPUTED`/`FAILED` outcomes — a bounded per-case pull, never a whole-case fallback (real-Postgres 6/6). Not generalised into a robustness engine
 - [ ] Add adaptive stopping `[Mayur]`
-- [ ] Evaluate ER pair completeness / false split / false merge `[Mayur]`
-- [ ] Run missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification) `[Mayur]`
-- [ ] Separate structural signal from robustness from evidence posture `[Mayur]`
+- [ ] Evaluate ER pair completeness / false split / false merge `[Mayur]` — the pilot measures false merges per case (`overCollapsedEntities`) and the golden corpus exercises splits, but there is no completeness / false-split / false-merge **evaluation** milestone yet
+- [ ] Run missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification) `[Mayur]` — the pilot's `NOISY_MISSING` / `ADVERSARIAL` conditions are a benchmark regime, **not** these five regimes; they are deliberately not counted here
+- [ ] Separate structural signal from robustness from evidence posture `[Mayur]` — the score surface keeps the axes separate and the benchmark reports hit rate / robustness / classification independently, but there is no robustness-axis engine to separate yet
 - 🔵 [ ] Semantic retrieval architecture (future) `[Mayur]` — high-recall embedding/LLM retrieval feeding structured analytical signals into the existing deterministic scoring; semantic similarity is **NOT** evidence and embeddings/LLMs **never** create canonical entities/relations; recall-optimizing retrieval layer, precision/explainability stays in the deterministic policy + explicit authority
 
 ### 6B. Gurashish
@@ -520,13 +531,13 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 9B. Mayur
 
-- [ ] Review all intelligence wording for epistemic overclaim `[Mayur]`
-- [ ] Verify role != culpability `[Mayur]`
-- [ ] Verify absence != concealment `[Mayur]`
-- [ ] Verify structural signal != criminal relevance `[Mayur]`
-- [ ] Verify confidence != legal admissibility `[Mayur]`
-- [ ] Verify blocked pair != different entity `[Mayur]`
-- [ ] Verify alternatives/counter-evidence surfaced for high-impact leads `[Mayur]`
+- 🟡 [x] Review all intelligence wording for epistemic overclaim `[Mayur]` — the **intelligence surface's** wording is codified and machine-checked: the PR-8 validator (11 frozen finding codes, 15 checked categories, 112 tests) enforces negation-guarded pattern rules, closed rating/warning enums, bounded uncertainty and completeness-overclaim checks; PR-30 audited the golden run against the V7 rules (7 verdicts) and PR-31 remediated + pinned all of them. Scope limit: hand-written UI copy has not had a line-by-line epistemic review
+- [ ] Verify role != culpability `[Mayur]` — the role model has **no culpability concept at all** (a structural safeguard), but there is no dedicated verification record
+- 🟡 [x] Verify absence != concealment `[Mayur]` — enforced in frozen policy and tested: `INSUFFICIENT_CONTEXT` is never forced to `MISSING_DATA`; contradictions force `AMBIGUOUS` + `CONTRADICTION_PRESERVED`; the concealment status ceiling is `SUPPORTED` with pattern-compatible wording only; PR-15 §16 forbids `CONCEALMENT_CONSISTENT` / `MISSING_DATA` under contradictions. Absence is reported as absence
+- [ ] Verify structural signal != criminal relevance `[Mayur]` — the frozen score surface keeps structural / evidence / significance separate and gap labels describe the gap rather than a person, but there is no dedicated verification record
+- [ ] Verify confidence != legal admissibility `[Mayur]` — asserted in the architecture and the UI language, never independently verified
+- 🟡 [x] Verify blocked pair != different entity `[Mayur]` — M-A12-G2/G3 verified it (`docs/reports/m-a12-entry-gate-audit.md`): distinct id namespaces (`candidateId` never becomes `EntityId`), canonical ids minted only under explicit accept authority, bounded deterministic UNION blocking (`maxBlockSize` 50, `maxPassesPerPair` 100), and a `CandidatePair` carrying no entity id and no score. A blocked pair is unexamined, not a verdict of difference
+- [ ] Verify alternatives/counter-evidence surfaced for high-impact leads `[Mayur]` — PR-15 emits bounded competing explanations for a qualified gap and the lead runtime carries alternative explanations, but there is no rule yet that *enforces* surfacing them for high-impact leads specifically
 
 ---
 
