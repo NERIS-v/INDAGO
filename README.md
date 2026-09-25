@@ -1095,6 +1095,16 @@ The `intelligence/` packages are **pure and deterministic** wherever the archite
 
 The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provider seam. Every surface renders from the provider seam. In DEMO mode the provider serves curated demo fixtures (deterministic, covered by `vitest` suites); in LIVE mode it renders authoritative data from the platform API. The seam itself never fabricates data — it selects between demo fixtures and live data, and never injects ad-hoc values at render time. Feature-scoped reports live in `docs/reports/`.
 
+**Per-capability resolution, no silent fallback.** The seam resolves *per capability*, not per workspace:
+
+| Serving | Capabilities |
+|---|---|
+| **Live-backed** (authoritative HTTP routes; demo fixtures in DEMO mode) | `investigation`, `evidence`, `observations`, `cases`, `entities`, `relations`, `graph`, `leads`, `crossCase`, `realtime`, `network.pulse`, `network.matrix`, `network.flow` |
+| **Live-only** (authoritative backend analytics / temporal projection; no demo equivalent) | `graph.centrality`, `graph.communities`, `graph.validAt` |
+| **Demo-only** (a live workspace fails fast with a typed `UNSUPPORTED` error and renders an honest absence) | `intelligence`, `timeline`, `gaps`, `review`, `robustness`, `hypotheses`, `network.graph` |
+
+Two invariants make the seam honest: a capability that *has* a live implementation is never demo-served (a runtime failure surfaces as a typed provider error instead of silently falling back to fixtures), and a capability with neither implementation is `not-ready` rather than mocked. AUTO is the only mode in which demo and live coexist in one bundle, and it resolves per capability.
+
 | PR | Surface | Scope |
 |---|---|---|
 | PR-1 | Workspace navigation dock | Every workspace destination rendered as a link from the provider-backed nav model |
@@ -1112,8 +1122,33 @@ The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provide
 | PR-9 | Cinematic theme refinement | Semantic color language (restrained rose, contradiction red), attention-driven canvas states, reduced-motion collapse, one state per element at scale |
 | PR-10 | Reliability & accessibility | One tab stop per node, unambiguous labeled controls, `?focus=` deep links, panel error boundaries, single-subscription realtime lifecycle, no double-submit mutations, large-graph visual-state derivations, simulation stability |
 | F-PR9 | Reverse hypothesis engine | Deterministic reverse-test mode **added beside the preserved pipeline** on `/investigations/[id]/hypothesis` — classifies saved observations as supporting / contradicting / unresolved with reasons, records a session decision trail; no scores, probabilities, or AI verdicts |
+| PR-21 / PR-22 | Live provider wiring | `EntityProvider`, `RelationProvider`, `GraphProvider`, lead and run projections moved off `Unsupported*` stubs onto real HTTP routes: canonical entities, entity/relation hypotheses, accept/reject/reverse authority, canonical relations, graph, centrality, communities, community candidates and valid-at |
+| PR-23 | Representation realignment | Pulse / Matrix / Flow re-aligned onto the live seams as frontend-derived visualizations (their authoritative inputs resolve live; no backend "pulse/matrix/flow" API is claimed), with runtime frame and HTTP-boundary verification |
+| PR-22 | Live hypothesis + lead surfaces | Relation `evidenceBasis` and contradictions rendered beside the authority actions in the live hypothesis workspace; the lead drawer surfaces the persisted provenance chain and alternative explanations |
+| Cinematic home | Opening sequence at `/` | Scroll-driven WebGL particle field, DOM network assembly, wordmark decomposition, shipped calibration timeline, dev calibration/debug flags; the dashboard moved to `/dashboard` |
+| Benchmark surface | `/benchmarks` | Run index, run detail, condition explorer, capability coverage, failure mechanisms, raw artifact serving, typed benchmark contracts, registry/domain unit tests and a pilot artifact smoke test |
+| Report export | Ledger + case report | Reasoning-ledger and case-report print stylesheets, an export configuration dialog, and ledger export printing the case report |
 
-Additional workspace routes implemented for the investigation lifecycle: `/investigations/[id]` (detail), `evidence`, `observations`, `graph`, `hypothesis`, `cross-case`, `gaps`, `leads`, `timeline`, `judge`, `ledger`, `review`, `robustness`, plus a case-list dashboard and New Investigation flow.
+### Routes
+
+| Route | Purpose |
+|---|---|
+| `/` | Cinematic home (scroll-driven opening sequence) |
+| `/dashboard` | Case list, mini-topology, new investigation |
+| `/investigations/new` | New investigation flow |
+| `/investigations/[id]` | Investigation overview (run state, evidence, observations, leads, cross-case) |
+| `/investigations/[id]/graph` | Graph representation + control center |
+| `/investigations/[id]/hypothesis` | Hypotheses, live relation evidence basis, reverse hypothesis |
+| `/investigations/[id]/leads` | Lead list + lead drawer (provenance, alternatives) |
+| `/investigations/[id]/gaps` | Graph holes and the gap lifecycle |
+| `/investigations/[id]/cross-case` | Cross-case matrix and foreign overlays |
+| `/investigations/[id]/evidence` · `/observations` | Evidence and observation surfaces |
+| `/investigations/[id]/ledger` · `/review` · `/robustness` · `/judge` | Reasoning ledger, review/approval, robustness, judge views |
+| `/benchmarks` · `/benchmarks/[runId]` · `/benchmarks/[runId]/documents/[doc]` | Benchmark runs and raw artifacts |
+| `/design` | Design / calibration surface |
+| `/api/proxy` · `/api/sse/[investigationId]` | Authenticated API proxy and SSE bridge |
+
+The temporal zone (timeline, versions, activity replay) is a workspace-wide controller inside the five-zone shell rather than a standalone route; `?focus=` deep links and the shared workspace-temporal state make selection survive sub-route navigation.
 
 ### Getting Started
 
