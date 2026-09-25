@@ -919,7 +919,7 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
 
 <div align="center">
 
-<img src="https://img.shields.io/badge/Phase_1-Foundation-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 1"> <img src="https://img.shields.io/badge/Phase_2-Platform-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 2"> <img src="https://img.shields.io/badge/Phase_3-Integration-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 3">
+<img src="https://img.shields.io/badge/Phase_1-Foundation-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 1"> <img src="https://img.shields.io/badge/Phase_2-Platform-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 2"> <img src="https://img.shields.io/badge/Phase_3-Integration-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 3"> <img src="https://img.shields.io/badge/Phase_4-Investigation_Loop-FFB800?style=for-the-badge&labelColor=0D1117" alt="Phase 4"> <img src="https://img.shields.io/badge/Phase_5A-Graph_Hole-6A5ACD?style=for-the-badge&labelColor=0D1117" alt="Phase 5A"> <img src="https://img.shields.io/badge/Phase_8-Benchmark_Pilot-1A1A2E?style=for-the-badge&labelColor=0D1117" alt="Phase 8">
 
 </div>
 
@@ -932,14 +932,31 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
   <tr>
     <td><strong>Phase 2 — Platform Core</strong></td>
     <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
-    <td>Express API, RBAC auth, upload queue, SSE streaming</td>
+    <td>Express API, RBAC auth, upload queue, SSE streaming, Prisma + Postgres persistence, temporal projection</td>
   </tr>
   <tr>
     <td><strong>Phase 3 — Integration & UI</strong></td>
     <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
     <td>Next.js 15 investigative workspace — five-zone shell, graph control center, intelligence + hypothesis surfaces, deterministic demo mode</td>
   </tr>
+  <tr>
+    <td><strong>Phase 4 — Core Investigation Loop</strong></td>
+    <td><img src="https://img.shields.io/badge/Backend_Complete-00D4AA?style=flat-square" alt="Backend complete"> <img src="https://img.shields.io/badge/UX_Partial-FFB800?style=flat-square" alt="UX partial"></td>
+    <td>Entity/relation authority, graph projection + traversal/centrality/communities/valid-at, lead generation runtime (bridge, burst, community, cross-case) with strict provenance, live-wired provider seams for graph / entities / relations / leads / cross-case</td>
+  </tr>
+  <tr>
+    <td><strong>Phase 5A — Graph-Hole / Intelligence-Gap Core</strong></td>
+    <td><img src="https://img.shields.io/badge/Certified-6A5ACD?style=flat-square" alt="Certified"></td>
+    <td>Deterministic graph-hole chain: region building (graph + semantic expansion) → six-detector candidate detection → qualification → bounded LLM analysis + 0-LLM validation → certified scoring → gap classification → competing explanations → ER-split explanation → candidate evidence requests → next-best-evidence selection → incremental reassessment, with a persisted <code>InvestigativeGap</code> lifecycle. Certified against real Postgres with documented limitations</td>
+  </tr>
+  <tr>
+    <td><strong>Phase 8 — Synthetic Benchmark (Pilot)</strong></td>
+    <td><img src="https://img.shields.io/badge/Prototype-1A1A2E?style=flat-square" alt="Prototype"></td>
+    <td>Deterministic internal pilot benchmark: seeded synthetic corpus, CLEAN / NOISY_MISSING / ADVERSARIAL conditions, per-case metric families, robustness verdicts, content-hashed artifacts and a deep audit — an internal prototype evaluation, not production or third-party validation</td>
+  </tr>
 </table>
+
+The milestone source of truth is [`docs/roadmap/phase-tracker.md`](docs/roadmap/phase-tracker.md). Status discipline there is deliberately strict: **backend correctness and frontend surfacing are graded separately**, a route existing is not milestone completion unless the capability is surfaced end-to-end, and a partially verified item is marked partial rather than done. Every capability row below is backed by code and tests in-repo.
 
 ### Monorepo Structure
 
