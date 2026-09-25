@@ -919,7 +919,7 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
 
 <div align="center">
 
-<img src="https://img.shields.io/badge/Phase_1-Foundation-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 1"> <img src="https://img.shields.io/badge/Phase_2-Platform-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 2"> <img src="https://img.shields.io/badge/Phase_3-Integration-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 3">
+<img src="https://img.shields.io/badge/Phase_1-Foundation-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 1"> <img src="https://img.shields.io/badge/Phase_2-Platform-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 2"> <img src="https://img.shields.io/badge/Phase_3-Integration-00D4AA?style=for-the-badge&labelColor=0D1117" alt="Phase 3"> <img src="https://img.shields.io/badge/Phase_4-Investigation_Loop-FFB800?style=for-the-badge&labelColor=0D1117" alt="Phase 4"> <img src="https://img.shields.io/badge/Phase_5A-Graph_Hole-6A5ACD?style=for-the-badge&labelColor=0D1117" alt="Phase 5A"> <img src="https://img.shields.io/badge/Phase_8-Benchmark_Pilot-1A1A2E?style=for-the-badge&labelColor=0D1117" alt="Phase 8">
 
 </div>
 
@@ -932,24 +932,71 @@ Use **2-3 synthetic cases** containing enough ambiguity to demonstrate the full 
   <tr>
     <td><strong>Phase 2 — Platform Core</strong></td>
     <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
-    <td>Express API, RBAC auth, upload queue, SSE streaming</td>
+    <td>Express API, RBAC auth, upload queue, SSE streaming, Prisma + Postgres persistence, temporal projection</td>
   </tr>
   <tr>
     <td><strong>Phase 3 — Integration & UI</strong></td>
     <td><img src="https://img.shields.io/badge/Complete-00D4AA?style=flat-square" alt="Complete"></td>
     <td>Next.js 15 investigative workspace — five-zone shell, graph control center, intelligence + hypothesis surfaces, deterministic demo mode</td>
   </tr>
+  <tr>
+    <td><strong>Phase 4 — Core Investigation Loop</strong></td>
+    <td><img src="https://img.shields.io/badge/Backend_Complete-00D4AA?style=flat-square" alt="Backend complete"> <img src="https://img.shields.io/badge/UX_Partial-FFB800?style=flat-square" alt="UX partial"></td>
+    <td>Entity/relation authority, graph projection + traversal/centrality/communities/valid-at, lead generation runtime (bridge, burst, community, cross-case) with strict provenance, live-wired provider seams for graph / entities / relations / leads / cross-case</td>
+  </tr>
+  <tr>
+    <td><strong>Phase 5A — Graph-Hole / Intelligence-Gap Core</strong></td>
+    <td><img src="https://img.shields.io/badge/Certified-6A5ACD?style=flat-square" alt="Certified"></td>
+    <td>Deterministic graph-hole chain: region building (graph + semantic expansion) → six-detector candidate detection → qualification → bounded LLM analysis + 0-LLM validation → certified scoring → gap classification → competing explanations → ER-split explanation → candidate evidence requests → next-best-evidence selection → incremental reassessment, with a persisted <code>InvestigativeGap</code> lifecycle. Certified against real Postgres with documented limitations</td>
+  </tr>
+  <tr>
+    <td><strong>Phase 8 — Synthetic Benchmark (Pilot)</strong></td>
+    <td><img src="https://img.shields.io/badge/Prototype-1A1A2E?style=flat-square" alt="Prototype"></td>
+    <td>Deterministic internal pilot benchmark: seeded synthetic corpus, CLEAN / NOISY_MISSING / ADVERSARIAL conditions, per-case metric families, robustness verdicts, content-hashed artifacts and a deep audit — an internal prototype evaluation, not production or third-party validation</td>
+  </tr>
 </table>
+
+The milestone source of truth is [`docs/roadmap/phase-tracker.md`](docs/roadmap/phase-tracker.md). Status discipline there is deliberately strict: **backend correctness and frontend surfacing are graded separately**, a route existing is not milestone completion unless the capability is surfaced end-to-end, and a partially verified item is marked partial rather than done. Every capability row below is backed by code and tests in-repo.
 
 ### Monorepo Structure
 
 ```
 packages/
-├── contracts/      Zod schemas for domain models & API validation
-├── platform/       Express API server, auth, upload queue, orchestrator
-├── web/            Next.js 15 investigative workspace UI (five-zone shell, representable graph)
-└── intelligence/   Ingestion pipeline (OCR, NER, CDR/financial parsing)
+├── contracts/                Zod schemas for domain models & API validation
+├── platform/                 Express API server, auth, upload queue, orchestrator,
+│                             Prisma/Postgres persistence, BullMQ workers, audit chain
+├── web/                      Next.js 15 investigative workspace UI (five-zone shell,
+│                             representable graph, cinematic home, benchmark surface)
+├── intelligence/             Deterministic analysis packages (one per capability)
+│   ├── ingestion/            acquisition → classification → raw extraction/OCR →
+│   │                         normalization → observation extraction → entity mentions
+│   ├── entity-resolution/    canonical entity identity, comparison evidence, scoring, resolver
+│   ├── relation-resolution/  relation resolution over canonical entities
+│   ├── graphology-projection/ canonical graph projection (nodes, edges, analytics)
+│   ├── semantic-retrieval/   embedding port + bounded retrieval (recall layer, never identity)
+│   ├── lead-generation/      lead drafts, identity, alternative explanations
+│   ├── graph-hole-region/    candidate-region construction (graph + semantic expansion)
+│   ├── graph-hole-detection/ six deterministic missing-link detectors
+│   ├── graph-hole-qualification/ qualification + frozen score surface
+│   ├── graph-hole-analysis/  bounded LLM structured analysis
+│   ├── graph-hole-validation/ 0-LLM closed-world claim validator
+│   ├── graph-hole-judge/     feature-owned LLM judge over a validated analysis
+│   ├── hypothesis-context/   atomic + grouped hypothesis context (read-only)
+│   ├── gap-classification/   one frozen gap label + confidence + reasons
+│   ├── competing-explanations/ bounded, ranked competing explanations
+│   ├── entity-split-analysis/ ER-split-explains-hole detection
+│   ├── evidence-request-generation/ bounded candidate evidence requests
+│   ├── next-best-evidence/   evidence utility + ranked next-best-evidence selection
+│   ├── targeted-reblocking/  region-scoped candidate-pair reblocking
+│   └── graph-hole-reassessment/ incremental, bounded reassessment after a change
+├── infrastructure/
+│   └── ai-agent-runtime/     provider-agnostic LLM runtime (budgets, reliability,
+│                             structured output, security filters)
+benchmark/                    Pilot benchmark artifacts (summary, per-case, audit)
+docs/                         Architecture, platform, frontend, roadmap, reports
 ```
+
+The `intelligence/` packages are **pure and deterministic** wherever the architecture demands it (detection, classification, explanations, evidence requests, selection, reassessment). LLM calls exist only where the V7 architecture explicitly allows them (bounded structured analysis, the judge, and semantic retrieval embeddings) and are always wrapped by a 0-LLM validator that can reject the result.
 
 ### Features Built
 
@@ -976,7 +1023,7 @@ packages/
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/Temporal-Graph_Versioning-00D4AA?style=flat-square" alt="Temporal"></td>
-    <td>Temporal history store, interval reconstruction, and graph versioning with historical projection</td>
+    <td>Temporal history store, interval reconstruction, graph versioning with advisory-locked version allocation, append-only history, and case-scoped current / versions / valid-at projection</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/Workspace-Five--Zone-00D4AA?style=flat-square" alt="Workspace"></td>
@@ -999,14 +1046,64 @@ packages/
     <td>Cinematic semantic color language, reduced-motion support, roving-tab keyboard semantics, deep links, and panel error boundaries</td>
   </tr>
   <tr>
+    <td><img src="https://img.shields.io/badge/Graph_Hole_Engine-6A5ACD?style=flat-square" alt="Graph-hole engine"></td>
+    <td>The differentiation core: candidate-region building (deterministic graph expansion + optional semantic expansion) → six missing-link detectors → qualification with a frozen score surface → bounded LLM structured analysis → <strong>0-LLM</strong> closed-world claim validator → one frozen gap label with confidence, structural impact, reasons and provenance</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Next_Best_Evidence-00D4AA?style=flat-square" alt="Next-best-evidence"></td>
+    <td>Bounded competing explanations, ER-split explanation, candidate evidence requests, and evidence-utility selection (<code>0.40·EIG + 0.25·relevance + 0.20·feasibility + 0.15·(1−cost)</code>) — every candidate discriminates between <em>real</em> explanation ids, content-addressed identity, bounded and deduplicated</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Incremental_Reassessment-00D4AA?style=flat-square" alt="Incremental reassessment"></td>
+    <td>Authoritative change ledger + per-case cursor watermark; only the graph-hole intelligence a change could have affected is recomputed, under a per-case lock, with a <code>contextSha256</code> AI-skip gate — never a whole-case fallback</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Gap_Lifecycle-1A1A2E?style=flat-square" alt="Gap lifecycle"></td>
+    <td>Qualified graph holes persisted as <code>InvestigativeGap</code> rows with deterministic gap-type mapping, GraphHole linkage, a typed <code>GRAPH_HOLE_DETECTED</code> event, and the gap status machine (<code>IDENTIFIED</code>…<code>ADDRESSED</code>)</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Lead_Runtime-1A1A2E?style=flat-square" alt="Lead runtime"></td>
+    <td>Bridge, burst, community and cross-case lead generation with strict provenance conformance, identity, alternative explanations and a claim-grounding gate — candidate lines of inquiry, never verdicts</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Semantic_Retrieval-389826?style=flat-square" alt="Semantic retrieval"></td>
+    <td>pgvector-backed recall layer (Ollama embeddings, exact cosine, case-isolated, true closed-interval temporal overlap) feeding deterministic region expansion — similarity is never evidence and never creates a canonical entity</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Real_Stack_E2E-E63946?style=flat-square" alt="Real-stack E2E"></td>
+    <td>Golden-corpus verification against the real stack — HTTP → BullMQ → real worker → Postgres → SSE, covering ingest → normalize → observations → mentions → blocking → resolution → relations → graph → leads → reassessment → audit → explicit finalize, with a golden regression suite pinning the graded outputs</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Benchmark_Pilot-1A1A2E?style=flat-square" alt="Benchmark pilot"></td>
+    <td>Deterministic internal pilot benchmark over the wired intelligence core: seeded synthetic corpus, CLEAN / NOISY_MISSING / ADVERSARIAL conditions, per-case metric families, robustness verdicts, content-hashed artifacts, a deep audit, and an in-app benchmark surface (run index, run detail, raw artifact serving)</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Cinematic_Home-6A5ACD?style=flat-square" alt="Cinematic home"></td>
+    <td>Scroll-driven opening sequence at <code>/</code> (WebGL particle field, DOM network assembly, wordmark decomposition) with a shipped calibration timeline, reduced-motion collapse, and the dashboard at <code>/dashboard</code></td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Case_Report_Export-FF6B35?style=flat-square" alt="Report export"></td>
+    <td>Reasoning-ledger and case-report export as print-styled PDF, plus an export configuration dialog — deterministic output, no fabricated content</td>
+  </tr>
+  <tr>
     <td><img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square" alt="CI"></td>
-    <td>Build, typecheck, test on every push</td>
+    <td>Build, typecheck and test on every push against <strong>real</strong> Postgres (pgvector) and Redis services, so the DB-backed integration and e2e suites actually run instead of silently skipping</td>
   </tr>
 </table>
 
 ### Investigative Workspace (packages/web)
 
 The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provider seam. Every surface renders from the provider seam. In DEMO mode the provider serves curated demo fixtures (deterministic, covered by `vitest` suites); in LIVE mode it renders authoritative data from the platform API. The seam itself never fabricates data — it selects between demo fixtures and live data, and never injects ad-hoc values at render time. Feature-scoped reports live in `docs/reports/`.
+
+**Per-capability resolution, no silent fallback.** The seam resolves *per capability*, not per workspace:
+
+| Serving | Capabilities |
+|---|---|
+| **Live-backed** (authoritative HTTP routes; demo fixtures in DEMO mode) | `investigation`, `evidence`, `observations`, `cases`, `entities`, `relations`, `graph`, `leads`, `crossCase`, `realtime`, `network.pulse`, `network.matrix`, `network.flow` |
+| **Live-only** (authoritative backend analytics / temporal projection; no demo equivalent) | `graph.centrality`, `graph.communities`, `graph.validAt` |
+| **Demo-only** (a live workspace fails fast with a typed `UNSUPPORTED` error and renders an honest absence) | `intelligence`, `timeline`, `gaps`, `review`, `robustness`, `hypotheses`, `network.graph` |
+
+Two invariants make the seam honest: a capability that *has* a live implementation is never demo-served (a runtime failure surfaces as a typed provider error instead of silently falling back to fixtures), and a capability with neither implementation is `not-ready` rather than mocked. AUTO is the only mode in which demo and live coexist in one bundle, and it resolves per capability.
 
 | PR | Surface | Scope |
 |---|---|---|
@@ -1025,17 +1122,69 @@ The web frontend is an investigative workspace over a DEMO / LIVE / AUTO provide
 | PR-9 | Cinematic theme refinement | Semantic color language (restrained rose, contradiction red), attention-driven canvas states, reduced-motion collapse, one state per element at scale |
 | PR-10 | Reliability & accessibility | One tab stop per node, unambiguous labeled controls, `?focus=` deep links, panel error boundaries, single-subscription realtime lifecycle, no double-submit mutations, large-graph visual-state derivations, simulation stability |
 | F-PR9 | Reverse hypothesis engine | Deterministic reverse-test mode **added beside the preserved pipeline** on `/investigations/[id]/hypothesis` — classifies saved observations as supporting / contradicting / unresolved with reasons, records a session decision trail; no scores, probabilities, or AI verdicts |
+| PR-21 / PR-22 | Live provider wiring | `EntityProvider`, `RelationProvider`, `GraphProvider`, lead and run projections moved off `Unsupported*` stubs onto real HTTP routes: canonical entities, entity/relation hypotheses, accept/reject/reverse authority, canonical relations, graph, centrality, communities, community candidates and valid-at |
+| PR-23 | Representation realignment | Pulse / Matrix / Flow re-aligned onto the live seams as frontend-derived visualizations (their authoritative inputs resolve live; no backend "pulse/matrix/flow" API is claimed), with runtime frame and HTTP-boundary verification |
+| PR-22 | Live hypothesis + lead surfaces | Relation `evidenceBasis` and contradictions rendered beside the authority actions in the live hypothesis workspace; the lead drawer surfaces the persisted provenance chain and alternative explanations |
+| Cinematic home | Opening sequence at `/` | Scroll-driven WebGL particle field, DOM network assembly, wordmark decomposition, shipped calibration timeline, dev calibration/debug flags; the dashboard moved to `/dashboard` |
+| Benchmark surface | `/benchmarks` | Run index, run detail, condition explorer, capability coverage, failure mechanisms, raw artifact serving, typed benchmark contracts, registry/domain unit tests and a pilot artifact smoke test |
+| Report export | Ledger + case report | Reasoning-ledger and case-report print stylesheets, an export configuration dialog, and ledger export printing the case report |
 
-Additional workspace routes implemented for the investigation lifecycle: `/investigations/[id]` (detail), `evidence`, `observations`, `graph`, `hypothesis`, `cross-case`, `gaps`, `leads`, `timeline`, `judge`, `ledger`, `review`, `robustness`, plus a case-list dashboard and New Investigation flow.
+### Routes
+
+| Route | Purpose |
+|---|---|
+| `/` | Cinematic home (scroll-driven opening sequence) |
+| `/dashboard` | Case list, mini-topology, new investigation |
+| `/investigations/new` | New investigation flow |
+| `/investigations/[id]` | Investigation overview (run state, evidence, observations, leads, cross-case) |
+| `/investigations/[id]/graph` | Graph representation + control center |
+| `/investigations/[id]/hypothesis` | Hypotheses, live relation evidence basis, reverse hypothesis |
+| `/investigations/[id]/leads` | Lead list + lead drawer (provenance, alternatives) |
+| `/investigations/[id]/gaps` | Graph holes and the gap lifecycle |
+| `/investigations/[id]/cross-case` | Cross-case matrix and foreign overlays |
+| `/investigations/[id]/evidence` · `/observations` | Evidence and observation surfaces |
+| `/investigations/[id]/ledger` · `/review` · `/robustness` · `/judge` | Reasoning ledger, review/approval, robustness, judge views |
+| `/benchmarks` · `/benchmarks/[runId]` · `/benchmarks/[runId]/documents/[doc]` | Benchmark runs and raw artifacts |
+| `/design` | Design / calibration surface |
+| `/api/proxy` · `/api/sse/[investigationId]` | Authenticated API proxy and SSE bridge |
+
+The temporal zone (timeline, versions, activity replay) is a workspace-wide controller inside the five-zone shell rather than a standalone route; `?focus=` deep links and the shared workspace-temporal state make selection survive sub-route navigation.
 
 ### Getting Started
 
+**Prerequisites:** Node.js 20, pnpm 9, PostgreSQL 16 with the **pgvector** extension (`pgvector/pgvector:pg16`), and Redis 7. The DB-backed integration and e2e suites are gated on real services — without them they skip rather than fake green, and the same holds in CI.
+
 ```bash
-pnpm install          # install all dependencies
-pnpm typecheck        # run type checks across packages
-pnpm test             # run test suites
-pnpm build            # build all packages
+pnpm install                      # install all dependencies
+pnpm typecheck                    # run type checks across packages
+pnpm test                         # run test suites
+pnpm build                        # build all packages
 ```
+
+```bash
+# platform — schema, migrations, API + worker
+cd packages/platform
+cp .env.example .env              # DATABASE_URL, REDIS_URL, TEST_DATABASE_URL, JWT_SECRET
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy   # or: pnpm db:push for a throwaway database
+pnpm dev                          # Express API + BullMQ worker (port 3001)
+
+# web — Next.js 15 workspace (port 3000)
+cd packages/web
+cp .env.example .env.local
+pnpm dev
+```
+
+```bash
+# benchmark pilot — deterministic harness over the wired intelligence core
+cd packages/platform
+pnpm bench:pilot                  # full run; artifacts land in benchmark/
+pnpm bench:pilot:light            # subset
+pnpm bench:pilot:quiet            # no cinematic terminal output
+pnpm test:integration             # real-Postgres integration suites only
+```
+
+Setting `TEST_DATABASE_URL` (never `DATABASE_URL`) points the integration suites at a dedicated test database; `INDAGO_DEV_ALLOWED_CASES` grants the dev principal access to specific case ids, because case-scope authorization is fail-closed in every environment. LLM-backed surfaces (bounded graph-hole analysis, the judge, semantic embeddings) go through the shared agent runtime with an explicit provider choice — `AI_PROVIDER=ollama` by default, no automatic fallback, and no key required for the deterministic path.
 
 ---
 

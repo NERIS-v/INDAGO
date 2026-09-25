@@ -15,6 +15,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | Mark | Meaning |
 |---|---|
 | ✅ | **IMPLEMENTED AND VERIFIED** — code exists and is exercised by tests/evidence in-repo |
+| 🟢 | **CERTIFIED** — ✅ plus a written verification/certification record in `docs/architecture/` (frozen policy, reproducible fixtures, scoped regression matrix). Used by the Phase 5A rows |
 | 🟡 | **IMPLEMENTED BUT ONLY PARTIALLY VERIFIED** — a real subset exists; verification or full surfacing is missing |
 | 🔵 | **PLANNED** — documented intent; not implemented |
 | ⚠️ | **KNOWN LIMITATION** — an accepted technical debt / documented limitation, not an implementation gap |
@@ -79,6 +80,80 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 ## 5A-PR16 (ER-split-explains-hole) — PARTIAL 🟡 (policy frozen V1 + pure runtime; real-Postgres execution deferred — ENVIRONMENTAL)
 
 **PR16 (detect/rank/explain when a fragmentation of a canonical entity could create a Graph Hole) landed 2026-09-17 on `feat/m-a13-graph-hole-region` — policy frozen V1 + pure deterministic runtime; NO LLM, NO hypothesis lifecycle authority, NO reblocking, NO persistence, no hidden retrieval.** `@indago/entity-split-analysis` consumes the certified PR1/PR3/PR5/PR13/PR14/PR15 chain (input binds to the REAL PR14 classification by re-running `classifyGap`; PR15 competing set binds by re-running `generateCompetingExplanations` — `CONTEXT_MISMATCH` otherwise). It detects **boundary splits**: a pair of candidate observations whose canonical entities are distinct (`A1 ≈ A2`-compatible, `E1 ≠ E2` per PR14) and split an otherwise-unbroken hole boundary — `bridging = true`, no path, no hypothesis. Emits `ER_SplitExplainedGraphHole` rows with frozen `ER_SPLIT_EXPLANATION_POLICY_VERSION = 'v1'`, deterministic content-addressed `explanationId`, identity-support score (identity formula), status from frozen enum, `requiresTargetedReblocking` handoff on SUPPORTED only, and `missingDiscriminatingSignals` (superset: all absent discriminator codes incl. `OBSERVATION_OVERLAP_ABSENT` — see §28 Scenario B superset note). Bounded: `MAX_ER_SPLIT_EXPLANATIONS = 5`, `MAX_CANDIDATE_PAIRS_PER_QUERY = 250`, `MAX_ENTITY_HYPOTHESES_PER_QUERY = 500`. Typed failures only (`INVALID_INPUT`, `UNSUPPORTED_POLICY`, `CONTEXT_MISMATCH`, `INVALID_REFERENCE`, `INVALID_INVARIANT`). **Verification:** contracts 515/15 (40 PR16 contract tests incl. §31 closed-world, determinism, ceiling, bounds, contradictions); `@indago/entity-split-analysis` 41/2 (19 generation + 19 boundaries + 3 PR15-integration); rankingKey-before-validation +#24 boundary defects fixed at test time; platform typecheck/build green; real-Postgres integration suite 5 tests (T0–T4) written + typechecked + committed with clean-skip guard — **execution deferred: Neon DB unreachable (environmental, affects PR13/PR14/PR15/PR16 suites identically)**.
+
+## Tracker Update — Live Provider Surfacing (25 Sep 2026)
+
+**PR-21 / PR-22 / PR-23 (web live-seam realignment) landed 2026-09-24 on `feat/m-a13-graph-hole-region`.** These retire the "the live providers are still `Unsupported*` stubs" caveat that three Phase 3 rows, the Phase 3 joint-integration note and several Phase 7 rows carried. `packages/web/src/lib/providers/capabilities.ts` is now a **pure, declarative, per-capability registry** (`CAPABILITY_AVAILABILITY` + `resolveCapabilityStatus` / `createCapabilityStatusTable`), and the provider factory composes the AUTO bundle from exactly that matrix — the served status is derived, never asserted in a comment.
+
+- **Live-backed** (authoritative HTTP routes; deterministic demo fixtures in DEMO mode): `investigation`, `evidence`, `observations`, `cases`, `realtime`, `graph`, `leads`, `crossCase`, `entities`, `relations`, `network.pulse`, `network.matrix`, `network.flow`.
+- **Live-only** (authoritative backend analytics / temporal projection, deliberately with **no** demo equivalent so a live workspace can never demo-serve them): `graph.centrality`, `graph.communities`, `graph.validAt`.
+- **Demo-only** (a live workspace fails fast with a typed `UNSUPPORTED` `ProviderError` and renders an honest absence, never a fabricated demo row): `intelligence`, `timeline`, `gaps`, `review`, `robustness`, `hypotheses`, `network.graph`.
+- **No-silent-fallback is now a registry invariant, not just a comment:** a capability that HAS a live implementation is never demo-served (its runtime failures surface as typed provider errors), a capability with neither implementation is `not-ready` rather than mocked, and AUTO is the only bundle in which demo and live coexist — resolved per capability.
+- **PR-21** live-wired `EntityProvider` / `RelationProvider` (canonical entities, entity + concrete relation hypotheses, accept / reject / reverse authority, canonical relations) behind projection adapters; **PR-22** added the live `GraphProvider` analytics surface (centrality, authoritative communities kept distinct from community candidates, valid-at projection), the ValidAt panel, the Structural Signals panel, the lead drawer's persisted provenance chain + alternative explanations, and the live hypothesis workspace rendering relation `evidenceBasis` + contradictions beside the authority actions; **PR-23** re-aligned Pulse / Matrix / Flow onto the live seams as **frontend-derived visualizations** (their authoritative inputs — bursts, relations/edges, cross-case matches — resolve through live providers; no backend "pulse/matrix/flow" API is claimed and `network.graph` stays demo-only), with runtime frame and HTTP-boundary verification.
+- **Row changes in this entry:** Phase 3 "Expose entity resolution API" 🟡 → ✅, "Expose graph projection/query API" 🟡 → ✅, "Show graph-ready state in UI shell" 🟡 → ✅ (stub caveats removed from all three notes). Phase 4 "Stream analysis progress to UI" stays 🟡 with a PR-27 evidence note. Phase 7 rows keep 🟡 — a demo-only capability is still demo-only, and the milestone wording requires live end-to-end surfacing.
+
+## Tracker Update — Golden Corpus & Real-Stack Vertical Integration (25 Sep 2026)
+
+**PR-24 → PR-27 landed 2026-09-19 on `feat/m-a13-graph-hole-region`.** Before this run the tracker could still say "no single full `HTTP → BullMQ → worker → resolution → graph` pass exists". It now exists, is deterministic, and is pinned by a golden corpus. No AI, no fabrication, no auto-accept, no auto-finalize anywhere in the chain; human authority is exercised explicitly.
+
+- **PR-24 — golden corpus + extraction-hygiene remediation.** `packages/intelligence/ingestion/tests/fixtures/operation-financial-shadow.ts` — a four-document, deliberately messy corpus ("Operation Financial Shadow") with a MA06→MA07 golden suite. False-precision fixes that the corpus exposed: `DATE` added to the `EntityType` enum (an ISO date is a date, not a phone/account run), MA07 rule precedence (DATE rule, corporate-suffix ORG, `PATTERN_MATCH` precedence, person-after-window guard), exact known-mojibake repair **in derived text only**, structured-token retention, and boilerplate / SPATIAL over-reach removal.
+- **PR-25 — MA06→MA10 golden pipeline suite** (deterministic, DB-free) plus the MA10 false-precision fix: an `'other'` relation type is the **absence** of a type and must never award type-signal.
+- **PR-26 — honest run completion.** Contracts gain the legal `ANALYZING → COMPLETED` edge (`INVESTIGATION_COMPLETE`) with transition tests; a `run-completion` module provides a durable predicate + an **exactly-once guarded finalizer** (unit-tested); the ingestion store gains `QUEUED` attempt status and enqueue-rollback `deleteAttempt`; the API gains an expected-work registry checked **before** enqueue, a terminal-run guard, and an **explicit** finalize endpoint (real-Postgres integration); dev tooling provisions demo-reachable `Case` rows for manual finalize testing.
+- **PR-27 — golden full-pipeline E2E over the real stack** (`tests/integration/pr27-golden-e2e.test.ts`): HTTP → BullMQ → **real worker** → Postgres → SSE across acquire → ingest → raw → normalize → MA06 observation → MA07 mention → MA08 blocking → MA09 resolution → explicit authority materialization → MA10 relations → canonical relations → graph projection → analytics → leads → reassessment/temporal → audit → SSE → explicit finalize → terminal guard. Pinned durable counts: 4 artifacts / 4 attempts / 4 raw + 4 normalized extractions all `SUCCEEDED`, **exactly 90 observations**, **194 mention candidates** with the golden type mix, **279 candidate pairs**, **152 PROPOSED hypotheses**, and **no** auto-materialized canonical entity or relation. Re-running converges to the same durable counts (idempotent reprocessing).
+- **PR-27 provenance/strict-boundary fixes found by that suite:** the raw-extraction column now stores **only** the strict format body (base fields travel in their own columns, so the re-entrant worker path can rehydrate a `.strict()`-validated row on every retry); re-entrant completion re-asserts `SUCCEEDED` on the attempt row (a BullMQ retry used to leave it stuck `RUNNING`); relation materialization no longer embeds `hypothesisId` in persisted canonical provenance (it is already durable in the relation's own column, and the extra key made every lead built from it unreadable through the strict `LeadSchema` boundary); `lead-runtime` gained `toConformantProvenance` across all four lead paths (bridge, burst, community, cross-case), with a 3/3 regression suite.
+- **Follow-up fixes (25 Sep):** CI now provisions a real Redis service and `REDIS_URL` so the queue-backed e2e suites run instead of silently skipping; the PR-27 `DATABASE_URL` override appends query params with the real query separator (a clean URL joined with `&` made Postgres read `indago_test&connection_limit=…` as the database name); and the real-stack e2e cases are granted through `INDAGO_DEV_ALLOWED_CASES` — `verifyCaseAccess` is fail-closed in **every** environment, so the random per-test case ids 403'd on `/start` and the evidence 404s cascaded.
+- **Row changes in this entry:** Phase 3 "Seed one deliberately messy synthetic case" 🟡 → ✅ (the golden corpus is a real, versioned, in-repo corpus with pinned durable counts and a deterministic suite — plus the seeded pilot-benchmark corpus, see the benchmark entry). Phase 3 joint `FIR > INGEST > … > UI` 🟡 → ✅ (the single full pass, M-A12 temporal, and live-mode surfacing of entities/relations/graph/leads/cross-case all exist now; the remaining demo-only capabilities fail typed **by design** and are not part of this chain). Phase 4 "Stream analysis progress to UI" keeps 🟡 — the SSE run is E2E-proven over the real stack, but per-tool analysis-progress events are still not emitted.
+
+## Tracker Update — Quality-Gap Validation, Remediation & NEAR_MISS Durability (25 Sep 2026)
+
+**PR-30 → PR-33 landed 2026-09-19 to 2026-09-25 on `feat/m-a13-graph-hole-region`.** The golden run was audited against the V7 epistemic rules, the verdicts were fixed one by one, and the fixes were pinned so they cannot silently regress. Two reports carry the evidence: `docs/reports/pr30-quality-gap-validation.md` (7 verdicts) and `docs/reports/pr31-quality-gap-remediation.md` (verdict → fix, before/after).
+
+- **PR-30 — validation pass.** Seven quality-gap verdicts over the golden "Operation Financial Shadow" run: what the deterministic chain reported that a careful investigator would refuse to accept, and why. This is the audit that produced the fixes below, plus the benchmark deep audit (`benchmark/audit/deep-audit.md`).
+- **PR-31 — thirteen remediations, each with a golden regression:** FIX 1 MA07 rule-interaction (the `invoice-7842` reference, the "Sector" token, ORG greed, document-ID guard); FIX 2 case-scoped identity roster (census → **gazetteer** on the MA07 seam, so an identity is never resolved against another case's names); FIX 3/4 `computeObservablePresence` (observable observation/source coverage — presence claims are now derived, not assumed); FIX 5 NEAR_MISS observability (grounded pairs **below** the acceptance threshold become visible instead of vanishing); FIX 6 a `temporalRange`-carrying graph projection (without it the lead chain could not fire at all); FIX 7 a contradiction producer (deterministic explicit negative-claim polarity); FIX 8/10/11/13 golden regression suite over presence, NEAR_MISS, the producer and the lead chain.
+- **PR-33 — NEAR_MISS made durable and queryable:** `RELATION_NEAR_MISS_RECORDED` audit action, a durable NEAR_MISS write circuit in the MA10 completion path (real-Postgres durability suite), a `?status=` filter on the investigation relations endpoint (HTTP e2e: filter + a 409 on accepting a NEAR_MISS), and a golden pin of the four NEAR_MISS candidates. Follow-up (25 Sep): the graded FIX-5 population had drifted — `arjun mehta | meridian trading llp` legitimately graduated to `PROPOSED` (support 0.55, 3 evidence) and the grounded below-threshold pair `northstar warehousing | rohan singh` took its place; the pin now matches reality instead of freezing a stale fixture.
+- **5B-PR1 (gap lifecycle) is verified, not just wired:** `tests/integration/pr5b-pr1-gap-lifecycle.test.ts` + `tests/gap-type-mapping.test.ts` exercise graph hole → `InvestigativeGap` materialization, deterministic gap-type mapping and the status machine.
+- **Row changes in this entry:** Phase 4 "Implement bridge/connector candidates" 🟡 → ✅ and "Implement bounded path queries" 🟡 → ✅ — the earlier "web-only / no backend candidate-generation" note was stale: `@indago/graphology-projection` ships bounded `detectBridgeCandidates` (bridge edges whose removal disconnects the graph), `findConnectingPaths` (hop + result caps), `detectTemporalBursts` and `detectCommunityCandidates`, all consumed by the platform `GraphRuntime` and the lead runtime, and exposed over authenticated HTTP (`graph/bridges`, `graph/paths`, `graph/bursts`, `graph/community-candidates`, each with 400/401/404 coverage). Phase 4 "Create InvestigativeLead structure" 🟡 → ✅ — the structure now has a real runtime (`@indago/lead-generation` drafts/identity/alternative-explanations), four persisted production paths (bridge, burst, community, cross-case) with strict `LeadSchema` provenance conformance, a live-capable provider, a lead drawer that shows the provenance chain and alternatives, golden regression coverage, and a place in the PR-27 real-stack E2E. Phase 4 "Attach evidence FOR / AGAINST" stays 🟡 — evidence basis and contradictions are persisted **and** now rendered live beside the authority actions (PR-22), and a contradiction producer exists (PR-31 FIX 7), but there is still no human attach/verdict action. Phase 5B "Stream graph/lead changes live" stays 🟡 — the backend SSE now covers the full golden run, but a typed graph/lead-change event is still absent.
+
+## Tracker Update — Benchmark Pilot & Benchmark Surface (25 Sep 2026)
+
+**The Phase 8 board was at 0/24. The internal pilot benchmark landed 2026-09-24 on `feat/m-a13-graph-hole-region` and is now a real, deterministic, in-repo harness** — prototype scope, honestly labelled as such. It is **not** production, field, or third-party validation, and every artifact says so.
+
+- **Harness** — `packages/platform/tests/benchmark/`: `corpus.ts` (seeded, deterministic case generator), `pipeline.ts` (runs the **wired** core: ingest → normalize → MA06 observations → MA07 mentions → MA08 blocking → MA09/M-A10 resolution → graph → graph-hole chain → classification → explanations → evidence generation/selection), `metrics.ts` (per-case metric families), `robustness.ts` (per-hole verdicts), `holes.ts` + `labels.ts` (planted ground truth and expected mappings), `report.ts`, `terminal.ts` (cinematic presentation, light/quiet modes), `run-pilot.ts` + `pilot-benchmark.test.ts`. Runner: `pnpm --filter @indago/platform bench:pilot` (`:light`, `:quiet`).
+- **Corpus** — 15 cases × 3 conditions (**CLEAN**, **NOISY_MISSING**, **ADVERSARIAL**) = 45 per-case artifacts. Each case plants identities, records with witness lines, truth edges (observed vs withheld), contradictions, and typed graph holes; `withheld` / `heldOut` records and edges are excluded from inference by default (`includeHeldOut` is opt-in) so missingness is a real condition, not a label.
+- **Artifacts** (`benchmark/`) — `manifest.json` (run metadata + SHA-256 of every artifact for reproducibility), `summary.json` (full machine-readable summary), `condition-summary.md` (side-by-side indicator table), `viability.md` (internal 12-section viability assessment), `report-detailed.md`, `per-case/*.json`, plus `audit/deep-audit.md` and `holes.json`.
+- **What it currently measures** (CLEAN / NOISY_MISSING / ADVERSARIAL, from the committed `summary.json`): graph-hole `hookHitRate` 0.375 / 0.250 / 0.125 and `strictHitRate` identical, `robustness` 1.0, `candidatePrecision` 0.200 / 0.133 / 0.067, `fprProxy` 0.0138 / 0.0401 / 0.0440, `surfaceRecallAt1` 0.891 / 0.800 / 0.739, `entityPrecision` 1.0, `relationPrecision` 0.867 across conditions with `relationRecall` 0.566 / 0.585 / 0.545, `observationCoverage` 1.0, `classificationCoverage` 0.200 / 0.133 / 0.067, `hardFailures` 0, and the materialization counts (73/66/62 entities → graph nodes, 86/65/56 edges). **The honest read: detection and entity resolution degrade gracefully under noise and adversarial conditions; classification coverage and hole recall are the weak numbers** — which is exactly what the deep audit says.
+- **Contracts + web surface** — `packages/contracts/src/benchmark/` (run meta, per-case metrics, condition aggregates, web run view), `packages/web/src/lib/benchmark/` (typed annotations, capability coverage, failure mechanisms, presentation domain, loader), `/benchmarks` + `/benchmarks/[runId]` + `/benchmarks/[runId]/documents/[doc]` (raw artifact serving), the benchmark knowledge layer, condition explorer and execution toggle, dock wiring with a robustness cross-link, plus registry/domain unit tests and a pilot artifact smoke test.
+- **Row changes in this entry:** seven Phase 8A rows and four Phase 8B rows move to `🟡 [x]` (built and exercised, prototype scope); "Generate entity collisions and splits", "Record runtime and failure/recovery metrics" and the false-merge/false-split, evidence-resolution-rate, claim-grounding, recovery-rate and time-to-lead metric rows stay `🟡 [ ]` with the specific gap named. **`errAtK` in the pilot is mean reciprocal rank over holes hit in the chain (K=3) — that is *not* Evidence Resolution Rate@K**, and the tracker does not claim it as one.
+
+## Tracker Update — Investigator UX Surfacing (25 Sep 2026)
+
+**Phase 7 sat at 0/20 while the surfaces were in fact shipping.** The rows below are re-graded against what the code does today, not against the demo-era notes. The rule still applies: a demo-only capability is not a completed milestone, and a live-wired surface is only complete if it renders authoritative data.
+
+- **New shell surface:** the cinematic home now owns `/` (WebGL particle field, DOM network assembly, wordmark decomposition, shipped calibration timeline, reduced-motion collapse, dev calibration/debug flags) and the dashboard moved to `/dashboard`; a case-list dashboard, a New Investigation flow, `/design` and the `/benchmarks` surface join the route set.
+- **The graph canvas is live.** `graph-panel.tsx` resolves `workspace.graph.getVersion` / `getNodes` / `getEdges` / `getGraphHoles` / `getOverlayCatalog` through the live-backed `graph` capability (paged), and consumes live `gaps`, `observations` and `crossCase` seams. The Zone 2 `network.graph` key stays demo-only **by design** (it is a representation selector, not a backend capability) — that is not a stub.
+- **The hypothesis workspace is live and composes real provider seams** — it states in code that the canonical `hypotheses` capability has no backend route, so it composes `EntityProvider.listEntityHypotheses` + the explicit M-A09.5 accept and `RelationProvider.listByInvestigation` + accept / reject / reverse, rendering each relation's `evidenceBasis` and contradictions next to the authority actions. Nothing is fabricated.
+- **Structural Signals** renders authoritative centrality and communities (community **candidates** kept visibly distinct from authoritative communities) and a ValidAt panel renders the live valid-at projection.
+- **Case report export** landed: reasoning-ledger and case-report print stylesheets plus an export configuration dialog, deterministic output.
+- **Row changes in this entry:** 7A "Investigation workspace shell" 🟡 → 🟡 [x]; "Graph visualization" 🟡 → ✅; "Lead card" 🟡 → ✅ (the route is no longer hardcoded `DEMO_LEADS` — list + drawer run off the live-capable `leads` provider with the persisted provenance chain and alternative explanations); "Evidence FOR / AGAINST panels" 🟡 → ✅; "Premium loading/empty/error states" 🟡 → ✅ (the kit is used across ~36 surfaces, including panel error boundaries). Unchanged: timeline, gap/graph-hole, next-best-evidence, reasoning ledger (still a demo `DEMO_LEDGER` beside the real case report), review/approval and realtime/recovery — all remain `🟡 [ ]` because their capabilities are still demo-only or the surface is still hardcoded.
+
+## Tracker Update — Robustness & Epistemic Verification Pass (25 Sep 2026)
+
+**The Phase 6 robustness engine is still not built, and this entry does not pretend otherwise.** What the last stretch *did* produce is real evidence against four rows, and a sharper statement of what is still missing. One Phase 6A row and three Phase 9B rows move to `🟡 [x]` on the strength of an enforcing artifact, not on the strength of intent.
+
+- **Phase 6A "Add incremental recomputation where possible" 🟡 → 🟡 [x].** PR-12 is exactly this for the graph-hole chain: an authorized change ledger with a per-case cursor watermark, an affected-set/plan resolver, ≤25 changes per run, group+coalesce by effect class and graph version, a `contextSha256` AI-skip gate, and `SKIPPED_CONTEXT_UNCHANGED` / `SKIPPED_NO_CHANGE` / `RECOMPUTED` / `FAILED` outcomes — a bounded per-case pull, never a whole-case fallback (real-Postgres integration 6/6).
+- **Still open in 6A, named precisely:** staged robustness, the graph-version + perturbation policy cache key, adaptive stopping, ER pair-completeness / false-split / false-merge **evaluation**, and the five named missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification). The pilot's `NOISY_MISSING` / `ADVERSARIAL` conditions are a **benchmark regime, not the five missingness regimes**, and are not counted here. Region-scoped computation exists (PR-1 region layer, PR-11 region-membership selector) but there is no robustness-stage candidate-region restriction yet.
+- **Phase 9B "Review all intelligence wording for epistemic overclaim" 🟡 → 🟡 [x].** The intelligence layer's wording is codified and machine-checked rather than eyeballed: the PR-8 validator enforces negation-guarded pattern rules, closed rating/warning-code enums, bounded uncertainty ranges and completeness-overclaim checks (11 finding codes, 15 checked categories, 112 tests); PR-30 audited the golden run's output against the V7 rules and produced 7 verdicts; PR-31 remediated all of them and pinned them. Scope note: this covers the deterministic intelligence surface and its emitted labels/explanations, not a line-by-line review of hand-written UI copy.
+- **Phase 9B "Verify absence != concealment" 🟡 → 🟡 [x].** The distinction is enforced in policy and tested, not merely documented: `INSUFFICIENT_CONTEXT` is never forced to `MISSING_DATA`; contradictions force `AMBIGUOUS` + `CONTRADICTION_PRESERVED`; the concealment status ceiling is `SUPPORTED` and the wording is pattern-compatible only; and PR-15 §16 forbids emitting `CONCEALMENT_CONSISTENT` or `MISSING_DATA` when contradictions exist. Absence is reported as absence.
+- **Phase 9B "Verify blocked pair != different entity" 🟡 → 🟡 [x].** M-A12-G2/G3 verified exactly this and the record is in `docs/reports/m-a12-entry-gate-audit.md`: distinct id namespaces (a `candidateId` never becomes an `EntityId`), canonical ids minted only under explicit M-A09.5 accept authority, bounded deterministic UNION blocking (`maxBlockSize` 50, `maxPassesPerPair` 100), and a `CandidatePair` that carries no entity id and no score. A blocked pair is an unexamined pair, not a verdict of difference.
+- **Still open in 9B, named precisely:** "role != culpability", "structural signal != criminal relevance" and "confidence != legal admissibility" have structural safeguards in the contracts (no culpability concept exists in the role model; the frozen score surface keeps structural / evidence / significance separate; the classification labels describe the *gap*, never a person) but **no dedicated verification record yet** — the statements are currently architectural intent plus contract shape.
+
+## Tracker Update — Phase 11 Grading Pass (25 Sep 2026)
+
+**No stress campaign was run, and Phase 11 remains an open board.** The pass did one thing: it stopped letting incidental coverage read as an untested plan, and stopped letting a measured metric read as a stress test.
+
+- **Three Gurashish rows move to `🟡 [x]`** on real assertions that exist: duplicate jobs (BullMQ attempts/backoff proven on the real stack, exactly-once completion finalizer, expected-work precheck, PR-27 convergence on re-run), worker crash/restart (checkpoint-row assertions, rehydrate-not-recompute, and the re-entrant attempt fix from PR-27-1), contradictory tool output (contradiction envelopes preserved through every stage, validated relevance-aware, plus the deterministic contradiction producer from PR-31).
+- **Mayur rows stay `[ ]` with the *available* evidence written down** so the next person does not have to rediscover it: entity collisions and false splits are exercised by the `ER-*` pilot cases, graph-hole false positives are *measured* per condition (candidate precision, FPR proxy) rather than stress-tested, and the concealment row has a hard policy guard (PR-15 §16) with no adversarial scenario behind it.
+- **Explicitly not counted as stress coverage:** the pilot's `NOISY_MISSING` / `ADVERSARIAL` conditions (a benchmark regime), the 57/57 and 6/6 green suites (regression and integration matrices, not fault injection), and the fail-closed case-scope gate (authorization, not stress). Redis interruption, database timeout, malformed tool request, stale checkpoint, agent loop, partial realtime connection, duplicate evidence, contradictory timestamps, missing source classes, high-degree entities, false bridge candidates, sparse networks, and the whole Joint Release Gate remain owed.
 
 ---
 
@@ -246,9 +321,9 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 - [x] Expose ingestion API `[Mayur]` — `POST /investigations/:id/evidence`: submission body → artifact fetch/sha256-verify/mime-detect → BullMQ job → worker; verified in the REAL-STACK E2E and the live case-deletion gate
 - [x] Expose observation API `[Mayur]` — `GET /investigations/:id/observations` (full ObservationSchema records, case-scoped via auth → latest run → run.caseId; routes.ts)
-- 🟡 [x] Expose entity resolution API `[Mayur]` — decision authority exists (accept/reject/reverse route + canonical materialization, integra-verified); full resolution UX/review surface is frontend-phase work, not yet exposed end-to-end
-- 🟡 [x] Expose graph projection/query API `[Mayur]` — projection/query routes exist (graph, traversal, centrality, communities, 404/401/403 integration-tested); broad live-mode UI surfacing is frontend-phase work `[graph-http 9 tests]`
-- 🟡 [ ] Seed one deliberately messy synthetic case `[Mayur]` — test fixtures + web demo fixtures only; **no product seed path / no benchmark dataset** — capability present in form only, does NOT satisfy the milestone
+- [x] Expose entity resolution API `[Mayur]` — decision authority exists (accept/reject/reverse route + canonical materialization, integra-verified); **PR-21/PR-22: now live-wired end-to-end** — `EntityProvider` / `RelationProvider` over real HTTP routes, entity + relation hypotheses, authority actions, and the live hypothesis workspace rendering `evidenceBasis` + contradictions beside them
+- [x] Expose graph projection/query API `[Mayur]` — projection/query routes exist (graph, traversal, centrality, communities, 404/401/403 integration-tested); **PR-21/PR-22: live surfacing landed** (`LiveGraphProvider` with centrality, authoritative communities vs community candidates, and valid-at), so this is no longer "backend-only, UI work outstanding" `[graph-http 9 tests]`
+- [x] Seed one deliberately messy synthetic case `[Mayur]` — **PR-24: the "Operation Financial Shadow" golden corpus** (four documents, deliberately messy) + MA06→MA07 golden suite + PR-25 MA06→MA10 golden pipeline + PR-27 real-stack E2E with pinned durable counts (90 observations / 194 mentions / 279 candidate pairs / 152 PROPOSED hypotheses); the seeded pilot-benchmark corpus extends this to 15 cases × 3 conditions
 
 ### Gurashish
 
@@ -257,12 +332,12 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [x] Consume tool results `[Gurashish]`
 - [x] Persist state `[Gurashish]`
 - [x] Emit progress events `[Gurashish]`
-- 🟡 [x] Show graph-ready state in UI shell `[Gurashish]` — run state (InvestigationStatus/StateBadge) renders in the live UI shell; graph/entity/relation live providers remain `UnsupportedGraphProvider`/`UnsupportedEntityProvider`/`UnsupportedRelationProvider` stubs (frontend-phase work)
+- [x] Show graph-ready state in UI shell `[Gurashish]` — run state (InvestigationStatus/StateBadge) renders in the live UI shell, **and the graph/entity/relation/lead/cross-case live providers are real** (PR-21/PR-22/PR-23; the `Unsupported*` stubs are retired for those capabilities — remaining demo-only keys fail typed by design)
 
 ### Joint Integration Test
 
-- 🟡 [ ] FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI `[Both]`
-  - Partial: the `INGEST > OBSERVATIONS > INVESTIGATION STATE > SSE > UI(live)` leg is proven by the REAL-STACK E2E (HTTP → BullMQ → worker → Postgres → SSE) plus the M-A06 Option A live re-ingest test. The `ENTITY HYPOTHESES > RELATIONS > GRAPH` leg is now built (M-A07–A10, A13: canonical entity/relation authority + Graphology projection), with the backend proven end-to-end (real Postgres 43/43 integration across 5 suites incl. graph/traversal/centrality/communities over real HTTP via `m-a10-ingest-http.e2e` + `m-a10-graph-http`); remaining gaps: a single full `HTTP → BullMQ → worker → resolution → graph` demo pass, the temporal projection (M-A12), and live-mode frontend surfacing of entities/graph/relations (providers are still `Unsupported*` stubs).
+- [x] FIR > INGEST > OBSERVATIONS > ENTITY HYPOTHESES > RELATIONS > GRAPH > INVESTIGATION STATE > UI `[Both]`
+  - **Proven end-to-end (25 Sep 2026).** PR-27 is the single full pass this row was waiting on: `POST /evidence` → BullMQ → real worker → Postgres → SSE over the golden corpus, covering ingest → observations → mentions → blocking → resolution → explicit authority materialization → relations → canonical relations → graph → analytics → leads → reassessment → audit → SSE → explicit finalize → terminal guard, with pinned durable counts and idempotent reprocessing. M-A12 temporal projection is in (43/43 real-Postgres). The UI leg is live-wired (PR-21/22/23) for entities, relations, graph, leads and cross-case. Human authority stays explicit at every step — nothing auto-accepts or auto-finalizes.
 
 ---
 
@@ -274,12 +349,12 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 - [x] Implement temporal burst detection `[Mayur]`
 - [x] Implement community candidates `[Mayur]`
-- 🟡 [x] Implement bridge/connector candidates `[Mayur]` — web-only deterministic cut-edge detection/rendering (`use-graph-layout`); no backend candidate-generation metric (betweenness/bridge_impact explicitly unimplemented) — NOT milestone completion
-- 🟡 [x] Implement bounded path queries `[Mayur]` — M-A13 delivered and tested the backend capability (`graph/traversal`, hop ≤ 4, path cap; 9 graph-http tests); not yet surfaced as a Phase 4-graded investigation-loop path query
+- [x] Implement bridge/connector candidates `[Mayur]` — **backend, not web-only** (the earlier note was stale): `@indago/graphology-projection` `detectBridgeCandidates` (bounded; edges whose removal disconnects the undirected view) + `path-candidates.ts` bounded `findConnectingPaths`, consumed by the platform `GraphRuntime` and the lead runtime, exposed as authenticated `graph/bridges` / `graph/paths` (400/401/404 covered) and pinned by `bridges.test.ts` / `path-candidates.test.ts`
+- [x] Implement bounded path queries `[Mayur]` — M-A13 `graph/traversal` (hop ≤ 4, path cap) **plus** projection-level `findConnectingPaths` (hop + `maxResults` bounds) and the `graph/paths` HTTP endpoint; 9 graph-http tests + unit coverage. Not yet surfaced as a judge-graded UI action — the loop action set (Focus, Detect Gaps, Cross-Case, Filter) does not expose path finding
 - [x] Implement cross-case shared-entity/infrastructure discovery `[Mayur]`
 - 🔵 [ ] Cross-observation relation retrieval `[Mayur]` — recover relation candidates that span different observations (shared infrastructure / temporal / explicit relation claims / graph-gap-driven / semantic retrieval); must preserve "candidate relationship ≠ canonical relationship" and distinguish DIRECT RELATION EVIDENCE vs INDIRECT STRUCTURAL LINKAGE vs SEMANTIC ASSOCIATION
-- 🟡 [x] Create InvestigativeLead structure `[Mayur]` — `LeadSchema` contract + web-demo `buildLead`/`DemoLeadProvider` exist; no backend runtime/lifecycle — structure defined, milestone NOT complete
-- 🟡 [x] Attach evidence FOR / AGAINST `[Mayur]` — platform persists supporting/contradicting observation sets (`EntityHypothesis`/`RelationHypothesis` evidenceBasis/contradictions); no dedicated verdict/attach API — runtime data exists, dedicated attach surface NOT complete
+- [x] Create InvestigativeLead structure `[Mayur]` — structure **and runtime**: `LeadSchema` + `@indago/lead-generation` (drafts, content-addressed identity, alternative explanations), four persisted production paths (bridge, burst, community, cross-case) with strict `toConformantProvenance` conformance, a live-capable leads provider, a lead drawer surfacing the provenance chain + alternatives, golden regression coverage, and a leg in the PR-27 real-stack E2E
+- 🟡 [x] Attach evidence FOR / AGAINST `[Mayur]` — platform persists supporting/contradicting observation sets (`EntityHypothesis`/`RelationHypothesis` evidenceBasis/contradictions) **and PR-22 renders them live beside the authority actions**, with a deterministic contradiction producer (PR-31 FIX 7); still no human attach/verdict action, so the dedicated attach surface is NOT complete
 - [x] Generate alternative explanations `[Mayur]`
 - [x] Persist lead provenance `[Mayur]`
 
@@ -288,7 +363,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - [x] Implement investigation state transitions around analysis `[Gurashish]`
 - [x] Add tool orchestration for graph analytics `[Gurashish]`
 - [x] Persist Lead/Hypothesis lifecycle `[Gurashish]`
-- 🟡 [x] Stream analysis progress to UI `[Gurashish]` — SSE infra + live run-status projection are real; analysis-progress events not yet emitted — NOT milestone completion
+- 🟡 [x] Stream analysis progress to UI `[Gurashish]` — SSE infra + live run-status projection are real, and PR-27 now proves the SSE run over the **real stack** (HTTP → BullMQ → real worker → Postgres → frames) with a terminal guard; per-tool analysis-progress events are still not emitted — NOT milestone completion
 - 🟡 [x] Implement human-review state `[Gurashish]` — `REVIEW_REQUIRED` state + transitions frozen in the state-machine contract; runtime entry/wiring not implemented
 - 🟡 [x] Add pause/resume behavior `[Gurashish]` — `PAUSED` + resume transitions frozen in the state machine; runtime only enters `PAUSED` via human escalation (`queue/recovery.ts`); no resume trigger yet
 
@@ -330,7 +405,7 @@ And the underlying temporal sub-items (tracked to reflect reality):
 - 🟡 [ ] Implement WAITING_FOR_EVIDENCE state `[Gurashish]` — state + transitions frozen in the state-machine contract; runtime entry/exit + evidence-arrival wiring not implemented
 - 🟡 [ ] Handle evidence arrival event `[Gurashish]` — PR12 (Phase 5A, Mayur) backend trigger loop handles evidence arrival (ingest-evidence producer → change ledger → `graph-hole-reassessment` job); full 5B/5C workflow + UI surfacing absent — backend partial, NOT milestone completion
 - 🟡 [ ] Re-trigger reassessment `[Gurashish]` — PR12 (Phase 5A, Mayur) incremental reassessment engine landed: new evidence/observation and accepted entity/relation resolutions re-trigger reassessment via the change ledger + cursor; 5B/5C end-to-end workflow loop still outstanding — backend partial, NOT milestone completion
-- 🟡 [ ] Stream graph/lead changes live `[Gurashish]` — web overlay materialization via `graph-live.ts` + realtime normalizer (demo); backend SSE for graph/lead changes absent — NOT milestone completion
+- 🟡 [ ] Stream graph/lead changes live `[Gurashish]` — backend SSE now covers the **full golden run** (PR-27: HTTP → BullMQ → worker → Postgres → frames, terminal guard) and the web overlay materializes graph/lead changes via `graph-live.ts`; a typed graph/lead-**change** event is still absent — NOT milestone completion
 
 ### 5C. Signature Integration
 
@@ -346,12 +421,12 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 - [ ] Implement staged robustness `[Mayur]`
 - [ ] Add graph version + perturbation policy cache key `[Mayur]`
-- [ ] Add candidate-region restriction `[Mayur]`
-- [ ] Add incremental recomputation where possible `[Mayur]`
+- [ ] Add candidate-region restriction `[Mayur]` — region-scoped computation exists (PR-1 region layer, PR-11 region-membership selector) but there is **no robustness-stage region restriction**; partial evidence, milestone not met
+- 🟡 [x] Add incremental recomputation where possible `[Mayur]` — PR-12 is exactly this for the graph-hole chain: authorized change ledger + per-case cursor watermark, affected-set/plan resolution, ≤25 changes/run, group+coalesce by effect class and graph version, `contextSha256` AI-skip gate, `SKIPPED_*`/`RECOMPUTED`/`FAILED` outcomes — a bounded per-case pull, never a whole-case fallback (real-Postgres 6/6). Not generalised into a robustness engine
 - [ ] Add adaptive stopping `[Mayur]`
-- [ ] Evaluate ER pair completeness / false split / false merge `[Mayur]`
-- [ ] Run missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification) `[Mayur]`
-- [ ] Separate structural signal from robustness from evidence posture `[Mayur]`
+- [ ] Evaluate ER pair completeness / false split / false merge `[Mayur]` — the pilot measures false merges per case (`overCollapsedEntities`) and the golden corpus exercises splits, but there is no completeness / false-split / false-merge **evaluation** milestone yet
+- [ ] Run missingness regimes (random, source-dependent, entity-dependent, structure-dependent, strategic sparsification) `[Mayur]` — the pilot's `NOISY_MISSING` / `ADVERSARIAL` conditions are a benchmark regime, **not** these five regimes; they are deliberately not counted here
+- [ ] Separate structural signal from robustness from evidence posture `[Mayur]` — the score surface keeps the axes separate and the benchmark reports hit rate / robustness / classification independently, but there is no robustness-axis engine to separate yet
 - 🔵 [ ] Semantic retrieval architecture (future) `[Mayur]` — high-recall embedding/LLM retrieval feeding structured analytical signals into the existing deterministic scoring; semantic similarity is **NOT** evidence and embeddings/LLMs **never** create canonical entities/relations; recall-optimizing retrieval layer, precision/explainability stays in the deterministic policy + explicit authority
 
 ### 6B. Gurashish
@@ -380,17 +455,17 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 7A. Gurashish (Implementation)
 
-- 🟡 [ ] Investigation workspace shell `[Gurashish]` — full routes/nav dock + overview/scaffold render (`app/investigations/[id]/**`); live surfaces partial — demo/imcomplete milestone, NOT completion
-- 🟡 [ ] Graph visualization `[Gurashish]` — rendered d3-force graph + 5-zone control center (`graph-panel`, `graph-canvas`) — demo mode
-- 🟡 [ ] Timeline visualization `[Gurashish]` — provider-driven `timeline-panel` — demo mode
-- 🟡 [ ] Lead card `[Gurashish]` — `DemoLeadProvider` + leads-list/drawer; dedicated route feeds hardcoded `DEMO_LEADS` — partial, NOT completion
-- 🟡 [ ] Evidence FOR / AGAINST panels `[Gurashish]` — contradiction envelopes + `forAgainst` surface (`phase2-hypothesis-surface`) — demo mode
-- 🟡 [ ] Gap / graph-hole visualization `[Gurashish]` — burst layer + gap-adapter + `DemoGapProvider` — demo mode; dedicated gaps route is a stub
-- 🟡 [ ] Next-best-evidence panel `[Gurashish]` — NBE card + derived `nbeLead` surface; no dedicated panel — partial, NOT completion
-- 🟡 [ ] Reasoning ledger `[Gurashish]` — `reasoning-ledger` component + demo ledger; ledger route feeds hardcoded data — partial, NOT completion
-- 🟡 [ ] Review/approval UI `[Gurashish]` — `review-center` + `DemoReviewProvider`; demo route feeds `DEMO_TASKS` — demo mode
-- 🟡 [ ] Realtime progress and recovery states `[Gurashish]` — PAUSED + recovery visuals render; `HUMAN_ESCALATION` not surfaced anywhere — partial, NOT completion
-- 🟡 [ ] Premium loading/empty/error states `[Gurashish]` — `ui/` empty-state/error-display/loading-spinner/panel-error-boundary kit
+- 🟡 [x] Investigation workspace shell `[Gurashish]` — full route set over the provider seam (`/` cinematic home, `/dashboard`, `/investigations/new`, 12 investigation sub-routes, `/benchmarks`, `/design`), nav dock, shared workspace-temporal state, two-way URL state. Still partial: `timeline`, `gaps`, `review`, `robustness`, `hypotheses` and `intelligence` remain demo-only capabilities and fail typed in a live workspace
+- [x] Graph visualization `[Gurashish]` — d3-force graph + five-zone control center, resolving **live** `workspace.graph.getVersion/getNodes/getEdges/getGraphHoles/getOverlayCatalog` (paged) plus live `gaps` / `observations` / `crossCase` seams, with the graph-hole burst layer, focus deep links, cross-case foreign overlays and reduced-motion support. (Zone 2 `network.graph` is demo-only by design — a representation selector, not a backend capability)
+- 🟡 [ ] Timeline visualization `[Gurashish]` — provider-driven `timeline-panel` with the shared `timeRange` controller; the `timeline` capability is still demo-only (no live timeline route) — partial, NOT completion
+- [x] Lead card `[Gurashish]` — `/investigations/[id]/leads` + `LeadsList` + `LeadDrawer` over the **live-capable** `leads` provider (typed `UNSUPPORTED` honesty when a deployment has no leads); the drawer surfaces the persisted provenance chain and alternative explanations. The old "dedicated route feeds hardcoded `DEMO_LEADS`" note no longer applies
+- [x] Evidence FOR / AGAINST panels `[Gurashish]` — `live-hypothesis-workspace` renders each relation's `evidenceBasis` and contradictions from the **live** `relations` seam beside the M-A09.5 accept / reject / reverse authority actions (composed from live provider seams because no canonical hypothesis route exists); the demo-era `forAgainst` surface is preserved
+- 🟡 [ ] Gap / graph-hole visualization `[Gurashish]` — burst layer + gap-adapter + the real `/gaps` route over the provider seam; the `gaps` capability is still demo-only (the 5B-PR1 runtime persists gaps, but no live gap read route is exposed) — partial, NOT completion
+- 🟡 [ ] Next-best-evidence panel `[Gurashish]` — NBE card + derived `nbeLead` surface; the backend is real (PR-10 / PR-17 / PR-18 utility + selection) but there is still no dedicated panel and no live seam — partial, NOT completion
+- 🟡 [ ] Reasoning ledger `[Gurashish]` — reasoning-ledger component + **case-report export** (print stylesheet + export configuration dialog, deterministic); the ledger route still feeds a hardcoded `DEMO_LEDGER` because no live ledger read route exists — partial, NOT completion
+- 🟡 [ ] Review/approval UI `[Gurashish]` — `review-center` + `DemoReviewProvider`; the `review` capability is still demo-only and the route feeds `DEMO_TASKS` — demo mode
+- 🟡 [ ] Realtime progress and recovery states `[Gurashish]` — PAUSED + recovery visuals render and the SSE stream is proven over the real stack (PR-27), but `HUMAN_ESCALATION` is still not surfaced anywhere — partial, NOT completion
+- [x] Premium loading/empty/error states `[Gurashish]` — the `ui/` kit (`empty-state`, `error-display`, `loading-spinner`, `panel-error-boundary`) is wired across ~36 surfaces, including the control center, every panel, list and drawer
 
 ### 7B. Mayur (Intelligence Presentation)
 
@@ -412,36 +487,36 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 8A. Mayur
 
-- [ ] Build development generator `[Mayur]`
-- [ ] Generate ground-truth networks `[Mayur]`
-- [ ] Transform into observations (aliases, duplicates, missingness, contradictions, sparsification) `[Mayur]`
-- [ ] Generate known hidden relationships `[Mayur]`
-- [ ] Generate entity collisions and splits `[Mayur]`
-- [ ] Create expected graph-hole/evidence mappings `[Mayur]`
-- [ ] Define intelligence metrics `[Mayur]`
+- 🟡 [x] Build development generator `[Mayur]` — seeded deterministic corpus generator (`tests/benchmark/corpus.ts`) producing 15 cases × 3 conditions over the wired intelligence core; fixed analyst-supplied `nowIso` and seeded layout, so a run is bit-reproducible. **Prototype generator, not the full Phase 8 generator** (no randomized sweeps, no campaign-scale volumes)
+- 🟡 [x] Generate ground-truth networks `[Mayur]` — planted identities, records with witness lines, truth edges split into observed vs withheld, and typed graph holes per case (`holes.ts` + `labels.ts`); truth is used for scoring only
+- 🟡 [x] Transform into observations (aliases, duplicates, missingness, contradictions, sparsification) `[Mayur]` — the three conditions are exactly this: CLEAN, NOISY_MISSING (withheld records/edges → real observation + graph missingness), ADVERSARIAL (collisions, contradictions, over-reach bait). Alias/duplicate forms are planted in the corpus text
+- 🟡 [x] Generate known hidden relationships `[Mayur]` — planted truth edges with witness record ids; withheld edges are the hidden set the detector is scored against, and the per-condition recall drop is reported
+- 🟡 [ ] Generate entity collisions and splits `[Mayur]` — **collisions/alias variants are planted and drive false-merge measurement** (`overCollapsedEntities` per case); planted *splits* are not a separate class in the pilot corpus, and ER-split analysis is exercised by the `ER-*` cases rather than measured as a split rate
+- 🟡 [x] Create expected graph-hole/evidence mappings `[Mayur]` — planted hole id/type/anchors per case with expected classification and explanation coverage, carried into the per-case artifacts and the report
+- 🟡 [x] Define intelligence metrics `[Mayur]` — nine metric families in `metrics.ts` (materialization, entity, relation, contradiction, graph, holes, classification, explanation, evidence) + robustness verdicts, frozen as `packages/contracts/src/benchmark/` contracts so the web surface cannot invent numbers
 - 🔵 [ ] Semantic intelligence benchmark (future, must precede major adoption of semantic scoring) `[Mayur]` — compare V1 deterministic-only vs V2 +embeddings vs V3 +embeddings +LLM judge; measure candidate recall, entity precision/recall, false merges/splits, relation precision/recall, graph-hole precision, evidence-retrieval utility, robustness stability, latency, cost
 - 🔵 [ ] Model versioning for future semantic features `[Mayur]` — embeddings/LLM-feature schema and weights determined by benchmark evidence, versioned separately; do not treat "embedding = better" as an assumption
 
 ### 8B. Gurashish
 
-- [ ] Build blind evaluation harness `[Gurashish]`
-- [ ] Hide ground truth during inference `[Gurashish]`
-- [ ] Run repeatable experiment jobs `[Gurashish]`
-- [ ] Persist metrics `[Gurashish]`
-- [ ] Record runtime and failure/recovery metrics `[Gurashish]`
-- [ ] Generate experiment summary `[Gurashish]`
+- 🟡 [x] Build blind evaluation harness `[Gurashish]` — `tests/benchmark/pipeline.ts` drives the real ingestion → resolution → graph → graph-hole chain; the intelligence packages never receive the truth object. Caveat stated plainly: truth and harness live in one process, so "blind" is **procedural** (truth is withheld from inference and used only for scoring), not an air-gapped separation
+- 🟡 [x] Hide ground truth during inference `[Gurashish]` — `withheld` / `heldOut` records and edges are excluded from the documents handed to inference unless `includeHeldOut` is explicitly set; identity/edge truth is read only by the scoring layer
+- 🟡 [x] Run repeatable experiment jobs `[Gurashish]` — `bench:pilot` / `bench:pilot:light` / `bench:pilot:quiet`, deterministic seeded corpus, fixed `nowIso`, per-stage timings captured
+- 🟡 [x] Persist metrics `[Gurashish]` — `benchmark/manifest.json` (SHA-256 of every artifact), `summary.json`, `per-case/*.json` (45 files), `condition-summary.md`, `viability.md`, `report-detailed.md`, `holes.json`
+- 🟡 [ ] Record runtime and failure/recovery metrics `[Gurashish]` — per-stage timings and `hardFailures` are recorded (0 across all three conditions in the committed run) and the resilience machinery (checkpoints, bounded retries, human escalation) is tested elsewhere, but **no recovery-rate metric exists** — partial, NOT completion
+- 🟡 [x] Generate experiment summary `[Gurashish]` — `report.ts` produces the condition table, the detailed per-case report and the internal viability assessment, all rendered by the `/benchmarks` surface
 
 ### Benchmark Metrics
 
-- [ ] Entity-resolution precision/recall measured `[Both]`
-- [ ] False-merge / false-split rate measured `[Both]`
-- [ ] Relation precision/recall measured `[Both]`
-- [ ] Graph-hole precision measured `[Both]`
-- [ ] Evidence Resolution Rate@K measured `[Both]`
-- [ ] Robustness stability measured `[Both]`
-- [ ] Claim-grounding accuracy measured `[Both]`
-- [ ] Recovery rate measured `[Both]`
-- [ ] Time-to-lead measured `[Both]`
+- 🟡 [x] Entity-resolution precision/recall measured `[Both]` — per condition: `surfaceRecallAt1` 0.891 / 0.800 / 0.739 and `entityPrecision` 1.0, with `overCollapsedEntities` counted per case
+- 🟡 [ ] False-merge / false-split rate measured `[Both]` — **false merges are measured** (over-collapsed entities against planted identities); false splits are not a reported rate
+- 🟡 [x] Relation precision/recall measured `[Both]` — `relationPrecision` 0.867 across all three conditions, `relationRecall` 0.566 / 0.585 / 0.545 at the frozen threshold, plus `typeAccuracy`
+- 🟡 [x] Graph-hole precision measured `[Both]` — `candidatePrecision` 0.200 / 0.133 / 0.067 and `fprProxy` 0.0138 / 0.0401 / 0.0440, with planted/detected counts per hole type
+- [ ] Evidence Resolution Rate@K measured `[Both]` — **still not measured.** The pilot's `errAtK` is mean reciprocal rank over holes hit in the chain (K=3), a different quantity; evidence-request generation and selection *retention* are measured, resolution of real-world evidence is not
+- 🟡 [x] Robustness stability measured `[Both]` — lenient vs strict `hookHitRate`, the `robustness` ratio (strict/lenient, 1.0 in all three conditions), per-hole verdicts and `hardFailures`
+- [ ] Claim-grounding accuracy measured `[Both]` — the claim-grounding validator is unit-tested, but the benchmark does not score grounding accuracy
+- [ ] Recovery rate measured `[Both]` — recovery machinery is tested; no recovery-rate metric is produced
+- [ ] Time-to-lead measured `[Both]` — per-stage timings are captured in the harness but no time-to-lead metric is reported
 
 ---
 
@@ -464,13 +539,13 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 9B. Mayur
 
-- [ ] Review all intelligence wording for epistemic overclaim `[Mayur]`
-- [ ] Verify role != culpability `[Mayur]`
-- [ ] Verify absence != concealment `[Mayur]`
-- [ ] Verify structural signal != criminal relevance `[Mayur]`
-- [ ] Verify confidence != legal admissibility `[Mayur]`
-- [ ] Verify blocked pair != different entity `[Mayur]`
-- [ ] Verify alternatives/counter-evidence surfaced for high-impact leads `[Mayur]`
+- 🟡 [x] Review all intelligence wording for epistemic overclaim `[Mayur]` — the **intelligence surface's** wording is codified and machine-checked: the PR-8 validator (11 frozen finding codes, 15 checked categories, 112 tests) enforces negation-guarded pattern rules, closed rating/warning enums, bounded uncertainty and completeness-overclaim checks; PR-30 audited the golden run against the V7 rules (7 verdicts) and PR-31 remediated + pinned all of them. Scope limit: hand-written UI copy has not had a line-by-line epistemic review
+- [ ] Verify role != culpability `[Mayur]` — the role model has **no culpability concept at all** (a structural safeguard), but there is no dedicated verification record
+- 🟡 [x] Verify absence != concealment `[Mayur]` — enforced in frozen policy and tested: `INSUFFICIENT_CONTEXT` is never forced to `MISSING_DATA`; contradictions force `AMBIGUOUS` + `CONTRADICTION_PRESERVED`; the concealment status ceiling is `SUPPORTED` with pattern-compatible wording only; PR-15 §16 forbids `CONCEALMENT_CONSISTENT` / `MISSING_DATA` under contradictions. Absence is reported as absence
+- [ ] Verify structural signal != criminal relevance `[Mayur]` — the frozen score surface keeps structural / evidence / significance separate and gap labels describe the gap rather than a person, but there is no dedicated verification record
+- [ ] Verify confidence != legal admissibility `[Mayur]` — asserted in the architecture and the UI language, never independently verified
+- 🟡 [x] Verify blocked pair != different entity `[Mayur]` — M-A12-G2/G3 verified it (`docs/reports/m-a12-entry-gate-audit.md`): distinct id namespaces (`candidateId` never becomes `EntityId`), canonical ids minted only under explicit accept authority, bounded deterministic UNION blocking (`maxBlockSize` 50, `maxPassesPerPair` 100), and a `CandidatePair` carrying no entity id and no score. A blocked pair is unexamined, not a verdict of difference
+- [ ] Verify alternatives/counter-evidence surfaced for high-impact leads `[Mayur]` — PR-15 emits bounded competing explanations for a qualified gap and the lead runtime carries alternative explanations, but there is no rule yet that *enforces* surfacing them for high-impact leads specifically
 
 ---
 
@@ -495,30 +570,32 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 **Date:** 5 Sep | **Owner:** Both | **Gate:** No critical blocker
 
+> **No dedicated stress campaign has been run.** Phase 11 stays a 0/30 board on purpose. The stretch of work it was supposed to follow produced *incidental* coverage for a few failure modes (below), and a few rows now record that coverage — but a row only moves when a real assertion exercises that failure mode, never because the surrounding code is "probably fine". Everything else here is untouched and still owed.
+
 ### Mayur Stress Tests
 
 - [ ] Duplicate evidence `[Mayur]`
-- [ ] Entity collisions `[Mayur]`
-- [ ] False splits `[Mayur]`
+- [ ] Entity collisions `[Mayur]` — planted alias/collision variants exist in the pilot corpus and false merges are measured per case, but there is no dedicated collision stress run
+- [ ] False splits `[Mayur]` — ER-split analysis is exercised by the `ER-*` pilot cases and the golden corpus, but no false-split stress measurement exists
 - [ ] Contradictory timestamps `[Mayur]`
 - [ ] Missing source classes `[Mayur]`
 - [ ] Legitimate high-degree entities `[Mayur]`
 - [ ] False bridge candidates `[Mayur]`
 - [ ] Sparse networks `[Mayur]`
-- [ ] Concealment-consistent patterns with innocent alternatives `[Mayur]`
-- [ ] Graph-hole false positives `[Mayur]`
+- [ ] Concealment-consistent patterns with innocent alternatives `[Mayur]` — the policy forbids emitting concealment under contradictions (PR-15 §16) and the concealment status ceiling is `SUPPORTED`, but no adversarial "concealment vs innocent alternative" scenario has been run
+- [ ] Graph-hole false positives `[Mayur]` — the pilot **measures** candidate precision and an FPR proxy per condition (0.200 / 0.133 / 0.067 and 0.0138 / 0.0401 / 0.0440), which is the signal this row wants, but no dedicated false-positive stress corpus exists
 
 ### Gurashish Stress Tests
 
-- [ ] Duplicate jobs `[Gurashish]`
-- [ ] Worker crash/restart `[Gurashish]`
+- 🟡 [x] Duplicate jobs `[Gurashish]` — BullMQ attempts + backoff are E2E-proven over the real stack (a real retry and a permanent failure), the expected-work registry is checked before enqueue with rollback, the run-completion finalizer is **exactly-once guarded**, the terminal-run guard rejects late writes, and PR-27 proves a re-run converges to identical durable counts
+- 🟡 [x] Worker crash/restart `[Gurashish]` — checkpoint rows are asserted in the ingestion E2E, the worker **rehydrates stored rows instead of recomputing**, and the re-entrant completion path re-asserts `SUCCEEDED` on the attempt (PR-27-1 fixed exactly the "retry leaves the attempt stuck `RUNNING`" failure). No kill-the-process-mid-job test exists
 - [ ] Redis interruption `[Gurashish]`
 - [ ] Database timeout `[Gurashish]`
 - [ ] Malformed tool request `[Gurashish]`
-- [ ] Stale checkpoint `[Gurashish]`
+- [ ] Stale checkpoint `[Gurashish]` — checkpoint persistence and recovery exist (`queue/recovery.ts`) and the 6B row records the missing dedicated contract unit suite; no stale-checkpoint scenario is exercised
 - [ ] Agent loop `[Gurashish]`
-- [ ] Contradictory tool output `[Gurashish]`
-- [ ] Unauthorized tool call `[Gurashish]`
+- 🟡 [x] Contradictory tool output `[Gurashish]` — contradictions are a first-class preserved structure, not an error path: PR-3 preserves them through every grouping stage, PR-8 validates contradiction preservation (relevance-aware, including hypothesis-vs-hypothesis `contradictsHypothesisId`), the claim-grounding validator rejects unsupported claims, and PR-31 FIX 7 added a deterministic contradiction producer. No adversarial tool-output fixture drives it end-to-end yet
+- [ ] Unauthorized tool call `[Gurashish]` — the API case-scope gate is fail-closed and e2e-proven (401/403/404 coverage), but the **role gate and a tool-level authorization boundary** are still unexercised (see Phase 9A)
 - [ ] Partial realtime connection `[Gurashish]`
 
 ### Joint Release Gate
@@ -569,22 +646,26 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ## Summary
 
+**Recounted 25 Sep 2026** from the checkboxes in this file.
+
 | Phase | Tasks | Done | Open | Mayur | Gurashish | Both | Done % |
 |:------|------:|-----:|-----:|------:|-----------:|-----:|-------:|
 | 0 | 10 | 10 | 0 | 0 | 0 | 10 | 100% |
 | 1 | 40 | 40 | 0 | 20 | 6 | 14 | 100% |
-| 2A | 34 | 31 | 3 | 26 | 0 | 8 | 91% |
+| 2A | 30 | 27 | 3 | 22 | 0 | 8 | 90% |
 | 2B | 12 | 12 | 0 | 0 | 12 | 0 | 100% |
-| 3 | 12 | 10 | 2 | 5 | 6 | 1 | 83% |
+| 3 | 12 | 12 | 0 | 5 | 6 | 1 | 100% |
 | 4 | 17 | 16 | 1 | 10 | 6 | 1 | 94% |
-| 5 | 22 | 5 | 17 | 13 | 8 | 1 | 23% |
-| 6 | 21 | 8 | 13 | 9 | 8 | 4 | 38% |
-| 7 | 20 | 0 | 20 | 9 | 11 | 0 | 0% |
-| 8 | 24 | 0 | 24 | 9 | 6 | 9 | 0% |
-| 9 | 17 | 4 | 13 | 7 | 10 | 0 | 24% |
+| 5 | 25 | 15 | 10 | 16 | 8 | 1 | 60% |
+| 6 | 21 | 9 | 12 | 9 | 8 | 4 | 43% |
+| 7 | 20 | 5 | 15 | 9 | 11 | 0 | 25% |
+| 8 | 24 | 15 | 9 | 9 | 6 | 9 | 62% |
+| 9 | 17 | 7 | 10 | 7 | 10 | 0 | 41% |
 | 10 | 10 | 0 | 10 | 5 | 5 | 0 | 0% |
-| 11 | 30 | 0 | 30 | 10 | 10 | 10 | 0% |
+| 11 | 30 | 3 | 27 | 10 | 10 | 10 | 10% |
 | 12 | 16 | 0 | 16 | 7 | 8 | 1 | 0% |
-| **Total** | **285** | **136** | **149** | **130** | **96** | **59** | **48%** |
+| **Total** | **284** | **171** | **113** | **129** | **96** | **59** | **60%** |
 
-> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 17 M-A12 rows added by the V7 tracker reconciliation plus M-A12 implementation: 8 gate audits (G1–G8, `[Both]`, **verified 12 Sep 2026 — see `docs/reports/m-a12-entry-gate-audit.md`**) + 4 design/implementation rows (PR0–PR3, `[Mayur]`) + 5 implemented temporal deep-dives (T1–T5, `[Mayur]`).
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes the M-A12 rows added by the V7 tracker reconciliation (G1–G8 gate audits `[Both]`, PR0–PR3 design/implementation `[Mayur]`, T1–T5 temporal deep-dives `[Mayur]`) — the pre-existing 34/31 tally double-counted four of them.
+>
+> **Reading the 60% honestly.** The previous table (285 / 136 / 149, 48%) predated this pass. The rise to 171 done is real but it is *not* 35 points of new product: it is the re-grading of shipped work that the board under-credited (Phases 3–4 live surfacing, Phase 7 UX, the Phase 8 pilot benchmark, PR-12 incremental recomputation, and the three Phase 11 failure modes that always had assertions behind them). Roughly a third of the "done" rows are 🟡 — implemented, partially verified. Phases 10–12 (the WOW layer, the stress campaign, the demo freeze) are still essentially untouched, and the Phase 6A robustness engine, the gap-classification runtime, Evidence Resolution Rate@K, the role gate, audit-chain tamper evidence, and the whole Joint Release Gate remain open. This file's job is to keep the remainder visible, not to make the percentage look better.
