@@ -624,22 +624,24 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ## Summary
 
+**Recounted 25 Sep 2026** from the checkboxes in this file.
+
 | Phase | Tasks | Done | Open | Mayur | Gurashish | Both | Done % |
 |:------|------:|-----:|-----:|------:|-----------:|-----:|-------:|
 | 0 | 10 | 10 | 0 | 0 | 0 | 10 | 100% |
 | 1 | 40 | 40 | 0 | 20 | 6 | 14 | 100% |
-| 2A | 34 | 31 | 3 | 26 | 0 | 8 | 91% |
+| 2A | 30 | 27 | 3 | 22 | 0 | 8 | 90% |
 | 2B | 12 | 12 | 0 | 0 | 12 | 0 | 100% |
-| 3 | 12 | 10 | 2 | 5 | 6 | 1 | 83% |
+| 3 | 12 | 12 | 0 | 5 | 6 | 1 | 100% |
 | 4 | 17 | 16 | 1 | 10 | 6 | 1 | 94% |
-| 5 | 22 | 5 | 17 | 13 | 8 | 1 | 23% |
+| 5 | 25 | 15 | 10 | 16 | 8 | 1 | 60% |
 | 6 | 21 | 8 | 13 | 9 | 8 | 4 | 38% |
-| 7 | 20 | 0 | 20 | 9 | 11 | 0 | 0% |
-| 8 | 24 | 0 | 24 | 9 | 6 | 9 | 0% |
+| 7 | 20 | 5 | 15 | 9 | 11 | 0 | 25% |
+| 8 | 24 | 15 | 9 | 9 | 6 | 9 | 62% |
 | 9 | 17 | 4 | 13 | 7 | 10 | 0 | 24% |
 | 10 | 10 | 0 | 10 | 5 | 5 | 0 | 0% |
 | 11 | 30 | 0 | 30 | 10 | 10 | 10 | 0% |
 | 12 | 16 | 0 | 16 | 7 | 8 | 1 | 0% |
-| **Total** | **285** | **136** | **149** | **130** | **96** | **59** | **48%** |
+| **Total** | **284** | **164** | **120** | **129** | **96** | **59** | **58%** |
 
-> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes 17 M-A12 rows added by the V7 tracker reconciliation plus M-A12 implementation: 8 gate audits (G1–G8, `[Both]`, **verified 12 Sep 2026 — see `docs/reports/m-a12-entry-gate-audit.md`**) + 4 design/implementation rows (PR0–PR3, `[Mayur]`) + 5 implemented temporal deep-dives (T1–T5, `[Mayur]`).
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes the M-A12 rows added by the V7 tracker reconciliation (G1–G8 gate audits `[Both]`, PR0–PR3 design/implementation `[Mayur]`, T1–T5 temporal deep-dives `[Mayur]`) — the pre-existing 34/31 tally double-counted four of them. The previous summary (285 / 136 / 149, 48%) predated the 25 Sep entries; the movement since is Phase 3 → 100%, Phase 4 bridge/path/lead rows, Phase 7 live surfacing, and the Phase 8 pilot benchmark. **A done count is not a product claim:** 🟡 rows are implemented-but-partially-verified and 🟡 `[ ]` rows are real subsets that do not satisfy their milestone, and Phase 10–12 (robustness/WOW layer, stress tests, demo freeze) remain largely untouched.
