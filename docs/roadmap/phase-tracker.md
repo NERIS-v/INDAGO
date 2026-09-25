@@ -147,6 +147,14 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 - **Phase 9B "Verify blocked pair != different entity" 🟡 → 🟡 [x].** M-A12-G2/G3 verified exactly this and the record is in `docs/reports/m-a12-entry-gate-audit.md`: distinct id namespaces (a `candidateId` never becomes an `EntityId`), canonical ids minted only under explicit M-A09.5 accept authority, bounded deterministic UNION blocking (`maxBlockSize` 50, `maxPassesPerPair` 100), and a `CandidatePair` that carries no entity id and no score. A blocked pair is an unexamined pair, not a verdict of difference.
 - **Still open in 9B, named precisely:** "role != culpability", "structural signal != criminal relevance" and "confidence != legal admissibility" have structural safeguards in the contracts (no culpability concept exists in the role model; the frozen score surface keeps structural / evidence / significance separate; the classification labels describe the *gap*, never a person) but **no dedicated verification record yet** — the statements are currently architectural intent plus contract shape.
 
+## Tracker Update — Phase 11 Grading Pass (25 Sep 2026)
+
+**No stress campaign was run, and Phase 11 remains an open board.** The pass did one thing: it stopped letting incidental coverage read as an untested plan, and stopped letting a measured metric read as a stress test.
+
+- **Three Gurashish rows move to `🟡 [x]`** on real assertions that exist: duplicate jobs (BullMQ attempts/backoff proven on the real stack, exactly-once completion finalizer, expected-work precheck, PR-27 convergence on re-run), worker crash/restart (checkpoint-row assertions, rehydrate-not-recompute, and the re-entrant attempt fix from PR-27-1), contradictory tool output (contradiction envelopes preserved through every stage, validated relevance-aware, plus the deterministic contradiction producer from PR-31).
+- **Mayur rows stay `[ ]` with the *available* evidence written down** so the next person does not have to rediscover it: entity collisions and false splits are exercised by the `ER-*` pilot cases, graph-hole false positives are *measured* per condition (candidate precision, FPR proxy) rather than stress-tested, and the concealment row has a hard policy guard (PR-15 §16) with no adversarial scenario behind it.
+- **Explicitly not counted as stress coverage:** the pilot's `NOISY_MISSING` / `ADVERSARIAL` conditions (a benchmark regime), the 57/57 and 6/6 green suites (regression and integration matrices, not fault injection), and the fail-closed case-scope gate (authorization, not stress). Redis interruption, database timeout, malformed tool request, stale checkpoint, agent loop, partial realtime connection, duplicate evidence, contradictory timestamps, missing source classes, high-degree entities, false bridge candidates, sparse networks, and the whole Joint Release Gate remain owed.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
@@ -562,30 +570,32 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 **Date:** 5 Sep | **Owner:** Both | **Gate:** No critical blocker
 
+> **No dedicated stress campaign has been run.** Phase 11 stays a 0/30 board on purpose. The stretch of work it was supposed to follow produced *incidental* coverage for a few failure modes (below), and a few rows now record that coverage — but a row only moves when a real assertion exercises that failure mode, never because the surrounding code is "probably fine". Everything else here is untouched and still owed.
+
 ### Mayur Stress Tests
 
 - [ ] Duplicate evidence `[Mayur]`
-- [ ] Entity collisions `[Mayur]`
-- [ ] False splits `[Mayur]`
+- [ ] Entity collisions `[Mayur]` — planted alias/collision variants exist in the pilot corpus and false merges are measured per case, but there is no dedicated collision stress run
+- [ ] False splits `[Mayur]` — ER-split analysis is exercised by the `ER-*` pilot cases and the golden corpus, but no false-split stress measurement exists
 - [ ] Contradictory timestamps `[Mayur]`
 - [ ] Missing source classes `[Mayur]`
 - [ ] Legitimate high-degree entities `[Mayur]`
 - [ ] False bridge candidates `[Mayur]`
 - [ ] Sparse networks `[Mayur]`
-- [ ] Concealment-consistent patterns with innocent alternatives `[Mayur]`
-- [ ] Graph-hole false positives `[Mayur]`
+- [ ] Concealment-consistent patterns with innocent alternatives `[Mayur]` — the policy forbids emitting concealment under contradictions (PR-15 §16) and the concealment status ceiling is `SUPPORTED`, but no adversarial "concealment vs innocent alternative" scenario has been run
+- [ ] Graph-hole false positives `[Mayur]` — the pilot **measures** candidate precision and an FPR proxy per condition (0.200 / 0.133 / 0.067 and 0.0138 / 0.0401 / 0.0440), which is the signal this row wants, but no dedicated false-positive stress corpus exists
 
 ### Gurashish Stress Tests
 
-- [ ] Duplicate jobs `[Gurashish]`
-- [ ] Worker crash/restart `[Gurashish]`
+- 🟡 [x] Duplicate jobs `[Gurashish]` — BullMQ attempts + backoff are E2E-proven over the real stack (a real retry and a permanent failure), the expected-work registry is checked before enqueue with rollback, the run-completion finalizer is **exactly-once guarded**, the terminal-run guard rejects late writes, and PR-27 proves a re-run converges to identical durable counts
+- 🟡 [x] Worker crash/restart `[Gurashish]` — checkpoint rows are asserted in the ingestion E2E, the worker **rehydrates stored rows instead of recomputing**, and the re-entrant completion path re-asserts `SUCCEEDED` on the attempt (PR-27-1 fixed exactly the "retry leaves the attempt stuck `RUNNING`" failure). No kill-the-process-mid-job test exists
 - [ ] Redis interruption `[Gurashish]`
 - [ ] Database timeout `[Gurashish]`
 - [ ] Malformed tool request `[Gurashish]`
-- [ ] Stale checkpoint `[Gurashish]`
+- [ ] Stale checkpoint `[Gurashish]` — checkpoint persistence and recovery exist (`queue/recovery.ts`) and the 6B row records the missing dedicated contract unit suite; no stale-checkpoint scenario is exercised
 - [ ] Agent loop `[Gurashish]`
-- [ ] Contradictory tool output `[Gurashish]`
-- [ ] Unauthorized tool call `[Gurashish]`
+- 🟡 [x] Contradictory tool output `[Gurashish]` — contradictions are a first-class preserved structure, not an error path: PR-3 preserves them through every grouping stage, PR-8 validates contradiction preservation (relevance-aware, including hypothesis-vs-hypothesis `contradictsHypothesisId`), the claim-grounding validator rejects unsupported claims, and PR-31 FIX 7 added a deterministic contradiction producer. No adversarial tool-output fixture drives it end-to-end yet
+- [ ] Unauthorized tool call `[Gurashish]` — the API case-scope gate is fail-closed and e2e-proven (401/403/404 coverage), but the **role gate and a tool-level authorization boundary** are still unexercised (see Phase 9A)
 - [ ] Partial realtime connection `[Gurashish]`
 
 ### Joint Release Gate
