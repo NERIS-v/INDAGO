@@ -657,13 +657,15 @@ And the underlying temporal sub-items (tracked to reflect reality):
 | 3 | 12 | 12 | 0 | 5 | 6 | 1 | 100% |
 | 4 | 17 | 16 | 1 | 10 | 6 | 1 | 94% |
 | 5 | 25 | 15 | 10 | 16 | 8 | 1 | 60% |
-| 6 | 21 | 8 | 13 | 9 | 8 | 4 | 38% |
+| 6 | 21 | 9 | 12 | 9 | 8 | 4 | 43% |
 | 7 | 20 | 5 | 15 | 9 | 11 | 0 | 25% |
 | 8 | 24 | 15 | 9 | 9 | 6 | 9 | 62% |
-| 9 | 17 | 4 | 13 | 7 | 10 | 0 | 24% |
+| 9 | 17 | 7 | 10 | 7 | 10 | 0 | 41% |
 | 10 | 10 | 0 | 10 | 5 | 5 | 0 | 0% |
-| 11 | 30 | 0 | 30 | 10 | 10 | 10 | 0% |
+| 11 | 30 | 3 | 27 | 10 | 10 | 10 | 10% |
 | 12 | 16 | 0 | 16 | 7 | 8 | 1 | 0% |
-| **Total** | **284** | **164** | **120** | **129** | **96** | **59** | **58%** |
+| **Total** | **284** | **171** | **113** | **129** | **96** | **59** | **60%** |
 
-> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes the M-A12 rows added by the V7 tracker reconciliation (G1–G8 gate audits `[Both]`, PR0–PR3 design/implementation `[Mayur]`, T1–T5 temporal deep-dives `[Mayur]`) — the pre-existing 34/31 tally double-counted four of them. The previous summary (285 / 136 / 149, 48%) predated the 25 Sep entries; the movement since is Phase 3 → 100%, Phase 4 bridge/path/lead rows, Phase 7 live surfacing, and the Phase 8 pilot benchmark. **A done count is not a product claim:** 🟡 rows are implemented-but-partially-verified and 🟡 `[ ]` rows are real subsets that do not satisfy their milestone, and Phase 10–12 (robustness/WOW layer, stress tests, demo freeze) remain largely untouched.
+> Counts are derived from the actual `[x]` / `[ ]` checkboxes in this file (owner-tagged rows only for Mayur/Gurashish/Both). **Open** = Tasks − Done. Phase 2A's total includes the M-A12 rows added by the V7 tracker reconciliation (G1–G8 gate audits `[Both]`, PR0–PR3 design/implementation `[Mayur]`, T1–T5 temporal deep-dives `[Mayur]`) — the pre-existing 34/31 tally double-counted four of them.
+>
+> **Reading the 60% honestly.** The previous table (285 / 136 / 149, 48%) predated this pass. The rise to 171 done is real but it is *not* 35 points of new product: it is the re-grading of shipped work that the board under-credited (Phases 3–4 live surfacing, Phase 7 UX, the Phase 8 pilot benchmark, PR-12 incremental recomputation, and the three Phase 11 failure modes that always had assertions behind them). Roughly a third of the "done" rows are 🟡 — implemented, partially verified. Phases 10–12 (the WOW layer, the stress campaign, the demo freeze) are still essentially untouched, and the Phase 6A robustness engine, the gap-classification runtime, Evidence Resolution Rate@K, the role gate, audit-chain tamper evidence, and the whole Joint Release Gate remain open. This file's job is to keep the remainder visible, not to make the percentage look better.
