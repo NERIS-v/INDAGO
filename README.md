@@ -1023,7 +1023,7 @@ The `intelligence/` packages are **pure and deterministic** wherever the archite
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/Temporal-Graph_Versioning-00D4AA?style=flat-square" alt="Temporal"></td>
-    <td>Temporal history store, interval reconstruction, and graph versioning with historical projection</td>
+    <td>Temporal history store, interval reconstruction, graph versioning with advisory-locked version allocation, append-only history, and case-scoped current / versions / valid-at projection</td>
   </tr>
   <tr>
     <td><img src="https://img.shields.io/badge/Workspace-Five--Zone-00D4AA?style=flat-square" alt="Workspace"></td>
@@ -1046,8 +1046,48 @@ The `intelligence/` packages are **pure and deterministic** wherever the archite
     <td>Cinematic semantic color language, reduced-motion support, roving-tab keyboard semantics, deep links, and panel error boundaries</td>
   </tr>
   <tr>
+    <td><img src="https://img.shields.io/badge/Graph_Hole_Engine-6A5ACD?style=flat-square" alt="Graph-hole engine"></td>
+    <td>The differentiation core: candidate-region building (deterministic graph expansion + optional semantic expansion) → six missing-link detectors → qualification with a frozen score surface → bounded LLM structured analysis → <strong>0-LLM</strong> closed-world claim validator → one frozen gap label with confidence, structural impact, reasons and provenance</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Next_Best_Evidence-00D4AA?style=flat-square" alt="Next-best-evidence"></td>
+    <td>Bounded competing explanations, ER-split explanation, candidate evidence requests, and evidence-utility selection (<code>0.40·EIG + 0.25·relevance + 0.20·feasibility + 0.15·(1−cost)</code>) — every candidate discriminates between <em>real</em> explanation ids, content-addressed identity, bounded and deduplicated</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Incremental_Reassessment-00D4AA?style=flat-square" alt="Incremental reassessment"></td>
+    <td>Authoritative change ledger + per-case cursor watermark; only the graph-hole intelligence a change could have affected is recomputed, under a per-case lock, with a <code>contextSha256</code> AI-skip gate — never a whole-case fallback</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Gap_Lifecycle-1A1A2E?style=flat-square" alt="Gap lifecycle"></td>
+    <td>Qualified graph holes persisted as <code>InvestigativeGap</code> rows with deterministic gap-type mapping, GraphHole linkage, a typed <code>GRAPH_HOLE_DETECTED</code> event, and the gap status machine (<code>IDENTIFIED</code>…<code>ADDRESSED</code>)</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Lead_Runtime-1A1A2E?style=flat-square" alt="Lead runtime"></td>
+    <td>Bridge, burst, community and cross-case lead generation with strict provenance conformance, identity, alternative explanations and a claim-grounding gate — candidate lines of inquiry, never verdicts</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Semantic_Retrieval-389826?style=flat-square" alt="Semantic retrieval"></td>
+    <td>pgvector-backed recall layer (Ollama embeddings, exact cosine, case-isolated, true closed-interval temporal overlap) feeding deterministic region expansion — similarity is never evidence and never creates a canonical entity</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Real_Stack_E2E-E63946?style=flat-square" alt="Real-stack E2E"></td>
+    <td>Golden-corpus verification against the real stack — HTTP → BullMQ → real worker → Postgres → SSE, covering ingest → normalize → observations → mentions → blocking → resolution → relations → graph → leads → reassessment → audit → explicit finalize, with a golden regression suite pinning the graded outputs</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Benchmark_Pilot-1A1A2E?style=flat-square" alt="Benchmark pilot"></td>
+    <td>Deterministic internal pilot benchmark over the wired intelligence core: seeded synthetic corpus, CLEAN / NOISY_MISSING / ADVERSARIAL conditions, per-case metric families, robustness verdicts, content-hashed artifacts, a deep audit, and an in-app benchmark surface (run index, run detail, raw artifact serving)</td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Cinematic_Home-6A5ACD?style=flat-square" alt="Cinematic home"></td>
+    <td>Scroll-driven opening sequence at <code>/</code> (WebGL particle field, DOM network assembly, wordmark decomposition) with a shipped calibration timeline, reduced-motion collapse, and the dashboard at <code>/dashboard</code></td>
+  </tr>
+  <tr>
+    <td><img src="https://img.shields.io/badge/Case_Report_Export-FF6B35?style=flat-square" alt="Report export"></td>
+    <td>Reasoning-ledger and case-report export as print-styled PDF, plus an export configuration dialog — deterministic output, no fabricated content</td>
+  </tr>
+  <tr>
     <td><img src="https://img.shields.io/badge/CI-GitHub_Actions-2088FF?style=flat-square" alt="CI"></td>
-    <td>Build, typecheck, test on every push</td>
+    <td>Build, typecheck and test on every push against <strong>real</strong> Postgres (pgvector) and Redis services, so the DB-backed integration and e2e suites actually run instead of silently skipping</td>
   </tr>
 </table>
 
