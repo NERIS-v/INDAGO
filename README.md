@@ -1152,12 +1152,39 @@ The temporal zone (timeline, versions, activity replay) is a workspace-wide cont
 
 ### Getting Started
 
+**Prerequisites:** Node.js 20, pnpm 9, PostgreSQL 16 with the **pgvector** extension (`pgvector/pgvector:pg16`), and Redis 7. The DB-backed integration and e2e suites are gated on real services — without them they skip rather than fake green, and the same holds in CI.
+
 ```bash
-pnpm install          # install all dependencies
-pnpm typecheck        # run type checks across packages
-pnpm test             # run test suites
-pnpm build            # build all packages
+pnpm install                      # install all dependencies
+pnpm typecheck                    # run type checks across packages
+pnpm test                         # run test suites
+pnpm build                        # build all packages
 ```
+
+```bash
+# platform — schema, migrations, API + worker
+cd packages/platform
+cp .env.example .env              # DATABASE_URL, REDIS_URL, TEST_DATABASE_URL, JWT_SECRET
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy   # or: pnpm db:push for a throwaway database
+pnpm dev                          # Express API + BullMQ worker (port 3001)
+
+# web — Next.js 15 workspace (port 3000)
+cd packages/web
+cp .env.example .env.local
+pnpm dev
+```
+
+```bash
+# benchmark pilot — deterministic harness over the wired intelligence core
+cd packages/platform
+pnpm bench:pilot                  # full run; artifacts land in benchmark/
+pnpm bench:pilot:light            # subset
+pnpm bench:pilot:quiet            # no cinematic terminal output
+pnpm test:integration             # real-Postgres integration suites only
+```
+
+Setting `TEST_DATABASE_URL` (never `DATABASE_URL`) points the integration suites at a dedicated test database; `INDAGO_DEV_ALLOWED_CASES` grants the dev principal access to specific case ids, because case-scope authorization is fail-closed in every environment. LLM-backed surfaces (bounded graph-hole analysis, the judge, semantic embeddings) go through the shared agent runtime with an explicit provider choice — `AI_PROVIDER=ollama` by default, no automatic fallback, and no key required for the deterministic path.
 
 ---
 
