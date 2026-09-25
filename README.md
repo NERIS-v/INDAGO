@@ -962,11 +962,41 @@ The milestone source of truth is [`docs/roadmap/phase-tracker.md`](docs/roadmap/
 
 ```
 packages/
-├── contracts/      Zod schemas for domain models & API validation
-├── platform/       Express API server, auth, upload queue, orchestrator
-├── web/            Next.js 15 investigative workspace UI (five-zone shell, representable graph)
-└── intelligence/   Ingestion pipeline (OCR, NER, CDR/financial parsing)
+├── contracts/                Zod schemas for domain models & API validation
+├── platform/                 Express API server, auth, upload queue, orchestrator,
+│                             Prisma/Postgres persistence, BullMQ workers, audit chain
+├── web/                      Next.js 15 investigative workspace UI (five-zone shell,
+│                             representable graph, cinematic home, benchmark surface)
+├── intelligence/             Deterministic analysis packages (one per capability)
+│   ├── ingestion/            acquisition → classification → raw extraction/OCR →
+│   │                         normalization → observation extraction → entity mentions
+│   ├── entity-resolution/    canonical entity identity, comparison evidence, scoring, resolver
+│   ├── relation-resolution/  relation resolution over canonical entities
+│   ├── graphology-projection/ canonical graph projection (nodes, edges, analytics)
+│   ├── semantic-retrieval/   embedding port + bounded retrieval (recall layer, never identity)
+│   ├── lead-generation/      lead drafts, identity, alternative explanations
+│   ├── graph-hole-region/    candidate-region construction (graph + semantic expansion)
+│   ├── graph-hole-detection/ six deterministic missing-link detectors
+│   ├── graph-hole-qualification/ qualification + frozen score surface
+│   ├── graph-hole-analysis/  bounded LLM structured analysis
+│   ├── graph-hole-validation/ 0-LLM closed-world claim validator
+│   ├── graph-hole-judge/     feature-owned LLM judge over a validated analysis
+│   ├── hypothesis-context/   atomic + grouped hypothesis context (read-only)
+│   ├── gap-classification/   one frozen gap label + confidence + reasons
+│   ├── competing-explanations/ bounded, ranked competing explanations
+│   ├── entity-split-analysis/ ER-split-explains-hole detection
+│   ├── evidence-request-generation/ bounded candidate evidence requests
+│   ├── next-best-evidence/   evidence utility + ranked next-best-evidence selection
+│   ├── targeted-reblocking/  region-scoped candidate-pair reblocking
+│   └── graph-hole-reassessment/ incremental, bounded reassessment after a change
+├── infrastructure/
+│   └── ai-agent-runtime/     provider-agnostic LLM runtime (budgets, reliability,
+│                             structured output, security filters)
+benchmark/                    Pilot benchmark artifacts (summary, per-case, audit)
+docs/                         Architecture, platform, frontend, roadmap, reports
 ```
+
+The `intelligence/` packages are **pure and deterministic** wherever the architecture demands it (detection, classification, explanations, evidence requests, selection, reassessment). LLM calls exist only where the V7 architecture explicitly allows them (bounded structured analysis, the judge, and semantic retrieval embeddings) and are always wrapped by a 0-LLM validator that can reject the result.
 
 ### Features Built
 
