@@ -15,6 +15,7 @@ Check off tasks as they are completed. Each task is tagged with its owner.
 | Mark | Meaning |
 |---|---|
 | ✅ | **IMPLEMENTED AND VERIFIED** — code exists and is exercised by tests/evidence in-repo |
+| 🟢 | **CERTIFIED** — ✅ plus a written verification/certification record in `docs/architecture/` (frozen policy, reproducible fixtures, scoped regression matrix). Used by the Phase 5A rows |
 | 🟡 | **IMPLEMENTED BUT ONLY PARTIALLY VERIFIED** — a real subset exists; verification or full surfacing is missing |
 | 🔵 | **PLANNED** — documented intent; not implemented |
 | ⚠️ | **KNOWN LIMITATION** — an accepted technical debt / documented limitation, not an implementation gap |
