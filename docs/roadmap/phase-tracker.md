@@ -113,6 +113,17 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 - **5B-PR1 (gap lifecycle) is verified, not just wired:** `tests/integration/pr5b-pr1-gap-lifecycle.test.ts` + `tests/gap-type-mapping.test.ts` exercise graph hole → `InvestigativeGap` materialization, deterministic gap-type mapping and the status machine.
 - **Row changes in this entry:** Phase 4 "Implement bridge/connector candidates" 🟡 → ✅ and "Implement bounded path queries" 🟡 → ✅ — the earlier "web-only / no backend candidate-generation" note was stale: `@indago/graphology-projection` ships bounded `detectBridgeCandidates` (bridge edges whose removal disconnects the graph), `findConnectingPaths` (hop + result caps), `detectTemporalBursts` and `detectCommunityCandidates`, all consumed by the platform `GraphRuntime` and the lead runtime, and exposed over authenticated HTTP (`graph/bridges`, `graph/paths`, `graph/bursts`, `graph/community-candidates`, each with 400/401/404 coverage). Phase 4 "Create InvestigativeLead structure" 🟡 → ✅ — the structure now has a real runtime (`@indago/lead-generation` drafts/identity/alternative-explanations), four persisted production paths (bridge, burst, community, cross-case) with strict `LeadSchema` provenance conformance, a live-capable provider, a lead drawer that shows the provenance chain and alternatives, golden regression coverage, and a place in the PR-27 real-stack E2E. Phase 4 "Attach evidence FOR / AGAINST" stays 🟡 — evidence basis and contradictions are persisted **and** now rendered live beside the authority actions (PR-22), and a contradiction producer exists (PR-31 FIX 7), but there is still no human attach/verdict action. Phase 5B "Stream graph/lead changes live" stays 🟡 — the backend SSE now covers the full golden run, but a typed graph/lead-change event is still absent.
 
+## Tracker Update — Benchmark Pilot & Benchmark Surface (25 Sep 2026)
+
+**The Phase 8 board was at 0/24. The internal pilot benchmark landed 2026-09-24 on `feat/m-a13-graph-hole-region` and is now a real, deterministic, in-repo harness** — prototype scope, honestly labelled as such. It is **not** production, field, or third-party validation, and every artifact says so.
+
+- **Harness** — `packages/platform/tests/benchmark/`: `corpus.ts` (seeded, deterministic case generator), `pipeline.ts` (runs the **wired** core: ingest → normalize → MA06 observations → MA07 mentions → MA08 blocking → MA09/M-A10 resolution → graph → graph-hole chain → classification → explanations → evidence generation/selection), `metrics.ts` (per-case metric families), `robustness.ts` (per-hole verdicts), `holes.ts` + `labels.ts` (planted ground truth and expected mappings), `report.ts`, `terminal.ts` (cinematic presentation, light/quiet modes), `run-pilot.ts` + `pilot-benchmark.test.ts`. Runner: `pnpm --filter @indago/platform bench:pilot` (`:light`, `:quiet`).
+- **Corpus** — 15 cases × 3 conditions (**CLEAN**, **NOISY_MISSING**, **ADVERSARIAL**) = 45 per-case artifacts. Each case plants identities, records with witness lines, truth edges (observed vs withheld), contradictions, and typed graph holes; `withheld` / `heldOut` records and edges are excluded from inference by default (`includeHeldOut` is opt-in) so missingness is a real condition, not a label.
+- **Artifacts** (`benchmark/`) — `manifest.json` (run metadata + SHA-256 of every artifact for reproducibility), `summary.json` (full machine-readable summary), `condition-summary.md` (side-by-side indicator table), `viability.md` (internal 12-section viability assessment), `report-detailed.md`, `per-case/*.json`, plus `audit/deep-audit.md` and `holes.json`.
+- **What it currently measures** (CLEAN / NOISY_MISSING / ADVERSARIAL, from the committed `summary.json`): graph-hole `hookHitRate` 0.375 / 0.250 / 0.125 and `strictHitRate` identical, `robustness` 1.0, `candidatePrecision` 0.200 / 0.133 / 0.067, `fprProxy` 0.0138 / 0.0401 / 0.0440, `surfaceRecallAt1` 0.891 / 0.800 / 0.739, `entityPrecision` 1.0, `relationPrecision` 0.867 across conditions with `relationRecall` 0.566 / 0.585 / 0.545, `observationCoverage` 1.0, `classificationCoverage` 0.200 / 0.133 / 0.067, `hardFailures` 0, and the materialization counts (73/66/62 entities → graph nodes, 86/65/56 edges). **The honest read: detection and entity resolution degrade gracefully under noise and adversarial conditions; classification coverage and hole recall are the weak numbers** — which is exactly what the deep audit says.
+- **Contracts + web surface** — `packages/contracts/src/benchmark/` (run meta, per-case metrics, condition aggregates, web run view), `packages/web/src/lib/benchmark/` (typed annotations, capability coverage, failure mechanisms, presentation domain, loader), `/benchmarks` + `/benchmarks/[runId]` + `/benchmarks/[runId]/documents/[doc]` (raw artifact serving), the benchmark knowledge layer, condition explorer and execution toggle, dock wiring with a robustness cross-link, plus registry/domain unit tests and a pilot artifact smoke test.
+- **Row changes in this entry:** seven Phase 8A rows and four Phase 8B rows move to `🟡 [x]` (built and exercised, prototype scope); "Generate entity collisions and splits", "Record runtime and failure/recovery metrics" and the false-merge/false-split, evidence-resolution-rate, claim-grounding, recovery-rate and time-to-lead metric rows stay `🟡 [ ]` with the specific gap named. **`errAtK` in the pilot is mean reciprocal rank over holes hit in the chain (K=3) — that is *not* Evidence Resolution Rate@K**, and the tracker does not claim it as one.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
@@ -445,36 +456,36 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 8A. Mayur
 
-- [ ] Build development generator `[Mayur]`
-- [ ] Generate ground-truth networks `[Mayur]`
-- [ ] Transform into observations (aliases, duplicates, missingness, contradictions, sparsification) `[Mayur]`
-- [ ] Generate known hidden relationships `[Mayur]`
-- [ ] Generate entity collisions and splits `[Mayur]`
-- [ ] Create expected graph-hole/evidence mappings `[Mayur]`
-- [ ] Define intelligence metrics `[Mayur]`
+- 🟡 [x] Build development generator `[Mayur]` — seeded deterministic corpus generator (`tests/benchmark/corpus.ts`) producing 15 cases × 3 conditions over the wired intelligence core; fixed analyst-supplied `nowIso` and seeded layout, so a run is bit-reproducible. **Prototype generator, not the full Phase 8 generator** (no randomized sweeps, no campaign-scale volumes)
+- 🟡 [x] Generate ground-truth networks `[Mayur]` — planted identities, records with witness lines, truth edges split into observed vs withheld, and typed graph holes per case (`holes.ts` + `labels.ts`); truth is used for scoring only
+- 🟡 [x] Transform into observations (aliases, duplicates, missingness, contradictions, sparsification) `[Mayur]` — the three conditions are exactly this: CLEAN, NOISY_MISSING (withheld records/edges → real observation + graph missingness), ADVERSARIAL (collisions, contradictions, over-reach bait). Alias/duplicate forms are planted in the corpus text
+- 🟡 [x] Generate known hidden relationships `[Mayur]` — planted truth edges with witness record ids; withheld edges are the hidden set the detector is scored against, and the per-condition recall drop is reported
+- 🟡 [ ] Generate entity collisions and splits `[Mayur]` — **collisions/alias variants are planted and drive false-merge measurement** (`overCollapsedEntities` per case); planted *splits* are not a separate class in the pilot corpus, and ER-split analysis is exercised by the `ER-*` cases rather than measured as a split rate
+- 🟡 [x] Create expected graph-hole/evidence mappings `[Mayur]` — planted hole id/type/anchors per case with expected classification and explanation coverage, carried into the per-case artifacts and the report
+- 🟡 [x] Define intelligence metrics `[Mayur]` — nine metric families in `metrics.ts` (materialization, entity, relation, contradiction, graph, holes, classification, explanation, evidence) + robustness verdicts, frozen as `packages/contracts/src/benchmark/` contracts so the web surface cannot invent numbers
 - 🔵 [ ] Semantic intelligence benchmark (future, must precede major adoption of semantic scoring) `[Mayur]` — compare V1 deterministic-only vs V2 +embeddings vs V3 +embeddings +LLM judge; measure candidate recall, entity precision/recall, false merges/splits, relation precision/recall, graph-hole precision, evidence-retrieval utility, robustness stability, latency, cost
 - 🔵 [ ] Model versioning for future semantic features `[Mayur]` — embeddings/LLM-feature schema and weights determined by benchmark evidence, versioned separately; do not treat "embedding = better" as an assumption
 
 ### 8B. Gurashish
 
-- [ ] Build blind evaluation harness `[Gurashish]`
-- [ ] Hide ground truth during inference `[Gurashish]`
-- [ ] Run repeatable experiment jobs `[Gurashish]`
-- [ ] Persist metrics `[Gurashish]`
-- [ ] Record runtime and failure/recovery metrics `[Gurashish]`
-- [ ] Generate experiment summary `[Gurashish]`
+- 🟡 [x] Build blind evaluation harness `[Gurashish]` — `tests/benchmark/pipeline.ts` drives the real ingestion → resolution → graph → graph-hole chain; the intelligence packages never receive the truth object. Caveat stated plainly: truth and harness live in one process, so "blind" is **procedural** (truth is withheld from inference and used only for scoring), not an air-gapped separation
+- 🟡 [x] Hide ground truth during inference `[Gurashish]` — `withheld` / `heldOut` records and edges are excluded from the documents handed to inference unless `includeHeldOut` is explicitly set; identity/edge truth is read only by the scoring layer
+- 🟡 [x] Run repeatable experiment jobs `[Gurashish]` — `bench:pilot` / `bench:pilot:light` / `bench:pilot:quiet`, deterministic seeded corpus, fixed `nowIso`, per-stage timings captured
+- 🟡 [x] Persist metrics `[Gurashish]` — `benchmark/manifest.json` (SHA-256 of every artifact), `summary.json`, `per-case/*.json` (45 files), `condition-summary.md`, `viability.md`, `report-detailed.md`, `holes.json`
+- 🟡 [ ] Record runtime and failure/recovery metrics `[Gurashish]` — per-stage timings and `hardFailures` are recorded (0 across all three conditions in the committed run) and the resilience machinery (checkpoints, bounded retries, human escalation) is tested elsewhere, but **no recovery-rate metric exists** — partial, NOT completion
+- 🟡 [x] Generate experiment summary `[Gurashish]` — `report.ts` produces the condition table, the detailed per-case report and the internal viability assessment, all rendered by the `/benchmarks` surface
 
 ### Benchmark Metrics
 
-- [ ] Entity-resolution precision/recall measured `[Both]`
-- [ ] False-merge / false-split rate measured `[Both]`
-- [ ] Relation precision/recall measured `[Both]`
-- [ ] Graph-hole precision measured `[Both]`
-- [ ] Evidence Resolution Rate@K measured `[Both]`
-- [ ] Robustness stability measured `[Both]`
-- [ ] Claim-grounding accuracy measured `[Both]`
-- [ ] Recovery rate measured `[Both]`
-- [ ] Time-to-lead measured `[Both]`
+- 🟡 [x] Entity-resolution precision/recall measured `[Both]` — per condition: `surfaceRecallAt1` 0.891 / 0.800 / 0.739 and `entityPrecision` 1.0, with `overCollapsedEntities` counted per case
+- 🟡 [ ] False-merge / false-split rate measured `[Both]` — **false merges are measured** (over-collapsed entities against planted identities); false splits are not a reported rate
+- 🟡 [x] Relation precision/recall measured `[Both]` — `relationPrecision` 0.867 across all three conditions, `relationRecall` 0.566 / 0.585 / 0.545 at the frozen threshold, plus `typeAccuracy`
+- 🟡 [x] Graph-hole precision measured `[Both]` — `candidatePrecision` 0.200 / 0.133 / 0.067 and `fprProxy` 0.0138 / 0.0401 / 0.0440, with planted/detected counts per hole type
+- [ ] Evidence Resolution Rate@K measured `[Both]` — **still not measured.** The pilot's `errAtK` is mean reciprocal rank over holes hit in the chain (K=3), a different quantity; evidence-request generation and selection *retention* are measured, resolution of real-world evidence is not
+- 🟡 [x] Robustness stability measured `[Both]` — lenient vs strict `hookHitRate`, the `robustness` ratio (strict/lenient, 1.0 in all three conditions), per-hole verdicts and `hardFailures`
+- [ ] Claim-grounding accuracy measured `[Both]` — the claim-grounding validator is unit-tested, but the benchmark does not score grounding accuracy
+- [ ] Recovery rate measured `[Both]` — recovery machinery is tested; no recovery-rate metric is produced
+- [ ] Time-to-lead measured `[Both]` — per-stage timings are captured in the harness but no time-to-lead metric is reported
 
 ---
 
