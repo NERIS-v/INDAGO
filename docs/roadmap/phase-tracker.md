@@ -124,6 +124,17 @@ Read-only audit of this tracker against repo evidence (implementation + test sui
 - **Contracts + web surface** — `packages/contracts/src/benchmark/` (run meta, per-case metrics, condition aggregates, web run view), `packages/web/src/lib/benchmark/` (typed annotations, capability coverage, failure mechanisms, presentation domain, loader), `/benchmarks` + `/benchmarks/[runId]` + `/benchmarks/[runId]/documents/[doc]` (raw artifact serving), the benchmark knowledge layer, condition explorer and execution toggle, dock wiring with a robustness cross-link, plus registry/domain unit tests and a pilot artifact smoke test.
 - **Row changes in this entry:** seven Phase 8A rows and four Phase 8B rows move to `🟡 [x]` (built and exercised, prototype scope); "Generate entity collisions and splits", "Record runtime and failure/recovery metrics" and the false-merge/false-split, evidence-resolution-rate, claim-grounding, recovery-rate and time-to-lead metric rows stay `🟡 [ ]` with the specific gap named. **`errAtK` in the pilot is mean reciprocal rank over holes hit in the chain (K=3) — that is *not* Evidence Resolution Rate@K**, and the tracker does not claim it as one.
 
+## Tracker Update — Investigator UX Surfacing (25 Sep 2026)
+
+**Phase 7 sat at 0/20 while the surfaces were in fact shipping.** The rows below are re-graded against what the code does today, not against the demo-era notes. The rule still applies: a demo-only capability is not a completed milestone, and a live-wired surface is only complete if it renders authoritative data.
+
+- **New shell surface:** the cinematic home now owns `/` (WebGL particle field, DOM network assembly, wordmark decomposition, shipped calibration timeline, reduced-motion collapse, dev calibration/debug flags) and the dashboard moved to `/dashboard`; a case-list dashboard, a New Investigation flow, `/design` and the `/benchmarks` surface join the route set.
+- **The graph canvas is live.** `graph-panel.tsx` resolves `workspace.graph.getVersion` / `getNodes` / `getEdges` / `getGraphHoles` / `getOverlayCatalog` through the live-backed `graph` capability (paged), and consumes live `gaps`, `observations` and `crossCase` seams. The Zone 2 `network.graph` key stays demo-only **by design** (it is a representation selector, not a backend capability) — that is not a stub.
+- **The hypothesis workspace is live and composes real provider seams** — it states in code that the canonical `hypotheses` capability has no backend route, so it composes `EntityProvider.listEntityHypotheses` + the explicit M-A09.5 accept and `RelationProvider.listByInvestigation` + accept / reject / reverse, rendering each relation's `evidenceBasis` and contradictions next to the authority actions. Nothing is fabricated.
+- **Structural Signals** renders authoritative centrality and communities (community **candidates** kept visibly distinct from authoritative communities) and a ValidAt panel renders the live valid-at projection.
+- **Case report export** landed: reasoning-ledger and case-report print stylesheets plus an export configuration dialog, deterministic output.
+- **Row changes in this entry:** 7A "Investigation workspace shell" 🟡 → 🟡 [x]; "Graph visualization" 🟡 → ✅; "Lead card" 🟡 → ✅ (the route is no longer hardcoded `DEMO_LEADS` — list + drawer run off the live-capable `leads` provider with the persisted provenance chain and alternative explanations); "Evidence FOR / AGAINST panels" 🟡 → ✅; "Premium loading/empty/error states" 🟡 → ✅ (the kit is used across ~36 surfaces, including panel error boundaries). Unchanged: timeline, gap/graph-hole, next-best-evidence, reasoning ledger (still a demo `DEMO_LEDGER` beside the real case report), review/approval and realtime/recovery — all remain `🟡 [ ]` because their capabilities are still demo-only or the surface is still hardcoded.
+
 ---
 
 ## Phase 0 — Architecture & Scope Lock
@@ -424,17 +435,17 @@ And the underlying temporal sub-items (tracked to reflect reality):
 
 ### 7A. Gurashish (Implementation)
 
-- 🟡 [ ] Investigation workspace shell `[Gurashish]` — full routes/nav dock + overview/scaffold render (`app/investigations/[id]/**`); live surfaces partial — demo/imcomplete milestone, NOT completion
-- 🟡 [ ] Graph visualization `[Gurashish]` — rendered d3-force graph + 5-zone control center (`graph-panel`, `graph-canvas`) — demo mode
-- 🟡 [ ] Timeline visualization `[Gurashish]` — provider-driven `timeline-panel` — demo mode
-- 🟡 [ ] Lead card `[Gurashish]` — `DemoLeadProvider` + leads-list/drawer; dedicated route feeds hardcoded `DEMO_LEADS` — partial, NOT completion
-- 🟡 [ ] Evidence FOR / AGAINST panels `[Gurashish]` — contradiction envelopes + `forAgainst` surface (`phase2-hypothesis-surface`) — demo mode
-- 🟡 [ ] Gap / graph-hole visualization `[Gurashish]` — burst layer + gap-adapter + `DemoGapProvider` — demo mode; dedicated gaps route is a stub
-- 🟡 [ ] Next-best-evidence panel `[Gurashish]` — NBE card + derived `nbeLead` surface; no dedicated panel — partial, NOT completion
-- 🟡 [ ] Reasoning ledger `[Gurashish]` — `reasoning-ledger` component + demo ledger; ledger route feeds hardcoded data — partial, NOT completion
-- 🟡 [ ] Review/approval UI `[Gurashish]` — `review-center` + `DemoReviewProvider`; demo route feeds `DEMO_TASKS` — demo mode
-- 🟡 [ ] Realtime progress and recovery states `[Gurashish]` — PAUSED + recovery visuals render; `HUMAN_ESCALATION` not surfaced anywhere — partial, NOT completion
-- 🟡 [ ] Premium loading/empty/error states `[Gurashish]` — `ui/` empty-state/error-display/loading-spinner/panel-error-boundary kit
+- 🟡 [x] Investigation workspace shell `[Gurashish]` — full route set over the provider seam (`/` cinematic home, `/dashboard`, `/investigations/new`, 12 investigation sub-routes, `/benchmarks`, `/design`), nav dock, shared workspace-temporal state, two-way URL state. Still partial: `timeline`, `gaps`, `review`, `robustness`, `hypotheses` and `intelligence` remain demo-only capabilities and fail typed in a live workspace
+- [x] Graph visualization `[Gurashish]` — d3-force graph + five-zone control center, resolving **live** `workspace.graph.getVersion/getNodes/getEdges/getGraphHoles/getOverlayCatalog` (paged) plus live `gaps` / `observations` / `crossCase` seams, with the graph-hole burst layer, focus deep links, cross-case foreign overlays and reduced-motion support. (Zone 2 `network.graph` is demo-only by design — a representation selector, not a backend capability)
+- 🟡 [ ] Timeline visualization `[Gurashish]` — provider-driven `timeline-panel` with the shared `timeRange` controller; the `timeline` capability is still demo-only (no live timeline route) — partial, NOT completion
+- [x] Lead card `[Gurashish]` — `/investigations/[id]/leads` + `LeadsList` + `LeadDrawer` over the **live-capable** `leads` provider (typed `UNSUPPORTED` honesty when a deployment has no leads); the drawer surfaces the persisted provenance chain and alternative explanations. The old "dedicated route feeds hardcoded `DEMO_LEADS`" note no longer applies
+- [x] Evidence FOR / AGAINST panels `[Gurashish]` — `live-hypothesis-workspace` renders each relation's `evidenceBasis` and contradictions from the **live** `relations` seam beside the M-A09.5 accept / reject / reverse authority actions (composed from live provider seams because no canonical hypothesis route exists); the demo-era `forAgainst` surface is preserved
+- 🟡 [ ] Gap / graph-hole visualization `[Gurashish]` — burst layer + gap-adapter + the real `/gaps` route over the provider seam; the `gaps` capability is still demo-only (the 5B-PR1 runtime persists gaps, but no live gap read route is exposed) — partial, NOT completion
+- 🟡 [ ] Next-best-evidence panel `[Gurashish]` — NBE card + derived `nbeLead` surface; the backend is real (PR-10 / PR-17 / PR-18 utility + selection) but there is still no dedicated panel and no live seam — partial, NOT completion
+- 🟡 [ ] Reasoning ledger `[Gurashish]` — reasoning-ledger component + **case-report export** (print stylesheet + export configuration dialog, deterministic); the ledger route still feeds a hardcoded `DEMO_LEDGER` because no live ledger read route exists — partial, NOT completion
+- 🟡 [ ] Review/approval UI `[Gurashish]` — `review-center` + `DemoReviewProvider`; the `review` capability is still demo-only and the route feeds `DEMO_TASKS` — demo mode
+- 🟡 [ ] Realtime progress and recovery states `[Gurashish]` — PAUSED + recovery visuals render and the SSE stream is proven over the real stack (PR-27), but `HUMAN_ESCALATION` is still not surfaced anywhere — partial, NOT completion
+- [x] Premium loading/empty/error states `[Gurashish]` — the `ui/` kit (`empty-state`, `error-display`, `loading-spinner`, `panel-error-boundary`) is wired across ~36 surfaces, including the control center, every panel, list and drawer
 
 ### 7B. Mayur (Intelligence Presentation)
 
