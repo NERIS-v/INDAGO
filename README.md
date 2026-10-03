@@ -8,8 +8,6 @@
 
 ### Evidence-to-Graph Investigative Intelligence
 
-**AI-Powered Criminal Network Analysis System**
-
 ---
 
 <img src="https://img.shields.io/badge/OBSERVE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/RESOLVE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/CONNECT-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/FIND_LEAD-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/CLASSIFY_GAP-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/REQUEST_EVIDENCE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/VERIFY-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/UPDATE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/CHALLENGE-grey?style=flat-square"> <img src="https://img.shields.io/badge/→-grey?style=flat-square"> <img src="https://img.shields.io/badge/REASSESS-grey?style=flat-square">
