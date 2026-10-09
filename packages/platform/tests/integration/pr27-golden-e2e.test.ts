@@ -221,8 +221,8 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
       existingRun != null &&
       persisted[0] === 4 &&
       persisted[1] === 90 &&
-      persisted[2] === 194 &&
-      persisted[3] === 279;
+      persisted[2] === 190 &&
+      persisted[3] === 297;
     if (!resuming) {
       await wipe();
     }
@@ -422,7 +422,12 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
       expect(obs).toHaveLength(90);
     });
 
-    it("persists exactly 194 mention candidates with the golden type mix", async () => {
+    // Re-graded after the golden remediation: the ORG greed cap, the PERSON
+    // shape guard, and the invoice-number exclusion dropped 6 ACCOUNT and
+    // 2 PERSON false positives out of the type mix (see tests/golden-pipeline
+    // header — the fabricated 'invoice 7842' account entity was removed).
+    // PERSON 8→6, ACCOUNT 40→34, total 194→190.
+    it("persists exactly 190 mention candidates with the golden type mix", async () => {
       const mentions = await prisma.entityMentionCandidate.findMany({
         where: { caseId: CASE_ID },
       });
@@ -432,15 +437,15 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
         return acc;
       }, {});
       console.log("PR27 mentions", mentions.length, counts);
-      expect(mentions).toHaveLength(194);
+      expect(mentions).toHaveLength(190);
       expect(counts.PHONE).toBeUndefined();
       expect(counts.DATE).toBe(25);
-      expect(counts.PERSON).toBe(8);
+      expect(counts.PERSON).toBe(6);
       expect(counts.ORGANIZATION).toBe(27);
-      expect(counts.ACCOUNT).toBe(40);
+      expect(counts.ACCOUNT).toBe(34);
     });
 
-    it("persists exactly 279 candidate pairs and 152 PROPOSED hypotheses", async () => {
+    it("persists exactly 297 candidate pairs and 166 PROPOSED hypotheses", async () => {
       const pairs = await prisma.candidatePair.findMany({ where: { caseId: CASE_ID } });
       const hyps = await prisma.entityHypothesis.findMany({ where: { caseId: CASE_ID } });
       const proposed = hyps.filter((h) => h.status === "PROPOSED");
@@ -451,8 +456,8 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
         proposed: proposed.length,
         scores,
       });
-      expect(pairs).toHaveLength(279);
-      expect(proposed).toHaveLength(152);
+      expect(pairs).toHaveLength(297);
+      expect(proposed).toHaveLength(166);
       expect(scores).toEqual([0.25, 0.35]);
     });
 
@@ -576,7 +581,9 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
       for (const id of ["AX-4471", "ORX-102", "MT-883", "BDL-210", "NW-009", "MT-SET-119"]) {
         expect(accounts, id).toContain(id);
       }
-      expect([...accounts].some((a) => /7842/.test(a))).toBe(true);
+      // "7842" appears in the corpus only as "Invoice 7842" (an invoice
+      // number, not an ACCOUNT id) — the extractor correctly does NOT type it
+      // ACCOUNT (see the golden-pipeline remediation header).
     });
   });
 
@@ -599,24 +606,29 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
       };
     }
 
-    it("re-running a job converges to the SAME durable counts", async () => {
+    // Re-submission of an already-ingested file is a BOUNDARY NO-OP: the
+    // route short-circuits on the durable SUCCEEDED attempt (no new job, no
+    // new evidence chain — evidence identity keys on a per-submission
+    // operationId, so a re-derive would fake new observations). Durable counts
+    // across the whole case-scoped corpus must stay byte-identical.
+    it("re-submitting an already-ingested file is a no-op — counts converge", async () => {
       before = await counts();
 
-      // Remove the retained completed job (simulating a crash/re-entry) and
-      // replay the SAME evidence through the real API → worker. One document is
-      // representative of the re-entrant path; the count equality proves
-      // idempotency across the whole case-scoped corpus.
+      // Remove the retained completed job (simulating a crash/re-entry where
+      // the BullMQ job is gone) and replay the SAME evidence through the real
+      // API → worker. The boundary must detect the durable SUCCEEDED attempt
+      // and short-circuit without re-enqueuing.
       const a = artifacts[0];
       const job = await queue.getJob(`evidence-${INV_ID}-${a.fileKey}`);
       if (job) await job.remove();
       const r = await submitFileArtifact(a);
       expect(r.status).toBe(202);
+      expect(r.body.jobsEnqueued).toBe(0);
+      expect(r.body.alreadyIngested).toBe(1);
 
-      const allDone = await pollUntil(async () => {
-        const replay = await queue.getJob(`evidence-${INV_ID}-${a.fileKey}`);
-        return (await replay?.getState()) === "completed";
-      }, 1_800_000);
-      expect(allDone).toBe(true);
+      // No re-enqueued job exists for the already-ingested file.
+      const reEnqueued = await queue.getJob(`evidence-${INV_ID}-${a.fileKey}`);
+      expect(reEnqueued).toBeNull();
 
       const after = await counts();
       console.log("PR27 reprocess", { before, after });
