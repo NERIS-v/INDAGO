@@ -17,8 +17,11 @@ jobs:
     # trigger, and the Phase 5A-PR1.5 vector migration only hold against a live
     # server). pgvector/pgvector:pg16 ships the vector extension natively.
     services:
+      # TEMPORARY: Docker Hub originals while the GHCR mirror finishes
+      # publishing (rate-limit workaround). Flip back to
+      # ghcr.io/neris-v/pgvector-pg16:pg16 once that package is live+public.
       postgres:
-        image: ghcr.io/neris-v/pgvector-pg16:pg16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: indago
           POSTGRES_PASSWORD: indago
@@ -36,8 +39,10 @@ jobs:
       # connections at module load (defaulting to localhost:6379); provisioning
       # Redis keeps REDIS_URL resolvable so the PR-33 HTTP e2e suites run
       # instead of silently skipping (m-a33, m-a10, m-a12, real-stack, pr27).
+      # TEMPORARY: Docker Hub original while the GHCR mirror finishes
+      # publishing. Flip back to ghcr.io/neris-v/redis:7-alpine once live.
       redis:
-        image: ghcr.io/neris-v/redis:7-alpine
+        image: redis:7-alpine
         ports:
           - 6379:6379
         options: >-
