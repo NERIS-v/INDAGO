@@ -88,12 +88,13 @@ jobs:
         # Runs strict TypeScript validation
         run: pnpm --recursive run typecheck
 
-      # Tests temporarily disabled to prevent failing Vitest suites
-      # from marking the GitHub Actions check as failed.
-      #
-      # - name: Run Tests (Vitest)
-      #   run: pnpm --recursive test
-      #   env:
-      #     TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
-      #     DATABASE_URL: ${{ env.DATABASE_URL }}
-      #     REDIS_URL: ${{ env.REDIS_URL }}
+      - name: Run Tests (Vitest)
+        # Runs the test suites only if the build and types are perfectly valid.
+        # TEST_DATABASE_URL + REDIS_URL are set so the gated Postgres/Redis
+        # integration and e2e suites run (including the PR-33 NEAR_MISS
+        # durability and HTTP suites, which are covered by `pnpm -r test`).
+        run: pnpm --recursive test
+        env:
+          TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          REDIS_URL: ${{ env.REDIS_URL }}
