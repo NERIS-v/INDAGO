@@ -18,7 +18,7 @@ jobs:
     # server). pgvector/pgvector:pg16 ships the vector extension natively.
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: ghcr.io/neris-v/pgvector-pg16:pg16
         env:
           POSTGRES_USER: indago
           POSTGRES_PASSWORD: indago
@@ -37,7 +37,7 @@ jobs:
       # Redis keeps REDIS_URL resolvable so the PR-33 HTTP e2e suites run
       # instead of silently skipping (m-a33, m-a10, m-a12, real-stack, pr27).
       redis:
-        image: redis:7-alpine
+        image: ghcr.io/neris-v/redis:7-alpine
         ports:
           - 6379:6379
         options: >-
