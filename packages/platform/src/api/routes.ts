@@ -1939,17 +1939,25 @@ apiRouter.post(
       // created — a pre-existing attempt is left intact.
       const expectedKeys: string[] = [];
       const createdKeys = new Set<string>();
+      // Durable content-addressed dedup at the submission boundary. A file
+      // whose canonical ingestion already SUCCEEDED is a true NO-OP: no
+      // placeholder reset and no re-enqueue. Previously the route bet on
+      // BullMQ jobId dedup returning the retained completed job — but once
+      // that job is removed/expired, a fresh job re-derives a NEW evidence
+      // chain (evidence identity keys on the operationId, which is minted per
+      // submission), duplicating observations/mentions/pairs. The durable
+      // IngestionAttempt row is the authoritative guard.
+      const alreadyIngestedKeys = new Set<string>();
       for (const file of submission.files) {
         const idempotencyKey = `evidence-${investigationId}-${file.fileKey}`;
         expectedKeys.push(idempotencyKey);
 
         const existing = await ingestionStore.findAttempt(investigationId, idempotencyKey);
-        // Never downgrade an already-succeeded file to QUEUED. Re-submitting a
-        // file whose canonical ingestion already completed is a no-op (the
-        // BullMQ jobId dedup returns the retained job), so resetting it would
-        // strand the run in ANALYZING forever. Failed/queued/running attempts
-        // (and brand-new files) are registered as expected work.
+        // Never downgrade an already-succeeded file to QUEUED. Failed/queued/
+        // running attempts (and brand-new files) are registered as expected
+        // work.
         if (existing?.status === "SUCCEEDED") {
+          alreadyIngestedKeys.add(idempotencyKey);
           continue;
         }
         createdKeys.add(idempotencyKey);
@@ -1973,9 +1981,17 @@ apiRouter.post(
 
       const jobIds: string[] = [];
       let enqueued = 0;
+      const skipped = alreadyIngestedKeys.size;
       try {
         for (const file of submission.files) {
           const idempotencyKey = `evidence-${investigationId}-${file.fileKey}`;
+
+          // Boundary no-op: an already-ingested (SUCCEEDED) file is never
+          // re-enqueued — a fresh job would mint a new evidence chain and
+          // duplicate the durable corpus.
+          if (alreadyIngestedKeys.has(idempotencyKey)) {
+            continue;
+          }
 
           const artifactReference = {
             url: file.fileUrl,
@@ -2041,7 +2057,10 @@ apiRouter.post(
         actor: req.user!.id,
         targetType: "EVIDENCE",
         targetId: investigationId,
-        description: `Evidence queued: ${submission.evidenceTitle} (${submission.files.length} file(s), case: ${caseId})`,
+        description:
+          skipped > 0
+            ? `Evidence queued: ${submission.evidenceTitle} (${submission.files.length} file(s), case: ${caseId}, ${skipped} already ingested — skipped)`
+            : `Evidence queued: ${submission.evidenceTitle} (${submission.files.length} file(s), case: ${caseId})`,
       });
 
       // 8. Broadcast to SSE listeners
@@ -2059,6 +2078,7 @@ apiRouter.post(
         correlationId,
         jobsEnqueued: jobIds.length,
         fileCount: submission.files.length,
+        alreadyIngested: skipped,
       });
 
     } catch (error: unknown) {
