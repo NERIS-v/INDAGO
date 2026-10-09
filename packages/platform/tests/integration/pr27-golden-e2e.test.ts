@@ -628,7 +628,7 @@ describeOrSkip("PR-27 golden corpus real E2E", () => {
 
       // No re-enqueued job exists for the already-ingested file.
       const reEnqueued = await queue.getJob(`evidence-${INV_ID}-${a.fileKey}`);
-      expect(reEnqueued).toBeNull();
+      expect(reEnqueued).toBeUndefined();
 
       const after = await counts();
       console.log("PR27 reprocess", { before, after });
