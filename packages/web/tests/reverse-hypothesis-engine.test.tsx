@@ -284,9 +284,13 @@ describe("F-PR9 — the live seam renders the honest live surface (no reverse se
     // platform seam per section (unavailable or error) - it never fabricates.
     // PR-21: the canonical-relations section is genuinely live, so in an
     // unconfigured env it honestly reports its server/config error rather than
-    // an unavailable seam or a fabricated literal.
+    // an unavailable seam or a fabricated literal. Settle-wait: the parent
+    // surface renders while the section is still LOADING; the error node
+    // appears only once the async canonical-relations fetch rejection lands.
     expect(
-      screen.getByTestId("section-canonical-relations-error"),
+      await screen.findByTestId("section-canonical-relations-error", undefined, {
+        timeout: 5000,
+      }),
     ).toBeInTheDocument();
   });
 });
