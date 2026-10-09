@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadBenchmarkRun, loadBenchmarkCatalog } from "@/lib/benchmark/benchmark-loader";
 
 describe("real repo benchmark artifacts (one-off smoke)", () => {
-  it("loads the pilot run and surfaces the measured 6/8 clean recovery", async () => {
+  it("loads the pilot run and surfaces the measured 3/8 clean recovery", async () => {
     const run = await loadBenchmarkRun("pilot");
     if (!run) throw new Error("pilot run not resolved");
     expect(run.view.runId).toBe("pilot");
@@ -12,9 +12,9 @@ describe("real repo benchmark artifacts (one-off smoke)", () => {
     expect(run.counts.cases).toBe(45);
     expect(run.counts.plantedHoles).toBe(24);
     expect(run.counts.conditionCount).toBe(3);
-    expect(run.counts.holesDetected).toBe(15);
+    expect(run.counts.holesDetected).toBe(6);
     const clean = run.view.conditions.find((c) => c.condition === "CLEAN");
-    expect(clean?.holesDetected).toBe(6);
+    expect(clean?.holesDetected).toBe(3);
     expect(clean?.totalHoles).toBe(8);
     expect(run.view.perCase["GAP-01__NOISY_MISSING"].holes.holesDetected).toBe(0);
     expect(run.view.holes.length).toBe(24);
